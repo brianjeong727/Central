@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Search, Calendar, ChevronRight, Edit3, Check, X,
-  LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft,
+  LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
@@ -52,6 +52,15 @@ interface ChatGroup {
   last_sender: string | null
   last_message_time: string | null
   unread_count: number
+}
+
+interface Message {
+  id: string
+  group_id: string
+  sender_id: string
+  content: string
+  created_at: string
+  sender_name: string
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -106,6 +115,14 @@ function getGreeting(): string {
   if (h < 12) return "Good morning"
   if (h < 18) return "Good afternoon"
   return "Good evening"
+}
+
+function formatMessageTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
 }
 
 function audienceLabel(audience: string | null): string {
@@ -844,14 +861,229 @@ function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: Anno
   )
 }
 
+// ─── Chat Screen ────────────────────────────────────────────────────────────
+
+interface ChatScreenProps {
+  groupId: string
+  groupName: string
+  userId: string
+  userName: string
+  onClose: () => void
+}
+
+function ChatScreen({ groupId, groupName, userId, userName, onClose }: ChatScreenProps) {
+  const supabase = createClient()
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const [inputText, setInputText] = useState("")
+  const [sending, setSending] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
+  }, [])
+
+  // Load last 50 messages
+  useEffect(() => {
+    async function loadMessages() {
+      const { data } = await supabase
+        .from("messages")
+        .select("id, group_id, sender_id, content, created_at, profiles!sender_id(name)")
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: true })
+        .limit(50)
+
+      if (data) {
+        const enriched: Message[] = data.map((m: {
+          id: string; group_id: string; sender_id: string; content: string; created_at: string;
+          profiles: { name: string } | { name: string }[] | null
+        }) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+          const name = p?.name ?? "Unknown"
+          profilesCache.current[m.sender_id] = name
+          return { id: m.id, group_id: m.group_id, sender_id: m.sender_id, content: m.content, created_at: m.created_at, sender_name: name }
+        })
+        setMessages(enriched)
+      }
+      setLoading(false)
+    }
+    loadMessages()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
+
+  // Scroll to bottom after initial load
+  useEffect(() => {
+    if (!loading) scrollToBottom(false)
+  }, [loading, scrollToBottom])
+
+  // Realtime subscription for new messages from others
+  useEffect(() => {
+    const channel = supabase
+      .channel(`group-messages-${groupId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
+        async (payload) => {
+          const raw = payload.new as { id: string; group_id: string; sender_id: string; content: string; created_at: string }
+          // Skip own messages — handled optimistically
+          if (raw.sender_id === userId) return
+
+          let senderName = profilesCache.current[raw.sender_id]
+          if (!senderName) {
+            const { data: prof } = await supabase.from("profiles").select("name").eq("id", raw.sender_id).single()
+            senderName = prof?.name ?? "Unknown"
+            profilesCache.current[raw.sender_id] = senderName
+          }
+          setMessages((prev) => [...prev, { ...raw, sender_name: senderName }])
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  async function handleSend() {
+    const content = inputText.trim()
+    if (!content || sending) return
+
+    setSending(true)
+    setInputText("")
+
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMsg: Message = {
+      id: optimisticId,
+      group_id: groupId,
+      sender_id: userId,
+      content,
+      created_at: new Date().toISOString(),
+      sender_name: userName,
+    }
+    setMessages((prev) => [...prev, optimisticMsg])
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ group_id: groupId, sender_id: userId, content })
+      .select("id")
+      .single()
+
+    if (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+    } else if (data) {
+      setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
+    }
+    setSending(false)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#FAFAFE] flex flex-col">
+      {/* ── Top bar ── */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+        >
+          <ArrowLeft className="w-4 h-4 text-foreground" />
+        </button>
+        <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(groupName)} shadow-md shadow-[#6D28D9]/15`}>
+          <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
+            {getInitials(groupName)}
+          </AvatarFallback>
+        </Avatar>
+        <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
+          {groupName}
+        </h2>
+      </div>
+
+      {/* ── Messages area ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        {loading ? (
+          <Spinner />
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-[14px] font-semibold text-foreground/40">No messages yet</p>
+              <p className="text-[12px] text-muted-foreground/40 mt-1">Say hello! 👋</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {messages.map((msg, i) => {
+              const isOwn = msg.sender_id === userId
+              const prevMsg = i > 0 ? messages[i - 1] : null
+              const showSender = !isOwn && msg.sender_id !== prevMsg?.sender_id
+              return (
+                <div key={msg.id} className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
+                  {showSender && (
+                    <span className="text-[10px] font-semibold text-[#6D28D9]/60 mb-1 px-1">
+                      {msg.sender_name}
+                    </span>
+                  )}
+                  <div
+                    className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
+                      isOwn
+                        ? "bg-[#F59E0B] text-[#6D28D9] rounded-br-sm font-medium shadow-md shadow-[#F59E0B]/20"
+                        : "bg-white border border-[#F59E0B]/15 text-foreground rounded-bl-sm shadow-sm"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/40 mt-1 px-1">
+                    {formatMessageTime(msg.created_at)}
+                  </span>
+                </div>
+              )
+            })}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Input bar ── */}
+      <div className="flex-shrink-0 bg-white border-t border-[#F59E0B]/15 px-4 py-3 flex items-end gap-3">
+        <textarea
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message…"
+          rows={1}
+          className="flex-1 resize-none bg-[#F59E0B]/5 rounded-2xl px-4 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 border border-[#F59E0B]/10 max-h-28 overflow-y-auto"
+          style={{ lineHeight: "1.5" }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!inputText.trim() || sending}
+          className="w-10 h-10 rounded-full bg-[#F59E0B] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#E18D07] transition-all shadow-md shadow-[#F59E0B]/25 active:scale-95"
+        >
+          <Send className="w-4 h-4 text-[#6D28D9]" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Chats Tab ──────────────────────────────────────────────────────────────
 
-function ChatsTab({ userId }: { userId: string }) {
+function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profile }) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
   const [myChats, setMyChats] = useState<ChatGroup[]>([])
   const [loading, setLoading] = useState(true)
+  const [openChat, setOpenChat] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -931,17 +1163,27 @@ function ChatsTab({ userId }: { userId: string }) {
       ) : (
         <div className="flex flex-col gap-3">
           {active.map((group) => (
-            <ChatGroupCard key={group.id} group={group} />
+            <ChatGroupCard key={group.id} group={group} onClick={() => setOpenChat({ id: group.id, name: group.name })} />
           ))}
         </div>
+      )}
+
+      {openChat && (
+        <ChatScreen
+          groupId={openChat.id}
+          groupName={openChat.name}
+          userId={userId}
+          userName={userProfile.name}
+          onClose={() => setOpenChat(null)}
+        />
       )}
     </div>
   )
 }
 
-function ChatGroupCard({ group }: { group: ChatGroup }) {
+function ChatGroupCard({ group, onClick }: { group: ChatGroup; onClick: () => void }) {
   return (
-    <button className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-[#F59E0B]/25 transition-all text-left">
+    <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-[#F59E0B]/25 transition-all text-left">
       <div className="flex items-center gap-3.5">
         <Avatar className={`w-11 h-11 ${getAvatarColor(group.name)} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
@@ -1369,7 +1611,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
         {activeTab === "announcements" && (
           <AnnouncementsTab userId={userId} userRole={initialProfile.role} />
         )}
-        {activeTab === "chats" && <ChatsTab userId={userId} />}
+        {activeTab === "chats" && <ChatsTab userId={userId} userProfile={initialProfile} />}
         {activeTab === "directory" && <DirectoryTab currentUserId={userId} />}
         {activeTab === "profile" && (
           <ProfileTab
