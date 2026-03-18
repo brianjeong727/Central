@@ -1,0 +1,18 @@
+You are helping build CENTRAL, a church communication app for college ministry.
+
+Tech stack: Next.js 16, Supabase, Tailwind CSS, shadcn/ui, TypeScript.
+
+Project structure follows Next.js App Router conventions.
+Supabase client is in lib/supabase.ts.
+Environment variables are in .env.local.
+
+Roles: Visitor, Member, Leader, Admin.
+
+Key features being built:
+- Personalized chat home (members only see their assigned chats)
+- Church Chats (leader managed) and My Chats (private, member created)
+- Announcements feed with RSVP
+- Member directory
+- Customizable profile with prayer requests and bible verse
+
+Always use TypeScript. Always use Tailwind for styling. Use shadcn/ui components where possible. Keep components small and focused. Use Supabase for all database and auth operations.
