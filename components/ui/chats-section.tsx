@@ -33,7 +33,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll }: ChatsSectionProps
         {onSeeAll && (
           <button
             onClick={onSeeAll}
-            className="text-[11px] text-[#6D28D9] font-semibold flex items-center gap-0.5 hover:opacity-70 transition-opacity"
+            className="text-[11px] text-[#F59E0B] font-semibold flex items-center gap-0.5 hover:opacity-70 transition-opacity"
           >
             See all
             <ChevronRight className="w-3.5 h-3.5" />
@@ -52,7 +52,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll }: ChatsSectionProps
 
 function ChatCard({ chat }: { chat: ChatPreview }) {
   return (
-    <button className="w-full bg-white rounded-2xl border border-[#6D28D9]/8 p-4 shadow-[0_2px_16px_rgba(109,40,217,0.06)] hover:shadow-[0_4px_24px_rgba(109,40,217,0.1)] hover:border-[#6D28D9]/12 transition-all text-left group">
+      <button className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.12)] hover:border-[#F59E0B]/25 transition-all text-left group">
       <div className="flex items-center gap-3.5">
         <Avatar className={`w-11 h-11 ${chat.avatarColor} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">

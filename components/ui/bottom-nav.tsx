@@ -31,8 +31,8 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               onClick={() => onTabChange(tab.id)}
               className={`flex flex-col items-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
                 isActive
-                  ? "text-[#6D28D9]"
-                  : "text-muted-foreground/60 hover:text-[#6D28D9]/70"
+                  ? "text-[#F59E0B]"
+                  : "text-muted-foreground/60 hover:text-[#F59E0B]/70"
               }`}
             >
               <div className="relative">
@@ -47,7 +47,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               </div>
               <span
                 className={`text-[9px] font-semibold tracking-wide ${
-                  isActive ? "text-[#6D28D9]" : "text-muted-foreground/60"
+                  isActive ? "text-[#F59E0B]" : "text-muted-foreground/60"
                 }`}
               >
                 {tab.label}

@@ -1,7 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Search, Calendar, ChevronRight, Edit3, Check, X, LogOut, Bell, Users } from "lucide-react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import {
+  Search, Calendar, ChevronRight, Edit3, Check, X,
+  LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft,
+} from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -30,7 +33,15 @@ interface Announcement {
   created_at: string
   is_pinned: boolean
   is_event: boolean
-  seen_count: number | null
+  image_url: string | null
+  audience: string | null
+  created_by: string | null
+}
+
+interface EnrichedAnnouncement extends Announcement {
+  view_count: number
+  rsvp_count: number
+  user_has_rsvped: boolean
 }
 
 interface ChatGroup {
@@ -97,11 +108,18 @@ function getGreeting(): string {
   return "Good evening"
 }
 
+function audienceLabel(audience: string | null): string {
+  if (!audience || audience === "all") return "Whole Church"
+  if (audience.match(/^\d{4}$/)) return `Class of ${audience}`
+  if (audience === "group") return "Specific Group"
+  return audience
+}
+
 // ─── Shared Components ──────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.1em]">
+    <h2 className="text-[11px] font-semibold text-[#F59E0B] uppercase tracking-[0.1em] pl-2.5 border-l-2 border-[#F59E0B]">
       {children}
     </h2>
   )
@@ -115,7 +133,15 @@ function Spinner() {
   )
 }
 
-function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+function EmptyState({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
       <div className="w-14 h-14 rounded-2xl bg-[#6D28D9]/6 flex items-center justify-center text-[#6D28D9]/40">
@@ -163,9 +189,10 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
 
       if (groups) {
         const previews: ChatPreview[] = groups
-          .map((m: { groups: { id: string; name: string; type: string } | null }) => {
+          .map((m: { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null }) => {
             if (!m.groups) return null
-            const g = m.groups
+            const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+            if (!g) return null
             return {
               id: g.id,
               groupName: g.name,
@@ -183,7 +210,7 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
       setLoading(false)
     }
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id])
 
   const totalUnread = chats.reduce((s, c) => s + c.unreadCount, 0)
@@ -196,10 +223,10 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
             <span className="text-[#F59E0B] font-bold text-base">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[#F59E0B] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
-        <button className="w-10 h-10 rounded-full bg-[#6D28D9]/8 flex items-center justify-center hover:bg-[#6D28D9]/12 transition-colors relative">
-          <Bell className="w-[18px] h-[18px] text-[#6D28D9] stroke-[1.5px]" />
+        <button className="w-10 h-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center hover:bg-[#F59E0B]/20 transition-colors relative">
+          <Bell className="w-[18px] h-[18px] text-[#F59E0B] stroke-[1.5px]" />
         </button>
       </div>
 
@@ -213,7 +240,7 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
             {profile.name.split(" ")[0]}
           </h1>
         </div>
-        <span className="mt-2 px-2.5 py-1 bg-[#6D28D9]/8 text-[#6D28D9] text-[10px] font-semibold rounded-full tracking-wide uppercase">
+        <span className="mt-2 px-2.5 py-1 bg-[#F59E0B] text-white text-[10px] font-semibold rounded-full tracking-wide uppercase shadow-sm shadow-[#F59E0B]/30">
           {profile.role}
         </span>
       </div>
@@ -228,14 +255,14 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
               <SectionLabel>Latest Announcement</SectionLabel>
               <button
                 onClick={onSeeAnnouncements}
-                className="text-[11px] text-[#6D28D9] font-semibold flex items-center gap-0.5 hover:opacity-70 transition-opacity"
+                className="text-[11px] text-[#F59E0B] font-semibold flex items-center gap-0.5 hover:opacity-70 transition-opacity"
               >
                 View all <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {announcement ? (
-              <div className="bg-white rounded-2xl border border-[#6D28D9]/8 p-5 shadow-[0_4px_24px_rgba(109,40,217,0.08)]">
+              <div className="bg-white rounded-2xl border border-[#F59E0B]/15 p-5 shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
                 <div className="flex items-center gap-2 text-muted-foreground/60 text-[11px] font-medium mb-3">
                   <Calendar className="w-3.5 h-3.5" />
                   <span>{formatDate(announcement.created_at)}</span>
@@ -254,14 +281,14 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
                   )}
                   <button
                     onClick={onSeeAnnouncements}
-                    className="py-3 px-4 rounded-xl border border-[#6D28D9]/12 text-[#6D28D9] font-semibold hover:bg-[#6D28D9]/4 transition-colors text-[13px]"
+                    className="py-3 px-4 rounded-xl border border-[#F59E0B]/25 text-[#F59E0B] font-semibold hover:bg-[#F59E0B]/8 transition-colors text-[13px]"
                   >
                     Details
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-[#6D28D9]/8 p-5 text-center text-[13px] text-muted-foreground/50">
+              <div className="bg-white rounded-2xl border border-[#F59E0B]/15 p-5 text-center text-[13px] text-muted-foreground/50">
                 No announcements yet
               </div>
             )}
@@ -281,26 +308,365 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
   )
 }
 
+// ─── Create Announcement Modal ───────────────────────────────────────────────
+
+const AUDIENCE_OPTIONS = [
+  { value: "all", label: "Whole Church" },
+  { value: "2025", label: "Class of 2025" },
+  { value: "2026", label: "Class of 2026" },
+  { value: "2027", label: "Class of 2027" },
+  { value: "2028", label: "Class of 2028" },
+  { value: "group", label: "Specific Group" },
+]
+
+interface CreateAnnouncementModalProps {
+  userId: string
+  onClose: () => void
+  onSuccess: (ann: Announcement) => void
+}
+
+function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncementModalProps) {
+  const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [title, setTitle] = useState("")
+  const [body, setBody] = useState("")
+  const [audience, setAudience] = useState("all")
+  const [isEvent, setIsEvent] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title.trim() || !body.trim()) {
+      setError("Title and body are required.")
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+
+    let imageUrl: string | null = null
+
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop()
+      const fileName = `${Date.now()}.${ext}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("announcement-images")
+        .upload(fileName, imageFile, { upsert: true })
+
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl } } = supabase.storage
+          .from("announcement-images")
+          .getPublicUrl(uploadData.path)
+        imageUrl = publicUrl
+      }
+      // If upload fails (e.g. bucket not set up), we proceed without the image
+    }
+
+    const { data, error: insertError } = await supabase
+      .from("announcements")
+      .insert({
+        title: title.trim(),
+        body: body.trim(),
+        audience,
+        is_event: isEvent,
+        is_pinned: false,
+        image_url: imageUrl,
+        created_by: userId,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      setError(insertError.message)
+      setSubmitting(false)
+      return
+    }
+
+    setSuccess(true)
+    setTimeout(() => {
+      onSuccess(data as Announcement)
+      onClose()
+    }, 1200)
+  }
+
+  // Success screen
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-[#F59E0B]/15 flex items-center justify-center">
+          <CheckCircle2 className="w-8 h-8 text-[#F59E0B]" />
+        </div>
+        <div className="text-center">
+          <p className="text-[16px] font-bold text-foreground">Announcement posted!</p>
+          <p className="text-[13px] text-muted-foreground mt-1">Your announcement is now live.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+    <div className="max-w-[390px] mx-auto h-full flex flex-col w-full">
+
+      {/* ── Top nav bar ── */}
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#F59E0B]/15 bg-white">
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+        >
+          <ArrowLeft className="w-4 h-4 text-foreground" />
+        </button>
+        <h1 className="text-[17px] font-bold text-foreground tracking-tight">New Announcement</h1>
+      </div>
+
+      {/* ── Scrollable form fields ── */}
+      <div className="flex-1 overflow-y-auto">
+        <form
+          id="ann-form"
+          onSubmit={handleSubmit}
+          className="px-5 py-6 flex flex-col gap-5"
+        >
+          {error && (
+            <div className="rounded-xl bg-destructive/8 px-4 py-3 text-[13px] text-destructive font-medium">
+              {error}
+            </div>
+          )}
+
+          {/* Title */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Announcement title…"
+              required
+              className="w-full px-4 py-3 rounded-xl border border-[#F59E0B]/20 bg-[#F59E0B]/3 text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 focus:border-[#F59E0B]/40 transition-all"
+            />
+          </div>
+
+          {/* Body */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">Body</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Write the full announcement here…"
+              required
+              rows={5}
+              className="w-full px-4 py-3 rounded-xl border border-[#F59E0B]/20 bg-[#F59E0B]/3 text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 focus:border-[#F59E0B]/40 transition-all resize-none"
+            />
+          </div>
+
+          {/* Audience */}
+          <div className="flex flex-col gap-2.5">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">Audience</label>
+            <div className="flex flex-wrap gap-2">
+              {AUDIENCE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAudience(opt.value)}
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${
+                    audience === opt.value
+                      ? "bg-[#6D28D9] text-white border-[#6D28D9] shadow-md shadow-[#6D28D9]/20"
+                      : "bg-white text-muted-foreground border-[#F59E0B]/20 hover:border-[#F59E0B]/40"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Is Event toggle */}
+          <div className="flex items-center justify-between bg-[#6D28D9]/4 rounded-xl px-4 py-3.5">
+            <div>
+              <p className="text-[13px] font-semibold text-foreground">This is an event</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5">Shows an RSVP button on the card</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEvent((v) => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${
+                isEvent ? "bg-[#6D28D9]" : "bg-muted-foreground/20"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${
+                  isEvent ? "left-[22px]" : "left-0.5"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Image upload */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">
+              Image{" "}
+              <span className="text-muted-foreground/50 normal-case font-medium tracking-normal">(optional)</span>
+            </label>
+            {imagePreview ? (
+              <div className="relative rounded-xl overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-24 rounded-xl border-2 border-dashed border-[#6D28D9]/20 flex flex-col items-center justify-center gap-2 text-muted-foreground/50 hover:border-[#F59E0B]/40 hover:text-[#F59E0B]/60 transition-all"
+              >
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-[12px] font-medium">Tap to add image</span>
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </div>
+        </form>
+      </div>
+
+      {/* ── Sticky submit button — always visible at the bottom ── */}
+      <div className="bg-white border-t border-[#F59E0B]/15 px-5 py-4">
+        <button
+          type="submit"
+          form="ann-form"
+          disabled={submitting}
+          className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-60 text-[#6D28D9] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#F59E0B]/30"
+        >
+          {submitting ? "Posting…" : "Post Announcement"}
+        </button>
+      </div>
+
+    </div>
+    </div>
+  )
+}
+
 // ─── Announcements Tab ──────────────────────────────────────────────────────
 
-function AnnouncementsTab() {
+interface AnnouncementsTabProps {
+  userId: string
+  userRole: string
+}
+
+function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+
+  const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
+
+  const loadAnnouncements = useCallback(async () => {
+    const { data: annData } = await supabase
+      .from("announcements")
+      .select("*")
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false })
+
+    const anns: Announcement[] = annData ?? []
+
+    if (anns.length === 0) {
+      setAnnouncements([])
+      setLoading(false)
+      return
+    }
+
+    const ids = anns.map((a) => a.id)
+
+    // Fetch view counts, RSVP data in parallel
+    const [{ data: viewRows }, { data: rsvpRows }] = await Promise.all([
+      supabase.from("announcement_views").select("announcement_id").in("announcement_id", ids),
+      supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", ids),
+    ])
+
+    // Record current user's views (upsert — unique on announcement_id + user_id)
+    supabase
+      .from("announcement_views")
+      .upsert(
+        ids.map((id) => ({ announcement_id: id, user_id: userId })),
+        { onConflict: "announcement_id,user_id" }
+      )
+      .then() // fire and forget
+
+    // Build lookup maps
+    const viewMap: Record<string, number> = {}
+    const rsvpCountMap: Record<string, number> = {}
+    const userRsvpSet = new Set<string>()
+
+    for (const v of viewRows ?? []) {
+      viewMap[v.announcement_id] = (viewMap[v.announcement_id] ?? 0) + 1
+    }
+    for (const r of rsvpRows ?? []) {
+      rsvpCountMap[r.announcement_id] = (rsvpCountMap[r.announcement_id] ?? 0) + 1
+      if (r.user_id === userId) userRsvpSet.add(r.announcement_id)
+    }
+
+    const enriched: EnrichedAnnouncement[] = anns.map((ann) => ({
+      ...ann,
+      view_count: viewMap[ann.id] ?? 0,
+      rsvp_count: rsvpCountMap[ann.id] ?? 0,
+      user_has_rsvped: userRsvpSet.has(ann.id),
+    }))
+
+    setAnnouncements(enriched)
+    setLoading(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("is_pinned", { ascending: false })
-        .order("created_at", { ascending: false })
-      setAnnouncements(data ?? [])
-      setLoading(false)
+    loadAnnouncements()
+  }, [loadAnnouncements])
+
+  function handleRsvpToggle(announcementId: string) {
+    setAnnouncements((prev) =>
+      prev.map((ann) =>
+        ann.id === announcementId
+          ? {
+              ...ann,
+              user_has_rsvped: true,
+              rsvp_count: ann.rsvp_count + 1,
+            }
+          : ann
+      )
+    )
+  }
+
+  function handleNewAnnouncement(newAnn: Announcement) {
+    const enriched: EnrichedAnnouncement = {
+      ...newAnn,
+      view_count: 0,
+      rsvp_count: 0,
+      user_has_rsvped: false,
     }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    setAnnouncements((prev) => [enriched, ...prev])
+  }
 
   return (
     <div className="px-5 pt-14 pb-2">
@@ -310,7 +676,7 @@ function AnnouncementsTab() {
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
             <span className="text-[#F59E0B] font-bold text-base">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[#F59E0B] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
       </div>
       <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-6">Announcements</h1>
@@ -321,52 +687,159 @@ function AnnouncementsTab() {
         <EmptyState
           icon={<Bell className="w-7 h-7" />}
           title="No announcements yet"
-          subtitle="Check back soon for updates"
+          subtitle={isLeaderOrAdmin ? "Tap + to post the first one" : "Check back soon for updates"}
         />
       ) : (
         <div className="flex flex-col gap-4">
           {announcements.map((ann, idx) => (
-            <AnnouncementCard key={ann.id} announcement={ann} isPinned={ann.is_pinned && idx === 0} />
+            <AnnouncementCard
+              key={ann.id}
+              announcement={ann}
+              isPinned={ann.is_pinned && idx === 0}
+              userId={userId}
+              onRsvpToggle={handleRsvpToggle}
+            />
           ))}
         </div>
+      )}
+
+      {/* FAB — only for leaders/admins */}
+      {isLeaderOrAdmin && (
+        <button
+          onClick={() => setShowCreate(true)}
+          style={{
+            position: "fixed",
+            bottom: "6.5rem",
+            right: "max(calc(50% - 195px + 16px), 16px)",
+          }}
+          className="w-14 h-14 bg-[#6D28D9] rounded-full shadow-xl shadow-[#6D28D9]/30 flex items-center justify-center z-40 hover:bg-[#5B21B6] active:scale-95 transition-all"
+          aria-label="New announcement"
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </button>
+      )}
+
+      {/* Create modal */}
+      {showCreate && (
+        <CreateAnnouncementModal
+          userId={userId}
+          onClose={() => setShowCreate(false)}
+          onSuccess={handleNewAnnouncement}
+        />
       )}
     </div>
   )
 }
 
-function AnnouncementCard({ announcement, isPinned }: { announcement: Announcement; isPinned: boolean }) {
+// ─── Announcement Card ───────────────────────────────────────────────────────
+
+interface AnnouncementCardProps {
+  announcement: EnrichedAnnouncement
+  isPinned: boolean
+  userId: string
+  onRsvpToggle: (id: string) => void
+}
+
+function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: AnnouncementCardProps) {
+  const supabase = createClient()
+  const [rsvping, setRsvping] = useState(false)
+
+  async function handleRsvp() {
+    if (announcement.user_has_rsvped || rsvping) return
+    setRsvping(true)
+
+    // Optimistic update immediately
+    onRsvpToggle(announcement.id)
+
+    await supabase.from("rsvps").upsert(
+      { announcement_id: announcement.id, user_id: userId },
+      { onConflict: "announcement_id,user_id" }
+    )
+
+    setRsvping(false)
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-[#6D28D9]/8 p-5 shadow-[0_4px_24px_rgba(109,40,217,0.08)]">
-      {isPinned && (
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
-          <span className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider">Pinned</span>
-        </div>
+    <div className="bg-white rounded-2xl border border-[#F59E0B]/15 overflow-hidden shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
+      {/* Optional image */}
+      {announcement.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={announcement.image_url}
+          alt={announcement.title}
+          className="w-full h-44 object-cover"
+        />
       )}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-muted-foreground/60 text-[11px] font-medium">
-          <Calendar className="w-3.5 h-3.5" />
-          <span>{formatDate(announcement.created_at)}</span>
+
+      <div className="p-5">
+        {isPinned && (
+          <div className="flex items-center gap-1.5 mb-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+            <span className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider">Pinned</span>
+          </div>
+        )}
+
+        {/* Meta row */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-muted-foreground/60 text-[11px] font-medium">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{formatDate(announcement.created_at)}</span>
+            </div>
+            {announcement.audience && announcement.audience !== "all" && (
+              <span className="text-[10px] bg-[#6D28D9]/6 text-[#6D28D9] font-semibold px-2 py-0.5 rounded-full">
+                {audienceLabel(announcement.audience)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {announcement.view_count > 0 && (
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium">
+                <Users className="w-3 h-3" />
+                {announcement.view_count} seen
+              </span>
+            )}
+          </div>
         </div>
-        {announcement.seen_count != null && announcement.seen_count > 0 && (
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium">
-            <Users className="w-3 h-3" />
-            {announcement.seen_count} seen
-          </span>
+
+        <h3 className="text-[17px] font-bold text-foreground tracking-tight mb-2">
+          {announcement.title}
+        </h3>
+        <p className="text-[13px] text-muted-foreground leading-relaxed mb-4 line-clamp-3">
+          {announcement.body}
+        </p>
+
+        {/* RSVP section */}
+        {announcement.is_event && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRsvp}
+              disabled={announcement.user_has_rsvped || rsvping}
+              className={`flex-1 font-bold py-3 px-4 rounded-xl transition-all text-[13px] tracking-wide ${
+                announcement.user_has_rsvped
+                  ? "bg-[#6D28D9]/8 text-[#6D28D9] cursor-default"
+                  : "bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] shadow-lg shadow-[#F59E0B]/20 active:scale-[0.98]"
+              }`}
+            >
+              {announcement.user_has_rsvped ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  You&apos;re going!
+                </span>
+              ) : (
+                "RSVP Now"
+              )}
+            </button>
+
+            {announcement.rsvp_count > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 font-medium flex-shrink-0">
+                <Users className="w-3.5 h-3.5" />
+                <span>{announcement.rsvp_count} going</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
-      <h3 className="text-[17px] font-bold text-foreground tracking-tight mb-2">{announcement.title}</h3>
-      <p className="text-[13px] text-muted-foreground leading-relaxed mb-4 line-clamp-3">{announcement.body}</p>
-      {announcement.is_event && (
-        <div className="flex items-center gap-3">
-          <button className="flex-1 bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] font-bold py-3 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/20">
-            RSVP Now
-          </button>
-          <button className="py-3 px-4 rounded-xl border border-[#6D28D9]/12 text-[#6D28D9] font-semibold hover:bg-[#6D28D9]/4 transition-colors text-[13px]">
-            Details
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -388,12 +861,14 @@ function ChatsTab({ userId }: { userId: string }) {
         .eq("user_id", userId)
 
       const all: ChatGroup[] = (data ?? [])
-        .map((m: { groups: { id: string; name: string; type: string } | null }) => {
+        .map((m: { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null }) => {
           if (!m.groups) return null
+          const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+          if (!g) return null
           return {
-            id: m.groups.id,
-            name: m.groups.name,
-            type: m.groups.type,
+            id: g.id,
+            name: g.name,
+            type: g.type,
             last_message: null,
             last_sender: null,
             last_message_time: null,
@@ -407,7 +882,7 @@ function ChatsTab({ userId }: { userId: string }) {
       setLoading(false)
     }
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   const active = subTab === "church" ? churchChats : myChats
@@ -420,7 +895,7 @@ function ChatsTab({ userId }: { userId: string }) {
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
             <span className="text-[#F59E0B] font-bold text-base">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[#F59E0B] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
       </div>
 
@@ -466,7 +941,7 @@ function ChatsTab({ userId }: { userId: string }) {
 
 function ChatGroupCard({ group }: { group: ChatGroup }) {
   return (
-    <button className="w-full bg-white rounded-2xl border border-[#6D28D9]/8 p-4 shadow-[0_2px_16px_rgba(109,40,217,0.06)] hover:shadow-[0_4px_24px_rgba(109,40,217,0.1)] hover:border-[#6D28D9]/12 transition-all text-left">
+    <button className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-[#F59E0B]/25 transition-all text-left">
       <div className="flex items-center gap-3.5">
         <Avatar className={`w-11 h-11 ${getAvatarColor(group.name)} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
@@ -488,7 +963,12 @@ function ChatGroupCard({ group }: { group: ChatGroup }) {
             <p className="text-[12px] text-muted-foreground/60 truncate">
               {group.last_message
                 ? group.last_sender
-                  ? <><span className="font-medium text-muted-foreground">{group.last_sender}:</span> {group.last_message}</>
+                  ? (
+                    <>
+                      <span className="font-medium text-muted-foreground">{group.last_sender}:</span>{" "}
+                      {group.last_message}
+                    </>
+                  )
                   : group.last_message
                 : "No messages yet"}
             </p>
@@ -534,7 +1014,7 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
       setLoading(false)
     }
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const filtered = members.filter((m) =>
@@ -549,7 +1029,7 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
             <span className="text-[#F59E0B] font-bold text-base">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[#F59E0B] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
       </div>
       <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-4">Directory</h1>
@@ -562,7 +1042,7 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
           placeholder="Search members…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#6D28D9]/4 text-[13px] placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:bg-white border border-transparent focus:border-[#6D28D9]/12 transition-all"
+          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F59E0B]/5 text-[13px] placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 focus:bg-white border border-transparent focus:border-[#F59E0B]/25 transition-all"
         />
       </div>
 
@@ -580,7 +1060,7 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
             <button
               key={member.id}
               onClick={() => setSelected(member)}
-              className="w-full bg-white rounded-2xl border border-[#6D28D9]/8 p-4 shadow-[0_2px_16px_rgba(109,40,217,0.06)] hover:shadow-[0_4px_24px_rgba(109,40,217,0.1)] hover:border-[#6D28D9]/12 transition-all text-left"
+              className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-[#F59E0B]/25 transition-all text-left"
             >
               <div className="flex items-center gap-3.5">
                 <Avatar className="w-11 h-11 bg-[#6D28D9] shadow-md shadow-[#6D28D9]/15">
@@ -592,7 +1072,9 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-foreground text-[14px] tracking-tight">{member.name}</h3>
                     {member.id === currentUserId && (
-                      <span className="text-[9px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-1.5 py-0.5 rounded-full">You</span>
+                      <span className="text-[9px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-1.5 py-0.5 rounded-full">
+                        You
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -602,7 +1084,7 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
                       </span>
                     )}
                     {member.role && (
-                      <span className="text-[10px] bg-[#6D28D9]/6 text-[#6D28D9] font-semibold px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-[#F59E0B] text-white font-semibold px-2 py-0.5 rounded-full shadow-sm shadow-[#F59E0B]/30">
                         {member.role}
                       </span>
                     )}
@@ -646,10 +1128,12 @@ function MemberSheet({ member, onClose }: { member: DirectoryMember; onClose: ()
             <h2 className="text-[20px] font-bold text-foreground tracking-tight">{member.name}</h2>
             <div className="flex items-center gap-2 mt-2">
               {member.graduation_year && (
-                <span className="text-[12px] text-muted-foreground/60">Class of {member.graduation_year}</span>
+                <span className="text-[12px] text-muted-foreground/60">
+                  Class of {member.graduation_year}
+                </span>
               )}
               {member.role && (
-                <span className="text-[10px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                <span className="text-[10px] bg-[#F59E0B] text-white font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-sm shadow-[#F59E0B]/30">
                   {member.role}
                 </span>
               )}
@@ -658,26 +1142,34 @@ function MemberSheet({ member, onClose }: { member: DirectoryMember; onClose: ()
 
           {member.bible_verse && (
             <div className="bg-[#F59E0B]/8 rounded-xl p-4 mb-4">
-              <p className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider mb-1.5">Bible Verse</p>
-              <p className="text-[13px] text-foreground/80 italic leading-relaxed">&ldquo;{member.bible_verse}&rdquo;</p>
+              <p className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider mb-1.5">
+                Bible Verse
+              </p>
+              <p className="text-[13px] text-foreground/80 italic leading-relaxed">
+                &ldquo;{member.bible_verse}&rdquo;
+              </p>
             </div>
           )}
 
           {member.prayer_request && (
             <div className="bg-[#6D28D9]/4 rounded-xl p-4 mb-4">
-              <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-1.5">Prayer Request</p>
+              <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-1.5">
+                Prayer Request
+              </p>
               <p className="text-[13px] text-foreground/80 leading-relaxed">{member.prayer_request}</p>
             </div>
           )}
 
           {member.about_me && (
             <div className="bg-muted/40 rounded-xl p-4 mb-6">
-              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1.5">About</p>
+              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1.5">
+                About
+              </p>
               <p className="text-[13px] text-foreground/80 leading-relaxed">{member.about_me}</p>
             </div>
           )}
 
-          <button className="w-full bg-[#6D28D9] hover:bg-[#5B21B6] text-white font-bold py-3.5 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#6D28D9]/20">
+          <button className="w-full bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] font-bold py-3.5 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/25">
             Send Message
           </button>
         </div>
@@ -737,7 +1229,7 @@ function ProfileTab({
     if (!error && data) setProfile(data as Profile)
     setSaving(false)
     setEditing(false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, userId])
 
   const fields = [
@@ -755,7 +1247,7 @@ function ProfileTab({
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
             <span className="text-[#F59E0B] font-bold text-base">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[#F59E0B] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -769,7 +1261,7 @@ function ProfileTab({
               <button
                 onClick={saveEdit}
                 disabled={saving}
-                className="flex items-center gap-1.5 bg-[#6D28D9] text-white text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#5B21B6] transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 bg-[#F59E0B] text-[#6D28D9] text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#E18D07] transition-colors disabled:opacity-60 shadow-md shadow-[#F59E0B]/30"
               >
                 <Check className="w-3.5 h-3.5" />
                 {saving ? "Saving…" : "Save"}
@@ -778,7 +1270,7 @@ function ProfileTab({
           ) : (
             <button
               onClick={startEdit}
-              className="flex items-center gap-1.5 bg-[#6D28D9]/8 text-[#6D28D9] text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#6D28D9]/12 transition-colors"
+              className="flex items-center gap-1.5 bg-[#F59E0B]/12 text-[#F59E0B] text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#F59E0B]/20 transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" />
               Edit
@@ -801,7 +1293,7 @@ function ProfileTab({
               Class of {profile.graduation_year}
             </span>
           )}
-          <span className="text-[10px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">
+          <span className="text-[10px] bg-[#F59E0B] text-white font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-sm shadow-[#F59E0B]/30">
             {profile.role}
           </span>
         </div>
@@ -811,7 +1303,10 @@ function ProfileTab({
       {/* Editable Fields */}
       <div className="flex flex-col gap-4 mb-8">
         {fields.map(({ key, label, placeholder }) => (
-          <div key={key} className="bg-white rounded-2xl border border-[#6D28D9]/8 p-4 shadow-[0_2px_16px_rgba(109,40,217,0.04)]">
+          <div
+            key={key}
+            className="bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.04)]"
+          >
             <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-2">{label}</p>
             {editing ? (
               <textarea
@@ -871,7 +1366,9 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
             onSeeAnnouncements={() => setActiveTab("announcements")}
           />
         )}
-        {activeTab === "announcements" && <AnnouncementsTab />}
+        {activeTab === "announcements" && (
+          <AnnouncementsTab userId={userId} userRole={initialProfile.role} />
+        )}
         {activeTab === "chats" && <ChatsTab userId={userId} />}
         {activeTab === "directory" && <DirectoryTab currentUserId={userId} />}
         {activeTab === "profile" && (
