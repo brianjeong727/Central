@@ -6,6 +6,7 @@ import {
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
+import { createGroup } from "@/app/actions/create-group"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection, type ChatPreview } from "@/components/ui/chats-section"
@@ -178,9 +179,10 @@ interface HomeTabProps {
   profile: Profile
   onSeeChats: () => void
   onSeeAnnouncements: () => void
+  onOpenChat: (id: string, name: string) => void
 }
 
-function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
+function HomeTab({ profile, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const [chats, setChats] = useState<ChatPreview[]>([])
@@ -317,6 +319,7 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements }: HomeTabProps) {
               chats={chats}
               totalUnread={totalUnread}
               onSeeAll={onSeeChats}
+              onOpenChat={onOpenChat}
             />
           )}
         </div>
@@ -861,6 +864,208 @@ function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: Anno
   )
 }
 
+// ─── Create Chat Screen ──────────────────────────────────────────────────────
+
+interface CreateChatScreenProps {
+  userId: string
+  userName: string
+  groupType: "my" | "church"
+  onClose: () => void
+  onCreated: (group: { id: string; name: string }) => void
+}
+
+function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: CreateChatScreenProps) {
+  const supabase = createClient()
+  const [chatName, setChatName] = useState("")
+  const [search, setSearch] = useState("")
+  const [allMembers, setAllMembers] = useState<{ id: string; name: string; graduation_year: number | null; role: string }[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadMembers() {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, graduation_year, role")
+        .neq("id", userId)
+        .order("name")
+      setAllMembers(data ?? [])
+    }
+    loadMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const filtered = allMembers.filter((m) =>
+    m.name.toLowerCase().includes(search.toLowerCase())
+  )
+  const selectedMembers = allMembers.filter((m) => selectedIds.has(m.id))
+
+  function toggleMember(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleCreate() {
+    const name = chatName.trim()
+    console.log("[handleCreate] fired — name:", JSON.stringify(name), "groupType:", groupType, "userId:", userId)
+    if (!name) { setError("Please enter a chat name."); return }
+
+    setCreating(true)
+    setError(null)
+
+    console.log("[handleCreate] calling server action createGroup…")
+    const { group, error: createErr } = await createGroup({
+      name,
+      type: groupType,
+      memberIds: Array.from(selectedIds),
+      createdBy: userId,
+    })
+    console.log("[handleCreate] server action returned — group:", group, "error:", createErr)
+
+    if (createErr || !group) {
+      setError(createErr ?? "Failed to create chat.")
+      setCreating(false)
+      return
+    }
+
+    onCreated({ id: group.id, name: group.name })
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+
+        {/* Top nav */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#F59E0B]/15 bg-white">
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-foreground" />
+          </button>
+          <h1 className="text-[17px] font-bold text-foreground tracking-tight">
+            {groupType === "church" ? "New Church Chat" : "New Chat"}
+          </h1>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+          {error && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-600 font-medium">
+              {error}
+            </div>
+          )}
+
+          {/* Chat name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">Chat Name</label>
+            <input
+              type="text"
+              value={chatName}
+              onChange={(e) => setChatName(e.target.value)}
+              placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
+              className="w-full px-4 py-3 rounded-xl border border-[#F59E0B]/20 bg-[#F59E0B]/3 text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 focus:border-[#F59E0B]/40 transition-all"
+            />
+          </div>
+
+          {/* Selected chips */}
+          {selectedMembers.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedMembers.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => toggleMember(m.id)}
+                  className="flex items-center gap-1.5 bg-[#6D28D9] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#5B21B6] transition-colors"
+                >
+                  {m.name.split(" ")[0]}
+                  <X className="w-3 h-3 opacity-70" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Member search */}
+          <div className="flex flex-col gap-3">
+            <label className="text-[11px] font-bold text-[#6D28D9] uppercase tracking-wider">
+              Add Members
+              {selectedMembers.length > 0 && (
+                <span className="ml-2 text-[#F59E0B] font-bold">{selectedMembers.length} selected</span>
+              )}
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search members…"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F59E0B]/5 text-[13px] placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 border border-transparent focus:border-[#F59E0B]/25 transition-all"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {filtered.length === 0 ? (
+                <p className="text-center text-[13px] text-muted-foreground/50 py-6">No members found</p>
+              ) : (
+                filtered.map((member) => {
+                  const isSelected = selectedIds.has(member.id)
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => toggleMember(member.id)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                        isSelected
+                          ? "border-[#6D28D9]/30 bg-[#6D28D9]/4"
+                          : "border-[#F59E0B]/15 bg-white hover:border-[#F59E0B]/30"
+                      }`}
+                    >
+                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm`}>
+                        <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">
+                          {getInitials(member.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-foreground">{member.name}</p>
+                        {member.graduation_year && (
+                          <p className="text-[11px] text-muted-foreground/60">Class of {member.graduation_year}</p>
+                        )}
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        isSelected ? "bg-[#6D28D9] border-[#6D28D9]" : "border-muted-foreground/25"
+                      }`}>
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Create button */}
+        <div className="flex-shrink-0 bg-white border-t border-[#F59E0B]/15 px-5 py-4">
+          <button
+            onClick={handleCreate}
+            disabled={creating || !chatName.trim()}
+            className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-50 text-[#6D28D9] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#F59E0B]/30"
+          >
+            {creating ? "Creating…" : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 // ─── Chat Screen ────────────────────────────────────────────────────────────
 
 interface ChatScreenProps {
@@ -869,9 +1074,10 @@ interface ChatScreenProps {
   userId: string
   userName: string
   onClose: () => void
+  onRead?: () => void
 }
 
-function ChatScreen({ groupId, groupName, userId, userName, onClose }: ChatScreenProps) {
+function ChatScreen({ groupId, groupName, userId, userName, onClose, onRead }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -883,6 +1089,17 @@ function ChatScreen({ groupId, groupName, userId, userName, onClose }: ChatScree
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
   }, [])
+
+  // Mark messages as read when opening the chat
+  useEffect(() => {
+    supabase
+      .from("group_members")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .then(() => { if (onRead) onRead() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
 
   // Load last 50 messages
   useEffect(() => {
@@ -1077,23 +1294,39 @@ function ChatScreen({ groupId, groupName, userId, userName, onClose }: ChatScree
 
 // ─── Chats Tab ──────────────────────────────────────────────────────────────
 
-function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profile }) {
+interface ChatsTabProps {
+  userId: string
+  userProfile: Profile
+  userRole: string
+  onOpenChat: (id: string, name: string) => void
+  onTotalUnreadChange: (count: number) => void
+  refreshKey: number
+}
+
+function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChange, refreshKey }: ChatsTabProps) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
   const [myChats, setMyChats] = useState<ChatGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [openChat, setOpenChat] = useState<{ id: string; name: string } | null>(null)
+  const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+
+  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase
         .from("group_members")
-        .select("groups(id, name, type)")
+        .select("groups(id, name, type), last_read_at")
         .eq("user_id", userId)
 
-      const all: ChatGroup[] = (data ?? [])
-        .map((m: { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null }) => {
+      type RawMember = {
+        groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null
+        last_read_at: string | null
+      }
+
+      const allWithLastRead = (data ?? [])
+        .map((m: RawMember) => {
           if (!m.groups) return null
           const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
           if (!g) return null
@@ -1105,19 +1338,38 @@ function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profil
             last_sender: null,
             last_message_time: null,
             unread_count: 0,
+            _lastReadAt: m.last_read_at,
           }
         })
-        .filter(Boolean) as ChatGroup[]
+        .filter(Boolean) as (ChatGroup & { _lastReadAt: string | null })[]
 
-      setChurchChats(all.filter((g) => g.type === "church"))
-      setMyChats(all.filter((g) => g.type !== "church"))
+      // Fetch unread counts in parallel
+      const withUnread = await Promise.all(
+        allWithLastRead.map(async ({ _lastReadAt, ...group }) => {
+          let query = supabase
+            .from("messages")
+            .select("*", { count: "exact", head: true })
+            .eq("group_id", group.id)
+            .neq("sender_id", userId)
+          if (_lastReadAt) query = query.gt("created_at", _lastReadAt)
+          const { count } = await query
+          return { ...group, unread_count: count ?? 0 }
+        })
+      )
+
+      setChurchChats(withUnread.filter((g) => g.type === "church"))
+      setMyChats(withUnread.filter((g) => g.type !== "church"))
+
+      const total = withUnread.reduce((s, g) => s + g.unread_count, 0)
+      onTotalUnreadChange(total)
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, refreshKey])
 
   const active = subTab === "church" ? churchChats : myChats
+  const showPlusButton = subTab === "my" || (subTab === "church" && isAdminOrLeader)
 
   return (
     <div className="px-5 pt-14 pb-2">
@@ -1132,7 +1384,7 @@ function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profil
       </div>
 
       {/* Sub-tab switcher */}
-      <div className="flex items-center gap-1 bg-[#6D28D9]/6 rounded-xl p-1 mb-6">
+      <div className="flex items-center gap-1 bg-[#6D28D9]/6 rounded-xl p-1 mb-5">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
@@ -1148,6 +1400,21 @@ function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profil
         ))}
       </div>
 
+      {/* Section header with + button */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-[13px] font-bold text-foreground/60 tracking-tight">
+          {subTab === "church" ? "Church Chats" : "My Chats"}
+        </h2>
+        {showPlusButton && (
+          <button
+            onClick={() => setShowCreateChat(subTab)}
+            className="w-8 h-8 rounded-full bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/25 hover:bg-[#5B21B6] active:scale-95 transition-all"
+          >
+            <Plus className="w-4 h-4 text-[#F59E0B]" />
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <Spinner />
       ) : active.length === 0 ? (
@@ -1157,24 +1424,27 @@ function ChatsTab({ userId, userProfile }: { userId: string; userProfile: Profil
           subtitle={
             subTab === "church"
               ? "You haven't been added to any church chats yet"
-              : "Start a chat with someone from the directory"
+              : "Tap + to start a new chat"
           }
         />
       ) : (
         <div className="flex flex-col gap-3">
           {active.map((group) => (
-            <ChatGroupCard key={group.id} group={group} onClick={() => setOpenChat({ id: group.id, name: group.name })} />
+            <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} />
           ))}
         </div>
       )}
 
-      {openChat && (
-        <ChatScreen
-          groupId={openChat.id}
-          groupName={openChat.name}
+      {showCreateChat && (
+        <CreateChatScreen
           userId={userId}
           userName={userProfile.name}
-          onClose={() => setOpenChat(null)}
+          groupType={showCreateChat}
+          onClose={() => setShowCreateChat(null)}
+          onCreated={(group) => {
+            setShowCreateChat(null)
+            onOpenChat(group.id, group.name)
+          }}
         />
       )}
     </div>
@@ -1239,7 +1509,7 @@ interface DirectoryMember {
   prayer_request: string | null
 }
 
-function DirectoryTab({ currentUserId }: { currentUserId: string }) {
+function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentUserId: string; currentUserName: string; onOpenChat: (id: string, name: string) => void }) {
   const supabase = createClient()
   const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
@@ -1341,13 +1611,86 @@ function DirectoryTab({ currentUserId }: { currentUserId: string }) {
 
       {/* Member Detail Sheet */}
       {selected && (
-        <MemberSheet member={selected} onClose={() => setSelected(null)} />
+        <MemberSheet
+          member={selected}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          onClose={() => setSelected(null)}
+          onOpenChat={(id, name) => {
+            setSelected(null)
+            onOpenChat(id, name)
+          }}
+        />
       )}
     </div>
   )
 }
 
-function MemberSheet({ member, onClose }: { member: DirectoryMember; onClose: () => void }) {
+function MemberSheet({
+  member,
+  currentUserId,
+  currentUserName,
+  onClose,
+  onOpenChat,
+}: {
+  member: DirectoryMember
+  currentUserId: string
+  currentUserName: string
+  onClose: () => void
+  onOpenChat: (id: string, name: string) => void
+}) {
+  const supabase = createClient()
+  const [dmLoading, setDmLoading] = useState(false)
+  const isOwnProfile = member.id === currentUserId
+
+  async function handleSendMessage() {
+    setDmLoading(true)
+
+    // Find existing DM group between these two users
+    const { data: myGroups } = await supabase
+      .from("group_members")
+      .select("group_id, groups!inner(type)")
+      .eq("user_id", currentUserId)
+
+    const myDmGroupIds = (myGroups ?? [])
+      .filter((m: { groups: { type: string } | { type: string }[] | null }) => {
+        const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+        return g?.type === "dm"
+      })
+      .map((m: { group_id: string }) => m.group_id)
+
+    if (myDmGroupIds.length > 0) {
+      const { data: shared } = await supabase
+        .from("group_members")
+        .select("group_id")
+        .eq("user_id", member.id)
+        .in("group_id", myDmGroupIds)
+        .limit(1)
+
+      if (shared && shared.length > 0) {
+        const groupId = shared[0].group_id
+        const { data: grp } = await supabase.from("groups").select("name").eq("id", groupId).single()
+        setDmLoading(false)
+        onOpenChat(groupId, grp?.name ?? member.name)
+        return
+      }
+    }
+
+    // Create new DM group via server action
+    const dmName = `${currentUserName.split(" ")[0]} & ${member.name.split(" ")[0]}`
+
+    const { group: newGroup, error: dmErr } = await createGroup({
+      name: dmName,
+      type: "dm",
+      memberIds: [member.id],
+      createdBy: currentUserId,
+    })
+
+    setDmLoading(false)
+    if (dmErr || !newGroup) return
+    onOpenChat(newGroup.id, newGroup.name)
+  }
+
   return (
     <>
       <div
@@ -1411,9 +1754,15 @@ function MemberSheet({ member, onClose }: { member: DirectoryMember; onClose: ()
             </div>
           )}
 
-          <button className="w-full bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] font-bold py-3.5 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/25">
-            Send Message
-          </button>
+          {!isOwnProfile && (
+            <button
+              onClick={handleSendMessage}
+              disabled={dmLoading}
+              className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-60 text-[#6D28D9] font-bold py-3.5 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/25"
+            >
+              {dmLoading ? "Opening chat…" : "Send Message"}
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -1591,6 +1940,18 @@ interface HomeAppProps {
 export function HomeApp({ userId, initialProfile }: HomeAppProps) {
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState<Tab>("home")
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
+  const [totalChatsUnread, setTotalChatsUnread] = useState(0)
+  const [chatRefreshKey, setChatRefreshKey] = useState(0)
+
+  function handleOpenChat(id: string, name: string) {
+    setGlobalOpenChat({ id, name })
+  }
+
+  function handleChatClose() {
+    setGlobalOpenChat(null)
+    setChatRefreshKey((k) => k + 1)
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -1606,13 +1967,32 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
             profile={initialProfile}
             onSeeChats={() => setActiveTab("chats")}
             onSeeAnnouncements={() => setActiveTab("announcements")}
+            onOpenChat={handleOpenChat}
           />
         )}
         {activeTab === "announcements" && (
           <AnnouncementsTab userId={userId} userRole={initialProfile.role} />
         )}
-        {activeTab === "chats" && <ChatsTab userId={userId} userProfile={initialProfile} />}
-        {activeTab === "directory" && <DirectoryTab currentUserId={userId} />}
+        {activeTab === "chats" && (
+          <ChatsTab
+            userId={userId}
+            userProfile={initialProfile}
+            userRole={initialProfile.role}
+            onOpenChat={handleOpenChat}
+            onTotalUnreadChange={setTotalChatsUnread}
+            refreshKey={chatRefreshKey}
+          />
+        )}
+        {activeTab === "directory" && (
+          <DirectoryTab
+            currentUserId={userId}
+            currentUserName={initialProfile.name}
+            onOpenChat={(id, name) => {
+              setActiveTab("chats")
+              handleOpenChat(id, name)
+            }}
+          />
+        )}
         {activeTab === "profile" && (
           <ProfileTab
             userId={userId}
@@ -1622,7 +2002,23 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
         )}
       </div>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        chatsUnread={totalChatsUnread}
+      />
+
+      {/* Global ChatScreen — rendered above everything including bottom nav */}
+      {globalOpenChat && (
+        <ChatScreen
+          groupId={globalOpenChat.id}
+          groupName={globalOpenChat.name}
+          userId={userId}
+          userName={initialProfile.name}
+          onClose={handleChatClose}
+          onRead={() => setTotalChatsUnread((n) => Math.max(0, n - 1))}
+        />
+      )}
     </div>
   )
 }

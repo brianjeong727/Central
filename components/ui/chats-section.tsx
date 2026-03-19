@@ -16,16 +16,17 @@ interface ChatsSectionProps {
   chats: ChatPreview[]
   totalUnread: number
   onSeeAll?: () => void
+  onOpenChat?: (id: string, name: string) => void
 }
 
-export function ChatsSection({ chats, totalUnread, onSeeAll }: ChatsSectionProps) {
+export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: ChatsSectionProps) {
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <h2 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.1em]">Your Chats</h2>
           {totalUnread > 0 && (
-            <span className="w-5 h-5 bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+            <span className="w-5 h-5 bg-[#F59E0B] rounded-full text-[9px] font-bold text-[#6D28D9] flex items-center justify-center">
               {totalUnread}
             </span>
           )}
@@ -43,16 +44,16 @@ export function ChatsSection({ chats, totalUnread, onSeeAll }: ChatsSectionProps
 
       <div className="flex flex-col gap-3">
         {chats.map((chat) => (
-          <ChatCard key={chat.id} chat={chat} />
+          <ChatCard key={chat.id} chat={chat} onClick={onOpenChat ? () => onOpenChat(chat.id, chat.groupName) : undefined} />
         ))}
       </div>
     </section>
   )
 }
 
-function ChatCard({ chat }: { chat: ChatPreview }) {
+function ChatCard({ chat, onClick }: { chat: ChatPreview; onClick?: () => void }) {
   return (
-      <button className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.12)] hover:border-[#F59E0B]/25 transition-all text-left group">
+      <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#F59E0B]/15 p-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)] hover:shadow-[0_4px_24px_rgba(245,158,11,0.12)] hover:border-[#F59E0B]/25 transition-all text-left group">
       <div className="flex items-center gap-3.5">
         <Avatar className={`w-11 h-11 ${chat.avatarColor} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">

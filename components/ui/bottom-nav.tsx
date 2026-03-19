@@ -7,6 +7,7 @@ type Tab = "home" | "announcements" | "chats" | "directory" | "profile"
 interface BottomNavProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
+  chatsUnread?: number
 }
 
 const tabs = [
@@ -17,13 +18,14 @@ const tabs = [
   { id: "profile" as const, label: "Profile", icon: User },
 ]
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white/95 backdrop-blur-xl border-t border-[#6D28D9]/8 px-2 pt-3 pb-7 z-50 shadow-[0_-4px_20px_rgba(109,40,217,0.06)]">
       <div className="flex items-center justify-around">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab
           const Icon = tab.icon
+          const showBadge = tab.id === "chats" && chatsUnread > 0
 
           return (
             <button
@@ -43,6 +45,11 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                 />
                 {isActive && (
                   <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#F59E0B] rounded-full" />
+                )}
+                {showBadge && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F59E0B] rounded-full text-[9px] font-bold text-[#6D28D9] flex items-center justify-center px-1 shadow-sm shadow-[#F59E0B]/40">
+                    {chatsUnread > 99 ? "99+" : chatsUnread}
+                  </span>
                 )}
               </div>
               <span
