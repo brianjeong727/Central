@@ -30,7 +30,7 @@ export function AnnouncementCard({ title, preview, date }: AnnouncementCardProps
         </p>
         
         <div className="flex items-center gap-3">
-          <button className="flex-1 bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] font-bold py-3 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/20">
+          <button className="flex-1 bg-[#F59E0B] hover:bg-[#E18D07] text-[#1A1A2E] font-bold py-3 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/20">
             RSVP Now
           </button>
           <button className="py-3 px-4 rounded-xl border border-[#6D28D9]/12 text-[#6D28D9] font-semibold hover:bg-[#6D28D9]/4 transition-colors text-[13px]">

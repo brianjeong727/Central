@@ -19,13 +19,13 @@ export function Header({ userName, role }: HeaderProps) {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-[#F59E0B] font-bold text-base">C</span>
+            <span className="text-white font-bold text-base">C</span>
           </div>
           <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
         </div>
         <button className="w-10 h-10 rounded-full bg-[#6D28D9]/8 flex items-center justify-center hover:bg-[#6D28D9]/12 transition-colors relative">
           <Bell className="w-[18px] h-[18px] text-[#6D28D9] stroke-[1.5px]" />
-          <span className="absolute -top-0.5 -right-0.5 w-[18px] h-[18px] bg-[#F59E0B] rounded-full text-[9px] font-bold text-[#6D28D9] flex items-center justify-center shadow-sm">
+          <span className="absolute -top-0.5 -right-0.5 w-[18px] h-[18px] bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center shadow-sm">
             3
           </span>
         </button>

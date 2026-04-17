@@ -33,8 +33,8 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNav
               onClick={() => onTabChange(tab.id)}
               className={`flex flex-col items-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
                 isActive
-                  ? "text-[#F59E0B]"
-                  : "text-muted-foreground/60 hover:text-[#F59E0B]/70"
+                  ? tab.id === "home" ? "text-[#F59E0B]" : "text-[#6D28D9]"
+                  : "text-[#9CA3AF] hover:text-[#6D28D9]/70"
               }`}
             >
               <div className="relative">
@@ -44,17 +44,17 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNav
                   }`}
                 />
                 {isActive && (
-                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#F59E0B] rounded-full" />
+                  <span className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${tab.id === "home" ? "bg-[#F59E0B]" : "bg-[#6D28D9]"}`} />
                 )}
                 {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F59E0B] rounded-full text-[9px] font-bold text-[#6D28D9] flex items-center justify-center px-1 shadow-sm shadow-[#F59E0B]/40">
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1 shadow-sm shadow-[#6D28D9]/40">
                     {chatsUnread > 99 ? "99+" : chatsUnread}
                   </span>
                 )}
               </div>
               <span
                 className={`text-[9px] font-semibold tracking-wide ${
-                  isActive ? "text-[#F59E0B]" : "text-muted-foreground/60"
+                  isActive ? (tab.id === "home" ? "text-[#F59E0B]" : "text-[#6D28D9]") : "text-[#9CA3AF]"
                 }`}
               >
                 {tab.label}

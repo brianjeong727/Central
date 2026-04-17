@@ -66,8 +66,8 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-widest text-foreground">CENTRAL</h1>
-          <p className="mt-2 text-sm text-muted-foreground">College ministry community</p>
+          <h1 className="text-3xl font-bold tracking-widest text-[#6D28D9]">CENTRAL</h1>
+          <p className="mt-2 text-sm text-[#6B7280]">College ministry community</p>
         </div>
 
         <Card>
@@ -142,13 +142,13 @@ export default function SignupPage() {
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3 pt-2">
-              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              <Button type="submit" className="w-full bg-[#6D28D9] hover:bg-[#5B21B6] text-white" size="lg" disabled={loading}>
                 {loading ? "Creating account…" : "Create account"}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
-                <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+                <Link href="/login" className="font-medium text-[#6D28D9] underline-offset-4 hover:underline">
                   Sign in
                 </Link>
               </p>
