@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
-  Search, Calendar, ChevronRight, Edit3, Check, X,
-  LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send,
+  Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
+  LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
+  MoreHorizontal, Trash2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -53,6 +54,14 @@ interface ChatGroup {
   last_sender: string | null
   last_message_time: string | null
   unread_count: number
+  archived?: boolean
+}
+
+interface GroupMember {
+  user_id: string
+  name: string
+  role: string
+  graduation_year: number | null
 }
 
 interface Message {
@@ -341,20 +350,22 @@ const AUDIENCE_OPTIONS = [
 
 interface CreateAnnouncementModalProps {
   userId: string
+  existing?: Announcement
   onClose: () => void
   onSuccess: (ann: Announcement) => void
 }
 
-function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncementModalProps) {
+function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: CreateAnnouncementModalProps) {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isEditing = !!existing
 
-  const [title, setTitle] = useState("")
-  const [body, setBody] = useState("")
-  const [audience, setAudience] = useState("all")
-  const [isEvent, setIsEvent] = useState(false)
+  const [title, setTitle] = useState(existing?.title ?? "")
+  const [body, setBody] = useState(existing?.body ?? "")
+  const [audience, setAudience] = useState(existing?.audience ?? "all")
+  const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -382,9 +393,10 @@ function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncem
     setSubmitting(true)
     setError(null)
 
+    // Resolve image URL
     let imageUrl: string | null = null
-
     if (imageFile) {
+      // New file picked — upload it
       const ext = imageFile.name.split(".").pop()
       const fileName = `${Date.now()}.${ext}`
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -397,34 +409,65 @@ function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncem
           .getPublicUrl(uploadData.path)
         imageUrl = publicUrl
       }
-      // If upload fails (e.g. bucket not set up), we proceed without the image
+    } else if (imagePreview) {
+      // No new file but preview is still set — keep existing URL
+      imageUrl = imagePreview
     }
+    // else imageUrl stays null (removed or never set)
 
-    const { data, error: insertError } = await supabase
-      .from("announcements")
-      .insert({
-        title: title.trim(),
-        body: body.trim(),
-        audience,
-        is_event: isEvent,
-        is_pinned: false,
-        image_url: imageUrl,
-        created_by: userId,
-      })
-      .select()
-      .single()
+    if (isEditing && existing) {
+      const { data, error: updateError } = await supabase
+        .from("announcements")
+        .update({
+          title: title.trim(),
+          body: body.trim(),
+          audience,
+          is_event: isEvent,
+          image_url: imageUrl,
+        })
+        .eq("id", existing.id)
+        .select()
+        .maybeSingle()
 
-    if (insertError) {
-      setError(insertError.message)
-      setSubmitting(false)
-      return
+      if (updateError) {
+        setError(updateError.message)
+        setSubmitting(false)
+        return
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        // data may be null with maybeSingle(); fall back to merging existing fields
+        onSuccess((data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, image_url: imageUrl }) as Announcement)
+        onClose()
+      }, 1000)
+    } else {
+      const { data, error: insertError } = await supabase
+        .from("announcements")
+        .insert({
+          title: title.trim(),
+          body: body.trim(),
+          audience,
+          is_event: isEvent,
+          is_pinned: false,
+          image_url: imageUrl,
+          created_by: userId,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        setError(insertError.message)
+        setSubmitting(false)
+        return
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        onSuccess(data as Announcement)
+        onClose()
+      }, 1200)
     }
-
-    setSuccess(true)
-    setTimeout(() => {
-      onSuccess(data as Announcement)
-      onClose()
-    }, 1200)
   }
 
   // Success screen
@@ -435,8 +478,12 @@ function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncem
           <CheckCircle2 className="w-8 h-8 text-[#F59E0B]" />
         </div>
         <div className="text-center">
-          <p className="text-[16px] font-bold text-foreground">Announcement posted!</p>
-          <p className="text-[13px] text-muted-foreground mt-1">Your announcement is now live.</p>
+          <p className="text-[16px] font-bold text-foreground">
+            {isEditing ? "Announcement updated!" : "Announcement posted!"}
+          </p>
+          <p className="text-[13px] text-muted-foreground mt-1">
+            {isEditing ? "Your changes have been saved." : "Your announcement is now live."}
+          </p>
         </div>
       </div>
     )
@@ -454,7 +501,9 @@ function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncem
         >
           <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
-        <h1 className="text-[17px] font-bold text-foreground tracking-tight">New Announcement</h1>
+        <h1 className="text-[17px] font-bold text-foreground tracking-tight">
+          {isEditing ? "Edit Announcement" : "New Announcement"}
+        </h1>
       </div>
 
       {/* ── Scrollable form fields ── */}
@@ -579,7 +628,9 @@ function CreateAnnouncementModal({ userId, onClose, onSuccess }: CreateAnnouncem
           disabled={submitting}
           className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-60 text-[#6D28D9] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#F59E0B]/30"
         >
-          {submitting ? "Posting…" : "Post Announcement"}
+          {submitting
+            ? isEditing ? "Saving…" : "Posting…"
+            : isEditing ? "Save Changes" : "Post Announcement"}
         </button>
       </div>
 
@@ -600,6 +651,7 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingAnn, setEditingAnn] = useState<EnrichedAnnouncement | null>(null)
 
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
 
@@ -688,6 +740,18 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
     setAnnouncements((prev) => [enriched, ...prev])
   }
 
+  function handleDeleteAnnouncement(id: string) {
+    setAnnouncements((prev) => prev.filter((ann) => ann.id !== id))
+  }
+
+  function handleEditSuccess(updated: Announcement) {
+    setAnnouncements((prev) =>
+      prev.map((ann) =>
+        ann.id === updated.id ? { ...ann, ...updated } : ann
+      )
+    )
+  }
+
   return (
     <div className="px-5 pt-14 pb-2">
       {/* Header */}
@@ -717,7 +781,10 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
               announcement={ann}
               isPinned={ann.is_pinned && idx === 0}
               userId={userId}
+              userRole={userRole}
               onRsvpToggle={handleRsvpToggle}
+              onEdit={(a) => setEditingAnn(a)}
+              onDelete={handleDeleteAnnouncement}
             />
           ))}
         </div>
@@ -747,6 +814,141 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
           onSuccess={handleNewAnnouncement}
         />
       )}
+
+      {/* Edit modal */}
+      {editingAnn && (
+        <CreateAnnouncementModal
+          userId={userId}
+          existing={editingAnn}
+          onClose={() => setEditingAnn(null)}
+          onSuccess={(updated) => {
+            handleEditSuccess(updated)
+            setEditingAnn(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Announcement Detail ─────────────────────────────────────────────────────
+
+interface AnnouncementDetailProps {
+  announcement: EnrichedAnnouncement
+  userId: string
+  onClose: () => void
+  onRsvpToggle: (id: string) => void
+}
+
+function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: AnnouncementDetailProps) {
+  const supabase = createClient()
+  const [rsvping, setRsvping] = useState(false)
+
+  async function handleRsvp() {
+    if (announcement.user_has_rsvped || rsvping) return
+    setRsvping(true)
+    onRsvpToggle(announcement.id)
+    await supabase.from("rsvps").upsert(
+      { announcement_id: announcement.id, user_id: userId },
+      { onConflict: "announcement_id,user_id" }
+    )
+    setRsvping(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-white flex flex-col">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-foreground" />
+          </button>
+          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
+            Announcement
+          </h2>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Image */}
+          {announcement.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={announcement.image_url}
+              alt={announcement.title}
+              className="w-full h-52 object-cover"
+            />
+          )}
+
+          <div className="px-5 py-6">
+            {/* Meta row */}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mb-4">
+              <div className="flex items-center gap-1.5 text-muted-foreground/60 text-[11px] font-medium">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{formatDate(announcement.created_at)}</span>
+              </div>
+              {announcement.audience && announcement.audience !== "all" && (
+                <span className="text-[10px] bg-[#6D28D9]/6 text-[#6D28D9] font-semibold px-2 py-0.5 rounded-full">
+                  {audienceLabel(announcement.audience)}
+                </span>
+              )}
+              {announcement.view_count > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium ml-auto">
+                  <Users className="w-3 h-3" />
+                  {announcement.view_count} seen
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 className="text-[22px] font-bold text-foreground tracking-tight leading-tight mb-4">
+              {announcement.title}
+            </h1>
+
+            {/* Body — full, no truncation */}
+            <p className="text-[14px] text-foreground/80 leading-relaxed whitespace-pre-wrap">
+              {announcement.body}
+            </p>
+
+            {/* RSVP count (inline, below body) */}
+            {announcement.is_event && announcement.rsvp_count > 0 && (
+              <div className="flex items-center gap-1.5 mt-5 text-[12px] text-muted-foreground/60 font-medium">
+                <Users className="w-3.5 h-3.5" />
+                <span>{announcement.rsvp_count} going</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pinned RSVP button */}
+        {announcement.is_event && (
+          <div className="flex-shrink-0 bg-white border-t border-[#F59E0B]/15 px-5 py-4">
+            <button
+              onClick={handleRsvp}
+              disabled={announcement.user_has_rsvped || rsvping}
+              className={`w-full font-bold py-4 px-4 rounded-xl transition-all text-[14px] tracking-wide ${
+                announcement.user_has_rsvped
+                  ? "bg-[#6D28D9]/8 text-[#6D28D9] cursor-default"
+                  : "bg-[#F59E0B] hover:bg-[#E18D07] text-[#6D28D9] shadow-lg shadow-[#F59E0B]/25 active:scale-[0.98]"
+              }`}
+            >
+              {announcement.user_has_rsvped ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  You&apos;re going!
+                </span>
+              ) : (
+                "RSVP Now"
+              )}
+            </button>
+          </div>
+        )}
+
+      </div>
     </div>
   )
 }
@@ -757,30 +959,42 @@ interface AnnouncementCardProps {
   announcement: EnrichedAnnouncement
   isPinned: boolean
   userId: string
+  userRole: string
   onRsvpToggle: (id: string) => void
+  onEdit: (ann: EnrichedAnnouncement) => void
+  onDelete: (id: string) => void
 }
 
-function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: AnnouncementCardProps) {
+function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpToggle, onEdit, onDelete }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDetail, setShowDetail] = useState(false)
+
+  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
 
   async function handleRsvp() {
     if (announcement.user_has_rsvped || rsvping) return
     setRsvping(true)
-
-    // Optimistic update immediately
     onRsvpToggle(announcement.id)
-
     await supabase.from("rsvps").upsert(
       { announcement_id: announcement.id, user_id: userId },
       { onConflict: "announcement_id,user_id" }
     )
-
     setRsvping(false)
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from("announcements").delete().eq("id", announcement.id)
+    onDelete(announcement.id)
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-[#F59E0B]/15 overflow-hidden shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
+    <>
+    <div className="relative bg-white rounded-2xl border border-[#F59E0B]/15 overflow-hidden shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
       {/* Optional image */}
       {announcement.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -812,12 +1026,50 @@ function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: Anno
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2">
             {announcement.view_count > 0 && (
               <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium">
                 <Users className="w-3 h-3" />
                 {announcement.view_count} seen
               </span>
+            )}
+
+            {/* Three-dot menu — admin/leader only */}
+            {isAdminOrLeader && (
+              <div className="relative">
+                {showMenu && (
+                  <div
+                    className="fixed inset-0 z-[5]"
+                    onClick={() => setShowMenu(false)}
+                  />
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[#6D28D9]/8 transition-colors"
+                >
+                  <MoreHorizontal className="w-4 h-4 text-muted-foreground/50" />
+                </button>
+
+                {showMenu && (
+                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-lg border border-[#F59E0B]/15 py-1 min-w-[140px]">
+                    <button
+                      onClick={() => { setShowMenu(false); onEdit(announcement) }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-foreground hover:bg-muted/40 transition-colors text-left"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-[#6D28D9]" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -825,9 +1077,15 @@ function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: Anno
         <h3 className="text-[17px] font-bold text-foreground tracking-tight mb-2">
           {announcement.title}
         </h3>
-        <p className="text-[13px] text-muted-foreground leading-relaxed mb-4 line-clamp-3">
+        <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
           {announcement.body}
         </p>
+        <button
+          onClick={() => setShowDetail(true)}
+          className="text-[12px] font-semibold text-[#F59E0B] hover:text-[#E18D07] transition-colors mt-1 mb-3"
+        >
+          See more
+        </button>
 
         {/* RSVP section */}
         {announcement.is_event && (
@@ -860,7 +1118,45 @@ function AnnouncementCard({ announcement, isPinned, userId, onRsvpToggle }: Anno
           </div>
         )}
       </div>
+
+      {/* Delete confirmation overlay */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 z-[20] bg-white/96 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-3 p-7">
+          <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-1">
+            <Trash2 className="w-5 h-5 text-red-500" />
+          </div>
+          <p className="text-[15px] font-bold text-foreground text-center">Delete this announcement?</p>
+          <p className="text-[12px] text-muted-foreground/60 text-center -mt-1">This can&apos;t be undone.</p>
+          <div className="flex gap-3 w-full mt-1">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl border border-muted/40 text-[13px] font-semibold text-muted-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-60 shadow-md shadow-red-500/20"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+
+    {/* Full-screen detail page */}
+    {showDetail && (
+      <AnnouncementDetail
+        announcement={announcement}
+        userId={userId}
+        onClose={() => setShowDetail(false)}
+        onRsvpToggle={onRsvpToggle}
+      />
+    )}
+    </>
   )
 }
 
@@ -1066,6 +1362,401 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
   )
 }
 
+// ─── Chat Settings ───────────────────────────────────────────────────────────
+
+interface ChatSettingsProps {
+  groupId: string
+  groupName: string
+  groupType: string
+  userId: string
+  userRole: string
+  onBack: () => void
+  onNameChange: (name: string) => void
+  onClose: () => void
+}
+
+function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+  const supabase = createClient()
+  const [members, setMembers] = useState<GroupMember[]>([])
+  const [loading, setLoading] = useState(true)
+  const [displayGroupName, setDisplayGroupName] = useState(groupName)
+  const [renaming, setRenaming] = useState(false)
+  const [newName, setNewName] = useState(groupName)
+  const [saving, setSaving] = useState(false)
+  const [showAddMembers, setShowAddMembers] = useState(false)
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([])
+  const [searchAdd, setSearchAdd] = useState("")
+  const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
+  const [addingMembers, setAddingMembers] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
+  const isDM = groupType === "dm"
+  const isMy = groupType === "my"
+  const isChurch = groupType === "church"
+  const canManage = (isChurch && isAdminOrLeader) || isMy
+  const canLeave = isMy || isDM
+  const canArchive = isChurch && isAdminOrLeader
+
+  useEffect(() => {
+    loadMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
+
+  async function loadMembers() {
+    setLoading(true)
+    const { data } = await supabase
+      .from("group_members")
+      .select("user_id, profiles!user_id(name, role, graduation_year)")
+      .eq("group_id", groupId)
+
+    if (data) {
+      const mapped: GroupMember[] = data.map((m: {
+        user_id: string
+        profiles: { name: string; role: string; graduation_year: number | null } | { name: string; role: string; graduation_year: number | null }[] | null
+      }) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+        return {
+          user_id: m.user_id,
+          name: p?.name ?? "Unknown",
+          role: p?.role ?? "",
+          graduation_year: p?.graduation_year ?? null,
+        }
+      })
+      setMembers(mapped)
+    }
+    setLoading(false)
+  }
+
+  async function loadAllProfiles() {
+    const memberIds = new Set(members.map((m) => m.user_id))
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me")
+      .order("name")
+    setAllProfiles((data ?? []).filter((p: Profile) => !memberIds.has(p.id)))
+  }
+
+  async function handleRename() {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === displayGroupName) { setRenaming(false); return }
+    setSaving(true)
+    await supabase.from("groups").update({ name: trimmed }).eq("id", groupId)
+    setDisplayGroupName(trimmed)
+    onNameChange(trimmed)
+    setSaving(false)
+    setRenaming(false)
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    setRemovingId(memberId)
+    await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId)
+    setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+    setRemovingId(null)
+  }
+
+  async function handleLeave() {
+    await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userId)
+    onClose()
+  }
+
+  async function handleArchive() {
+    await supabase.from("groups").update({ archived: true }).eq("id", groupId)
+    onClose()
+  }
+
+  async function handleAddMembers() {
+    if (selectedToAdd.length === 0) return
+    setAddingMembers(true)
+    await supabase.from("group_members").insert(selectedToAdd.map((uid) => ({ group_id: groupId, user_id: uid })))
+    await loadMembers()
+    setSelectedToAdd([])
+    setAddingMembers(false)
+    setShowAddMembers(false)
+    setSearchAdd("")
+  }
+
+  const filteredProfiles = allProfiles.filter((p) =>
+    p.name.toLowerCase().includes(searchAdd.toLowerCase())
+  )
+
+  if (showAddMembers) {
+    return (
+      <div className="fixed inset-0 z-[110] bg-[#FAFAFE] flex flex-col">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
+          <button
+            onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
+            className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-foreground" />
+          </button>
+          <h2 className="flex-1 text-[15px] font-bold text-foreground tracking-tight">Add Members</h2>
+          {selectedToAdd.length > 0 && (
+            <span className="text-[12px] font-semibold text-[#6D28D9]">{selectedToAdd.length} selected</span>
+          )}
+        </div>
+
+        <div className="px-4 pt-4 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+            <input
+              type="text"
+              placeholder="Search members…"
+              value={searchAdd}
+              onChange={(e) => setSearchAdd(e.target.value)}
+              autoFocus
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F59E0B]/5 text-[13px] placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 focus:bg-white border border-transparent focus:border-[#F59E0B]/25 transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-2">
+          {filteredProfiles.length === 0 ? (
+            <div className="flex items-center justify-center h-24">
+              <p className="text-[13px] text-muted-foreground/40">No members to add</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {filteredProfiles.map((profile) => {
+                const selected = selectedToAdd.includes(profile.id)
+                return (
+                  <button
+                    key={profile.id}
+                    onClick={() => setSelectedToAdd((prev) =>
+                      selected ? prev.filter((id) => id !== profile.id) : [...prev, profile.id]
+                    )}
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                      selected
+                        ? "bg-[#6D28D9]/6 border-[#6D28D9]/20"
+                        : "bg-white border-[#F59E0B]/10 shadow-sm"
+                    }`}
+                  >
+                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(profile.name)} shadow-sm shadow-[#6D28D9]/10`}>
+                      <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
+                        {getInitials(profile.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-foreground truncate">{profile.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {profile.role && (
+                          <span className="text-[9px] bg-[#F59E0B]/15 text-[#F59E0B] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                            {profile.role}
+                          </span>
+                        )}
+                        {profile.graduation_year && (
+                          <span className="text-[11px] text-muted-foreground/50">Class of {profile.graduation_year}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                      selected ? "bg-[#6D28D9] border-[#6D28D9]" : "border-muted-foreground/20"
+                    }`}>
+                      {selected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 bg-white border-t border-[#F59E0B]/15 px-5 py-4">
+          <button
+            onClick={handleAddMembers}
+            disabled={selectedToAdd.length === 0 || addingMembers}
+            className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-50 text-[#6D28D9] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#F59E0B]/30"
+          >
+            {addingMembers
+              ? "Adding…"
+              : selectedToAdd.length > 0
+              ? `Add ${selectedToAdd.length} Member${selectedToAdd.length !== 1 ? "s" : ""}`
+              : "Add Members"}
+          </button>
+        </div>
+      </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-[#FAFAFE] flex flex-col">
+    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
+        <button
+          onClick={onBack}
+          className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+        >
+          <ArrowLeft className="w-4 h-4 text-foreground" />
+        </button>
+        <h2 className="flex-1 text-[15px] font-bold text-foreground tracking-tight">Chat Info</h2>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {/* ── CHAT INFO ── */}
+        <div className="px-5 pt-6 pb-2">
+          <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-4 pl-2.5 border-l-2 border-[#6D28D9]">
+            Chat Info
+          </p>
+
+          {/* Avatar + name + count card */}
+          <div className="bg-white rounded-2xl border border-[#F59E0B]/15 p-5 mb-4 flex items-center gap-4 shadow-[0_2px_16px_rgba(245,158,11,0.06)]">
+            <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)} shadow-lg shadow-[#6D28D9]/15`}>
+              <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">
+                {getInitials(displayGroupName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="text-[16px] font-bold text-foreground tracking-tight">{displayGroupName}</h3>
+              <p className="text-[12px] text-muted-foreground/60 mt-0.5">
+                {members.length} member{members.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+
+          {/* Members list */}
+          {loading ? (
+            <Spinner />
+          ) : (
+            <div className="flex flex-col gap-2 mb-6">
+              {members.map((member) => (
+                <div
+                  key={member.user_id}
+                  className="bg-white rounded-xl border border-[#F59E0B]/10 p-3.5 flex items-center gap-3 shadow-[0_1px_8px_rgba(245,158,11,0.04)]"
+                >
+                  <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm shadow-[#6D28D9]/10`}>
+                    <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
+                      {getInitials(member.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-[13px] font-semibold text-foreground truncate">{member.name}</p>
+                      {member.user_id === userId && (
+                        <span className="text-[9px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {member.role && (
+                        <span className="text-[9px] bg-[#F59E0B] text-white font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide shadow-sm shadow-[#F59E0B]/30">
+                          {member.role}
+                        </span>
+                      )}
+                      {member.graduation_year && (
+                        <span className="text-[11px] text-muted-foreground/50">
+                          Class of {member.graduation_year}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {canManage && member.user_id !== userId && (
+                    <button
+                      onClick={() => handleRemoveMember(member.user_id)}
+                      disabled={removingId === member.user_id}
+                      className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── MANAGE CHAT ── */}
+        {canManage && (
+          <div className="px-5 pb-4">
+            <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-4 pl-2.5 border-l-2 border-[#6D28D9]">
+              Manage Chat
+            </p>
+            <div className="bg-white rounded-2xl border border-[#F59E0B]/15 shadow-[0_2px_16px_rgba(245,158,11,0.06)] overflow-hidden">
+              {/* Rename row */}
+              {renaming ? (
+                <div className="p-4 flex items-center gap-3 border-b border-[#F59E0B]/10">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRename()
+                      if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) }
+                    }}
+                    className="flex-1 text-[13px] text-foreground bg-[#F59E0B]/5 border border-[#F59E0B]/20 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/30"
+                  />
+                  <button
+                    onClick={handleRename}
+                    disabled={saving}
+                    className="w-8 h-8 rounded-full bg-[#6D28D9] flex items-center justify-center disabled:opacity-50 hover:bg-[#5B21B6] transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  </button>
+                  <button
+                    onClick={() => { setRenaming(false); setNewName(displayGroupName) }}
+                    className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setRenaming(true); setNewName(displayGroupName) }}
+                  className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors border-b border-[#F59E0B]/10"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#6D28D9]/8 flex items-center justify-center flex-shrink-0">
+                    <Edit3 className="w-3.5 h-3.5 text-[#6D28D9]" />
+                  </div>
+                  <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Rename Chat</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                </button>
+              )}
+
+              {/* Add members row */}
+              <button
+                onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
+                className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 flex items-center justify-center flex-shrink-0">
+                  <Plus className="w-3.5 h-3.5 text-[#F59E0B]" />
+                </div>
+                <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Add Members</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── DANGER ZONE ── */}
+        {(canArchive || canLeave) && (
+          <div className="px-5 pb-10">
+            {canArchive && (
+              <button
+                onClick={handleArchive}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-50 text-red-600 font-semibold text-[13px] mb-3 hover:bg-red-100 transition-colors border border-red-100 active:scale-98"
+              >
+                Archive Chat
+              </button>
+            )}
+            {canLeave && (
+              <button
+                onClick={handleLeave}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-50 text-red-600 font-semibold text-[13px] hover:bg-red-100 transition-colors border border-red-100 active:scale-98"
+              >
+                Leave Chat
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+    </div>
+  )
+}
+
 // ─── Chat Screen ────────────────────────────────────────────────────────────
 
 interface ChatScreenProps {
@@ -1073,22 +1764,37 @@ interface ChatScreenProps {
   groupName: string
   userId: string
   userName: string
+  userRole: string
   onClose: () => void
   onRead?: () => void
 }
 
-function ChatScreen({ groupId, groupName, userId, userName, onClose, onRead }: ChatScreenProps) {
+function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [inputText, setInputText] = useState("")
   const [sending, setSending] = useState(false)
+  const [displayName, setDisplayName] = useState(groupName)
+  const [groupType, setGroupType] = useState("")
+  const [showSettings, setShowSettings] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
   }, [])
+
+  // Fetch group type for settings
+  useEffect(() => {
+    supabase
+      .from("groups")
+      .select("type")
+      .eq("id", groupId)
+      .single()
+      .then(({ data }) => { if (data) setGroupType(data.type) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
 
   // Mark messages as read when opening the chat
   useEffect(() => {
@@ -1206,7 +1912,9 @@ function ChatScreen({ groupId, groupName, userId, userName, onClose, onRead }: C
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[100] bg-[#FAFAFE] flex flex-col">
+    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
       {/* ── Top bar ── */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
         <button
@@ -1215,14 +1923,20 @@ function ChatScreen({ groupId, groupName, userId, userName, onClose, onRead }: C
         >
           <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
-        <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(groupName)} shadow-md shadow-[#6D28D9]/15`}>
+        <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(displayName)} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
-            {getInitials(groupName)}
+            {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
         <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
-          {groupName}
+          {displayName}
         </h2>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+        >
+          <Settings className="w-4 h-4 text-foreground" />
+        </button>
       </div>
 
       {/* ── Messages area ── */}
@@ -1289,6 +2003,21 @@ function ChatScreen({ groupId, groupName, userId, userName, onClose, onRead }: C
         </button>
       </div>
     </div>
+    </div>
+
+    {showSettings && (
+      <ChatSettings
+        groupId={groupId}
+        groupName={displayName}
+        groupType={groupType}
+        userId={userId}
+        userRole={userRole}
+        onBack={() => setShowSettings(false)}
+        onNameChange={(name) => setDisplayName(name)}
+        onClose={() => { setShowSettings(false); onClose() }}
+      />
+    )}
+    </>
   )
 }
 
@@ -1307,9 +2036,11 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
+  const [archivedChurchChats, setArchivedChurchChats] = useState<ChatGroup[]>([])
   const [myChats, setMyChats] = useState<ChatGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const isAdminOrLeader = userRole === "admin" || userRole === "leader"
 
@@ -1317,11 +2048,11 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
     async function load() {
       const { data } = await supabase
         .from("group_members")
-        .select("groups(id, name, type), last_read_at")
+        .select("groups(id, name, type, archived), last_read_at")
         .eq("user_id", userId)
 
       type RawMember = {
-        groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null
+        groups: { id: string; name: string; type: string; archived: boolean | null } | { id: string; name: string; type: string; archived: boolean | null }[] | null
         last_read_at: string | null
       }
 
@@ -1334,6 +2065,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
             id: g.id,
             name: g.name,
             type: g.type,
+            archived: g.archived ?? false,
             last_message: null,
             last_sender: null,
             last_message_time: null,
@@ -1357,10 +2089,11 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
         })
       )
 
-      setChurchChats(withUnread.filter((g) => g.type === "church"))
+      setChurchChats(withUnread.filter((g) => g.type === "church" && !g.archived))
+      setArchivedChurchChats(withUnread.filter((g) => g.type === "church" && g.archived))
       setMyChats(withUnread.filter((g) => g.type !== "church"))
 
-      const total = withUnread.reduce((s, g) => s + g.unread_count, 0)
+      const total = withUnread.filter((g) => !g.archived).reduce((s, g) => s + g.unread_count, 0)
       onTotalUnreadChange(total)
       setLoading(false)
     }
@@ -1417,7 +2150,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
 
       {loading ? (
         <Spinner />
-      ) : active.length === 0 ? (
+      ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
         <EmptyState
           icon={<Users className="w-7 h-7" />}
           title={subTab === "church" ? "No church chats" : "No personal chats"}
@@ -1432,6 +2165,30 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
           {active.map((group) => (
             <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} />
           ))}
+
+          {/* Archived section (Church Chats only) */}
+          {subTab === "church" && archivedChurchChats.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowArchived((s) => !s)}
+                className="w-full flex items-center justify-between py-3 px-1"
+              >
+                <span className="text-[11px] font-bold text-muted-foreground/40 uppercase tracking-wider">
+                  Archived · {archivedChurchChats.length}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
+              </button>
+              {showArchived && (
+                <div className="flex flex-col gap-3">
+                  {archivedChurchChats.map((group) => (
+                    <div key={group.id} className="opacity-50">
+                      <ChatGroupCard group={group} onClick={() => onOpenChat(group.id, group.name)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1507,6 +2264,7 @@ interface DirectoryMember {
   about_me: string | null
   bible_verse: string | null
   prayer_request: string | null
+  pray_for_me: string | null
 }
 
 function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentUserId: string; currentUserName: string; onOpenChat: (id: string, name: string) => void }) {
@@ -1520,7 +2278,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
     async function load() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request")
+        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me")
         .order("name")
       setMembers(data ?? [])
       setLoading(false)
@@ -1646,7 +2404,7 @@ function MemberSheet({
   async function handleSendMessage() {
     setDmLoading(true)
 
-    // Find existing DM group between these two users
+    // Check for an existing DM between these two users
     const { data: myGroups } = await supabase
       .from("group_members")
       .select("group_id, groups!inner(type)")
@@ -1668,19 +2426,15 @@ function MemberSheet({
         .limit(1)
 
       if (shared && shared.length > 0) {
-        const groupId = shared[0].group_id
-        const { data: grp } = await supabase.from("groups").select("name").eq("id", groupId).single()
         setDmLoading(false)
-        onOpenChat(groupId, grp?.name ?? member.name)
+        onOpenChat(shared[0].group_id, member.name)
         return
       }
     }
 
-    // Create new DM group via server action
-    const dmName = `${currentUserName.split(" ")[0]} & ${member.name.split(" ")[0]}`
-
+    // No existing DM — create one named after the other person
     const { group: newGroup, error: dmErr } = await createGroup({
-      name: dmName,
+      name: member.name,
       type: "dm",
       memberIds: [member.id],
       createdBy: currentUserId,
@@ -1692,26 +2446,38 @@ function MemberSheet({
   }
 
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white rounded-t-3xl z-50 pb-10 shadow-2xl">
-        {/* Pull handle */}
-        <div className="flex justify-center pt-3 pb-4">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F59E0B]/15 shadow-sm">
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-foreground" />
+          </button>
+          <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-md shadow-[#6D28D9]/15`}>
+            <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
+              {getInitials(member.name)}
+            </AvatarFallback>
+          </Avatar>
+          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
+            {member.name}
+          </h2>
         </div>
 
-        <div className="px-6">
-          <div className="flex flex-col items-center mb-6">
-            <Avatar className="w-20 h-20 bg-[#6D28D9] mb-4 shadow-lg shadow-[#6D28D9]/20">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 py-6">
+          {/* Avatar hero + name + meta */}
+          <div className="flex flex-col items-center mb-7">
+            <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4 shadow-lg shadow-[#6D28D9]/20`}>
               <AvatarFallback className="text-white font-bold text-2xl bg-transparent">
                 {getInitials(member.name)}
               </AvatarFallback>
             </Avatar>
-            <h2 className="text-[20px] font-bold text-foreground tracking-tight">{member.name}</h2>
-            <div className="flex items-center gap-2 mt-2">
+            <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-2">{member.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (
                 <span className="text-[12px] text-muted-foreground/60">
                   Class of {member.graduation_year}
@@ -1722,50 +2488,77 @@ function MemberSheet({
                   {member.role}
                 </span>
               )}
+              {isOwnProfile && (
+                <span className="text-[10px] bg-[#6D28D9]/10 text-[#6D28D9] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">
+                  You
+                </span>
+              )}
             </div>
           </div>
 
-          {member.bible_verse && (
-            <div className="bg-[#F59E0B]/8 rounded-xl p-4 mb-4">
-              <p className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider mb-1.5">
-                Bible Verse
-              </p>
-              <p className="text-[13px] text-foreground/80 italic leading-relaxed">
-                &ldquo;{member.bible_verse}&rdquo;
-              </p>
-            </div>
-          )}
+          {/* Fields */}
+          <div className="flex flex-col gap-3">
+            {member.bible_verse && (
+              <div className="bg-[#F59E0B]/8 rounded-2xl p-4 border border-[#F59E0B]/15">
+                <p className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-wider mb-2">
+                  Bible Verse
+                </p>
+                <p className="text-[13px] text-foreground/80 italic leading-relaxed">
+                  &ldquo;{member.bible_verse}&rdquo;
+                </p>
+              </div>
+            )}
 
-          {member.prayer_request && (
-            <div className="bg-[#6D28D9]/4 rounded-xl p-4 mb-4">
-              <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-1.5">
-                Prayer Request
-              </p>
-              <p className="text-[13px] text-foreground/80 leading-relaxed">{member.prayer_request}</p>
-            </div>
-          )}
+            {member.prayer_request && (
+              <div className="bg-[#6D28D9]/4 rounded-2xl p-4 border border-[#6D28D9]/8">
+                <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-2">
+                  Prayer Request
+                </p>
+                <p className="text-[13px] text-foreground/80 leading-relaxed">{member.prayer_request}</p>
+              </div>
+            )}
 
-          {member.about_me && (
-            <div className="bg-muted/40 rounded-xl p-4 mb-6">
-              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1.5">
-                About
-              </p>
-              <p className="text-[13px] text-foreground/80 leading-relaxed">{member.about_me}</p>
-            </div>
-          )}
+            {member.pray_for_me && (
+              <div className="bg-[#6D28D9]/4 rounded-2xl p-4 border border-[#6D28D9]/8">
+                <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-2">
+                  How to Pray for Me
+                </p>
+                <p className="text-[13px] text-foreground/80 leading-relaxed">{member.pray_for_me}</p>
+              </div>
+            )}
 
-          {!isOwnProfile && (
+            {member.about_me && (
+              <div className="bg-muted/40 rounded-2xl p-4 border border-muted/60">
+                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-2">
+                  About
+                </p>
+                <p className="text-[13px] text-foreground/80 leading-relaxed">{member.about_me}</p>
+              </div>
+            )}
+
+            {!member.bible_verse && !member.prayer_request && !member.pray_for_me && !member.about_me && (
+              <div className="flex items-center justify-center py-10">
+                <p className="text-[13px] text-muted-foreground/40">No details shared yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pinned Send Message button */}
+        {!isOwnProfile && (
+          <div className="flex-shrink-0 bg-white border-t border-[#F59E0B]/15 px-5 py-4">
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-60 text-[#6D28D9] font-bold py-3.5 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/25"
+              className="w-full bg-[#F59E0B] hover:bg-[#E18D07] disabled:opacity-60 text-[#6D28D9] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#F59E0B]/25 active:scale-[0.98]"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
       </div>
-    </>
+    </div>
   )
 }
 
@@ -2015,6 +2808,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           groupName={globalOpenChat.name}
           userId={userId}
           userName={initialProfile.name}
+          userRole={initialProfile.role}
           onClose={handleChatClose}
           onRead={() => setTotalChatsUnread((n) => Math.max(0, n - 1))}
         />
