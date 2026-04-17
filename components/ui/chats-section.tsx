@@ -24,7 +24,10 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
     <section>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
-          <h2 className="text-xs font-semibold tracking-widest text-[#6B7280] uppercase pl-2 border-l-2 border-[#6D28D9]">Your Chats</h2>
+          <div className="flex items-center gap-2">
+            <div className="w-0.5 h-3 bg-[#6D28D9] rounded-full" />
+            <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">Your Chats</span>
+          </div>
           {totalUnread > 0 && (
             <span className="w-5 h-5 bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center">
               {totalUnread}
@@ -34,7 +37,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
         {onSeeAll && (
           <button
             onClick={onSeeAll}
-            className="text-sm text-[#6D28D9] font-semibold flex items-center gap-0.5 hover:opacity-70 transition-opacity"
+            className="text-[12px] text-[#6D28D9] font-medium flex items-center gap-0.5 hover:opacity-70 transition-opacity"
           >
             See all
             <ChevronRight className="w-3.5 h-3.5" />
@@ -53,7 +56,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
 
 function ChatCard({ chat, onClick }: { chat: ChatPreview; onClick?: () => void }) {
   return (
-      <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#E5E3F0] p-4 shadow-sm hover:shadow-md hover:border-[#6D28D9]/20 transition-all text-left group">
+      <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left group">
       <div className="flex items-center gap-3.5">
         <Avatar className={`w-11 h-11 ${chat.avatarColor} shadow-md shadow-[#6D28D9]/15`}>
           <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">

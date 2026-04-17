@@ -146,9 +146,10 @@ function audienceLabel(audience: string | null): string {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-xs font-semibold text-[#6B7280] uppercase tracking-widest pl-2 border-l-2 border-[#6D28D9]">
-      {children}
-    </h2>
+    <div className="flex items-center gap-2">
+      <div className="w-0.5 h-3 bg-[#6D28D9] rounded-full" />
+      <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">{children}</span>
+    </div>
   )
 }
 
@@ -194,6 +195,7 @@ interface HomeTabProps {
 function HomeTab({ profile, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false)
   const [chats, setChats] = useState<ChatPreview[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -224,7 +226,7 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTa
             return {
               id: g.id,
               groupName: g.name,
-              lastMessage: "Tap to open chat",
+              lastMessage: "",
               lastMessageSender: "",
               unreadCount: 0,
               avatarColor: getAvatarColor(g.name),
@@ -247,28 +249,28 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTa
     <div className="px-5 pt-14 pb-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
+        <div className="flex items-center gap-2">
+          <div className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[15px] font-bold tracking-[0.05em] text-[#6D28D9] ml-0.5">CENTRAL</span>
         </div>
-        <button className="w-10 h-10 rounded-full bg-white border border-[#E5E3F0] shadow-sm flex items-center justify-center hover:bg-[#F3F4F6] transition-colors relative">
-          <Bell className="w-[18px] h-[18px] text-[#6B7280] stroke-[1.5px]" />
+        <button className="size-8 bg-[#F7F6FB] rounded-full border border-[#EFEFEF] flex items-center justify-center hover:bg-[#EEEDF5] transition-colors">
+          <Bell className="size-4 text-[#6B7280]" />
         </button>
       </div>
 
       {/* Greeting */}
       <div className="flex items-start justify-between gap-4 mb-8">
         <div className="flex-1">
-          <p className="text-[13px] text-muted-foreground/70 font-medium tracking-wide mb-1">
+          <p className="text-[13px] text-[#9CA3AF] font-normal mb-1">
             {getGreeting()}
           </p>
-          <h1 className="text-[28px] font-bold text-foreground tracking-tight leading-tight">
+          <h1 className="text-3xl font-bold tracking-tight text-[#0F0A1E] leading-tight">
             {profile.name.split(" ")[0]}
           </h1>
         </div>
-        <span className="mt-2 px-2.5 py-1 bg-[#6D28D9] text-white text-[10px] font-semibold rounded-full tracking-wide uppercase shadow-sm shadow-[#6D28D9]/30">
+        <span className="mt-2 px-3 py-1 bg-[#EDE9FE] text-[#5B21B6] text-[10px] font-semibold rounded-full tracking-wide uppercase">
           {profile.role}
         </span>
       </div>
@@ -289,35 +291,42 @@ function HomeTab({ profile, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTa
               </button>
             </div>
 
-            {announcement ? (
-              <div className="bg-white rounded-2xl border border-[#E5E3F0] p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-[#9CA3AF] text-[11px] font-medium mb-3">
-                  <Calendar className="w-3.5 h-3.5" />
+            {announcement && !announcementDismissed ? (
+              <div className="relative bg-white rounded-2xl border border-[#EFEFEF] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <button
+                  onClick={() => setAnnouncementDismissed(true)}
+                  className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#F3F4F6] transition-colors"
+                  aria-label="Dismiss announcement"
+                >
+                  <X className="w-3.5 h-3.5 text-[#C4C4C4]" />
+                </button>
+                <div className="flex items-center gap-1.5 text-[#C4C4C4] text-[11px] mb-3">
+                  <Calendar className="w-3 h-3" />
                   <span>{formatDate(announcement.created_at)}</span>
                 </div>
-                <h3 className="text-[17px] font-bold text-foreground tracking-tight mb-2">
+                <h3 className="text-[17px] font-bold text-[#0F0A1E] tracking-tight mb-2 pr-6">
                   {announcement.title}
                 </h3>
-                <p className="text-[13px] text-muted-foreground leading-relaxed mb-5 line-clamp-2">
+                <p className="text-[13px] text-[#9CA3AF] leading-relaxed mb-5 line-clamp-2">
                   {announcement.body}
                 </p>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {announcement.is_event && (
-                    <button className="flex-1 bg-[#F59E0B] hover:bg-[#E18D07] text-[#1A1A2E] font-bold py-3 px-4 rounded-xl transition-colors text-[13px] tracking-wide shadow-lg shadow-[#F59E0B]/20">
+                    <button className="flex-1 bg-[#6D28D9] hover:bg-[#5B21B6] text-white font-semibold py-3 rounded-xl transition-colors text-[13px]">
                       RSVP Now
                     </button>
                   )}
                   <button
                     onClick={onSeeAnnouncements}
-                    className="py-3 px-4 rounded-xl border border-[#6D28D9] text-[#6D28D9] font-semibold hover:bg-[#6D28D9]/8 transition-colors text-[13px]"
+                    className={`py-3 px-4 rounded-xl bg-[#F7F6FB] text-[#6D28D9] font-semibold hover:bg-[#EEEDF5] transition-colors text-[13px] ${announcement.is_event ? "" : "flex-1"}`}
                   >
                     Details
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-[#E5E3F0] p-5 text-center text-[13px] text-muted-foreground/50">
-                No announcements yet
+              <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 text-center text-[13px] text-[#C4C4C4] italic">
+                {announcementDismissed ? "Dismissed" : "No announcements yet"}
               </div>
             )}
           </section>
@@ -494,7 +503,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
     <div className="max-w-[390px] mx-auto h-full flex flex-col w-full">
 
       {/* ── Top nav bar ── */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#E5E3F0] bg-white">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#F0EEF8] bg-white">
         <button
           onClick={onClose}
           className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
@@ -528,7 +537,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Announcement title…"
               required
-              className="w-full px-4 py-3 rounded-xl border border-[#E5E3F0] bg-[#F3F4F6] text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-[#EFEFEF] bg-[#F7F6FB] text-[14px] text-[#0F0A1E] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all"
             />
           </div>
 
@@ -541,7 +550,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
               placeholder="Write the full announcement here…"
               required
               rows={5}
-              className="w-full px-4 py-3 rounded-xl border border-[#E5E3F0] bg-[#F3F4F6] text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all resize-none"
+              className="w-full px-4 py-3 rounded-xl border border-[#EFEFEF] bg-[#F7F6FB] text-[14px] text-[#0F0A1E] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all resize-none"
             />
           </div>
 
@@ -621,7 +630,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
       </div>
 
       {/* ── Sticky submit button — always visible at the bottom ── */}
-      <div className="bg-white border-t border-[#E5E3F0] px-5 py-4">
+      <div className="bg-white border-t border-[#F0EEF8] px-5 py-4">
         <button
           type="submit"
           form="ann-form"
@@ -757,13 +766,13 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
+          <div className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[15px] font-bold tracking-[0.05em] text-[#6D28D9] ml-0.5">CENTRAL</span>
         </div>
       </div>
-      <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-6">Announcements</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-[#0F0A1E] mb-6">Announcements</h1>
 
       {loading ? (
         <Spinner />
@@ -799,7 +808,7 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
             bottom: "6.5rem",
             right: "max(calc(50% - 195px + 16px), 16px)",
           }}
-          className="w-14 h-14 bg-[#6D28D9] rounded-full shadow-xl shadow-[#6D28D9]/30 flex items-center justify-center z-40 hover:bg-[#5B21B6] active:scale-95 transition-all"
+          className="w-12 h-12 bg-[#6D28D9] rounded-2xl shadow-xl shadow-[#6D28D9]/30 flex items-center justify-center z-40 hover:bg-[#5B21B6] active:scale-95 transition-all"
           aria-label="New announcement"
         >
           <Plus className="w-6 h-6 text-white" />
@@ -855,100 +864,62 @@ function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: Ann
     setRsvping(false)
   }
 
+  const formattedDate = formatDate(announcement.created_at)
+
   return (
-    <div className="fixed inset-0 z-[70] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
 
-        {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#E5E3F0] shadow-sm">
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
-          </button>
-          <h2 className="flex-1 min-w-0 text-[15px] font-semibold text-[#1A1A2E] tracking-tight truncate">
-            Announcement
-          </h2>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Image */}
-          {announcement.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={announcement.image_url}
-              alt={announcement.title}
-              className="w-full h-52 object-cover"
-            />
-          )}
-
-          <div className="px-5 py-6">
-            {/* Meta row */}
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mb-4">
-              <div className="flex items-center gap-1.5 text-muted-foreground/60 text-[11px] font-medium">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDate(announcement.created_at)}</span>
-              </div>
-              {announcement.audience && announcement.audience !== "all" && (
-                <span className="text-[10px] bg-[#6D28D9]/6 text-[#6D28D9] font-semibold px-2 py-0.5 rounded-full">
-                  {audienceLabel(announcement.audience)}
-                </span>
-              )}
-              {announcement.view_count > 0 && (
-                <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-medium ml-auto">
-                  <Users className="w-3 h-3" />
-                  {announcement.view_count} seen
-                </span>
-              )}
-            </div>
-
-            {/* Title */}
-            <h1 className="text-[22px] font-bold text-foreground tracking-tight leading-tight mb-4">
-              {announcement.title}
-            </h1>
-
-            {/* Body — full, no truncation */}
-            <p className="text-[14px] text-foreground/80 leading-relaxed whitespace-pre-wrap">
-              {announcement.body}
-            </p>
-
-            {/* RSVP count (inline, below body) */}
-            {announcement.is_event && announcement.rsvp_count > 0 && (
-              <div className="flex items-center gap-1.5 mt-5 text-[12px] text-muted-foreground/60 font-medium">
-                <Users className="w-3.5 h-3.5" />
-                <span>{announcement.rsvp_count} going</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Pinned RSVP button */}
-        {announcement.is_event && (
-          <div className="flex-shrink-0 bg-white border-t border-[#E5E3F0] px-5 py-4">
-            <button
-              onClick={handleRsvp}
-              disabled={announcement.user_has_rsvped || rsvping}
-              className={`w-full font-bold py-4 px-4 rounded-xl transition-all text-[14px] tracking-wide ${
-                announcement.user_has_rsvped
-                  ? "bg-[#6D28D9]/8 text-[#6D28D9] cursor-default"
-                  : "bg-[#F59E0B] hover:bg-[#E18D07] text-[#1A1A2E] shadow-lg shadow-[#F59E0B]/25 active:scale-[0.98]"
-              }`}
-            >
-              {announcement.user_has_rsvped ? (
-                <span className="flex items-center justify-center gap-1.5">
-                  <Check className="w-4 h-4" />
-                  You&apos;re going!
-                </span>
-              ) : (
-                "RSVP Now"
-              )}
-            </button>
-          </div>
-        )}
-
+      {/* Header — never grows/shrinks, sits at top */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 bg-white border-b border-[#F0EEF8]">
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full bg-[#F7F6FB] flex items-center justify-center flex-shrink-0 hover:bg-[#EEEAF6] transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 text-[#6D28D9]" />
+        </button>
+        <span className="text-[15px] font-semibold text-[#0F0A1E]">Announcement</span>
       </div>
+
+      {/* Content — takes all remaining space, scrollable */}
+      <div className="flex-1 overflow-y-auto px-5 py-6">
+        <div className="flex items-center gap-1.5 text-[11px] text-[#C4C4C4] mb-4">
+          <Calendar className="w-3 h-3 flex-shrink-0" />
+          <span>{formattedDate}</span>
+        </div>
+        <h1 className="text-2xl font-bold text-[#0F0A1E] tracking-tight leading-tight mb-4">
+          {announcement.title}
+        </h1>
+        <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
+          {announcement.body}
+        </p>
+      </div>
+
+      {/* RSVP bar — pinned to bottom, never floats */}
+      {announcement.is_event && (
+        <div className="flex-shrink-0 bg-white border-t border-[#F0EEF8] px-5 py-4 pb-20">
+          <button
+            onClick={handleRsvp}
+            disabled={announcement.user_has_rsvped || rsvping}
+            className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${
+              announcement.user_has_rsvped
+                ? "bg-[#6D28D9]/10 text-[#6D28D9] cursor-default"
+                : "bg-[#6D28D9] hover:bg-[#5B21B6] text-white"
+            }`}
+          >
+            {announcement.user_has_rsvped ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Check className="w-4 h-4" />
+                You&apos;re going!
+              </span>
+            ) : (
+              "RSVP Now"
+            )}
+          </button>
+        </div>
+      )}
+
+    </div>
     </div>
   )
 }
@@ -994,7 +965,7 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
 
   return (
     <>
-    <div className="relative bg-white rounded-2xl border border-[#E5E3F0] overflow-hidden shadow-sm">
+    <div className="relative bg-white rounded-2xl border border-[#EFEFEF] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
       {/* Optional image */}
       {announcement.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -1016,8 +987,8 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
         {/* Meta row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground/60 text-[11px] font-medium">
-              <Calendar className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-1.5 text-[#C4C4C4] text-[11px]">
+              <Calendar className="w-3 h-3" />
               <span>{formatDate(announcement.created_at)}</span>
             </div>
             {announcement.audience && announcement.audience !== "all" && (
@@ -1052,7 +1023,7 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
                 </button>
 
                 {showMenu && (
-                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-lg border border-[#E5E3F0] py-1 min-w-[140px]">
+                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-lg border border-[#EFEFEF] py-1 min-w-[140px]">
                     <button
                       onClick={() => { setShowMenu(false); onEdit(announcement) }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-foreground hover:bg-muted/40 transition-colors text-left"
@@ -1074,15 +1045,15 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
           </div>
         </div>
 
-        <h3 className="text-[17px] font-bold text-foreground tracking-tight mb-2">
+        <h3 className="text-[17px] font-bold text-[#0F0A1E] tracking-tight mb-2">
           {announcement.title}
         </h3>
-        <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
+        <p className="text-[13px] text-[#9CA3AF] leading-relaxed line-clamp-3">
           {announcement.body}
         </p>
         <button
           onClick={() => setShowDetail(true)}
-          className="text-[12px] font-semibold text-[#6D28D9] hover:text-[#5B21B6] transition-colors mt-1 mb-3"
+          className="text-[12px] font-medium text-[#6D28D9] hover:text-[#5B21B6] transition-colors mt-1 mb-3"
         >
           See more
         </button>
@@ -1096,7 +1067,7 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
               className={`flex-1 font-bold py-3 px-4 rounded-xl transition-all text-[13px] tracking-wide ${
                 announcement.user_has_rsvped
                   ? "bg-[#6D28D9]/8 text-[#6D28D9] cursor-default"
-                  : "bg-[#F59E0B] hover:bg-[#E18D07] text-[#1A1A2E] shadow-lg shadow-[#F59E0B]/20 active:scale-[0.98]"
+                  : "bg-[#6D28D9] hover:bg-[#5B21B6] text-white active:scale-[0.98]"
               }`}
             >
               {announcement.user_has_rsvped ? (
@@ -1237,10 +1208,10 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
 
         {/* Top nav */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#E5E3F0] bg-white">
+        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#F0EEF8] bg-white">
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
+            className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4 text-foreground" />
           </button>
@@ -1265,7 +1236,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-              className="w-full px-4 py-3 rounded-xl border border-[#E5E3F0] bg-[#F3F4F6] text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-[#EFEFEF] bg-[#F7F6FB] text-[14px] text-[#0F0A1E] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/40 transition-all"
             />
           </div>
 
@@ -1301,7 +1272,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F3F4F6] text-[13px] placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border border-transparent focus:border-[#6D28D9]/25 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F7F6FB] text-[13px] placeholder:text-[#C4C4C4] text-[#0F0A1E] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border border-[#EFEFEF] focus:border-[#6D28D9]/30 transition-all"
               />
             </div>
 
@@ -1319,7 +1290,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
                       className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                         isSelected
                           ? "border-[#6D28D9]/30 bg-[#6D28D9]/4"
-                          : "border-[#E5E3F0] bg-white hover:border-[#6D28D9]/30"
+                          : "border-[#EFEFEF] bg-white hover:border-[#6D28D9]/30"
                       }`}
                     >
                       <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm`}>
@@ -1347,7 +1318,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
         </div>
 
         {/* Create button */}
-        <div className="flex-shrink-0 bg-white border-t border-[#E5E3F0] px-5 py-4">
+        <div className="flex-shrink-0 bg-white border-t border-[#F0EEF8] px-5 py-4">
           <button
             onClick={handleCreate}
             disabled={creating || !chatName.trim()}
@@ -1482,12 +1453,12 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
 
   if (showAddMembers) {
     return (
-      <div className="fixed inset-0 z-[110] bg-[#FAFAFE] flex flex-col">
+      <div className="fixed inset-0 z-[110] bg-[#F7F6FB] flex flex-col">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#E5E3F0] shadow-sm">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F0EEF8]">
           <button
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
+            className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4 text-foreground" />
           </button>
@@ -1506,7 +1477,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
               value={searchAdd}
               onChange={(e) => setSearchAdd(e.target.value)}
               autoFocus
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F3F4F6] text-[13px] placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:bg-white border border-transparent focus:border-[#6D28D9]/25 transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F7F6FB] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border border-[#EFEFEF] focus:border-[#6D28D9]/30 transition-all"
             />
           </div>
         </div>
@@ -1529,7 +1500,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
                     className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
                       selected
                         ? "bg-[#6D28D9]/6 border-[#6D28D9]/20"
-                        : "bg-white border-[#E5E3F0] shadow-sm"
+                        : "bg-white border-[#EFEFEF]"
                     }`}
                   >
                     <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(profile.name)} shadow-sm shadow-[#6D28D9]/10`}>
@@ -1562,7 +1533,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
           )}
         </div>
 
-        <div className="flex-shrink-0 bg-white border-t border-[#E5E3F0] px-5 py-4">
+        <div className="flex-shrink-0 bg-white border-t border-[#F0EEF8] px-5 py-4">
           <button
             onClick={handleAddMembers}
             disabled={selectedToAdd.length === 0 || addingMembers}
@@ -1581,13 +1552,13 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
   }
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#FAFAFE] flex flex-col">
+    <div className="fixed inset-0 z-[110] bg-[#F7F6FB] flex flex-col">
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#E5E3F0] shadow-sm">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F0EEF8]">
         <button
           onClick={onBack}
-          className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
+          className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
         >
           <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
@@ -1597,12 +1568,13 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
       <div className="flex-1 overflow-y-auto">
         {/* ── CHAT INFO ── */}
         <div className="px-5 pt-6 pb-2">
-          <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-4 pl-2.5 border-l-2 border-[#6D28D9]">
-            Chat Info
-          </p>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-0.5 h-3 bg-[#6D28D9] rounded-full" />
+            <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">Chat Info</span>
+          </div>
 
           {/* Avatar + name + count card */}
-          <div className="bg-white rounded-2xl border border-[#E5E3F0] p-5 mb-4 flex items-center gap-4 shadow-sm">
+          <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
             <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)} shadow-lg shadow-[#6D28D9]/15`}>
               <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">
                 {getInitials(displayGroupName)}
@@ -1624,7 +1596,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
               {members.map((member) => (
                 <div
                   key={member.user_id}
-                  className="bg-white rounded-xl border border-[#E5E3F0] p-3.5 flex items-center gap-3 shadow-sm"
+                  className="bg-white rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
                 >
                   <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm shadow-[#6D28D9]/10`}>
                     <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
@@ -1671,13 +1643,14 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
         {/* ── MANAGE CHAT ── */}
         {canManage && (
           <div className="px-5 pb-4">
-            <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-4 pl-2.5 border-l-2 border-[#6D28D9]">
-              Manage Chat
-            </p>
-            <div className="bg-white rounded-2xl border border-[#E5E3F0] shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-0.5 h-3 bg-[#6D28D9] rounded-full" />
+              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">Manage Chat</span>
+            </div>
+            <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
               {/* Rename row */}
               {renaming ? (
-                <div className="p-4 flex items-center gap-3 border-b border-[#E5E3F0]">
+                <div className="p-4 flex items-center gap-3 border-b border-[#F0EEF8]">
                   <input
                     autoFocus
                     value={newName}
@@ -1686,7 +1659,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
                       if (e.key === "Enter") handleRename()
                       if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) }
                     }}
-                    className="flex-1 text-[13px] text-foreground bg-[#F3F4F6] border border-[#E5E3F0] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/30"
+                    className="flex-1 text-[13px] text-foreground bg-[#F7F6FB] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/30"
                   />
                   <button
                     onClick={handleRename}
@@ -1705,7 +1678,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
               ) : (
                 <button
                   onClick={() => { setRenaming(true); setNewName(displayGroupName) }}
-                  className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors border-b border-[#E5E3F0]"
+                  className="w-full p-4 flex items-center gap-3 hover:bg-[#F7F6FB] transition-colors border-b border-[#F0EEF8]"
                 >
                   <div className="w-8 h-8 rounded-xl bg-[#6D28D9]/8 flex items-center justify-center flex-shrink-0">
                     <Edit3 className="w-3.5 h-3.5 text-[#6D28D9]" />
@@ -1718,7 +1691,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
               {/* Add members row */}
               <button
                 onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
-                className="w-full p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors"
+                className="w-full p-4 flex items-center gap-3 hover:bg-[#F7F6FB] transition-colors"
               >
                 <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] flex items-center justify-center flex-shrink-0">
                   <Plus className="w-3.5 h-3.5 text-[#6D28D9]" />
@@ -1913,29 +1886,29 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
 
   return (
     <>
-    <div className="fixed inset-0 z-[100] bg-[#FAFAFE] flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-[#F7F6FB] flex flex-col">
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
       {/* ── Top bar ── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#E5E3F0] shadow-sm">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F0EEF8]">
         <button
           onClick={onClose}
-          className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
+          className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
         >
-          <ArrowLeft className="w-4 h-4 text-foreground" />
+          <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
         </button>
-        <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(displayName)} shadow-md shadow-[#6D28D9]/15`}>
-          <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
+        <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(displayName)}`}>
+          <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
-        <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
+        <h2 className="flex-1 min-w-0 text-[15px] font-semibold text-[#0F0A1E] truncate">
           {displayName}
         </h2>
         <button
           onClick={() => setShowSettings(true)}
-          className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+          className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
         >
-          <Settings className="w-4 h-4 text-foreground" />
+          <Settings className="w-4 h-4 text-[#6B7280]" />
         </button>
       </div>
 
@@ -1959,20 +1932,20 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
               return (
                 <div key={msg.id} className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
                   {showSender && (
-                    <span className="text-[10px] font-semibold text-[#6D28D9]/60 mb-1 px-1">
+                    <span className="text-[11px] font-medium text-[#6D28D9] mb-1 px-1">
                       {msg.sender_name}
                     </span>
                   )}
                   <div
                     className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
                       isOwn
-                        ? "bg-[#6D28D9] text-white rounded-tr-sm font-medium shadow-md shadow-[#6D28D9]/20"
-                        : "bg-white border border-[#E5E3F0] text-[#1A1A2E] rounded-tl-sm shadow-sm"
+                        ? "bg-[#6D28D9] text-white rounded-tr-sm"
+                        : "bg-white border border-[#EFEFEF] text-[#0F0A1E] rounded-tl-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                     }`}
                   >
                     {msg.content}
                   </div>
-                  <span className="text-[10px] text-muted-foreground/40 mt-1 px-1">
+                  <span className="text-[10px] text-[#C4C4C4] mt-1 px-1">
                     {formatMessageTime(msg.created_at)}
                   </span>
                 </div>
@@ -1984,20 +1957,20 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
       </div>
 
       {/* ── Input bar ── */}
-      <div className="flex-shrink-0 bg-white border-t border-[#E5E3F0] px-4 py-3 flex items-end gap-3">
+      <div className="flex-shrink-0 bg-white border-t border-[#F0EEF8] px-4 py-3 flex items-end gap-2">
         <textarea
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Message…"
           rows={1}
-          className="flex-1 resize-none bg-[#F3F4F6] rounded-full px-4 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border border-transparent max-h-28 overflow-y-auto"
+          className="flex-1 resize-none bg-[#F7F6FB] rounded-full px-4 py-2.5 text-[14px] text-[#0F0A1E] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
           style={{ lineHeight: "1.5" }}
         />
         <button
           onClick={handleSend}
           disabled={!inputText.trim() || sending}
-          className="w-10 h-10 rounded-full bg-[#6D28D9] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#5B21B6] transition-all shadow-md shadow-[#6D28D9]/25 active:scale-95"
+          className="size-9 rounded-full bg-[#6D28D9] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#5B21B6] transition-all active:scale-95 ml-1"
         >
           <Send className="w-4 h-4 text-white" />
         </button>
@@ -2041,6 +2014,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
   const [loading, setLoading] = useState(true)
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [search, setSearch] = useState("")
 
   const isAdminOrLeader = userRole === "admin" || userRole === "leader"
 
@@ -2101,7 +2075,10 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, refreshKey])
 
-  const active = subTab === "church" ? churchChats : myChats
+  const rawActive = subTab === "church" ? churchChats : myChats
+  const active = search.trim()
+    ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : rawActive
   const showPlusButton = subTab === "my" || (subTab === "church" && isAdminOrLeader)
 
   return (
@@ -2109,23 +2086,23 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
+          <div className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[15px] font-bold tracking-[0.05em] text-[#6D28D9] ml-0.5">CENTRAL</span>
         </div>
       </div>
 
       {/* Sub-tab switcher */}
-      <div className="flex items-center gap-1 bg-[#6D28D9]/6 rounded-xl p-1 mb-5">
+      <div className="flex items-center gap-1 bg-[#F7F6FB] rounded-xl p-1 mb-5">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => setSubTab(t)}
+            onClick={() => { setSubTab(t); setSearch("") }}
             className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
               subTab === t
-                ? "bg-white text-[#6D28D9] shadow-sm shadow-[#6D28D9]/10"
-                : "text-muted-foreground/60 hover:text-[#6D28D9]/70"
+                ? "bg-white text-[#6D28D9] shadow-sm"
+                : "text-[#9CA3AF] hover:text-[#6D28D9]/70"
             }`}
           >
             {t === "church" ? "Church Chats" : "My Chats"}
@@ -2133,15 +2110,30 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
         ))}
       </div>
 
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search chats…"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F7F6FB] text-[13px] placeholder:text-[#C4C4C4] text-[#0F0A1E] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border border-[#EFEFEF] focus:border-[#6D28D9]/30 transition-all"
+        />
+      </div>
+
       {/* Section header with + button */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[13px] font-bold text-foreground/60 tracking-tight">
-          {subTab === "church" ? "Church Chats" : "My Chats"}
-        </h2>
+        <div className="flex items-center gap-2">
+          <div className="w-0.5 h-3 bg-[#6D28D9] rounded-full" />
+          <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">
+            {subTab === "church" ? "Church Chats" : "My Chats"}
+          </span>
+        </div>
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="w-8 h-8 rounded-full bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/25 hover:bg-[#5B21B6] active:scale-95 transition-all"
+            className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center hover:bg-[#5B21B6] active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4 text-white" />
           </button>
@@ -2153,9 +2145,11 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
       ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
         <EmptyState
           icon={<Users className="w-7 h-7" />}
-          title={subTab === "church" ? "No church chats" : "No personal chats"}
+          title={search.trim() ? "No chats found" : subTab === "church" ? "No church chats" : "No personal chats"}
           subtitle={
-            subTab === "church"
+            search.trim()
+              ? `No chats match "${search.trim()}"`
+              : subTab === "church"
               ? "You haven't been added to any church chats yet"
               : "Tap + to start a new chat"
           }
@@ -2210,36 +2204,36 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
 
 function ChatGroupCard({ group, onClick }: { group: ChatGroup; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#E5E3F0] p-4 shadow-sm hover:shadow-md hover:border-[#6D28D9]/20 transition-all text-left">
+    <button onClick={onClick} className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left">
       <div className="flex items-center gap-3.5">
-        <Avatar className={`w-11 h-11 ${getAvatarColor(group.name)} shadow-md shadow-[#6D28D9]/15`}>
-          <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
+        <Avatar className={`w-11 h-11 rounded-full ${getAvatarColor(group.name)}`}>
+          <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
             {getInitials(group.name)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-foreground text-[14px] truncate pr-2 tracking-tight">
+          <div className="flex items-center justify-between mb-0.5">
+            <h3 className="text-[15px] font-semibold text-[#0F0A1E] truncate pr-2">
               {group.name}
             </h3>
             {group.last_message_time && (
-              <span className="text-[10px] text-muted-foreground/50 font-medium flex-shrink-0">
+              <span className="text-[11px] text-[#C4C4C4] flex-shrink-0">
                 {formatRelativeTime(group.last_message_time)}
               </span>
             )}
           </div>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[12px] text-muted-foreground/60 truncate">
+            <p className="text-[13px] text-[#9CA3AF] truncate">
               {group.last_message
                 ? group.last_sender
                   ? (
                     <>
-                      <span className="font-medium text-muted-foreground">{group.last_sender}:</span>{" "}
+                      <span className="font-medium text-[#6B7280]">{group.last_sender}:</span>{" "}
                       {group.last_message}
                     </>
                   )
                   : group.last_message
-                : "No messages yet"}
+                : <span className="italic text-[#C4C4C4]">No messages yet</span>}
             </p>
             {group.unread_count > 0 && (
               <span className="w-5 h-5 bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center flex-shrink-0 shadow-sm shadow-[#6D28D9]/30">
@@ -2296,23 +2290,23 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
+          <div className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[15px] font-bold tracking-[0.05em] text-[#6D28D9] ml-0.5">CENTRAL</span>
         </div>
       </div>
-      <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-4">Directory</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-[#0F0A1E] mb-4">Directory</h1>
 
       {/* Search */}
       <div className="relative mb-6">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
         <input
           type="text"
           placeholder="Search members…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F3F4F6] text-[13px] placeholder:text-muted-foreground/40 text-foreground focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 border-none transition-all"
+          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F7F6FB] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#0F0A1E] focus:outline-none focus:ring-2 focus:ring-[#6D28D9]/20 focus:border-[#6D28D9]/30 transition-all"
         />
       </div>
 
@@ -2330,7 +2324,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
             <button
               key={member.id}
               onClick={() => setSelected(member)}
-              className="w-full bg-white rounded-2xl border border-[#E5E3F0] p-4 shadow-sm hover:shadow-md hover:border-[#6D28D9]/20 transition-all text-left"
+              className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left"
             >
               <div className="flex items-center gap-3.5">
                 <Avatar className="w-11 h-11 bg-[#6D28D9] shadow-md shadow-[#6D28D9]/15">
@@ -2342,7 +2336,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-foreground text-[14px] tracking-tight">{member.name}</h3>
                     {member.id === currentUserId && (
-                      <span className="text-[9px] bg-[#6D28D9]/8 text-[#6D28D9] font-semibold px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-[#F7F6FB] text-[#9CA3AF] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide">
                         You
                       </span>
                     )}
@@ -2354,13 +2348,13 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
                       </span>
                     )}
                     {member.role && (
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#6D28D9] text-white" : "bg-[#EDE9FE] text-[#6D28D9]"}`}>
+                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#6D28D9] text-white" : "bg-[#EDE9FE] text-[#5B21B6]"}`}>
                         {member.role}
                       </span>
                     )}
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/30 flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-[#E0DDF0] flex-shrink-0" />
               </div>
             </button>
           ))}
@@ -2450,15 +2444,15 @@ function MemberSheet({
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
 
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#E5E3F0] shadow-sm">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#F0EEF8]">
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-[#F3F4F6] flex items-center justify-center hover:bg-[#E5E7EB] transition-colors flex-shrink-0"
+            className="size-8 bg-[#F7F6FB] rounded-full flex items-center justify-center hover:bg-[#EEEDF5] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
+            <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
           </button>
-          <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-md shadow-[#6D28D9]/15`}>
-            <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
+          <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(member.name)}`}>
+            <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
               {getInitials(member.name)}
             </AvatarFallback>
           </Avatar>
@@ -2499,8 +2493,8 @@ function MemberSheet({
           {/* Fields */}
           <div className="flex flex-col gap-3">
             {member.bible_verse && (
-              <div className="bg-white rounded-2xl p-4 border border-[#E5E3F0] shadow-sm">
-                <p className="text-[10px] font-semibold tracking-widest text-[#6D28D9] uppercase mb-2">
+              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#6D28D9] mb-2">
                   Bible Verse
                 </p>
                 <p className="text-[13px] text-[#374151] italic leading-relaxed">
@@ -2510,8 +2504,8 @@ function MemberSheet({
             )}
 
             {member.prayer_request && (
-              <div className="bg-white rounded-2xl p-4 border border-[#E5E3F0] shadow-sm">
-                <p className="text-[10px] font-semibold tracking-widest text-[#6D28D9] uppercase mb-2">
+              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#6D28D9] mb-2">
                   Prayer Request
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.prayer_request}</p>
@@ -2519,8 +2513,8 @@ function MemberSheet({
             )}
 
             {member.pray_for_me && (
-              <div className="bg-white rounded-2xl p-4 border border-[#E5E3F0] shadow-sm">
-                <p className="text-[10px] font-semibold tracking-widest text-[#6D28D9] uppercase mb-2">
+              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#6D28D9] mb-2">
                   How to Pray for Me
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.pray_for_me}</p>
@@ -2528,8 +2522,8 @@ function MemberSheet({
             )}
 
             {member.about_me && (
-              <div className="bg-white rounded-2xl p-4 border border-[#E5E3F0] shadow-sm">
-                <p className="text-[10px] font-semibold tracking-widest text-[#6D28D9] uppercase mb-2">
+              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#6D28D9] mb-2">
                   About
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.about_me}</p>
@@ -2546,7 +2540,7 @@ function MemberSheet({
 
         {/* Pinned Send Message button */}
         {!isOwnProfile && (
-          <div className="flex-shrink-0 bg-white border-t border-[#E5E3F0] px-5 py-4">
+          <div className="flex-shrink-0 bg-white border-t border-[#F0EEF8] px-5 py-4">
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
@@ -2628,10 +2622,10 @@ function ProfileTab({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
+          <div className="size-8 rounded-xl bg-[#6D28D9] flex items-center justify-center">
+            <span className="text-white font-bold text-sm">C</span>
           </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
+          <span className="text-[15px] font-bold tracking-[0.05em] text-[#6D28D9] ml-0.5">CENTRAL</span>
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -2654,7 +2648,7 @@ function ProfileTab({
           ) : (
             <button
               onClick={startEdit}
-              className="flex items-center gap-1.5 bg-white border border-[#E5E3F0] text-[#6D28D9] text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#F3F4F6] transition-colors"
+              className="flex items-center gap-1.5 bg-[#F7F6FB] border border-[#EFEFEF] text-[#6D28D9] text-[13px] font-medium px-4 py-1.5 rounded-full hover:bg-[#EEEDF5] transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" />
               Edit
@@ -2670,7 +2664,7 @@ function ProfileTab({
             {getInitials(profile.name)}
           </AvatarFallback>
         </Avatar>
-        <h1 className="text-[22px] font-bold text-foreground tracking-tight">{profile.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[#0F0A1E]">{profile.name}</h1>
         <div className="flex items-center gap-2.5 mt-2">
           {profile.graduation_year && (
             <span className="text-[12px] text-muted-foreground/60 font-medium">
@@ -2689,9 +2683,9 @@ function ProfileTab({
         {fields.map(({ key, label, placeholder }) => (
           <div
             key={key}
-            className="bg-white rounded-2xl border border-[#E5E3F0] p-4 shadow-sm"
+            className="bg-white rounded-2xl border border-[#EFEFEF] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
           >
-            <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-wider mb-2">{label}</p>
+            <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#6D28D9] mb-2">{label}</p>
             {editing ? (
               <textarea
                 value={draft[key]}
@@ -2701,9 +2695,9 @@ function ProfileTab({
                 className="w-full text-[13px] text-foreground/80 leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-muted-foreground/40"
               />
             ) : (
-              <p className="text-[13px] text-foreground/70 leading-relaxed whitespace-pre-wrap">
+              <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
                 {profile[key] || (
-                  <span className="text-muted-foreground/30 italic">{placeholder}</span>
+                  <span className="text-[#C4C4C4] italic">{placeholder}</span>
                 )}
               </p>
             )}
@@ -2714,7 +2708,7 @@ function ProfileTab({
       {/* Sign out */}
       <button
         onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-destructive/20 text-destructive text-[13px] font-semibold hover:bg-destructive/4 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-[#EFEFEF] text-[#EF4444] text-[14px] font-medium hover:bg-red-50 transition-colors"
       >
         <LogOut className="w-4 h-4" />
         Sign out
@@ -2752,7 +2746,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#FAFAFE] max-w-[390px] mx-auto">
+    <div className="relative min-h-screen bg-[#F7F6FB] max-w-[390px] mx-auto">
       {/* Scrollable content area */}
       <div className="overflow-y-auto pb-28 min-h-screen">
         {activeTab === "home" && (
