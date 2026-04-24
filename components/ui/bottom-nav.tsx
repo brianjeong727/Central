@@ -32,11 +32,11 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNav
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`flex flex-col items-center justify-center gap-1 py-1 px-3 transition-all ${
-                isActive ? "text-[#6D28D9]" : "text-[#C4C4C4] hover:text-[#9CA3AF]"
+                isActive ? "text-[#3E1540]" : "text-[#C4C4C4] hover:text-[#9CA3AF]"
               }`}
             >
               {isActive && (
-                <span className="w-5 h-0.5 bg-[#6D28D9] rounded-full mb-0.5" />
+                <span className="w-5 h-0.5 bg-[#3E1540] rounded-full mb-0.5" />
               )}
               <div className="relative">
                 <Icon
@@ -45,7 +45,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNav
                   }`}
                 />
                 {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1">
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#3E1540] rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1">
                     {chatsUnread > 99 ? "99+" : chatsUnread}
                   </span>
                 )}

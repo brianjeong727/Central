@@ -1,49 +1,23 @@
 import { Bell } from "lucide-react"
 
-interface HeaderProps {
-  userName: string
-  role: string
-}
-
-export function Header({ userName, role }: HeaderProps) {
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return "Good morning"
-    if (hour < 18) return "Good afternoon"
-    return "Good evening"
-  }
-
+export function Header() {
   return (
-    <header className="px-5 pt-14 pb-2">
-      {/* Minimal Logo Bar */}
-      <div className="flex items-center justify-between mb-8">
+    <header className="px-5 pt-14 pb-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#6D28D9] flex items-center justify-center shadow-lg shadow-[#6D28D9]/20">
-            <span className="text-white font-bold text-base">C</span>
-          </div>
-          <span className="text-[#6D28D9] font-semibold text-lg tracking-tight">CENTRAL</span>
-        </div>
-        <button className="w-10 h-10 rounded-full bg-[#6D28D9]/8 flex items-center justify-center hover:bg-[#6D28D9]/12 transition-colors relative">
-          <Bell className="w-[18px] h-[18px] text-[#6D28D9] stroke-[1.5px]" />
-          <span className="absolute -top-0.5 -right-0.5 w-[18px] h-[18px] bg-[#6D28D9] rounded-full text-[9px] font-bold text-white flex items-center justify-center shadow-sm">
-            3
+          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
+            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
+            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+          </svg>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+            Central
           </span>
-        </button>
-      </div>
-
-      {/* Greeting */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <p className="text-[13px] text-muted-foreground/70 font-medium tracking-wide mb-1">
-            {getGreeting()}
-          </p>
-          <h1 className="text-[28px] font-bold text-foreground tracking-tight leading-tight">
-            {userName}
-          </h1>
         </div>
-        <span className="mt-2 px-2.5 py-1 bg-[#6D28D9]/8 text-[#6D28D9] text-[10px] font-semibold rounded-full tracking-wide uppercase">
-          {role}
-        </span>
+        <button className="size-9 bg-[#FBF8F2] rounded-xl border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors relative">
+          <Bell className="size-4 text-[#13101A] stroke-[1.5px]" />
+          <span className="absolute top-1.5 right-1.5 size-2 bg-[#C9A34B] rounded-full" />
+        </button>
       </div>
     </header>
   )
