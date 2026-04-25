@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
@@ -1770,6 +1770,7 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
+  const [memberReadMap, setMemberReadMap] = useState<Record<string, { name: string; lastReadAt: string | null }>>({})
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -1815,6 +1816,50 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
       .then(({ data }) => { if (data) setGroupType(data.type) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
+
+  // Load other members' last_read_at for read receipts
+  useEffect(() => {
+    async function loadMemberReadStates() {
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id, last_read_at, profiles!user_id(name)")
+        .eq("group_id", groupId)
+        .neq("user_id", userId)
+
+      if (data) {
+        const map: Record<string, { name: string; lastReadAt: string | null }> = {}
+        for (const m of data) {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+          map[m.user_id] = { name: (p as { name: string } | null)?.name ?? "?", lastReadAt: m.last_read_at }
+        }
+        setMemberReadMap(map)
+      }
+    }
+    loadMemberReadStates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
+
+  // Realtime: update memberReadMap when other members mark messages read
+  useEffect(() => {
+    const channel = supabase
+      .channel(`read-receipts-${groupId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "group_members", filter: `group_id=eq.${groupId}` },
+        (payload) => {
+          const updated = payload.new as { user_id: string; last_read_at: string | null }
+          if (updated.user_id === userId) return
+          setMemberReadMap((prev) => ({
+            ...prev,
+            [updated.user_id]: { ...prev[updated.user_id], lastReadAt: updated.last_read_at },
+          }))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
 
   // Mark messages as read on open and again on close (clears badges for messages received while inside)
   useEffect(() => {
@@ -2063,6 +2108,26 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
     return Object.entries(map).map(([emoji, v]) => ({ emoji, ...v }))
   }
 
+  // For each own message: which other members have it as their most-recently-read own message
+  const readReceiptMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    const ownMsgs = messages.filter((m) => m.sender_id === userId)
+    if (ownMsgs.length === 0) return map
+    for (const { name, lastReadAt } of Object.values(memberReadMap)) {
+      if (!lastReadAt) continue
+      let target: Message | null = null
+      for (const m of ownMsgs) {
+        if (m.created_at <= lastReadAt) target = m
+        else break
+      }
+      if (target) {
+        if (!map[target.id]) map[target.id] = []
+        map[target.id].push(name)
+      }
+    }
+    return map
+  }, [messages, memberReadMap, userId])
+
   async function handleReact(messageId: string, emoji: string) {
     setEmojiPickerFor(null)
     const existing = (reactions[messageId] ?? []).find(
@@ -2240,9 +2305,25 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     </div>
                   )}
 
-                  <span className="text-[10px] text-[#C4C4C4] mt-1 px-1">
-                    {formatMessageTime(msg.created_at)}
-                  </span>
+                  <div className="flex items-center gap-1 mt-1 px-1">
+                    {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
+                      <div className="flex gap-0.5">
+                        {readReceiptMap[msg.id].map((name) => (
+                          <span
+                            key={name}
+                            title={`Read by ${name}`}
+                            className="w-[14px] h-[14px] rounded-full bg-[#8A8497] flex items-center justify-center text-white flex-shrink-0"
+                            style={{ fontSize: "7px", fontWeight: 700 }}
+                          >
+                            {name.charAt(0).toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <span className="text-[10px] text-[#C4C4C4]">
+                      {formatMessageTime(msg.created_at)}
+                    </span>
+                  </div>
                 </div>
               )
             })}
@@ -2291,16 +2372,15 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
           <Send className="w-4 h-4 text-white" />
         </button>
       </div>
+      {/* Overlay to dismiss emoji picker — inside z-[100] stacking context so picker at z-[160] sits above it */}
+      {emojiPickerFor && (
+        <div
+          className="fixed inset-0 z-[155]"
+          onClick={() => setEmojiPickerFor(null)}
+        />
+      )}
     </div>
     </div>
-
-    {/* Overlay to dismiss emoji picker on outside click */}
-    {emojiPickerFor && (
-      <div
-        className="fixed inset-0 z-[150]"
-        onClick={() => setEmojiPickerFor(null)}
-      />
-    )}
 
     {showSettings && (
       <ChatSettings
