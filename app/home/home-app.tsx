@@ -202,20 +202,45 @@ function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenC
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const [loading, setLoading] = useState(true)
+  const [userHasRsvped, setUserHasRsvped] = useState(false)
+  const [rsvping, setRsvping] = useState(false)
 
   useEffect(() => {
-    supabase
-      .from("announcements")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data: ann }) => {
-        if (ann) setAnnouncement(ann)
-        setLoading(false)
-      })
+    async function load() {
+      const { data: ann } = await supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (ann) {
+        setAnnouncement(ann)
+        if (ann.is_event) {
+          const { data: rsvpData } = await supabase
+            .from("rsvps")
+            .select("announcement_id")
+            .eq("announcement_id", ann.id)
+            .eq("user_id", profile.id)
+            .maybeSingle()
+          setUserHasRsvped(!!rsvpData)
+        }
+      }
+      setLoading(false)
+    }
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id])
+
+  async function handleHomeRsvp() {
+    if (!announcement || userHasRsvped || rsvping) return
+    setRsvping(true)
+    setUserHasRsvped(true)
+    await supabase.from("rsvps").upsert(
+      { announcement_id: announcement.id, user_id: profile.id },
+      { onConflict: "announcement_id,user_id" }
+    )
+    setRsvping(false)
+  }
 
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
@@ -276,8 +301,23 @@ function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenC
                   </p>
                   <div className="flex items-center gap-4">
                     {announcement.is_event && (
-                      <button className="bg-[#F6F4EF] text-[#3E1540] font-bold py-3 px-7 rounded-full text-[14px] hover:bg-white transition-colors">
-                        RSVP
+                      <button
+                        onClick={handleHomeRsvp}
+                        disabled={userHasRsvped || rsvping}
+                        className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${
+                          userHasRsvped
+                            ? "bg-white/20 text-[#F6F4EF] cursor-default"
+                            : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white"
+                        }`}
+                      >
+                        {userHasRsvped ? (
+                          <span className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5" />
+                            You&apos;re going!
+                          </span>
+                        ) : (
+                          "RSVP"
+                        )}
                       </button>
                     )}
                     <button
@@ -618,9 +658,10 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
 interface AnnouncementsTabProps {
   userId: string
   userRole: string
+  userGradYear: number | null
 }
 
-function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
+function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabProps) {
   const supabase = createClient()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
@@ -630,11 +671,20 @@ function AnnouncementsTab({ userId, userRole }: AnnouncementsTabProps) {
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
 
   const loadAnnouncements = useCallback(async () => {
-    const { data: annData } = await supabase
+    let annQuery = supabase
       .from("announcements")
       .select("*")
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })
+
+    if (!isLeaderOrAdmin) {
+      const audienceFilter = userGradYear
+        ? `audience.is.null,audience.eq.all,audience.eq.${userGradYear},audience.eq.group`
+        : `audience.is.null,audience.eq.all,audience.eq.group`
+      annQuery = annQuery.or(audienceFilter)
+    }
+
+    const { data: annData } = await annQuery
 
     const anns: Announcement[] = annData ?? []
 
@@ -911,7 +961,7 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
   const [deleting, setDeleting] = useState(false)
   const [showDetail, setShowDetail] = useState(false)
 
-  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
+  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
 
   async function handleRsvp() {
     if (announcement.user_has_rsvped || rsvping) return
@@ -1321,7 +1371,7 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
   const [addingMembers, setAddingMembers] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
-  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
+  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -2014,8 +2064,6 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
   }
 
   async function handleReact(messageId: string, emoji: string) {
-    console.log("handleReact called", messageId, emoji) // ADD THIS
-    alert(`handleReact called: ${emoji}`) // ADD THIS
     setEmojiPickerFor(null)
     const existing = (reactions[messageId] ?? []).find(
       (r) => r.user_id === userId && r.emoji === emoji
@@ -2292,7 +2340,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
-  const isAdminOrLeader = userRole === "admin" || userRole === "leader"
+  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
 
   useEffect(() => {
     async function load() {
@@ -3046,23 +3094,24 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
   const [recentChats, setRecentChats] = useState<ChatPreview[]>([])
 
-  // Fetch all user groups with their latest message, sorted by recency
+  // Fetch all user groups with their latest message + real unread counts, sorted by recency
   const loadRecentChats = useCallback(async () => {
     const { data: groups } = await supabase
       .from("group_members")
-      .select("groups(id, name, type)")
+      .select("groups(id, name, type), last_read_at")
       .eq("user_id", userId)
 
     if (!groups) return
 
-    type RawGroup = { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null }
+    type RawGroup = { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null; last_read_at: string | null }
     const groupList = (groups as RawGroup[])
       .map((m) => {
         if (!m.groups) return null
         const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-        return g ?? null
+        if (!g) return null
+        return { ...g, lastReadAt: m.last_read_at }
       })
-      .filter(Boolean) as { id: string; name: string; type: string }[]
+      .filter(Boolean) as { id: string; name: string; type: string; lastReadAt: string | null }[]
 
     if (groupList.length === 0) {
       setRecentChats([])
@@ -3070,15 +3119,18 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
     }
 
     const groupIds = groupList.map((g) => g.id)
+    const lastReadMap: Record<string, string | null> = {}
+    for (const g of groupList) lastReadMap[g.id] = g.lastReadAt
 
     const { data: msgs } = await supabase
       .from("messages")
-      .select("group_id, content, created_at, profiles!sender_id(name)")
+      .select("group_id, content, created_at, sender_id, profiles!sender_id(name)")
       .in("group_id", groupIds)
       .order("created_at", { ascending: false })
 
-    type RawMsg = { group_id: string; content: string; created_at: string; profiles: { name: string } | { name: string }[] | null }
+    type RawMsg = { group_id: string; content: string; created_at: string; sender_id: string; profiles: { name: string } | { name: string }[] | null }
     const lastMsgMap: Record<string, { content: string; senderName: string; time: string; ts: string }> = {}
+    const unreadCountMap: Record<string, number> = {}
     for (const msg of ((msgs ?? []) as RawMsg[])) {
       if (!lastMsgMap[msg.group_id]) {
         const p = Array.isArray(msg.profiles) ? msg.profiles[0] : msg.profiles
@@ -3089,6 +3141,10 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           ts: msg.created_at,
         }
       }
+      const lra = lastReadMap[msg.group_id]
+      if (msg.sender_id !== userId && (!lra || msg.created_at > lra)) {
+        unreadCountMap[msg.group_id] = (unreadCountMap[msg.group_id] ?? 0) + 1
+      }
     }
 
     const previews: ChatPreview[] = groupList.map((g) => {
@@ -3098,7 +3154,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
         groupName: g.name,
         lastMessage: last?.content ?? "",
         lastMessageSender: last?.senderName ?? "",
-        unreadCount: 0,
+        unreadCount: unreadCountMap[g.id] ?? 0,
         avatarColor: getAvatarColor(g.name),
         initials: getInitials(g.name),
         time: last?.time ?? "",
@@ -3140,12 +3196,20 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
             .eq("id", msg.sender_id)
             .single()
             .then(({ data: prof }) => {
+              const isOwnMessage = msg.sender_id === userId
               setRecentChats((prev) => {
                 const existing = prev.find((c) => c.id === msg.group_id)
                 if (!existing) return prev
                 const updated = prev.map((c) =>
                   c.id === msg.group_id
-                    ? { ...c, lastMessage: msg.content, lastMessageSender: prof?.name ?? "", time: formatRelativeTime(msg.created_at), _ts: msg.created_at } as ChatPreview & { _ts: string }
+                    ? {
+                        ...c,
+                        lastMessage: msg.content,
+                        lastMessageSender: prof?.name ?? "",
+                        time: formatRelativeTime(msg.created_at),
+                        _ts: msg.created_at,
+                        unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
+                      } as ChatPreview & { _ts: string }
                     : c
                 )
                 // Re-sort so the updated chat bubbles to the top
@@ -3161,6 +3225,31 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const recountTotalUnread = useCallback(async () => {
+    const { data } = await supabase
+      .from("group_members")
+      .select("group_id, last_read_at")
+      .eq("user_id", userId)
+
+    if (!data || data.length === 0) { setTotalChatsUnread(0); return }
+
+    let total = 0
+    await Promise.all(
+      data.map(async ({ group_id, last_read_at }: { group_id: string; last_read_at: string | null }) => {
+        let q = supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", group_id)
+          .neq("sender_id", userId)
+        if (last_read_at) q = q.gt("created_at", last_read_at)
+        const { count } = await q
+        total += count ?? 0
+      })
+    )
+    setTotalChatsUnread(total)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
@@ -3192,7 +3281,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           />
         )}
         {activeTab === "announcements" && (
-          <AnnouncementsTab userId={userId} userRole={initialProfile.role} />
+          <AnnouncementsTab userId={userId} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} />
         )}
         {activeTab === "chats" && (
           <ChatsTab
@@ -3238,7 +3327,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           userName={initialProfile.name}
           userRole={initialProfile.role}
           onClose={handleChatClose}
-          onRead={() => setTotalChatsUnread((n) => Math.max(0, n - 1))}
+          onRead={recountTotalUnread}
         />
       )}
     </div>

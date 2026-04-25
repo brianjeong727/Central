@@ -48,7 +48,7 @@ export default function SignupPage() {
         name,
         email,
         graduation_year: Number(graduationYear),
-        role: "Member",
+        role: "member",
       })
 
       if (profileError) {
