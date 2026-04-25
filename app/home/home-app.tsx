@@ -2305,18 +2305,22 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     </div>
                   )}
 
-                  <div className="flex items-center gap-1 mt-1 px-1">
+                  <div className="flex items-center gap-1.5 mt-1 px-1">
                     {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
-                      <div className="flex gap-0.5">
-                        {readReceiptMap[msg.id].map((name) => (
-                          <span
-                            key={name}
-                            title={`Read by ${name}`}
-                            className="w-[14px] h-[14px] rounded-full bg-[#8A8497] flex items-center justify-center text-white flex-shrink-0"
-                            style={{ fontSize: "7px", fontWeight: 700 }}
+                      <div className="flex items-center">
+                        {[userName, ...readReceiptMap[msg.id]].map((name, idx) => (
+                          <Avatar
+                            key={`${name}-${idx}`}
+                            title={idx === 0 ? "You" : `Read by ${name}`}
+                            className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
                           >
-                            {name.charAt(0).toUpperCase()}
-                          </span>
+                            <AvatarFallback
+                              className="text-white bg-transparent"
+                              style={{ fontSize: "6px", fontWeight: 700 }}
+                            >
+                              {name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
                         ))}
                       </div>
                     )}
