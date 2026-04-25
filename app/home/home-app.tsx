@@ -74,6 +74,7 @@ interface Message {
   reply_to_id: string | null
   reply_to_content: string | null
   reply_to_sender: string | null
+  deleted?: boolean
 }
 
 interface Reaction {
@@ -1764,6 +1765,8 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null)
+  const [contextMenuFor, setContextMenuFor] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
   const messagesRef = useRef<Message[]>([])
@@ -1781,15 +1784,17 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
   }
 
   function handlePointerDown(msg: Message) {
+    if (msg.deleted) return
     longPressFiredRef.current = false
     longPressTimer.current = setTimeout(() => {
       longPressFiredRef.current = true
       longPressTimer.current = null
-      setReplyingTo(msg)
+      setContextMenuFor(msg.id)
     }, 400)
   }
 
   function handlePointerUp(msg: Message) {
+    if (msg.deleted) return
     if (longPressTimer.current !== null) {
       // Timer still pending — this is a short tap, open emoji picker
       clearTimeout(longPressTimer.current)
@@ -1804,6 +1809,15 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+  }
+
+  async function handleDeleteMessage(msgId: string) {
+    setDeletingId(null)
+    setContextMenuFor(null)
+    // Optimistic
+    setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "" } : m))
+    setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
+    await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", userId)
   }
 
   // Fetch group type for settings
@@ -2240,6 +2254,43 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     </div>
                   )}
 
+                  {/* Context menu — floats above the bubble on long press */}
+                  {contextMenuFor === msg.id && (
+                    <div
+                      className={`absolute bottom-[calc(100%+4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[140px]">
+                        <button
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setContextMenuFor(null)
+                            setReplyingTo(msg)
+                          }}
+                          className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                        >
+                          <CornerUpLeft className="w-4 h-4 text-[#6B7280]" />
+                          Reply
+                        </button>
+                        {isOwn && (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setContextMenuFor(null)
+                              setDeletingId(msg.id)
+                            }}
+                            className="w-full text-left px-4 py-3 text-[14px] text-red-500 flex items-center gap-2.5 hover:bg-red-50 active:bg-red-100 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {showSender && (
                     <span className="text-[11px] font-medium text-[#3E1540] mb-1 px-1">
                       {msg.sender_name}
@@ -2251,39 +2302,49 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     onPointerLeave={handlePointerCancel}
                     onPointerCancel={handlePointerCancel}
                     className={`max-w-[78%] rounded-2xl text-[14px] leading-relaxed select-none ${
-                      isOwn
-                        ? "bg-[#3E1540] text-white rounded-tr-sm"
-                        : "bg-white border border-[#EFEFEF] text-[#13101A] rounded-tl-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-                    } ${msg.reply_to_id ? "" : "px-4 py-2.5"}`}
+                      msg.deleted
+                        ? isOwn
+                          ? "bg-[#3E1540]/30 text-white/50 rounded-tr-sm px-4 py-2.5"
+                          : "bg-white border border-[#EFEFEF] text-[#9CA3AF] rounded-tl-sm px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                        : isOwn
+                          ? "bg-[#3E1540] text-white rounded-tr-sm"
+                          : "bg-white border border-[#EFEFEF] text-[#13101A] rounded-tl-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                    } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
                   >
-                    {msg.reply_to_id && msg.reply_to_content && (
-                      <div className="px-3 pt-3 pb-0.5">
-                        <button
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={() => scrollToMessage(msg.reply_to_id!)}
-                          className={`w-full text-left px-3 py-2 rounded-[6px] flex flex-col gap-0.5 ${
-                            isOwn
-                              ? "bg-white/20 border-l-[3px] border-white/40"
-                              : "bg-[#FBF8F2] border-l-[3px] border-[#3E1540]"
-                          }`}
-                        >
-                          <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/80" : "text-[#3E1540]"}`}>
-                            <CornerUpLeft className="w-3 h-3" />
-                            {msg.reply_to_sender}
-                          </span>
-                          <span className={`text-[12px] truncate ${isOwn ? "text-white/60" : "text-[#9CA3AF]"}`}>
-                            {msg.reply_to_content.slice(0, 80)}
-                          </span>
-                        </button>
-                      </div>
+                    {msg.deleted ? (
+                      <span className="italic text-[13px]">Message deleted</span>
+                    ) : (
+                      <>
+                        {msg.reply_to_id && msg.reply_to_content && (
+                          <div className="px-3 pt-3 pb-0.5">
+                            <button
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={() => scrollToMessage(msg.reply_to_id!)}
+                              className={`w-full text-left px-3 py-2 rounded-[6px] flex flex-col gap-0.5 ${
+                                isOwn
+                                  ? "bg-white/20 border-l-[3px] border-white/40"
+                                  : "bg-[#FBF8F2] border-l-[3px] border-[#3E1540]"
+                              }`}
+                            >
+                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/80" : "text-[#3E1540]"}`}>
+                                <CornerUpLeft className="w-3 h-3" />
+                                {msg.reply_to_sender}
+                              </span>
+                              <span className={`text-[12px] truncate ${isOwn ? "text-white/60" : "text-[#9CA3AF]"}`}>
+                                {msg.reply_to_content.slice(0, 80)}
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                        <div className={msg.reply_to_id ? "px-4 py-2.5" : ""}>
+                          {msg.content}
+                        </div>
+                      </>
                     )}
-                    <div className={msg.reply_to_id ? "px-4 py-2.5" : ""}>
-                      {msg.content}
-                    </div>
                   </div>
 
-                  {/* Reaction pills */}
-                  {rxGroups.length > 0 && (
+                  {/* Reaction pills — hidden on deleted messages */}
+                  {!msg.deleted && rxGroups.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1 px-1">
                       {rxGroups.map(({ emoji, count, userReacted }) => (
                         <button
@@ -2302,6 +2363,28 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                           </span>
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Inline delete confirmation */}
+                  {deletingId === msg.id && (
+                    <div
+                      className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-[12px] text-[#6B7280]">Delete this message?</span>
+                      <button
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(null)}
+                        className="text-[12px] text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   )}
 
@@ -2376,11 +2459,11 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
           <Send className="w-4 h-4 text-white" />
         </button>
       </div>
-      {/* Overlay to dismiss emoji picker — inside z-[100] stacking context so picker at z-[160] sits above it */}
-      {emojiPickerFor && (
+      {/* Overlay to dismiss emoji picker / context menu — inside z-[100] stacking context so picker at z-[160] sits above it */}
+      {(emojiPickerFor || contextMenuFor) && (
         <div
           className="fixed inset-0 z-[155]"
-          onClick={() => setEmojiPickerFor(null)}
+          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null) }}
         />
       )}
     </div>
