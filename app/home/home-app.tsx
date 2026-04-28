@@ -271,7 +271,9 @@ function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenC
           {/* Latest Announcement */}
           <section>
             <div className="flex items-center justify-between mb-3">
-              <SectionLabel>Latest Announcement</SectionLabel>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                Latest announcement
+              </h2>
               <button
                 onClick={onSeeAnnouncements}
                 className="text-[13px] text-[#5A5466] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors"
@@ -536,7 +538,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
 
           {/* Title */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">Title</label>
+            <label className="text-[12px] font-medium text-[#8A8497]">Title</label>
             <input
               type="text"
               value={title}
@@ -549,7 +551,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
 
           {/* Body */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">Body</label>
+            <label className="text-[12px] font-medium text-[#8A8497]">Body</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -562,7 +564,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
 
           {/* Audience */}
           <div className="flex flex-col gap-2.5">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">Audience</label>
+            <label className="text-[12px] font-medium text-[#8A8497]">Audience</label>
             <div className="flex flex-wrap gap-2">
               {AUDIENCE_OPTIONS.map((opt) => (
                 <button
@@ -604,9 +606,8 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
 
           {/* Image upload */}
           <div className="flex flex-col gap-2">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">
-              Image{" "}
-              <span className="text-muted-foreground/50 normal-case font-medium tracking-normal">(optional)</span>
+            <label className="text-[12px] font-medium text-[#8A8497]">
+              Image <span className="text-[#C4C4C4]">(optional)</span>
             </label>
             {imagePreview ? (
               <div className="relative rounded-xl overflow-hidden">
@@ -901,11 +902,11 @@ function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: Ann
 
       {/* Content — takes all remaining space, scrollable */}
       <div className="flex-1 overflow-y-auto px-5 py-6">
-        <div className="flex items-center gap-1.5 text-[11px] text-[#C4C4C4] mb-4">
-          <Calendar className="w-3 h-3 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 text-[13px] text-[#8A8497] mb-5">
+          <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
           <span>{formattedDate}</span>
         </div>
-        <h1 className="text-2xl font-bold text-[#13101A] tracking-tight leading-tight mb-4">
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, marginBottom: "16px" }}>
           {announcement.title}
         </h1>
         <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
@@ -931,7 +932,7 @@ function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: Ann
                 You&apos;re going!
               </span>
             ) : (
-              "RSVP Now"
+              "RSVP"
             )}
           </button>
         </div>
@@ -1241,7 +1242,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
 
           {/* Chat name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">Chat Name</label>
+            <label className="text-[12px] font-medium text-[#8A8497]">Chat name</label>
             <input
               type="text"
               value={chatName}
@@ -1270,10 +1271,10 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
 
           {/* Member search */}
           <div className="flex flex-col gap-3">
-            <label className="text-[11px] font-bold text-[#3E1540] uppercase tracking-wider">
-              Add Members
+            <label className="text-[12px] font-medium text-[#8A8497]">
+              Add members
               {selectedMembers.length > 0 && (
-                <span className="ml-2 text-[#3E1540] font-bold">{selectedMembers.length} selected</span>
+                <span className="ml-2 text-[#3E1540] font-semibold">{selectedMembers.length} selected</span>
               )}
             </label>
             <div className="relative">
@@ -1579,10 +1580,9 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
       <div className="flex-1 overflow-y-auto">
         {/* ── CHAT INFO ── */}
         <div className="px-5 pt-6 pb-2">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-0.5 h-3 bg-[#3E1540] rounded-full" />
-            <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">Chat Info</span>
-          </div>
+          <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
+            Chat info
+          </h3>
 
           {/* Avatar + name + count card */}
           <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -1654,10 +1654,9 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
         {/* ── MANAGE CHAT ── */}
         {canManage && (
           <div className="px-5 pb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-0.5 h-3 bg-[#3E1540] rounded-full" />
-              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#9CA3AF]">Manage Chat</span>
-            </div>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
+              Manage chat
+            </h3>
             <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
               {/* Rename row */}
               {renaming ? (
@@ -1720,17 +1719,17 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
             {canArchive && (
               <button
                 onClick={handleArchive}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-red-500 font-semibold text-[13px] mb-3 hover:bg-red-50 transition-colors border border-red-200 active:scale-98"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]"
               >
-                Archive Chat
+                Archive chat
               </button>
             )}
             {canLeave && (
               <button
                 onClick={handleLeave}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-red-500 font-semibold text-[13px] hover:bg-red-50 transition-colors border border-red-200 active:scale-98"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]"
               >
-                Leave Chat
+                Leave chat
               </button>
             )}
           </div>
@@ -2224,7 +2223,9 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
             {messages.map((msg, i) => {
               const isOwn = msg.sender_id === userId
               const prevMsg = i > 0 ? messages[i - 1] : null
+              const nextMsg = i < messages.length - 1 ? messages[i + 1] : null
               const showSender = !isOwn && msg.sender_id !== prevMsg?.sender_id
+              const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id
               const rxGroups = groupedReactions(msg.id)
               return (
                 <div
@@ -2304,11 +2305,11 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     className={`max-w-[78%] rounded-2xl text-[14px] leading-relaxed select-none ${
                       msg.deleted
                         ? isOwn
-                          ? "bg-[#3E1540]/30 text-white/50 rounded-tr-sm px-4 py-2.5"
-                          : "bg-white border border-[#EFEFEF] text-[#9CA3AF] rounded-tl-sm px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                          ? `bg-[#3E1540]/30 text-white/50 ${isLastInGroup ? "rounded-tr-sm" : ""} px-4 py-2.5`
+                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${isLastInGroup ? "rounded-tl-sm" : ""} px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                         : isOwn
-                          ? "bg-[#3E1540] text-white rounded-tr-sm"
-                          : "bg-white border border-[#EFEFEF] text-[#13101A] rounded-tl-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                          ? `bg-[#3E1540] text-white ${isLastInGroup ? "rounded-tr-sm" : ""}`
+                          : `bg-white border border-[#EFEFEF] text-[#13101A] ${isLastInGroup ? "rounded-tl-sm" : ""} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                     } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
                   >
                     {msg.deleted ? (
@@ -2322,15 +2323,15 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                               onClick={() => scrollToMessage(msg.reply_to_id!)}
                               className={`w-full text-left px-3 py-2 rounded-[6px] flex flex-col gap-0.5 ${
                                 isOwn
-                                  ? "bg-white/20 border-l-[3px] border-white/40"
+                                  ? "bg-white/25 border-l-[3px] border-white/60"
                                   : "bg-[#FBF8F2] border-l-[3px] border-[#3E1540]"
                               }`}
                             >
-                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/80" : "text-[#3E1540]"}`}>
+                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/95" : "text-[#3E1540]"}`}>
                                 <CornerUpLeft className="w-3 h-3" />
                                 {msg.reply_to_sender}
                               </span>
-                              <span className={`text-[12px] truncate ${isOwn ? "text-white/60" : "text-[#9CA3AF]"}`}>
+                              <span className={`text-[12px] truncate ${isOwn ? "text-white/80" : "text-[#9CA3AF]"}`}>
                                 {msg.reply_to_content.slice(0, 80)}
                               </span>
                             </button>
@@ -2652,9 +2653,9 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[#3E1540] flex items-center justify-center hover:bg-[#2D0F2E] active:scale-95 transition-all"
+            className="size-8 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all"
           >
-            <Plus className="w-4 h-4 text-white" />
+            <Plus className="w-4 h-4 text-[#3E1540]" />
           </button>
         )}
       </div>
@@ -2875,7 +2876,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
                       </span>
                     )}
                     {member.role && (
-                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#5B21B6]"}`}>
+                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
                         {member.role}
                       </span>
                     )}
@@ -3021,8 +3022,8 @@ function MemberSheet({
           <div className="flex flex-col gap-3">
             {member.bible_verse && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#3E1540] mb-2">
-                  Bible Verse
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
+                  Bible verse
                 </p>
                 <p className="text-[13px] text-[#374151] italic leading-relaxed">
                   &ldquo;{member.bible_verse}&rdquo;
@@ -3032,8 +3033,8 @@ function MemberSheet({
 
             {member.prayer_request && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#3E1540] mb-2">
-                  Prayer Request
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
+                  Prayer request
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.prayer_request}</p>
               </div>
@@ -3041,8 +3042,8 @@ function MemberSheet({
 
             {member.pray_for_me && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#3E1540] mb-2">
-                  How to Pray for Me
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
+                  How to pray for me
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.pray_for_me}</p>
               </div>
@@ -3050,7 +3051,7 @@ function MemberSheet({
 
             {member.about_me && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#3E1540] mb-2">
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
                   About
                 </p>
                 <p className="text-[13px] text-[#374151] leading-relaxed">{member.about_me}</p>
@@ -3138,10 +3139,10 @@ function ProfileTab({
   }, [draft, userId])
 
   const fields = [
-    { key: "about_me" as const, label: "About Me", placeholder: "Tell the community about yourself…" },
-    { key: "bible_verse" as const, label: "Current Bible Verse", placeholder: "What verse are you meditating on?" },
-    { key: "prayer_request" as const, label: "Prayer Request", placeholder: "Share what you'd like prayer for…" },
-    { key: "pray_for_me" as const, label: "How to Pray for Me This Week", placeholder: "Specific ways others can intercede…" },
+    { key: "about_me" as const, label: "About me", placeholder: "Tell the community about yourself…" },
+    { key: "bible_verse" as const, label: "Current Bible verse", placeholder: "What verse are you meditating on?" },
+    { key: "prayer_request" as const, label: "Prayer request", placeholder: "Share what you'd like prayer for…" },
+    { key: "pray_for_me" as const, label: "How to pray for me this week", placeholder: "Specific ways others can intercede…" },
   ]
 
   return (
@@ -3214,7 +3215,7 @@ function ProfileTab({
             key={key}
             className="bg-white rounded-2xl border border-[#EFEFEF] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
           >
-            <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#3E1540] mb-2">{label}</p>
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>{label}</p>
             {editing ? (
               <textarea
                 value={draft[key]}

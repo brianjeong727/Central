@@ -4,10 +4,6 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 const CURRENT_YEAR = new Date().getFullYear()
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
@@ -62,99 +58,111 @@ export default function SignupPage() {
     router.refresh()
   }
 
+  const inputClass = "w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-[0.2em] text-[#6D28D9]">CENTRAL</h1>
-          <p className="mt-2 text-[13px] text-[#9CA3AF]">College ministry community</p>
+    <div className="min-h-screen bg-[#FBF8F2] flex items-center justify-center px-6 py-12">
+      <div className="w-full max-w-[390px]">
+
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="flex items-center gap-2.5 mb-3">
+            <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
+              <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
+              <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+            </svg>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+              Central
+            </span>
+          </div>
+          <p className="text-[13px] text-[#8A8497]">College ministry community</p>
         </div>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Create an account</CardTitle>
-            <CardDescription>Join the CENTRAL community</CardDescription>
-          </CardHeader>
+        {/* Form card */}
+        <div className="bg-white rounded-2xl border border-[#ECE8DE] p-6 shadow-[0_2px_8px_rgba(19,16,26,0.06)]">
+          <h2 className="text-[20px] font-bold text-[#13101A] tracking-tight mb-1">Create an account</h2>
+          <p className="text-[13px] text-[#8A8497] mb-6">Join the Central community</p>
 
-          <form onSubmit={handleSignup}>
-            <CardContent className="space-y-4">
-              {error && (
-                <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Full name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Brian Jeong"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  autoComplete="name"
-                />
+          <form onSubmit={handleSignup} className="flex flex-col gap-4">
+            {error && (
+              <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
+                {error}
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-medium text-[#5A5466]">Full name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Brian Jeong"
+                required
+                autoComplete="name"
+                className={inputClass}
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-medium text-[#5A5466]">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+                className={inputClass}
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="graduation-year">Graduation year</Label>
-                <select
-                  id="graduation-year"
-                  value={graduationYear}
-                  onChange={(e) => setGraduationYear(e.target.value)}
-                  required
-                  className="flex h-10 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="" disabled>Select a year</option>
-                  {GRAD_YEARS.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-            </CardContent>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-medium text-[#5A5466]">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                className={inputClass}
+              />
+            </div>
 
-            <CardFooter className="flex flex-col gap-3 pt-2">
-              <Button type="submit" className="w-full bg-[#6D28D9] hover:bg-[#5B21B6] text-white" size="lg" disabled={loading}>
-                {loading ? "Creating account…" : "Create account"}
-              </Button>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-medium text-[#5A5466]">Graduation year</label>
+              <select
+                value={graduationYear}
+                onChange={(e) => setGraduationYear(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all appearance-none"
+              >
+                <option value="" disabled>Select a year</option>
+                {GRAD_YEARS.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
 
-              <p className="text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link href="/login" className="font-medium text-[#6D28D9] underline-offset-4 hover:underline">
-                  Sign in
-                </Link>
-              </p>
-            </CardFooter>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px] mt-1"
+            >
+              {loading ? "Creating account…" : "Create account"}
+            </button>
           </form>
-        </Card>
+        </div>
+
+        <p className="text-center text-[13px] text-[#8A8497] mt-5">
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
+            Sign in
+          </Link>
+        </p>
+
       </div>
     </div>
   )
