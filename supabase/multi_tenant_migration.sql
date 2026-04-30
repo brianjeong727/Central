@@ -572,8 +572,54 @@ USING (
 
 
 -- ───────────────────────────────────────────────────────────────────────────────
+-- STEP 7c: Helper function — is_team_member()
+-- ───────────────────────────────────────────────────────────────────────────────
+-- SECURITY DEFINER: queries team_members without triggering its RLS policy.
+-- Breaks the team_members self-referential INSERT/DELETE policy recursion.
+
+CREATE OR REPLACE FUNCTION is_team_member(p_team_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM team_members
+    WHERE team_id = p_team_id AND user_id = p_user_id
+  )
+$$;
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
+-- STEP 7d: Helper function — user_can_manage_team()
+-- ───────────────────────────────────────────────────────────────────────────────
+-- SECURITY DEFINER: JOINs team_members + team_roles without triggering their RLS.
+-- Breaks infinite recursion in team_roles INSERT/UPDATE policies (which join
+-- team_roles inside a team_roles policy) and team_members DELETE.
+
+CREATE OR REPLACE FUNCTION user_can_manage_team(p_team_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM team_members tm
+    JOIN team_roles tr ON tr.id = tm.role_id
+    WHERE tm.team_id = p_team_id
+      AND tm.user_id = p_user_id
+      AND tr.permissions @> '["can_manage_team"]'::JSONB
+  )
+$$;
+
+
+-- ───────────────────────────────────────────────────────────────────────────────
 -- STEP 19: RLS — team_roles
 -- ───────────────────────────────────────────────────────────────────────────────
+-- Uses user_can_manage_team() (SECURITY DEFINER) to avoid JOIN-ing team_roles
+-- inside a team_roles policy, which would cause infinite recursion.
 
 ALTER TABLE team_roles ENABLE ROW LEVEL SECURITY;
 
@@ -588,18 +634,12 @@ USING (
   )
 );
 
--- Team members with can_manage_team, OR ministry admin/leader, can create roles
+-- Admin/leader or can_manage_team holder can create roles
 CREATE POLICY "Team managers can create team roles"
 ON team_roles FOR INSERT
 WITH CHECK (
   auth_is_admin_or_leader()
-  OR EXISTS (
-    SELECT 1 FROM team_members tm
-    JOIN team_roles tr ON tr.id = tm.role_id
-    WHERE tm.team_id = team_roles.team_id
-      AND tm.user_id = auth.uid()
-      AND tr.permissions @> '["can_manage_team"]'::JSONB
-  )
+  OR user_can_manage_team(team_roles.team_id, auth.uid())
 );
 
 -- Same gate for updates
@@ -607,19 +647,15 @@ CREATE POLICY "Team managers can update team roles"
 ON team_roles FOR UPDATE
 USING (
   auth_is_admin_or_leader()
-  OR EXISTS (
-    SELECT 1 FROM team_members tm
-    JOIN team_roles tr ON tr.id = tm.role_id
-    WHERE tm.team_id = team_roles.team_id
-      AND tm.user_id = auth.uid()
-      AND tr.permissions @> '["can_manage_team"]'::JSONB
-  )
+  OR user_can_manage_team(team_roles.team_id, auth.uid())
 );
 
 
 -- ───────────────────────────────────────────────────────────────────────────────
 -- STEP 20: RLS — team_members
 -- ───────────────────────────────────────────────────────────────────────────────
+-- Uses is_team_member() and user_can_manage_team() (SECURITY DEFINER) to avoid
+-- team_members self-referential subqueries causing recursion.
 
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 
@@ -639,29 +675,16 @@ CREATE POLICY "Team members or admins can add team members"
 ON team_members FOR INSERT
 WITH CHECK (
   auth_is_admin_or_leader()
-  OR EXISTS (
-    SELECT 1 FROM team_members tm
-    WHERE tm.team_id = team_members.team_id
-      AND tm.user_id = auth.uid()
-  )
+  OR is_team_member(team_members.team_id, auth.uid())
 );
 
 -- Self-remove always; can_manage_team or admin/leader can remove others
 CREATE POLICY "Team members can leave or be removed"
 ON team_members FOR DELETE
 USING (
-  -- Self-remove
   user_id = auth.uid()
-  -- Admin/leader can remove anyone
   OR auth_is_admin_or_leader()
-  -- can_manage_team holders can remove others from their team
-  OR EXISTS (
-    SELECT 1 FROM team_members tm
-    JOIN team_roles tr ON tr.id = tm.role_id
-    WHERE tm.team_id = team_members.team_id
-      AND tm.user_id = auth.uid()
-      AND tr.permissions @> '["can_manage_team"]'::JSONB
-  )
+  OR user_can_manage_team(team_members.team_id, auth.uid())
 );
 
 

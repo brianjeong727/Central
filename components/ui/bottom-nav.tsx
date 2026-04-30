@@ -1,26 +1,30 @@
 "use client"
 
-import { Home, Megaphone, MessageCircle, Users, User } from "lucide-react"
+import { Home, Megaphone, MessageCircle, Users, User, ClipboardList } from "lucide-react"
 
-type Tab = "home" | "announcements" | "chats" | "directory" | "profile"
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "profile"
 
 interface BottomNavProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   chatsUnread?: number
+  showPlan?: boolean
 }
 
-const tabs = [
+const ALL_TABS = [
   { id: "home" as const, label: "Home", icon: Home },
   { id: "announcements" as const, label: "Announce", icon: Megaphone },
   { id: "chats" as const, label: "Chats", icon: MessageCircle },
+  { id: "plan" as const, label: "Plan", icon: ClipboardList },
   { id: "directory" as const, label: "Directory", icon: Users },
   { id: "profile" as const, label: "Profile", icon: User },
 ]
 
-export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
+  const tabs = showPlan ? ALL_TABS : ALL_TABS.filter((t) => t.id !== "plan")
+
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 px-2">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 px-1">
       <div className="flex items-center justify-around h-full">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab
@@ -31,7 +35,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0 }: BottomNav
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 transition-all ${
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 transition-all ${
                 isActive ? "text-[#3E1540]" : "text-[#C4C4C4] hover:text-[#9CA3AF]"
               }`}
             >

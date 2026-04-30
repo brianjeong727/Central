@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
-  MoreHorizontal, Trash2, CornerUpLeft,
+  MoreHorizontal, Trash2, CornerUpLeft, ClipboardList,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -14,7 +14,7 @@ import { ChatsSection, type ChatPreview } from "@/components/ui/chats-section"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type Tab = "home" | "announcements" | "chats" | "directory" | "profile"
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "profile"
 
 interface Profile {
   id: string
@@ -3266,6 +3266,951 @@ function ProfileTab({
   )
 }
 
+// ─── Plan Tab ─────────────────────────────────────────────────────────────────
+
+interface UserTeam {
+  teamId: string
+  teamName: string
+  teamIcon: string | null
+  teamDescription: string | null
+  roleId: string
+  roleName: string
+  permissions: string[]
+}
+
+interface Team {
+  id: string
+  name: string
+  icon: string | null
+  description: string | null
+  created_by: string
+  member_count: number
+}
+
+interface TeamRole {
+  id: string
+  team_id: string
+  name: string
+  permissions: string[]
+}
+
+interface TeamMemberDisplay {
+  user_id: string
+  name: string
+  role_id: string
+  role_name: string
+  joined_at: string
+}
+
+interface DraftRole {
+  name: string
+  permissions: string[]
+}
+
+const PERMISSION_LABELS: Record<string, string> = {
+  can_manage_worship_set: "Manage worship set",
+  can_view_worship_set: "View worship set",
+  can_generate_slides: "Generate slides",
+  can_create_dgs: "Create discipleship groups",
+  can_view_dgs: "View discipleship groups",
+  can_generate_bible_study: "Generate Bible studies",
+  can_track_attendance: "Track attendance",
+  can_plan_events: "Plan events",
+  can_view_finances: "View finances",
+  can_manage_members: "Manage members",
+  can_manage_team: "Manage team",
+}
+
+const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS)
+
+const TEAM_PRESETS = [
+  {
+    id: "praise",
+    name: "Praise Team",
+    icon: "🎵",
+    description: "Worship and music ministry",
+    roles: [
+      { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
+      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
+    ],
+  },
+  {
+    id: "dgl",
+    name: "Small Group Leaders",
+    icon: "📖",
+    description: "Discipleship and Bible study",
+    roles: [
+      { name: "DGL President", permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"] },
+      { name: "Leader", permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance"] },
+    ],
+  },
+  {
+    id: "board",
+    name: "Student Org Board",
+    icon: "🏛️",
+    description: "Ministry operations and administration",
+    roles: [
+      { name: "President", permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"] },
+      { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
+      { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
+      { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
+    ],
+  },
+  {
+    id: "tech",
+    name: "Tech Team",
+    icon: "💻",
+    description: "Technical support and media",
+    roles: [{ name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] }],
+  },
+]
+
+const WORSHIP_FEATURES = [
+  { icon: "🎵", name: "This Week's Set", desc: "View songs, keys, and role assignments for Sunday's worship." },
+  { icon: "🎛️", name: "Set Builder", desc: "Build and reorder worship sets, assign keys and roles per song." },
+  { icon: "✨", name: "Slide Generator", desc: "Auto-generate lyric slides from your worship set." },
+  { icon: "📅", name: "Team Schedule", desc: "See who's playing what role this Sunday." },
+]
+
+const DISCIPLESHIP_FEATURES = [
+  { icon: "👥", name: "My Group", desc: "View your discipleship group members and contact info." },
+  { icon: "📖", name: "Bible Study Generator", desc: "AI-generated study guides from any passage or topic." },
+  { icon: "✅", name: "Attendance", desc: "Track weekly attendance for your discipleship group." },
+]
+
+const MINISTRY_FEATURES = [
+  { icon: "📅", name: "Events", desc: "Plan and manage upcoming ministry events." },
+  { icon: "📊", name: "Attendance Overview", desc: "Ministry-wide attendance trends and insights." },
+  { icon: "🌱", name: "Member Pipeline", desc: "Track new visitors and their journey to membership." },
+  { icon: "💰", name: "Finances", desc: "Budget tracking and expense reporting for your ministry." },
+]
+
+function PlanSectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+        {children}
+      </span>
+      <div className="flex-1 h-px bg-[#ECE8DE]" />
+    </div>
+  )
+}
+
+function PlanFeatureCard({ icon, name, desc }: { icon: string; name: string; desc: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[18px] flex-shrink-0">
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[14px] font-semibold text-[#13101A]">{name}</p>
+            <span className="text-[10px] font-medium text-[#8A8497] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
+              Coming soon
+            </span>
+          </div>
+          <p className="text-[13px] text-[#5A5466] mt-0.5 leading-relaxed">{desc}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface PlanTabProps {
+  userId: string
+  ministryId: string
+  ministryName: string
+  userTeams: UserTeam[]
+  allTeams: Team[]
+  isAdmin: boolean
+  onTeamsChange: () => void
+}
+
+function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange }: PlanTabProps) {
+  const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [openTeam, setOpenTeam] = useState<Team | null>(null)
+
+  const allPermissions = new Set(userTeams.flatMap((t) => t.permissions))
+  const showWorship =
+    allPermissions.has("can_manage_worship_set") ||
+    allPermissions.has("can_view_worship_set") ||
+    allPermissions.has("can_generate_slides")
+  const showDiscipleship =
+    allPermissions.has("can_create_dgs") ||
+    allPermissions.has("can_view_dgs") ||
+    allPermissions.has("can_generate_bible_study")
+  const showMinistry =
+    isAdmin ||
+    allPermissions.has("can_plan_events") ||
+    allPermissions.has("can_view_finances") ||
+    allPermissions.has("can_manage_members") ||
+    allPermissions.has("can_track_attendance")
+
+  const hasAnyPlanning = showWorship || showDiscipleship || showMinistry
+
+  return (
+    <div className="px-5 pt-14 pb-2">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2.5">
+          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
+            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
+            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+          </svg>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+            {ministryName}
+          </span>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setShowCreateTeam(true)}
+            className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors"
+          >
+            <Plus className="w-4 h-4 text-[#F6F4EF]" />
+          </button>
+        )}
+      </div>
+
+      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "20px", lineHeight: 1.05 }}>
+        Plan
+      </h1>
+
+      {/* Admin: team management */}
+      {isAdmin && (
+        <div className="mb-8">
+          <PlanSectionHeader>Teams</PlanSectionHeader>
+          {allTeams.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+              <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet</p>
+              <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {allTeams.map((team) => (
+                <button
+                  key={team.id}
+                  onClick={() => setOpenTeam(team)}
+                  className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[18px] flex-shrink-0">
+                    {team.icon ?? "👥"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
+                    <p className="text-[12px] text-[#8A8497]">
+                      {team.member_count} member{team.member_count !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Planning hub */}
+      {hasAnyPlanning && (
+        <div className="flex flex-col gap-8">
+          {showWorship && (
+            <div>
+              <PlanSectionHeader>Worship</PlanSectionHeader>
+              <div className="flex flex-col gap-2">
+                {WORSHIP_FEATURES.map((f) => (
+                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
+                ))}
+              </div>
+            </div>
+          )}
+          {showDiscipleship && (
+            <div>
+              <PlanSectionHeader>Discipleship</PlanSectionHeader>
+              <div className="flex flex-col gap-2">
+                {DISCIPLESHIP_FEATURES.map((f) => (
+                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
+                ))}
+              </div>
+            </div>
+          )}
+          {showMinistry && (
+            <div>
+              <PlanSectionHeader>Ministry</PlanSectionHeader>
+              <div className="flex flex-col gap-2">
+                {MINISTRY_FEATURES.map((f) => (
+                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isAdmin && !hasAnyPlanning && (
+        <EmptyState
+          icon={<ClipboardList className="w-6 h-6" />}
+          title="No teams yet"
+          subtitle="You'll see planning tools once you're added to a team."
+        />
+      )}
+
+      {showCreateTeam && (
+        <CreateTeamOverlay
+          userId={userId}
+          ministryId={ministryId}
+          onClose={() => setShowCreateTeam(false)}
+          onCreated={() => { setShowCreateTeam(false); onTeamsChange() }}
+        />
+      )}
+
+      {openTeam && (
+        <TeamDetailOverlay
+          team={openTeam}
+          userId={userId}
+          ministryId={ministryId}
+          isAdmin={isAdmin}
+          onClose={() => setOpenTeam(null)}
+          onChanged={() => { setOpenTeam(null); onTeamsChange() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── CreateTeamOverlay ─────────────────────────────────────────────────────────
+
+type CreateStep = "preset" | "customize" | "members"
+
+function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
+  userId: string
+  ministryId: string
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const supabase = createClient()
+  const [step, setStep] = useState<CreateStep>("preset")
+  const [teamName, setTeamName] = useState("")
+  const [teamIcon, setTeamIcon] = useState("👥")
+  const [teamDesc, setTeamDesc] = useState("")
+  const [roles, setRoles] = useState<DraftRole[]>([{ name: "Member", permissions: [] }])
+  const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null)
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  const [memberSearch, setMemberSearch] = useState("")
+  const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (step !== "members") return
+    supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("ministry_id", ministryId)
+      .neq("id", userId)
+      .order("name")
+      .then(({ data }) => setMinistryMembers(data ?? []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  function applyPreset(preset: typeof TEAM_PRESETS[0]) {
+    setTeamName(preset.name)
+    setTeamIcon(preset.icon)
+    setTeamDesc(preset.description)
+    setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions] })))
+    setStep("customize")
+  }
+
+  function addRole() {
+    const next = [...roles, { name: "", permissions: [] }]
+    setRoles(next)
+    setEditingRoleIdx(next.length - 1)
+  }
+
+  function updateRoleName(idx: number, name: string) {
+    setRoles((prev) => prev.map((r, i) => (i === idx ? { ...r, name } : r)))
+  }
+
+  function toggleRolePermission(idx: number, perm: string) {
+    setRoles((prev) =>
+      prev.map((r, i) =>
+        i === idx
+          ? { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter((p) => p !== perm) : [...r.permissions, perm] }
+          : r
+      )
+    )
+  }
+
+  function removeRole(idx: number) {
+    setRoles((prev) => prev.filter((_, i) => i !== idx))
+    setSelectedMembers((prev) =>
+      prev.filter((m) => m.roleIdx !== idx).map((m) => ({ ...m, roleIdx: m.roleIdx > idx ? m.roleIdx - 1 : m.roleIdx }))
+    )
+    if (editingRoleIdx === idx) setEditingRoleIdx(null)
+  }
+
+  function toggleMemberSelection(memberId: string) {
+    setSelectedMembers((prev) => {
+      const exists = prev.find((m) => m.userId === memberId)
+      return exists ? prev.filter((m) => m.userId !== memberId) : [...prev, { userId: memberId, roleIdx: 0 }]
+    })
+  }
+
+  function updateMemberRole(memberId: string, roleIdx: number) {
+    setSelectedMembers((prev) => prev.map((m) => (m.userId === memberId ? { ...m, roleIdx } : m)))
+  }
+
+  async function handleSave() {
+    if (!teamName.trim()) { setError("Team name is required."); return }
+    if (roles.some((r) => !r.name.trim())) { setError("All roles need a name."); return }
+    setSaving(true)
+    setError(null)
+
+    const { data: team, error: teamErr } = await supabase
+      .from("teams")
+      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId })
+      .select("id")
+      .single()
+
+    if (teamErr || !team) { setError(teamErr?.message ?? "Failed to create team."); setSaving(false); return }
+
+    const { data: createdRoles, error: rolesErr } = await supabase
+      .from("team_roles")
+      .insert(roles.map((r) => ({ team_id: team.id, name: r.name.trim(), permissions: r.permissions })))
+      .select("id")
+
+    if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
+
+    if (selectedMembers.length > 0) {
+      const { error: membersErr } = await supabase.from("team_members").insert(
+        selectedMembers.map((m) => ({
+          team_id: team.id,
+          user_id: m.userId,
+          role_id: createdRoles[m.roleIdx]?.id ?? createdRoles[0].id,
+          added_by: userId,
+        }))
+      )
+      if (membersErr) { setError(membersErr.message); setSaving(false); return }
+    }
+
+    onCreated()
+  }
+
+  const filteredMembers = ministryMembers.filter((m) =>
+    m.name.toLowerCase().includes(memberSearch.toLowerCase())
+  )
+
+  const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+        <button
+          onClick={step === "preset" ? onClose : () => setStep(step === "members" ? "customize" : "preset")}
+          className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          {step === "preset" ? "Cancel" : "Back"}
+        </button>
+        <span className="text-[14px] font-semibold text-[#13101A]">
+          {step === "preset" ? "New Team" : step === "customize" ? "Customize" : "Add Members"}
+        </span>
+        <div className="w-14 flex justify-end">
+          {step === "customize" && (
+            <button
+              onClick={() => setStep("members")}
+              disabled={!canAdvance}
+              className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30"
+            >
+              Next
+            </button>
+          )}
+          {step === "members" && (
+            <button onClick={handleSave} disabled={saving} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
+              {saving ? "Saving…" : "Create"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        {error && (
+          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium mb-4">{error}</div>
+        )}
+
+        {/* Step 1: Preset picker */}
+        {step === "preset" && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-[#8A8497] mb-1">Start with a preset or build from scratch.</p>
+            {TEAM_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyPreset(preset)}
+                className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)]"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-[22px]">{preset.icon}</span>
+                  <p className="text-[14px] font-bold text-[#13101A]">{preset.name}</p>
+                </div>
+                <p className="text-[12px] text-[#8A8497] mb-3">{preset.description}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {preset.roles.map((r) => (
+                    <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                      {r.name}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            ))}
+            <button
+              onClick={() => { setTeamName(""); setTeamIcon("👥"); setTeamDesc(""); setRoles([{ name: "Member", permissions: [] }]); setStep("customize") }}
+              className="w-full bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-4 text-center hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all"
+            >
+              <p className="text-[14px] font-semibold text-[#5A5466]">Start from scratch</p>
+              <p className="text-[12px] text-[#8A8497] mt-0.5">Build custom roles and permissions</p>
+            </button>
+          </div>
+        )}
+
+        {/* Step 2: Customize */}
+        {step === "customize" && (
+          <div className="flex flex-col gap-5">
+            <div className="flex gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-medium text-[#5A5466]">Icon</label>
+                <input
+                  type="text"
+                  value={teamIcon}
+                  onChange={(e) => setTeamIcon(e.target.value.slice(-2) || "👥")}
+                  className="w-14 h-12 text-center text-[20px] rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                />
+              </div>
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-[12px] font-medium text-[#5A5466]">Team name</label>
+                <input
+                  type="text"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="e.g. Praise Team"
+                  className="w-full h-12 px-4 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-medium text-[#5A5466]">Description (optional)</label>
+              <input
+                type="text"
+                value={teamDesc}
+                onChange={(e) => setTeamDesc(e.target.value)}
+                placeholder="What does this team do?"
+                className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-[12px] font-medium text-[#5A5466]">Roles</label>
+                <button onClick={addRole} className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 transition-opacity">
+                  + Add role
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {roles.map((role, idx) => (
+                  <div key={idx} className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden">
+                    <div
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                      onClick={() => setEditingRoleIdx(editingRoleIdx === idx ? null : idx)}
+                    >
+                      <input
+                        type="text"
+                        value={role.name}
+                        onChange={(e) => { e.stopPropagation(); updateRoleName(idx, e.target.value) }}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Role name"
+                        className="flex-1 text-[14px] font-semibold text-[#13101A] bg-transparent focus:outline-none placeholder:text-[#C4C4C4] placeholder:font-normal"
+                      />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[11px] text-[#8A8497]">{role.permissions.length} perms</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-[#C4C4C4] transition-transform ${editingRoleIdx === idx ? "rotate-180" : ""}`} />
+                        {roles.length > 1 && (
+                          <button onClick={(e) => { e.stopPropagation(); removeRole(idx) }}>
+                            <X className="w-3.5 h-3.5 text-[#C4C4C4] hover:text-[#3E1540] transition-colors" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {editingRoleIdx === idx && (
+                      <div className="border-t border-[#ECE8DE] px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {ALL_PERMISSIONS.map((perm) => {
+                            const active = role.permissions.includes(perm)
+                            return (
+                              <button
+                                key={perm}
+                                onClick={() => toggleRolePermission(idx, perm)}
+                                className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
+                                  active
+                                    ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
+                                    : "bg-[#FBF8F2] border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
+                                }`}
+                              >
+                                {PERMISSION_LABELS[perm]}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Members */}
+        {step === "members" && (
+          <div className="flex flex-col gap-4">
+            <p className="text-[13px] text-[#8A8497]">Add members now, or share the invite code later.</p>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Search members…"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {filteredMembers.length === 0 && (
+                <p className="text-[13px] text-[#8A8497] text-center py-6">No members found.</p>
+              )}
+              {filteredMembers.map((member) => {
+                const sel = selectedMembers.find((m) => m.userId === member.id)
+                return (
+                  <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
+                    <button
+                      onClick={() => toggleMemberSelection(member.id)}
+                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        sel ? "bg-[#3E1540] border-[#3E1540]" : "border-[#C4C4C4]"
+                      }`}
+                    >
+                      {sel && <Check className="w-3 h-3 text-white" />}
+                    </button>
+                    <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
+                    {sel && roles.length > 1 && (
+                      <select
+                        value={sel.roleIdx}
+                        onChange={(e) => updateMemberRole(member.id, Number(e.target.value))}
+                        className="text-[12px] text-[#5A5466] bg-[#FBF8F2] border border-[#ECE8DE] rounded-lg px-2 py-1 focus:outline-none"
+                      >
+                        {roles.map((r, i) => (
+                          <option key={i} value={i}>{r.name || `Role ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    )}
+                    {sel && roles.length === 1 && (
+                      <span className="text-[12px] text-[#8A8497]">{roles[0].name}</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── TeamDetailOverlay ─────────────────────────────────────────────────────────
+
+function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged }: {
+  team: Team
+  userId: string
+  ministryId: string
+  isAdmin: boolean
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const supabase = createClient()
+  const [roles, setRoles] = useState<TeamRole[]>([])
+  const [members, setMembers] = useState<TeamMemberDisplay[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  const [addSearch, setAddSearch] = useState("")
+  const [pendingAdd, setPendingAdd] = useState<{ userId: string; roleId: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: rolesData }, { data: membersData }] = await Promise.all([
+        supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", team.id),
+        supabase
+          .from("team_members")
+          .select("user_id, role_id, joined_at, profiles(name), team_roles(name)")
+          .eq("team_id", team.id),
+      ])
+      type RawMember = {
+        user_id: string
+        role_id: string
+        joined_at: string
+        profiles: { name: string } | { name: string }[] | null
+        team_roles: { name: string } | { name: string }[] | null
+      }
+      setRoles((rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] })))
+      setMembers(
+        (membersData ?? []).map((m: RawMember) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+          const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+          return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+        })
+      )
+      setLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team.id])
+
+  useEffect(() => {
+    if (!showAddMember) return
+    const memberIds = new Set([userId, ...members.map((m) => m.user_id)])
+    supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("ministry_id", ministryId)
+      .order("name")
+      .then(({ data }) => setMinistryMembers((data ?? []).filter((m) => !memberIds.has(m.id))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddMember, members.length])
+
+  async function handleDeleteTeam() {
+    await supabase.from("teams").delete().eq("id", team.id)
+    onChanged()
+    onClose()
+  }
+
+  async function handleAddMember() {
+    if (!pendingAdd || !pendingAdd.userId) return
+    if (!pendingAdd.roleId) { setError("This team has no roles. Delete the team and recreate it."); return }
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase.from("team_members").insert({
+      team_id: team.id,
+      user_id: pendingAdd.userId,
+      role_id: pendingAdd.roleId,
+      added_by: userId,
+    })
+    if (err) { setError(err.message); setSaving(false); return }
+    setShowAddMember(false)
+    setPendingAdd(null)
+    setAddSearch("")
+    setSaving(false)
+    onChanged()
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
+    setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+    onChanged()
+  }
+
+  const filteredAdd = ministryMembers.filter((m) =>
+    m.name.toLowerCase().includes(addSearch.toLowerCase())
+  )
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col">
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+        <button
+          onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : onClose}
+          className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          {showAddMember ? "Back" : "Teams"}
+        </button>
+        <div className="flex items-center gap-2">
+          {!showAddMember && <span className="text-[18px]">{team.icon ?? "👥"}</span>}
+          <span className="text-[14px] font-semibold text-[#13101A]">
+            {showAddMember ? "Add Member" : team.name}
+          </span>
+        </div>
+        <div className="w-14 flex justify-end">
+          {showAddMember && pendingAdd && (
+            <button onClick={handleAddMember} disabled={saving} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
+              {saving ? "Adding…" : "Add"}
+            </button>
+          )}
+          {!showAddMember && isAdmin && (
+            <button onClick={() => setConfirmDelete(true)} className="text-[#8A8497] hover:text-red-500 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <div className="mx-5 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-[13px] text-red-700 font-medium">Delete this team?</span>
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmDelete(false)} className="text-[12px] font-semibold text-[#8A8497] hover:text-[#13101A]">Cancel</button>
+            <button onClick={handleDeleteTeam} className="text-[12px] font-semibold text-red-600 hover:text-red-800">Delete</button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        {error && (
+          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium mb-4">{error}</div>
+        )}
+
+        {!showAddMember && (
+          <>
+            {loading ? <Spinner /> : (
+              <div className="flex flex-col gap-6">
+                {/* Roles */}
+                <div>
+                  <PlanSectionHeader>Roles</PlanSectionHeader>
+                  <div className="flex flex-col gap-2">
+                    {roles.length === 0 && (
+                      <p className="text-[13px] text-[#8A8497] text-center py-4">No roles defined.</p>
+                    )}
+                    {roles.map((role) => (
+                      <div key={role.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4">
+                        <p className="text-[14px] font-semibold text-[#13101A] mb-2">{role.name}</p>
+                        {role.permissions.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {role.permissions.map((p) => (
+                              <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                                {PERMISSION_LABELS[p] ?? p}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-[#8A8497]">No permissions assigned</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Members */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3 flex-1 mr-3">
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+                        Members
+                      </span>
+                      <div className="flex-1 h-px bg-[#ECE8DE]" />
+                    </div>
+                    <button
+                      onClick={() => setShowAddMember(true)}
+                      className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 flex-shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {members.length === 0 && (
+                      <p className="text-[13px] text-[#8A8497] text-center py-4">No members yet.</p>
+                    )}
+                    {members.map((m) => (
+                      <div key={m.user_id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(m.name)}`}>
+                          {getInitials(m.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
+                          <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                        </div>
+                        {isAdmin && m.user_id !== userId && (
+                          <button onClick={() => handleRemoveMember(m.user_id)} className="text-[#C4C4C4] hover:text-[#3E1540] transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {showAddMember && (
+          <div className="flex flex-col gap-4">
+            {roles.length > 1 && (
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-medium text-[#5A5466]">Assign role</label>
+                <div className="flex gap-2 flex-wrap">
+                  {roles.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setPendingAdd((prev) => prev ? { ...prev, roleId: r.id } : { userId: "", roleId: r.id })}
+                      className={`text-[12px] font-semibold px-3 py-1.5 rounded-xl border transition-all ${
+                        pendingAdd?.roleId === r.id
+                          ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
+                          : "bg-white border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
+                      }`}
+                    >
+                      {r.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+              <input
+                type="text"
+                value={addSearch}
+                onChange={(e) => setAddSearch(e.target.value)}
+                placeholder="Search members…"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {filteredAdd.length === 0 && (
+                <p className="text-[13px] text-[#8A8497] text-center py-6">No members to add.</p>
+              )}
+              {filteredAdd.map((member) => {
+                const selected = pendingAdd?.userId === member.id
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() =>
+                      setPendingAdd((prev) =>
+                        prev?.userId === member.id
+                          ? null
+                          : { userId: member.id, roleId: prev?.roleId ?? roles[0]?.id ?? "" }
+                      )
+                    }
+                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                      selected ? "bg-[#3E1540]/5 border-[#3E1540]/30" : "bg-white border-[#ECE8DE] hover:bg-[#FDFBF7]"
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(member.name)}`}>
+                      {getInitials(member.name)}
+                    </div>
+                    <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
+                    {selected && <Check className="w-4 h-4 text-[#3E1540]" />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── HomeApp (root) ──────────────────────────────────────────────────────────
 
 interface HomeAppProps {
@@ -3282,6 +4227,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [totalChatsUnread, setTotalChatsUnread] = useState(0)
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
   const [recentChats, setRecentChats] = useState<ChatPreview[]>([])
+  const [userTeams, setUserTeams] = useState<UserTeam[]>([])
+  const [allTeams, setAllTeams] = useState<Team[]>([])
+
+  const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
 
   // Fetch all user groups with their latest message + real unread counts, sorted by recency
   const loadRecentChats = useCallback(async () => {
@@ -3365,10 +4314,55 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
+  const loadUserTeams = useCallback(async () => {
+    type RawMembership = {
+      team_id: string
+      role_id: string
+      teams: { id: string; name: string; icon: string | null; description: string | null } | { id: string; name: string; icon: string | null; description: string | null }[] | null
+      team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
+    }
+    const { data } = await supabase
+      .from("team_members")
+      .select("team_id, role_id, teams(id, name, icon, description), team_roles(id, name, permissions)")
+      .eq("user_id", userId)
+    if (!data) return
+    const teams: UserTeam[] = (data as RawMembership[]).flatMap((m) => {
+      const t = Array.isArray(m.teams) ? m.teams[0] : m.teams
+      const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+      if (!t || !r) return []
+      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
+    })
+    setUserTeams(teams)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const loadAllTeams = useCallback(async () => {
+    if (!isAdmin) return
+    const { data } = await supabase
+      .from("teams")
+      .select("id, name, icon, description, created_by")
+      .eq("ministry_id", ministryId)
+      .order("created_at")
+    if (!data) return
+    const teamIds = (data as { id: string }[]).map((t) => t.id)
+    const countMap: Record<string, number> = {}
+    if (teamIds.length > 0) {
+      const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
+      for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
+    }
+    setAllTeams((data as { id: string; name: string; icon: string | null; description: string | null; created_by: string }[]).map((t) => ({ ...t, member_count: countMap[t.id] ?? 0 })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, ministryId])
+
   // Initial load + reload after closing a chat
   useEffect(() => {
     loadRecentChats()
   }, [loadRecentChats, chatRefreshKey])
+
+  useEffect(() => {
+    loadUserTeams()
+    loadAllTeams()
+  }, [loadUserTeams, loadAllTeams])
 
   // Realtime: keep recentChats preview fresh as messages arrive
   useEffect(() => {
@@ -3486,6 +4480,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             refreshKey={chatRefreshKey}
           />
         )}
+        {activeTab === "plan" && (
+          <PlanTab
+            userId={userId}
+            ministryId={ministryId}
+            ministryName={ministryName}
+            userTeams={userTeams}
+            allTeams={allTeams}
+            isAdmin={isAdmin}
+            onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
+          />
+        )}
         {activeTab === "directory" && (
           <DirectoryTab
             currentUserId={userId}
@@ -3512,6 +4517,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         activeTab={activeTab}
         onTabChange={setActiveTab}
         chatsUnread={totalChatsUnread}
+        showPlan={isAdmin || userTeams.length > 0}
       />
 
       {/* Global ChatScreen — rendered above everything including bottom nav */}
