@@ -26,6 +26,7 @@ interface Profile {
   bible_verse: string | null
   prayer_request: string | null
   pray_for_me: string | null
+  ministry_id?: string | null
 }
 
 interface Announcement {
@@ -193,13 +194,15 @@ function EmptyState({
 
 interface HomeTabProps {
   profile: Profile
+  ministryId: string
+  ministryName: string
   recentChats: ChatPreview[]
   onSeeChats: () => void
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string) => void
 }
 
-function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTabProps) {
+function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const [loading, setLoading] = useState(true)
@@ -211,6 +214,7 @@ function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenC
       const { data: ann } = await supabase
         .from("announcements")
         .select("*")
+        .eq("ministry_id", ministryId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -256,7 +260,7 @@ function HomeTab({ profile, recentChats, onSeeChats, onSeeAnnouncements, onOpenC
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Central</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
         <button className="size-9 bg-[#FBF8F2] rounded-xl border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors relative">
           <Bell className="size-4 text-[#13101A] stroke-[1.5px]" />
@@ -367,12 +371,13 @@ const AUDIENCE_OPTIONS = [
 
 interface CreateAnnouncementModalProps {
   userId: string
+  ministryId: string
   existing?: Announcement
   onClose: () => void
   onSuccess: (ann: Announcement) => void
 }
 
-function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: CreateAnnouncementModalProps) {
+function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSuccess }: CreateAnnouncementModalProps) {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isEditing = !!existing
@@ -469,6 +474,7 @@ function CreateAnnouncementModal({ userId, existing, onClose, onSuccess }: Creat
           is_pinned: false,
           image_url: imageUrl,
           created_by: userId,
+          ministry_id: ministryId,
         })
         .select()
         .single()
@@ -661,9 +667,11 @@ interface AnnouncementsTabProps {
   userId: string
   userRole: string
   userGradYear: number | null
+  ministryId: string
+  ministryName: string
 }
 
-function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabProps) {
+function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
   const supabase = createClient()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
@@ -676,6 +684,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabPr
     let annQuery = supabase
       .from("announcements")
       .select("*")
+      .eq("ministry_id", ministryId)
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })
 
@@ -788,7 +797,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabPr
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Central</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
       </div>
       <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "24px", lineHeight: 1.05 }}>Announcements</h1>
@@ -838,6 +847,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabPr
       {showCreate && (
         <CreateAnnouncementModal
           userId={userId}
+          ministryId={ministryId}
           onClose={() => setShowCreate(false)}
           onSuccess={handleNewAnnouncement}
         />
@@ -847,6 +857,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear }: AnnouncementsTabPr
       {editingAnn && (
         <CreateAnnouncementModal
           userId={userId}
+          ministryId={ministryId}
           existing={editingAnn}
           onClose={() => setEditingAnn(null)}
           onSuccess={(updated) => {
@@ -1148,12 +1159,13 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
 interface CreateChatScreenProps {
   userId: string
   userName: string
+  ministryId: string
   groupType: "my" | "church"
   onClose: () => void
   onCreated: (group: { id: string; name: string }) => void
 }
 
-function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: CreateChatScreenProps) {
+function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
   const [chatName, setChatName] = useState("")
   const [search, setSearch] = useState("")
@@ -1167,6 +1179,7 @@ function CreateChatScreen({ userId, userName, groupType, onClose, onCreated }: C
       const { data } = await supabase
         .from("profiles")
         .select("id, name, graduation_year, role")
+        .eq("ministry_id", ministryId)
         .neq("id", userId)
         .order("name")
       setAllMembers(data ?? [])
@@ -2492,12 +2505,14 @@ interface ChatsTabProps {
   userId: string
   userProfile: Profile
   userRole: string
+  ministryId: string
+  ministryName: string
   onOpenChat: (id: string, name: string) => void
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
 }
 
-function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChange, refreshKey }: ChatsTabProps) {
+function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey }: ChatsTabProps) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
@@ -2612,7 +2627,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Central</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
       </div>
 
@@ -2710,6 +2725,7 @@ function ChatsTab({ userId, userProfile, userRole, onOpenChat, onTotalUnreadChan
         <CreateChatScreen
           userId={userId}
           userName={userProfile.name}
+          ministryId={ministryId}
           groupType={showCreateChat}
           onClose={() => setShowCreateChat(null)}
           onCreated={(group) => {
@@ -2787,7 +2803,7 @@ interface DirectoryMember {
   pray_for_me: string | null
 }
 
-function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentUserId: string; currentUserName: string; onOpenChat: (id: string, name: string) => void }) {
+function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, onOpenChat }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; onOpenChat: (id: string, name: string) => void }) {
   const supabase = createClient()
   const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
@@ -2799,6 +2815,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
       const { data } = await supabase
         .from("profiles")
         .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me")
+        .eq("ministry_id", ministryId)
         .order("name")
       setMembers(data ?? [])
       setLoading(false)
@@ -2821,7 +2838,7 @@ function DirectoryTab({ currentUserId, currentUserName, onOpenChat }: { currentU
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Central</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
       </div>
       <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "16px", lineHeight: 1.05 }}>Directory</h1>
@@ -3089,10 +3106,12 @@ function MemberSheet({
 function ProfileTab({
   userId,
   initialProfile,
+  ministryName,
   onLogout,
 }: {
   userId: string
   initialProfile: Profile
+  ministryName: string
   onLogout: () => void
 }) {
   const supabase = createClient()
@@ -3155,7 +3174,7 @@ function ProfileTab({
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Central</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -3252,9 +3271,11 @@ function ProfileTab({
 interface HomeAppProps {
   userId: string
   initialProfile: Profile
+  ministryId: string
+  ministryName: string
 }
 
-export function HomeApp({ userId, initialProfile }: HomeAppProps) {
+export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState<Tab>("home")
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
@@ -3442,6 +3463,8 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
         {activeTab === "home" && (
           <HomeTab
             profile={initialProfile}
+            ministryId={ministryId}
+            ministryName={ministryName}
             recentChats={recentChats}
             onSeeChats={() => setActiveTab("chats")}
             onSeeAnnouncements={() => setActiveTab("announcements")}
@@ -3449,13 +3472,15 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           />
         )}
         {activeTab === "announcements" && (
-          <AnnouncementsTab userId={userId} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} />
+          <AnnouncementsTab userId={userId} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} />
         )}
         {activeTab === "chats" && (
           <ChatsTab
             userId={userId}
             userProfile={initialProfile}
             userRole={initialProfile.role}
+            ministryId={ministryId}
+            ministryName={ministryName}
             onOpenChat={handleOpenChat}
             onTotalUnreadChange={setTotalChatsUnread}
             refreshKey={chatRefreshKey}
@@ -3465,6 +3490,8 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           <DirectoryTab
             currentUserId={userId}
             currentUserName={initialProfile.name}
+            ministryId={ministryId}
+            ministryName={ministryName}
             onOpenChat={(id, name) => {
               setActiveTab("chats")
               handleOpenChat(id, name)
@@ -3475,6 +3502,7 @@ export function HomeApp({ userId, initialProfile }: HomeAppProps) {
           <ProfileTab
             userId={userId}
             initialProfile={initialProfile}
+            ministryName={ministryName}
             onLogout={handleLogout}
           />
         )}

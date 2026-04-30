@@ -32,15 +32,32 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  const isHomePage = pathname.startsWith('/home')
 
   // Unauthenticated user trying to access a protected page
   if (!user && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Authenticated user trying to visit auth pages — send them home
-  if (user && isAuthPage) {
+  // Authenticated user on /login → send home (no reason to see the login form)
+  // /signup is intentionally excluded: authenticated users may reach it via the
+  // "Sign up" link on /join, and blocking it creates a redirect loop.
+  if (user && pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/home', request.url))
+  }
+
+  // Authenticated user accessing /home without a ministry → send to /join
+  // /join itself is always accessible to authenticated users regardless of ministry status.
+  if (user && isHomePage) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('ministry_id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile?.ministry_id) {
+      return NextResponse.redirect(new URL('/join', request.url))
+    }
   }
 
   return supabaseResponse

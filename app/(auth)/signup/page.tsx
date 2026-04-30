@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 
@@ -9,7 +8,6 @@ const CURRENT_YEAR = new Date().getFullYear()
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
 
 export default function SignupPage() {
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -38,24 +36,8 @@ export default function SignupPage() {
       return
     }
 
-    if (data.user) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        name,
-        email,
-        graduation_year: Number(graduationYear),
-        role: "member",
-      })
-
-      if (profileError) {
-        setError("Account created but profile setup failed. Please contact support.")
-        setLoading(false)
-        return
-      }
-    }
-
-    router.push("/home")
-    router.refresh()
+    // Replace so /signup is not in the browser history stack — back button won't return here.
+    window.location.replace("/join")
   }
 
   const inputClass = "w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
