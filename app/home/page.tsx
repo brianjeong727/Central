@@ -13,7 +13,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id")
+    .select("id, name, email, graduation_year, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id, avatar_url")
     .eq("id", user.id)
     .single()
 
@@ -36,6 +36,7 @@ export default async function HomePage() {
     prayer_request: null,
     pray_for_me: null,
     ministry_id: null,
+    avatar_url: null,
   }
 
   return (

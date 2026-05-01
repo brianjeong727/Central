@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
-  MoreHorizontal, Trash2, CornerUpLeft, ClipboardList,
+  MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -27,6 +27,7 @@ interface Profile {
   prayer_request: string | null
   pray_for_me: string | null
   ministry_id?: string | null
+  avatar_url?: string | null
 }
 
 interface Announcement {
@@ -146,7 +147,7 @@ function formatMessageTime(dateStr: string): string {
 }
 
 function audienceLabel(audience: string | null): string {
-  if (!audience || audience === "all") return "Whole Church"
+  if (!audience || audience === "all") return "Everyone"
   if (audience.match(/^\d{4}$/)) return `Class of ${audience}`
   if (audience === "group") return "Specific Group"
   return audience
@@ -200,9 +201,11 @@ interface HomeTabProps {
   onSeeChats: () => void
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string) => void
+  onGoToProfile: () => void
+  avatarUrl?: string | null
 }
 
-function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat }: HomeTabProps) {
+function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const [loading, setLoading] = useState(true)
@@ -262,9 +265,16 @@ function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, o
           </svg>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
-        <button className="size-9 bg-[#FBF8F2] rounded-xl border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors relative">
-          <Bell className="size-4 text-[#13101A] stroke-[1.5px]" />
-          <span className="absolute top-1.5 right-1.5 size-2 bg-[#C9A34B] rounded-full" />
+        <button
+          onClick={onGoToProfile}
+          className="size-9 rounded-full overflow-hidden bg-[#3E1540] border border-[#ECE8DE] flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
+          aria-label="Your profile"
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white font-bold text-[11px]">{getInitials(profile.name)}</span>
+          )}
         </button>
       </div>
 
@@ -361,7 +371,7 @@ function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, o
 // ─── Create Announcement Modal ───────────────────────────────────────────────
 
 const AUDIENCE_OPTIONS = [
-  { value: "all", label: "Whole Church" },
+  { value: "all", label: "Everyone" },
   { value: "2025", label: "Class of 2025" },
   { value: "2026", label: "Class of 2026" },
   { value: "2027", label: "Class of 2027" },
@@ -808,7 +818,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministry
         <EmptyState
           icon={<Bell className="w-7 h-7" />}
           title="No announcements yet"
-          subtitle={isLeaderOrAdmin ? "Tap + to post the first one" : "Check back soon for updates"}
+          subtitle={isLeaderOrAdmin ? "Nothing announced yet." : "Check back soon for updates"}
         />
       ) : (
         <div className="flex flex-col gap-4">
@@ -2204,14 +2214,14 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
         >
           <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
         </button>
-        <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(displayName)}`}>
-          <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
-            {getInitials(displayName)}
-          </AvatarFallback>
-        </Avatar>
-        <h2 className="flex-1 min-w-0 text-[15px] font-semibold text-[#13101A] truncate">
-          {displayName}
-        </h2>
+        <div className="flex-1 min-w-0">
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.1 }} className="truncate">
+            {displayName}
+          </h2>
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>
+            {Object.keys(memberReadMap).length + 1} members · active
+          </p>
+        </div>
         <button
           onClick={() => setShowSettings(true)}
           className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -2232,19 +2242,43 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0.5">
             {messages.map((msg, i) => {
               const isOwn = msg.sender_id === userId
               const prevMsg = i > 0 ? messages[i - 1] : null
               const nextMsg = i < messages.length - 1 ? messages[i + 1] : null
-              const showSender = !isOwn && msg.sender_id !== prevMsg?.sender_id
-              const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id
+
+              // Group = consecutive same-sender within same minute window
+              const sameMinute = (a: Message, b: Message) =>
+                a.sender_id === b.sender_id &&
+                Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
+
+              const isFirstInGroup = !prevMsg || !sameMinute(msg, prevMsg)
+              const isLastInGroup = !nextMsg || !sameMinute(msg, nextMsg)
+
+              // Corner treatment per bubble position in group
+              const incomingRadius = isFirstInGroup && isLastInGroup
+                ? "rounded-2xl rounded-tl-sm"
+                : isFirstInGroup
+                  ? "rounded-2xl rounded-tl-sm rounded-bl-md"
+                  : isLastInGroup
+                    ? "rounded-2xl rounded-tl-md"
+                    : "rounded-2xl rounded-l-md"
+              const outgoingRadius = isFirstInGroup && isLastInGroup
+                ? "rounded-2xl rounded-tr-sm"
+                : isFirstInGroup
+                  ? "rounded-2xl rounded-tr-sm rounded-br-md"
+                  : isLastInGroup
+                    ? "rounded-2xl rounded-tr-md"
+                    : "rounded-2xl rounded-r-md"
+
               const rxGroups = groupedReactions(msg.id)
+              const groupGap = isFirstInGroup && i > 0 ? "mt-3" : ""
               return (
                 <div
                   key={msg.id}
                   ref={(el) => { messageRefs.current[msg.id] = el }}
-                  className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"}`}
+                  className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"} ${groupGap}`}
                 >
                   {/* Emoji picker — floats above the bubble */}
                   {emojiPickerFor === msg.id && (
@@ -2305,24 +2339,44 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     </div>
                   )}
 
-                  {showSender && (
-                    <span className="text-[11px] font-medium text-[#3E1540] mb-1 px-1">
-                      {msg.sender_name}
-                    </span>
+                  {/* Group kicker: sender + time, shown once at top of each incoming group */}
+                  {!isOwn && isFirstInGroup && (
+                    <div className="flex items-center gap-2 mb-1 pl-9">
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#8A8497", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                        {msg.sender_name} · {formatMessageTime(msg.created_at)}
+                      </span>
+                    </div>
                   )}
+
+                  {/* Incoming group: avatar at bottom-left of last bubble only */}
+                  <div className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                    {!isOwn && (
+                      <div className="flex-shrink-0 w-7">
+                        {isLastInGroup ? (
+                          <div
+                            className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(msg.sender_name)}`}
+                            style={{ borderRadius: "10px" }}
+                          >
+                            {msg.sender_name.charAt(0).toUpperCase()}
+                          </div>
+                        ) : (
+                          <div className="w-7 h-7" />
+                        )}
+                      </div>
+                    )}
                   <div
                     onPointerDown={() => handlePointerDown(msg)}
                     onPointerUp={() => handlePointerUp(msg)}
                     onPointerLeave={handlePointerCancel}
                     onPointerCancel={handlePointerCancel}
-                    className={`max-w-[78%] rounded-2xl text-[14px] leading-relaxed select-none ${
+                    className={`max-w-[78%] text-[14px] leading-relaxed select-none ${
                       msg.deleted
                         ? isOwn
-                          ? `bg-[#3E1540]/30 text-white/50 ${isLastInGroup ? "rounded-tr-sm" : ""} px-4 py-2.5`
-                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${isLastInGroup ? "rounded-tl-sm" : ""} px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                          ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2.5`
+                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${incomingRadius} px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                         : isOwn
-                          ? `bg-[#3E1540] text-white ${isLastInGroup ? "rounded-tr-sm" : ""}`
-                          : `bg-white border border-[#EFEFEF] text-[#13101A] ${isLastInGroup ? "rounded-tl-sm" : ""} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                          ? `bg-[#3E1540] text-white ${outgoingRadius}`
+                          : `bg-white border border-[#EFEFEF] text-[#13101A] ${incomingRadius} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                     } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
                   >
                     {msg.deleted ? (
@@ -2356,10 +2410,11 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                       </>
                     )}
                   </div>
+                  </div>{/* end avatar+bubble row */}
 
                   {/* Reaction pills — hidden on deleted messages */}
                   {!msg.deleted && rxGroups.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1 px-1">
+                    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
                       {rxGroups.map(({ emoji, count, userReacted }) => (
                         <button
                           key={emoji}
@@ -2367,12 +2422,12 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                           onClick={() => handleReact(msg.id, emoji)}
                           className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
                             userReacted
-                              ? "bg-[#F3EDE6] border-[#3E1540]"
-                              : "bg-white border-[#EFEFEF]"
+                              ? "bg-[#3E1540] border-[#3E1540]"
+                              : "bg-white border-[#ECE8DE]"
                           }`}
                         >
                           <span>{emoji}</span>
-                          <span className={`text-[11px] font-medium ${userReacted ? "text-[#3E1540]" : "text-[#6B7280]"}`}>
+                          <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[#8A8497]"}`}>
                             {count}
                           </span>
                         </button>
@@ -2402,29 +2457,31 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     </div>
                   )}
 
-                  <div className="flex items-center gap-1.5 mt-1 px-1">
-                    {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
-                      <div className="flex items-center">
-                        {[userName, ...readReceiptMap[msg.id]].map((name, idx) => (
-                          <Avatar
-                            key={`${name}-${idx}`}
-                            title={idx === 0 ? "You" : `Read by ${name}`}
-                            className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
-                          >
-                            <AvatarFallback
-                              className="text-white bg-transparent"
-                              style={{ fontSize: "6px", fontWeight: 700 }}
+                  {isLastInGroup && (
+                    <div className={`flex items-center gap-1.5 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
+                      {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
+                        <div className="flex items-center">
+                          {[userName, ...readReceiptMap[msg.id]].map((name, idx) => (
+                            <Avatar
+                              key={`${name}-${idx}`}
+                              title={idx === 0 ? "You" : `Read by ${name}`}
+                              className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
                             >
-                              {name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
-                      </div>
-                    )}
-                    <span className="text-[10px] text-[#C4C4C4]">
-                      {formatMessageTime(msg.created_at)}
-                    </span>
-                  </div>
+                              <AvatarFallback
+                                className="text-white bg-transparent"
+                                style={{ fontSize: "6px", fontWeight: 700 }}
+                              >
+                                {name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </div>
+                      )}
+                      <span className="text-[10px] text-[#C4C4C4]">
+                        {formatMessageTime(msg.created_at)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -2510,9 +2567,10 @@ interface ChatsTabProps {
   onOpenChat: (id: string, name: string) => void
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
+  onOpenDirectory: () => void
 }
 
-function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey }: ChatsTabProps) {
+function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory }: ChatsTabProps) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
@@ -2629,6 +2687,13 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
           </svg>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
+        <button
+          onClick={onOpenDirectory}
+          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors"
+          aria-label="Directory"
+        >
+          <Users className="w-5 h-5 text-[#3E1540]" />
+        </button>
       </div>
 
       {/* Sub-tab switcher */}
@@ -2803,7 +2868,7 @@ interface DirectoryMember {
   pray_for_me: string | null
 }
 
-function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, onOpenChat }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; onOpenChat: (id: string, name: string) => void }) {
+function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, onOpenChat, onBack }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; onOpenChat: (id: string, name: string) => void; onBack?: () => void }) {
   const supabase = createClient()
   const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
@@ -2833,15 +2898,18 @@ function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-          </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors -ml-1 mr-0.5"
+              aria-label="Back to Chats"
+            >
+              <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
+            </button>
+          )}
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
         </div>
       </div>
-      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "16px", lineHeight: 1.05 }}>Directory</h1>
 
       {/* Search */}
       <div className="relative mb-6">
@@ -3108,16 +3176,20 @@ function ProfileTab({
   initialProfile,
   ministryName,
   onLogout,
+  onAvatarChange,
 }: {
   userId: string
   initialProfile: Profile
   ministryName: string
   onLogout: () => void
+  onAvatarChange?: (url: string) => void
 }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState({
     about_me: initialProfile.about_me ?? "",
     bible_verse: initialProfile.bible_verse ?? "",
@@ -3156,6 +3228,27 @@ function ProfileTab({
     setEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, userId])
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    const ext = file.name.split(".").pop()
+    const fileName = `${userId}.${ext}`
+    const { data: uploadData, error } = await supabase.storage
+      .from("profile-images")
+      .upload(fileName, file, { upsert: true })
+    if (!error && uploadData) {
+      const { data: { publicUrl } } = supabase.storage
+        .from("profile-images")
+        .getPublicUrl(uploadData.path)
+      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId)
+      setProfile((p) => ({ ...p, avatar_url: publicUrl }))
+      onAvatarChange?.(publicUrl)
+    }
+    setUploadingAvatar(false)
+    if (avatarInputRef.current) avatarInputRef.current.value = ""
+  }
 
   const fields = [
     { key: "about_me" as const, label: "About me", placeholder: "Tell the community about yourself…" },
@@ -3208,11 +3301,29 @@ function ProfileTab({
 
       {/* Avatar + Identity */}
       <div className="flex flex-col items-center mb-8">
-        <Avatar className="w-20 h-20 bg-[#3E1540] mb-4 shadow-lg shadow-[#3E1540]/20">
-          <AvatarFallback className="text-white font-bold text-2xl bg-transparent">
-            {getInitials(profile.name)}
-          </AvatarFallback>
-        </Avatar>
+        <button
+          onClick={() => avatarInputRef.current?.click()}
+          disabled={uploadingAvatar}
+          className="relative w-20 h-20 rounded-full overflow-hidden bg-[#3E1540] mb-4 shadow-lg shadow-[#3E1540]/20 group flex-shrink-0"
+          aria-label="Change profile photo"
+        >
+          {profile.avatar_url ? (
+            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span className="flex items-center justify-center w-full h-full text-white font-bold text-2xl">
+              {getInitials(profile.name)}
+            </span>
+          )}
+          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Camera className="w-5 h-5 text-white" />
+          </div>
+          {uploadingAvatar && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </button>
+        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
         <h1 className="text-2xl font-bold tracking-tight text-[#13101A]">{profile.name}</h1>
         <div className="flex items-center gap-2.5 mt-2">
           {profile.graduation_year && (
@@ -3365,24 +3476,56 @@ const TEAM_PRESETS = [
   },
 ]
 
+// SVG paths for Plan tab icons
+const ICON_SVG: Record<string, React.ReactNode> = {
+  "🎵": <><path d="M9 18V6l11-3v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="15" r="3"/></>,
+  "📖": <><path d="M2 4h7a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-7a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h8z"/></>,
+  "🏛️": <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+  "💻": <><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></>,
+  "👥": <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  // feature-specific icons
+  "set": <><path d="M9 18V6l11-3v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="15" r="3"/></>,
+  "sliders": <><path d="M4 6h11M19 6h1M4 12h5M13 12h7M4 18h13M21 18h-1"/><circle cx="17" cy="6" r="2"/><circle cx="11" cy="12" r="2"/><circle cx="19" cy="18" r="2"/></>,
+  "sparkle": <><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/><path d="m6 6 3 3M15 15l3 3M6 18l3-3M15 9l3-3"/></>,
+  "calendar": <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></>,
+  "book": <><path d="M2 4h7a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-7a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h8z"/></>,
+  "users": <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  "chart": <><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></>,
+  "seedling": <path d="M7 20s-2-8 5-13c0 0 2 5 6 7l-1 6H7zM12 7s0 4-3 8"/>,
+  "dollar": <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+  "clipboard": <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/></>,
+}
+
+function PlanLineIcon({ iconKey, bg = "#3E1540", fg = "#F6F4EF", size = 40 }: { iconKey: string; bg?: string; fg?: string; size?: number }) {
+  const paths = ICON_SVG[iconKey] ?? ICON_SVG["clipboard"]
+  return (
+    <div style={{ width: size, height: size, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={fg} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        {paths}
+      </svg>
+    </div>
+  )
+}
+
+
 const WORSHIP_FEATURES = [
-  { icon: "🎵", name: "This Week's Set", desc: "View songs, keys, and role assignments for Sunday's worship." },
-  { icon: "🎛️", name: "Set Builder", desc: "Build and reorder worship sets, assign keys and roles per song." },
-  { icon: "✨", name: "Slide Generator", desc: "Auto-generate lyric slides from your worship set." },
-  { icon: "📅", name: "Team Schedule", desc: "See who's playing what role this Sunday." },
+  { icon: "set", name: "This Week's Set", desc: "View songs, keys, and role assignments for Sunday's worship." },
+  { icon: "sliders", name: "Set Builder", desc: "Build and reorder worship sets, assign keys and roles per song." },
+  { icon: "sparkle", name: "Slide Generator", desc: "Auto-generate lyric slides from your worship set." },
+  { icon: "calendar", name: "Team Schedule", desc: "See who's playing what role this Sunday." },
 ]
 
 const DISCIPLESHIP_FEATURES = [
-  { icon: "👥", name: "My Group", desc: "View your discipleship group members and contact info." },
-  { icon: "📖", name: "Bible Study Generator", desc: "AI-generated study guides from any passage or topic." },
-  { icon: "✅", name: "Attendance", desc: "Track weekly attendance for your discipleship group." },
+  { icon: "users", name: "My Group", desc: "View your small group members and contact info." },
+  { icon: "book", name: "Bible Study Generator", desc: "AI-generated study guides from any passage or topic." },
+  { icon: "users", name: "Attendance", desc: "Track weekly attendance for your small group." },
 ]
 
 const MINISTRY_FEATURES = [
-  { icon: "📅", name: "Events", desc: "Plan and manage upcoming ministry events." },
-  { icon: "📊", name: "Attendance Overview", desc: "Ministry-wide attendance trends and insights." },
-  { icon: "🌱", name: "Member Pipeline", desc: "Track new visitors and their journey to membership." },
-  { icon: "💰", name: "Finances", desc: "Budget tracking and expense reporting for your ministry." },
+  { icon: "calendar", name: "Events", desc: "Plan and manage upcoming ministry events." },
+  { icon: "chart", name: "Attendance Overview", desc: "Ministry-wide attendance trends and insights." },
+  { icon: "seedling", name: "New folks", desc: "Track new visitors and their journey to membership." },
+  { icon: "dollar", name: "Finances", desc: "Budget tracking and expense reporting for your ministry." },
 ]
 
 function PlanSectionHeader({ children }: { children: React.ReactNode }) {
@@ -3398,16 +3541,14 @@ function PlanSectionHeader({ children }: { children: React.ReactNode }) {
 
 function PlanFeatureCard({ icon, name, desc }: { icon: string; name: string; desc: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
+    <div className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-70">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[18px] flex-shrink-0">
-          {icon}
-        </div>
+        <PlanLineIcon iconKey={icon} bg="#ffffff" fg="#3E1540" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[14px] font-semibold text-[#13101A]">{name}</p>
             <span className="text-[10px] font-medium text-[#8A8497] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
-              Coming soon
+              Soon
             </span>
           </div>
           <p className="text-[13px] text-[#5A5466] mt-0.5 leading-relaxed">{desc}</p>
@@ -3431,23 +3572,7 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
 
-  const allPermissions = new Set(userTeams.flatMap((t) => t.permissions))
-  const showWorship =
-    allPermissions.has("can_manage_worship_set") ||
-    allPermissions.has("can_view_worship_set") ||
-    allPermissions.has("can_generate_slides")
-  const showDiscipleship =
-    allPermissions.has("can_create_dgs") ||
-    allPermissions.has("can_view_dgs") ||
-    allPermissions.has("can_generate_bible_study")
-  const showMinistry =
-    isAdmin ||
-    allPermissions.has("can_plan_events") ||
-    allPermissions.has("can_view_finances") ||
-    allPermissions.has("can_manage_members") ||
-    allPermissions.has("can_track_attendance")
-
-  const hasAnyPlanning = showWorship || showDiscipleship || showMinistry
+  const hasAnyPlanning = isAdmin || userTeams.length > 0
 
   return (
     <div className="px-5 pt-14 pb-2">
@@ -3483,7 +3608,7 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
           <PlanSectionHeader>Teams</PlanSectionHeader>
           {allTeams.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
-              <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet</p>
+              <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">You're not on a team yet.</p>
               <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
             </div>
           ) : (
@@ -3494,9 +3619,7 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
                   onClick={() => setOpenTeam(team)}
                   className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[18px] flex-shrink-0">
-                    {team.icon ?? "👥"}
-                  </div>
+                  <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
                     <p className="text-[12px] text-[#8A8497]">
@@ -3511,47 +3634,32 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
         </div>
       )}
 
-      {/* Planning hub */}
-      {hasAnyPlanning && (
-        <div className="flex flex-col gap-8">
-          {showWorship && (
-            <div>
-              <PlanSectionHeader>Worship</PlanSectionHeader>
-              <div className="flex flex-col gap-2">
-                {WORSHIP_FEATURES.map((f) => (
-                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
-                ))}
+      {/* Tools — compact grid */}
+      <div className="mt-4">
+        <PlanSectionHeader>Tools</PlanSectionHeader>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { icon: "set", name: "Set" },
+            { icon: "sparkle", name: "Slides" },
+            { icon: "calendar", name: "Schedule" },
+            { icon: "book", name: "Bible Study" },
+          ].map((tool) => (
+            <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
+              <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
+              <div>
+                <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
+                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
               </div>
             </div>
-          )}
-          {showDiscipleship && (
-            <div>
-              <PlanSectionHeader>Discipleship</PlanSectionHeader>
-              <div className="flex flex-col gap-2">
-                {DISCIPLESHIP_FEATURES.map((f) => (
-                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
-                ))}
-              </div>
-            </div>
-          )}
-          {showMinistry && (
-            <div>
-              <PlanSectionHeader>Ministry</PlanSectionHeader>
-              <div className="flex flex-col gap-2">
-                {MINISTRY_FEATURES.map((f) => (
-                  <PlanFeatureCard key={f.name} icon={f.icon} name={f.name} desc={f.desc} />
-                ))}
-              </div>
-            </div>
-          )}
+          ))}
         </div>
-      )}
+      </div>
 
-      {!isAdmin && !hasAnyPlanning && (
+      {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
         <EmptyState
           icon={<ClipboardList className="w-6 h-6" />}
-          title="No teams yet"
-          subtitle="You'll see planning tools once you're added to a team."
+          title="You're not on a team yet."
+          subtitle="Ask a leader to add you."
         />
       )}
 
@@ -3944,7 +4052,8 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
   const [addSearch, setAddSearch] = useState("")
-  const [pendingAdd, setPendingAdd] = useState<{ userId: string; roleId: string } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -3954,7 +4063,7 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
         supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", team.id),
         supabase
           .from("team_members")
-          .select("user_id, role_id, joined_at, profiles(name), team_roles(name)")
+          .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
           .eq("team_id", team.id),
       ])
       type RawMember = {
@@ -3980,7 +4089,9 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
 
   useEffect(() => {
     if (!showAddMember) return
-    const memberIds = new Set([userId, ...members.map((m) => m.user_id)])
+    setSelectedIds(new Set())
+    setSelectedRoleId(roles[0]?.id ?? "")
+    const memberIds = new Set([...members.map((m) => m.user_id)])
     supabase
       .from("profiles")
       .select("id, name")
@@ -3996,20 +4107,17 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
     onClose()
   }
 
-  async function handleAddMember() {
-    if (!pendingAdd || !pendingAdd.userId) return
-    if (!pendingAdd.roleId) { setError("This team has no roles. Delete the team and recreate it."); return }
+  async function handleAddMembers() {
+    if (selectedIds.size === 0) return
+    if (!selectedRoleId) { setError("This team has no roles. Delete the team and recreate it."); return }
     setSaving(true)
     setError(null)
-    const { error: err } = await supabase.from("team_members").insert({
-      team_id: team.id,
-      user_id: pendingAdd.userId,
-      role_id: pendingAdd.roleId,
-      added_by: userId,
-    })
+    const { error: err } = await supabase.from("team_members").insert(
+      Array.from(selectedIds).map((uid) => ({ team_id: team.id, user_id: uid, role_id: selectedRoleId, added_by: userId }))
+    )
     if (err) { setError(err.message); setSaving(false); return }
     setShowAddMember(false)
-    setPendingAdd(null)
+    setSelectedIds(new Set())
     setAddSearch("")
     setSaving(false)
     onChanged()
@@ -4042,11 +4150,6 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
           </span>
         </div>
         <div className="w-14 flex justify-end">
-          {showAddMember && pendingAdd && (
-            <button onClick={handleAddMember} disabled={saving} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
-              {saving ? "Adding…" : "Add"}
-            </button>
-          )}
           {!showAddMember && isAdmin && (
             <button onClick={() => setConfirmDelete(true)} className="text-[#8A8497] hover:text-red-500 transition-colors">
               <Trash2 className="w-4 h-4" />
@@ -4118,7 +4221,7 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {members.length === 0 && (
-                      <p className="text-[13px] text-[#8A8497] text-center py-4">No members yet.</p>
+                      <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>
                     )}
                     {members.map((m) => (
                       <div key={m.user_id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
@@ -4144,7 +4247,8 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
         )}
 
         {showAddMember && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 pb-24">
+            {/* Role picker — single role applies to all selected */}
             {roles.length > 1 && (
               <div className="flex flex-col gap-2">
                 <label className="text-[12px] font-medium text-[#5A5466]">Assign role</label>
@@ -4152,9 +4256,9 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
                   {roles.map((r) => (
                     <button
                       key={r.id}
-                      onClick={() => setPendingAdd((prev) => prev ? { ...prev, roleId: r.id } : { userId: "", roleId: r.id })}
+                      onClick={() => setSelectedRoleId(r.id)}
                       className={`text-[12px] font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-                        pendingAdd?.roleId === r.id
+                        selectedRoleId === r.id
                           ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
                           : "bg-white border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
                       }`}
@@ -4165,6 +4269,24 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
                 </div>
               </div>
             )}
+
+            {/* Selected chips */}
+            {selectedIds.size > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {ministryMembers.filter((m) => selectedIds.has(m.id)).map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedIds((prev) => { const next = new Set(prev); next.delete(m.id); return next })}
+                    className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
+                  >
+                    {m.name.split(" ")[0]}
+                    <X className="w-3 h-3 opacity-70" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
               <input
@@ -4175,22 +4297,23 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
               />
             </div>
+
+            {/* Member list */}
             <div className="flex flex-col gap-1.5">
               {filteredAdd.length === 0 && (
                 <p className="text-[13px] text-[#8A8497] text-center py-6">No members to add.</p>
               )}
               {filteredAdd.map((member) => {
-                const selected = pendingAdd?.userId === member.id
+                const selected = selectedIds.has(member.id)
                 return (
                   <button
                     key={member.id}
-                    onClick={() =>
-                      setPendingAdd((prev) =>
-                        prev?.userId === member.id
-                          ? null
-                          : { userId: member.id, roleId: prev?.roleId ?? roles[0]?.id ?? "" }
-                      )
-                    }
+                    onClick={() => setSelectedIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(member.id)) next.delete(member.id)
+                      else next.add(member.id)
+                      return next
+                    })}
                     className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
                       selected ? "bg-[#3E1540]/5 border-[#3E1540]/30" : "bg-white border-[#ECE8DE] hover:bg-[#FDFBF7]"
                     }`}
@@ -4207,6 +4330,19 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
           </div>
         )}
       </div>
+
+      {/* Sticky add button */}
+      {showAddMember && selectedIds.size > 0 && (
+        <div className="flex-shrink-0 px-5 pb-8 pt-3 bg-[#FBF8F2] border-t border-[#ECE8DE]">
+          <button
+            onClick={handleAddMembers}
+            disabled={saving}
+            className="w-full py-3.5 rounded-2xl bg-[#3E1540] text-[#F6F4EF] text-[15px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
+          >
+            {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -4229,6 +4365,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [recentChats, setRecentChats] = useState<ChatPreview[]>([])
   const [userTeams, setUserTeams] = useState<UserTeam[]>([])
   const [allTeams, setAllTeams] = useState<Team[]>([])
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
 
   const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
 
@@ -4463,6 +4600,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             onSeeChats={() => setActiveTab("chats")}
             onSeeAnnouncements={() => setActiveTab("announcements")}
             onOpenChat={handleOpenChat}
+            onGoToProfile={() => setActiveTab("profile")}
+            avatarUrl={avatarUrl}
           />
         )}
         {activeTab === "announcements" && (
@@ -4478,6 +4617,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             onOpenChat={handleOpenChat}
             onTotalUnreadChange={setTotalChatsUnread}
             refreshKey={chatRefreshKey}
+            onOpenDirectory={() => setActiveTab("directory")}
           />
         )}
         {activeTab === "plan" && (
@@ -4497,6 +4637,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             currentUserName={initialProfile.name}
             ministryId={ministryId}
             ministryName={ministryName}
+            onBack={() => setActiveTab("chats")}
             onOpenChat={(id, name) => {
               setActiveTab("chats")
               handleOpenChat(id, name)
@@ -4506,9 +4647,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         {activeTab === "profile" && (
           <ProfileTab
             userId={userId}
-            initialProfile={initialProfile}
+            initialProfile={{ ...initialProfile, avatar_url: avatarUrl }}
             ministryName={ministryName}
             onLogout={handleLogout}
+            onAvatarChange={(url) => setAvatarUrl(url)}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Megaphone, MessageCircle, Users, User, ClipboardList } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList } from "lucide-react"
 
 type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "profile"
 
@@ -11,17 +11,18 @@ interface BottomNavProps {
   showPlan?: boolean
 }
 
-const ALL_TABS = [
+const BASE_TABS = [
   { id: "home" as const, label: "Home", icon: Home },
-  { id: "announcements" as const, label: "Announce", icon: Megaphone },
   { id: "chats" as const, label: "Chats", icon: MessageCircle },
-  { id: "plan" as const, label: "Plan", icon: ClipboardList },
-  { id: "directory" as const, label: "Directory", icon: Users },
-  { id: "profile" as const, label: "Profile", icon: User },
+  { id: "profile" as const, label: "You", icon: User },
 ]
 
+const PLAN_TAB = { id: "plan" as const, label: "Plan", icon: ClipboardList }
+
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
-  const tabs = showPlan ? ALL_TABS : ALL_TABS.filter((t) => t.id !== "plan")
+  const tabs = showPlan
+    ? [BASE_TABS[0], BASE_TABS[1], PLAN_TAB, BASE_TABS[2]]
+    : BASE_TABS
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 px-1">
