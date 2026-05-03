@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
-  Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
+  Search, Calendar, ChevronRight, ChevronDown, ChevronLeft, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
   MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera, Home, MessageCircle, User,
+  List, Grid3x3,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -4084,6 +4085,54 @@ interface Team {
   member_count: number
 }
 
+interface CalendarEvent {
+  id: string
+  title: string
+  description: string | null
+  location: string | null
+  start_date: string
+  end_date: string
+  all_day: boolean
+  category: 'welcoming' | 'retreat' | 'social' | 'service' | 'regular'
+  created_by: string
+}
+
+interface EventPlan {
+  id: string
+  calendar_event_id: string
+  overview_notes: string | null
+  expected_turnout: number | null
+  budget_allocated: number | null
+}
+
+interface EventTask {
+  id: string
+  event_plan_id: string
+  title: string
+  assigned_to: string | null
+  assigned_name?: string
+  due_date: string | null
+  completed: boolean
+}
+
+interface EventRole {
+  id: string
+  event_plan_id: string
+  role_name: string
+  assigned_to: string | null
+  assigned_name?: string
+  notes: string | null
+}
+
+interface EventNote {
+  id: string
+  event_plan_id: string
+  content: string
+  created_by: string
+  created_by_name?: string
+  created_at: string
+}
+
 interface TeamRole {
   id: string
   team_id: string
@@ -4254,9 +4303,12 @@ interface PlanTabProps {
   onTeamsChange: () => void
   showCreateTeam: boolean
   onShowCreateTeam: (v: boolean) => void
+  activeTeamId: string | null
+  onTeamCreated: (teamId: string) => void
 }
 
-function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam }: PlanTabProps) {
+function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
+  const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
 
@@ -4300,46 +4352,50 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
       </div>
 
       {/* Desktop Editorial Header */}
-      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
+      <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
         <div>
           <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
           <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-            Plan
+            {activeTeamName}
           </h1>
           <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
             The week as it stands. Groups to prepare, people to thank.
           </p>
         </div>
-        <div className="flex gap-6 pb-1.5">
-          {[
-            { label: "Teams", value: String(teamsToShow.length) },
-            { label: "Your role", value: userTeams.length > 0 ? userTeams[0].roleName : isAdmin ? "Admin" : "—" },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p style={monoStyle}>{label}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", marginTop: "2px", color: "#13101A" }}>{value}</p>
-            </div>
-          ))}
-        </div>
+        {(() => {
+          const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
+          const activeTeamFull: Team | undefined = allTeams.find(t => t.id === activeTeamId)
+            ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0 } : undefined)
+          if (!activeTeamFull) return null
+          return (
+            <button
+              onClick={() => setOpenTeam(activeTeamFull)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+              title="Team settings"
+            >
+              <Settings className="w-4 h-4 text-[#5A5466]" />
+            </button>
+          )
+        })()}
       </div>
 
       {/* Desktop content */}
       <div className="hidden md:block px-14 py-7">
-        <h3 style={{ margin: "0 0 16px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "24px", color: "#13101A" }}>Tools</h3>
-        <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
-          {[
-            { icon: "set", name: "Set Builder", sub: "Build this week's worship set" },
-            { icon: "sparkle", name: "Slide Generator", sub: "Lyric slides from the set" },
-            { icon: "calendar", name: "Schedule", sub: "Who plays what Sunday" },
-            { icon: "book", name: "Bible Study", sub: "AI study guides" },
-          ].map((tool) => (
-            <div key={tool.name} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-4 opacity-55">
-              <PlanLineIcon iconKey={tool.icon} bg="#F4F1E8" fg="#3E1540" size={32} />
-              <p className="mt-3 text-[14px] font-medium text-[#13101A]">{tool.name}</p>
-              <p style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
-            </div>
-          ))}
-        </div>
+        {(() => {
+          const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
+          const perms = activeUserTeam?.permissions ?? []
+          const showCalendar = perms.includes('can_plan_events')
+          if (!showCalendar) return null
+          const canEdit = isAdmin || perms.includes('can_plan_events')
+          return (
+            <MinistryCalendar
+              ministryId={ministryId}
+              teamId={activeTeamId}
+              userId={userId}
+              canEdit={canEdit}
+            />
+          )
+        })()}
       </div>
 
       {/* Mobile content */}
@@ -4408,7 +4464,7 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
           userId={userId}
           ministryId={ministryId}
           onClose={() => setShowCreateTeam(false)}
-          onCreated={() => { setShowCreateTeam(false); onTeamsChange() }}
+          onCreated={(teamId) => { setShowCreateTeam(false); onTeamsChange(); onTeamCreated(teamId) }}
         />
       )}
 
@@ -4426,6 +4482,1560 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
   )
 }
 
+// ── MinistryCalendar ──────────────────────────────────────────────────────────
+
+const CATEGORY_CONFIG = {
+  welcoming: { label: "Welcoming", dot: "#16A34A", bg: "#DCFCE7", text: "#14532D" },
+  retreat:   { label: "Retreat",   dot: "#2563EB", bg: "#DBEAFE", text: "#1E3A8A" },
+  social:    { label: "Social",    dot: "#C9A34B", bg: "#FEF3C7", text: "#92400E" },
+  service:   { label: "Service",   dot: "#7C3AED", bg: "#EDE9FE", text: "#4C1D95" },
+  regular:   { label: "Regular",   dot: "#6B7280", bg: "#F3F4F6", text: "#374151" },
+} as const
+type Category = keyof typeof CATEGORY_CONFIG
+
+function MonthGrid({
+  events,
+  currentMonth,
+  onMonthChange,
+  onSelectEvent,
+}: {
+  events: CalendarEvent[]
+  currentMonth: Date
+  onMonthChange: (d: Date) => void
+  onSelectEvent: (e: CalendarEvent) => void
+}) {
+  const year = currentMonth.getFullYear()
+  const month = currentMonth.getMonth()
+  const firstDayOfWeek = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const cells: (number | null)[] = [
+    ...Array(firstDayOfWeek).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const today = new Date()
+  const isToday = (day: number) =>
+    today.getFullYear() === year && today.getMonth() === month && today.getDate() === day
+
+  const eventsOnDay = (day: number) => {
+    return events.filter((ev) => {
+      const d = new Date(ev.start_date)
+      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day
+    })
+  }
+
+  const monthLabel = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+
+  return (
+    <div>
+      {/* Month nav */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 12 }}>
+        <button
+          onClick={() => onMonthChange(new Date(year, month - 1, 1))}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        >
+          <ChevronLeft className="w-4 h-4 text-[#5A5466]" />
+        </button>
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", fontWeight: 400, minWidth: 180, textAlign: "center" }}>
+          {monthLabel}
+        </span>
+        <button
+          onClick={() => onMonthChange(new Date(year, month + 1, 1))}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        >
+          <ChevronRight className="w-4 h-4 text-[#5A5466]" />
+        </button>
+      </div>
+
+      {/* Week header */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase", color: "#8A8497", textAlign: "center", paddingBottom: 4 }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", border: "1px solid #E5E0D2", borderRadius: 10, overflow: "hidden" }}>
+        {cells.map((day, idx) => {
+          const dayEvents = day ? eventsOnDay(day) : []
+          const visible = dayEvents.slice(0, 2)
+          const overflow = dayEvents.length - 2
+
+          return (
+            <div
+              key={idx}
+              style={{
+                minHeight: 80,
+                borderRight: idx % 7 !== 6 ? "1px solid #E5E0D2" : "none",
+                borderBottom: idx < cells.length - 7 ? "1px solid #E5E0D2" : "none",
+                background: day && isToday(day) ? "#F4F0F8" : "#FBF8F2",
+                padding: "4px 3px 3px",
+                position: "relative",
+              }}
+            >
+              {day && (
+                <>
+                  <div style={{
+                    textAlign: "right",
+                    fontSize: 12,
+                    fontWeight: isToday(day) ? 700 : 400,
+                    color: isToday(day) ? "#3E1540" : "#5A5466",
+                    marginBottom: 2,
+                    paddingRight: 2,
+                  }}>
+                    {day}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {visible.map((ev) => {
+                      const cfg = CATEGORY_CONFIG[ev.category]
+                      return (
+                        <button
+                          key={ev.id}
+                          onClick={() => onSelectEvent(ev)}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "1px 4px 1px 6px",
+                            borderLeft: `3px solid ${cfg.dot}`,
+                            borderRadius: 2,
+                            fontSize: 11,
+                            color: "#13101A",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            lineHeight: "18px",
+                          }}
+                          title={ev.title}
+                        >
+                          {ev.title}
+                        </button>
+                      )
+                    })}
+                    {overflow > 0 && (
+                      <span style={{ fontSize: 10, color: "#8A8497", paddingLeft: 4 }}>+{overflow} more</span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TimelineView({
+  events,
+  onSelectEvent,
+}: {
+  events: CalendarEvent[]
+  onSelectEvent: (e: CalendarEvent) => void
+}) {
+  // Group by yyyy-MM
+  const groups: Record<string, CalendarEvent[]> = {}
+  for (const ev of events) {
+    const key = ev.start_date.slice(0, 7)
+    if (!groups[key]) groups[key] = []
+    groups[key].push(ev)
+  }
+
+  const monthKeys = Object.keys(groups).sort()
+
+  if (monthKeys.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>
+        No events yet.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {monthKeys.map((key) => {
+        const [yyyy, mm] = key.split("-")
+        const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+        return (
+          <div key={key}>
+            <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>
+              {monthLabel}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {groups[key].map((ev) => {
+                const cfg = CATEGORY_CONFIG[ev.category]
+                const startDate = new Date(ev.start_date)
+                const endDate = new Date(ev.end_date)
+                const dateStr = ev.all_day
+                  ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+                  : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
+                    " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+                    " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+
+                return (
+                  <button
+                    key={ev.id}
+                    onClick={() => onSelectEvent(ev)}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                      background: "#FBF8F2",
+                      border: "1px solid #E5E0D2",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      width: "100%",
+                    }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, flexShrink: 0, marginTop: 5 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 500, fontSize: 14, color: "#13101A" }}>{ev.title}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "1px 7px", borderRadius: 9999 }}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{dateStr}</div>
+                      {ev.location && <div style={{ fontSize: 12, color: "#8A8497", marginTop: 1 }}>{ev.location}</div>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EventDetailPopover({
+  event,
+  canEdit,
+  userId,
+  onClose,
+  onDelete,
+  onPlan,
+}: {
+  event: CalendarEvent
+  canEdit: boolean
+  userId: string
+  onClose: () => void
+  onDelete: (id: string) => void
+  onPlan: (ev: CalendarEvent) => void
+}) {
+  const cfg = CATEGORY_CONFIG[event.category]
+  const startDate = new Date(event.start_date)
+  const endDate = new Date(event.end_date)
+
+  const dateStr = event.all_day
+    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
+      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(19,16,26,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: "#FBF8F2", borderRadius: 16, padding: "24px", maxWidth: 480, width: "100%", maxHeight: 500, overflowY: "auto", boxShadow: "0 8px 40px rgba(19,16,26,0.16)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999 }}>
+            {cfg.label}
+          </span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <X className="w-4 h-4 text-[#8A8497]" />
+          </button>
+        </div>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 24, fontWeight: 400, color: "#13101A", margin: "0 0 8px" }}>
+          {event.title}
+        </h2>
+        <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 6px" }}>{dateStr}</p>
+        {event.location && (
+          <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 12px" }}>📍 {event.location}</p>
+        )}
+        {event.description && (
+          <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 16px" }}>{event.description}</p>
+        )}
+        <button
+          onClick={() => onPlan(event)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "#3E1540", color: "#F6F4EF",
+            border: "none", borderRadius: 8, padding: "8px 16px",
+            cursor: "pointer", fontSize: 13, fontWeight: 500,
+            marginBottom: 8, width: "100%", justifyContent: "center"
+          }}
+        >
+          Plan this event →
+        </button>
+        {(canEdit || event.created_by === userId) && (
+          <button
+            onClick={() => onDelete(event.id)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #ECE8DE", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#C0392B" }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete event
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AddEventModal({
+  ministryId,
+  teamId,
+  userId,
+  onClose,
+  onSaved,
+}: {
+  ministryId: string
+  teamId: string | null
+  userId: string
+  onClose: () => void
+  onSaved: (ev: CalendarEvent) => void
+}) {
+  const supabase = createClient()
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [location, setLocation] = useState("")
+  const [startDateStr, setStartDateStr] = useState("")
+  const [startTimeStr, setStartTimeStr] = useState("09:00")
+  const [endDateStr, setEndDateStr] = useState("")
+  const [endTimeStr, setEndTimeStr] = useState("10:00")
+  const [allDay, setAllDay] = useState(false)
+  const [category, setCategory] = useState<Category>("regular")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave() {
+    if (!title.trim()) { setError("Title is required."); return }
+    if (!startDateStr) { setError("Start date is required."); return }
+    if (!endDateStr) { setError("End date is required."); return }
+
+    const startTs = allDay
+      ? `${startDateStr}T00:00:00+00:00`
+      : `${startDateStr}T${startTimeStr}:00+00:00`
+    const endTs = allDay
+      ? `${endDateStr}T23:59:59+00:00`
+      : `${endDateStr}T${endTimeStr}:00+00:00`
+
+    setSaving(true)
+    setError(null)
+    try {
+      const { data, error: dbErr } = await supabase
+        .from("calendar_events")
+        .insert({
+          ministry_id: ministryId,
+          team_id: teamId,
+          title: title.trim(),
+          description: description.trim() || null,
+          location: location.trim() || null,
+          start_date: startTs,
+          end_date: endTs,
+          all_day: allDay,
+          category,
+          created_by: userId,
+        })
+        .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
+        .single()
+
+      if (dbErr) {
+        setError(dbErr.message)
+        setSaving(false)
+        return
+      }
+      onSaved(data as CalendarEvent)
+    } catch (e: unknown) {
+      setError((e as { message?: string }).message ?? "Failed to save event.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    background: "#FBF8F2",
+    border: "1px solid #E5E0D2",
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontSize: 14,
+    color: "#13101A",
+    outline: "none",
+    boxSizing: "border-box",
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+    marginBottom: 4,
+    display: "block",
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "#FBF8F2", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      <div style={{ maxWidth: 560, width: "100%", margin: "0 auto", padding: "48px 24px 40px" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", margin: 0 }}>
+            Add Event
+          </h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+            <X className="w-5 h-5 text-[#8A8497]" />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Title */}
+          <div>
+            <label style={labelStyle}>Title *</label>
+            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              style={{ ...inputStyle, resize: "vertical", minHeight: 80 }}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional details…"
+            />
+          </div>
+
+          {/* Location */}
+          <div>
+            <label style={labelStyle}>Location</label>
+            <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
+          </div>
+
+          {/* All day toggle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="checkbox"
+              id="allDay"
+              checked={allDay}
+              onChange={(e) => setAllDay(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: "#3E1540", cursor: "pointer" }}
+            />
+            <label htmlFor="allDay" style={{ fontSize: 14, color: "#5A5466", cursor: "pointer" }}>All day</label>
+          </div>
+
+          {/* Dates + times */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Start date *</label>
+              <input type="date" style={inputStyle} value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Start time</label>
+              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
+            </div>
+            <div>
+              <label style={labelStyle}>End date *</label>
+              <input type="date" style={inputStyle} value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>End time</label>
+              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
+            </div>
+          </div>
+
+          {/* Category picker */}
+          <div>
+            <label style={labelStyle}>Category</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(Object.keys(CATEGORY_CONFIG) as Category[]).map((cat) => {
+                const cfg = CATEGORY_CONFIG[cat]
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    style={{
+                      padding: "5px 14px",
+                      borderRadius: 9999,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      border: category === cat ? `2px solid ${cfg.dot}` : "2px solid transparent",
+                      background: cfg.bg,
+                      color: cfg.text,
+                      transition: "border-color 0.15s",
+                    }}
+                  >
+                    {cfg.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {error && <p style={{ fontSize: 13, color: "#C0392B" }}>{error}</p>}
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+            <button
+              onClick={onClose}
+              style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "#5A5466", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
+            >
+              {saving ? "Saving…" : "Save event"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MinistryCalendar({
+  ministryId,
+  teamId,
+  userId,
+  canEdit,
+}: {
+  ministryId: string
+  teamId: string | null
+  userId: string
+  canEdit: boolean
+}) {
+  const supabase = createClient()
+  const [view, setView] = useState<"month" | "list">("month")
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [plannedEventIds, setPlannedEventIds] = useState<Set<string>>(new Set())
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [tableReady, setTableReady] = useState(true)
+  const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
+
+  useEffect(() => {
+    async function fetchEvents() {
+      setLoading(true)
+      let query = supabase
+        .from("calendar_events")
+        .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
+        .eq("ministry_id", ministryId)
+        .order("start_date", { ascending: true })
+
+      if (teamId) {
+        query = query.or(`team_id.eq.${teamId},team_id.is.null`)
+      }
+
+      const { data, error } = await query
+      if (error && error.message.includes("Could not find the table")) {
+        setTableReady(false)
+      } else {
+        setEvents((data ?? []) as CalendarEvent[])
+      }
+
+      // Also fetch which events already have a plan
+      const { data: plans } = await supabase
+        .from("event_plans")
+        .select("calendar_event_id")
+        .eq("ministry_id", ministryId)
+      if (plans) {
+        setPlannedEventIds(new Set(plans.map((p: { calendar_event_id: string }) => p.calendar_event_id)))
+      }
+
+      setLoading(false)
+    }
+    fetchEvents()
+  }, [ministryId, teamId])
+
+  async function handleDelete(id: string) {
+    setEvents((prev) => prev.filter((ev) => ev.id !== id))
+    await supabase.from("calendar_events").delete().eq("id", id)
+  }
+
+  if (!tableReady) {
+    return (
+      <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", marginBottom: 8 }}>Ministry Calendar</p>
+        <div style={{ background: "#FBF8F2", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 4 }}>Calendar database table not set up yet.</p>
+          <p style={{ fontSize: 12, color: "#8A8497" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A" }}>
+          Ministry Calendar
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* View toggle */}
+          <div style={{ display: "flex", background: "#F0EDE8", borderRadius: 8, padding: 2, gap: 2 }}>
+            <button
+              onClick={() => setView("month")}
+              style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
+                background: view === "month" ? "#FBF8F2" : "transparent",
+                border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "#13101A" : "#8A8497",
+                fontWeight: view === "month" ? 500 : 400,
+                boxShadow: view === "month" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
+              }}
+            >
+              <Grid3x3 className="w-3 h-3" /> Month
+            </button>
+            <button
+              onClick={() => setView("list")}
+              style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
+                background: view === "list" ? "#FBF8F2" : "transparent",
+                border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "#13101A" : "#8A8497",
+                fontWeight: view === "list" ? 500 : 400,
+                boxShadow: view === "list" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
+              }}
+            >
+              <List className="w-3 h-3" /> List
+            </button>
+          </div>
+          {canEdit && (
+            <button
+              onClick={() => setShowAdd(true)}
+              style={{ display: "flex", alignItems: "center", gap: 4, background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+            >
+              <Plus className="w-3 h-3" /> Add event
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
+        {/* Calendar — left */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+          ) : view === "month" ? (
+            <MonthGrid
+              events={events}
+              currentMonth={currentMonth}
+              onMonthChange={setCurrentMonth}
+              onSelectEvent={setSelectedEvent}
+            />
+          ) : (
+            <TimelineView events={events} onSelectEvent={setSelectedEvent} />
+          )}
+        </div>
+
+        {/* Events panel — right */}
+        <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid #E5E0D2", paddingLeft: 20 }}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", margin: "0 0 10px" }}>
+            Events · {events.length || 3}
+          </p>
+
+          {events.length === 0 ? (
+            /* Default placeholder items when calendar isn't seeded yet */
+            [
+              { title: "Turkey Bowl", category: "social" as Category, date: "Nov 22" },
+              { title: "Welcome Night", category: "welcoming" as Category, date: "Aug 29" },
+              { title: "Coffeehouse", category: "social" as Category, date: "Nov 7" },
+            ].map((item) => {
+              const cfg = CATEGORY_CONFIG[item.category]
+              return (
+                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: "#8A8497", paddingLeft: 14 }}>{item.date}</span>
+                  <span style={{ marginLeft: 14, display: "inline-block", fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px", width: "fit-content" }}>
+                    Needs planning
+                  </span>
+                </div>
+              )
+            })
+          ) : (
+            events.map((ev) => {
+              const cfg = CATEGORY_CONFIG[ev.category]
+              const isPlanned = plannedEventIds.has(ev.id)
+              const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              return (
+                <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: "#8A8497", paddingLeft: 14 }}>{dateStr}</span>
+                  <div style={{ paddingLeft: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                    {isPlanned ? (
+                      <span style={{ fontSize: 10, fontWeight: 500, color: "#14532D", background: "#DCFCE7", borderRadius: 9999, padding: "2px 8px" }}>Planned ✓</span>
+                    ) : (
+                      <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px" }}>Needs planning</span>
+                    )}
+                    <button
+                      onClick={() => setPlanningEvent(ev)}
+                      style={{ fontSize: 11, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, textDecoration: "underline", textDecorationColor: "transparent" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "#3E1540")}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
+                    >
+                      {isPlanned ? "View plan" : "Plan →"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {selectedEvent && (
+        <EventDetailPopover
+          event={selectedEvent}
+          canEdit={canEdit}
+          userId={userId}
+          onClose={() => setSelectedEvent(null)}
+          onDelete={(id) => { handleDelete(id); setSelectedEvent(null) }}
+          onPlan={(ev) => { setSelectedEvent(null); setPlanningEvent(ev) }}
+        />
+      )}
+
+      {showAdd && (
+        <AddEventModal
+          ministryId={ministryId}
+          teamId={teamId}
+          userId={userId}
+          onClose={() => setShowAdd(false)}
+          onSaved={(ev) => {
+            setEvents((prev) => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+            setShowAdd(false)
+          }}
+        />
+      )}
+
+      {planningEvent && (
+        <EventPlanWorkspace
+          calendarEvent={planningEvent}
+          ministryId={ministryId}
+          userId={userId}
+          canEdit={canEdit}
+          onClose={() => setPlanningEvent(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── EventPlanWorkspace ────────────────────────────────────────────────────────
+
+function EventPlanWorkspace({
+  calendarEvent,
+  ministryId,
+  userId,
+  canEdit,
+  onClose,
+}: {
+  calendarEvent: CalendarEvent
+  ministryId: string
+  userId: string
+  canEdit: boolean
+  onClose: () => void
+}) {
+  const supabase = createClient()
+  const cfg = CATEGORY_CONFIG[calendarEvent.category]
+
+  // Core data state
+  const [plan, setPlan] = useState<EventPlan | null>(null)
+  const [tasks, setTasks] = useState<EventTask[]>([])
+  const [roles, setRoles] = useState<EventRole[]>([])
+  const [notes, setNotes] = useState<EventNote[]>([])
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeSection, setActiveSection] = useState<'overview' | 'checklist' | 'roles' | 'notes'>('overview')
+
+  // Overview edit state
+  const [turnout, setTurnout] = useState("")
+  const [budget, setBudget] = useState("")
+  const [overviewNotes, setOverviewNotes] = useState("")
+  const [savingOverview, setSavingOverview] = useState(false)
+
+  // Task add state
+  const [newTaskTitle, setNewTaskTitle] = useState("")
+  const [newTaskAssignee, setNewTaskAssignee] = useState("")
+  const [newTaskDue, setNewTaskDue] = useState("")
+  const [addingTask, setAddingTask] = useState(false)
+
+  // Role add state
+  const [newRoleName, setNewRoleName] = useState("")
+  const [newRoleAssignee, setNewRoleAssignee] = useState("")
+  const [newRoleNotes, setNewRoleNotes] = useState("")
+  const [addingRole, setAddingRole] = useState(false)
+
+  // Role inline edit state
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
+  const [editRoleName, setEditRoleName] = useState("")
+  const [editRoleAssignee, setEditRoleAssignee] = useState("")
+  const [editRoleNotes, setEditRoleNotes] = useState("")
+
+  // Note add state
+  const [newNote, setNewNote] = useState("")
+  const [addingNote, setAddingNote] = useState(false)
+
+  const startDate = new Date(calendarEvent.start_date)
+  const endDate = new Date(calendarEvent.end_date)
+  const dateStr = calendarEvent.all_day
+    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
+      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+
+  useEffect(() => {
+    async function init() {
+      setLoading(true)
+
+      // Fetch or create event_plan
+      let { data: planData } = await supabase
+        .from("event_plans")
+        .select("*")
+        .eq("calendar_event_id", calendarEvent.id)
+        .single()
+
+      if (!planData) {
+        const { data: newPlan } = await supabase
+          .from("event_plans")
+          .insert({ ministry_id: ministryId, calendar_event_id: calendarEvent.id, created_by: userId })
+          .select("*")
+          .single()
+        planData = newPlan
+      }
+
+      if (!planData) { setLoading(false); return }
+
+      setPlan(planData as EventPlan)
+      setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
+      setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
+      setOverviewNotes(planData.overview_notes ?? "")
+
+      const planId = planData.id
+
+      // Fetch tasks with assignee name
+      const { data: tasksData } = await supabase
+        .from("event_tasks")
+        .select("*, profiles!event_tasks_assigned_to_fkey(name)")
+        .eq("event_plan_id", planId)
+        .order("created_at", { ascending: true })
+
+      setTasks((tasksData ?? []).map((t: Record<string, unknown>) => ({
+        id: t.id as string,
+        event_plan_id: t.event_plan_id as string,
+        title: t.title as string,
+        assigned_to: t.assigned_to as string | null,
+        assigned_name: (t.profiles as { name?: string } | null)?.name,
+        due_date: t.due_date as string | null,
+        completed: t.completed as boolean,
+      })))
+
+      // Fetch roles with assignee name
+      const { data: rolesData } = await supabase
+        .from("event_roles")
+        .select("*, profiles!event_roles_assigned_to_fkey(name)")
+        .eq("event_plan_id", planId)
+        .order("created_at", { ascending: true })
+
+      setRoles((rolesData ?? []).map((r: Record<string, unknown>) => ({
+        id: r.id as string,
+        event_plan_id: r.event_plan_id as string,
+        role_name: r.role_name as string,
+        assigned_to: r.assigned_to as string | null,
+        assigned_name: (r.profiles as { name?: string } | null)?.name,
+        notes: r.notes as string | null,
+      })))
+
+      // Fetch notes with created_by name
+      const { data: notesData } = await supabase
+        .from("event_notes")
+        .select("*, profiles!event_notes_created_by_fkey(name)")
+        .eq("event_plan_id", planId)
+        .order("created_at", { ascending: false })
+
+      setNotes((notesData ?? []).map((n: Record<string, unknown>) => ({
+        id: n.id as string,
+        event_plan_id: n.event_plan_id as string,
+        content: n.content as string,
+        created_by: n.created_by as string,
+        created_by_name: (n.profiles as { name?: string } | null)?.name,
+        created_at: n.created_at as string,
+      })))
+
+      // Fetch ministry members for dropdowns
+      const { data: membersData } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .eq("ministry_id", ministryId)
+        .order("name")
+
+      setMembers(membersData ?? [])
+      setLoading(false)
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarEvent.id, ministryId, userId])
+
+  async function handleSaveOverview() {
+    if (!plan) return
+    setSavingOverview(true)
+    const updates = {
+      expected_turnout: turnout !== "" ? parseInt(turnout, 10) : null,
+      budget_allocated: budget !== "" ? parseFloat(budget) : null,
+      overview_notes: overviewNotes || null,
+    }
+    const { data } = await supabase
+      .from("event_plans")
+      .update(updates)
+      .eq("id", plan.id)
+      .select("*")
+      .single()
+    if (data) setPlan(data as EventPlan)
+    setSavingOverview(false)
+  }
+
+  async function handleToggleTask(task: EventTask) {
+    const newCompleted = !task.completed
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
+    await supabase
+      .from("event_tasks")
+      .update({ completed: newCompleted, completed_at: newCompleted ? new Date().toISOString() : null })
+      .eq("id", task.id)
+  }
+
+  async function handleAddTask() {
+    if (!plan || !newTaskTitle.trim()) return
+    setAddingTask(true)
+    const { data } = await supabase
+      .from("event_tasks")
+      .insert({
+        event_plan_id: plan.id,
+        title: newTaskTitle.trim(),
+        assigned_to: newTaskAssignee || null,
+        due_date: newTaskDue || null,
+        completed: false,
+        created_by: userId,
+      })
+      .select("*, profiles!event_tasks_assigned_to_fkey(name)")
+      .single()
+    if (data) {
+      const d = data as Record<string, unknown>
+      setTasks((prev) => [...prev, {
+        id: d.id as string,
+        event_plan_id: d.event_plan_id as string,
+        title: d.title as string,
+        assigned_to: d.assigned_to as string | null,
+        assigned_name: (d.profiles as { name?: string } | null)?.name,
+        due_date: d.due_date as string | null,
+        completed: d.completed as boolean,
+      }])
+    }
+    setNewTaskTitle("")
+    setNewTaskAssignee("")
+    setNewTaskDue("")
+    setAddingTask(false)
+  }
+
+  async function handleDeleteTask(id: string) {
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    await supabase.from("event_tasks").delete().eq("id", id)
+  }
+
+  async function handleAddRole() {
+    if (!plan || !newRoleName.trim()) return
+    setAddingRole(true)
+    const { data } = await supabase
+      .from("event_roles")
+      .insert({
+        event_plan_id: plan.id,
+        role_name: newRoleName.trim(),
+        assigned_to: newRoleAssignee || null,
+        notes: newRoleNotes || null,
+        created_by: userId,
+      })
+      .select("*, profiles!event_roles_assigned_to_fkey(name)")
+      .single()
+    if (data) {
+      const d = data as Record<string, unknown>
+      setRoles((prev) => [...prev, {
+        id: d.id as string,
+        event_plan_id: d.event_plan_id as string,
+        role_name: d.role_name as string,
+        assigned_to: d.assigned_to as string | null,
+        assigned_name: (d.profiles as { name?: string } | null)?.name,
+        notes: d.notes as string | null,
+      }])
+    }
+    setNewRoleName("")
+    setNewRoleAssignee("")
+    setNewRoleNotes("")
+    setAddingRole(false)
+  }
+
+  async function handleDeleteRole(id: string) {
+    setRoles((prev) => prev.filter((r) => r.id !== id))
+    await supabase.from("event_roles").delete().eq("id", id)
+  }
+
+  async function handleSaveRoleEdit(roleId: string) {
+    const memberName = members.find((m) => m.id === editRoleAssignee)?.name
+    setRoles((prev) => prev.map((r) => r.id === roleId ? {
+      ...r,
+      role_name: editRoleName,
+      assigned_to: editRoleAssignee || null,
+      assigned_name: memberName,
+      notes: editRoleNotes || null,
+    } : r))
+    await supabase.from("event_roles").update({
+      role_name: editRoleName,
+      assigned_to: editRoleAssignee || null,
+      notes: editRoleNotes || null,
+    }).eq("id", roleId)
+    setEditingRoleId(null)
+  }
+
+  async function handleAddNote() {
+    if (!plan || !newNote.trim()) return
+    setAddingNote(true)
+    const { data } = await supabase
+      .from("event_notes")
+      .insert({
+        event_plan_id: plan.id,
+        content: newNote.trim(),
+        created_by: userId,
+      })
+      .select("*, profiles!event_notes_created_by_fkey(name)")
+      .single()
+    if (data) {
+      const d = data as Record<string, unknown>
+      setNotes((prev) => [{
+        id: d.id as string,
+        event_plan_id: d.event_plan_id as string,
+        content: d.content as string,
+        created_by: d.created_by as string,
+        created_by_name: (d.profiles as { name?: string } | null)?.name,
+        created_at: d.created_at as string,
+      }, ...prev])
+    }
+    setNewNote("")
+    setAddingNote(false)
+  }
+
+  const incompleteTasks = tasks.filter((t) => !t.completed)
+  const completedTasks = tasks.filter((t) => t.completed)
+
+  const sections: { key: 'overview' | 'checklist' | 'roles' | 'notes'; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'checklist', label: 'Checklist' },
+    { key: 'roles', label: 'Roles & Leads' },
+    { key: 'notes', label: 'Notes' },
+  ]
+
+  const inputStyle: React.CSSProperties = {
+    background: "#FBF8F2",
+    border: "1px solid #E5E0D2",
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontSize: 13,
+    color: "#13101A",
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+  }
+
+  const selectStyle: React.CSSProperties = {
+    background: "#FBF8F2",
+    border: "1px solid #E5E0D2",
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontSize: 13,
+    color: "#13101A",
+    outline: "none",
+    cursor: "pointer",
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: "#FBF8F2",
+    border: "1px solid #E5E0D2",
+    borderRadius: 12,
+    padding: "20px 24px",
+    marginBottom: 16,
+  }
+
+  const sectionHeadingStyle: React.CSSProperties = {
+    fontFamily: "var(--font-instrument-serif)",
+    fontSize: 20,
+    fontWeight: 400,
+    color: "#13101A",
+    margin: "0 0 16px",
+  }
+
+  const chipStyle: React.CSSProperties = {
+    background: "#EFEAE0",
+    color: "#5A5466",
+    borderRadius: 999,
+    padding: "2px 8px",
+    fontSize: 12,
+    whiteSpace: "nowrap" as const,
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }}
+      className="md:left-[296px]"
+    >
+      {/* Header */}
+      <div style={{ position: "sticky", top: 0, background: "#FBF8F2", borderBottom: "1px solid #E5E0D2", zIndex: 10, padding: "0 24px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 48, paddingBottom: 16 }}>
+            <button
+              onClick={onClose}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex", alignItems: "center", gap: 6, color: "#5A5466", fontSize: 13 }}
+            >
+              ← Back
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", margin: 0 }}>
+                  {calendarEvent.title}
+                </h1>
+                <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999, flexShrink: 0 }}>
+                  {cfg.label}
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
+                {dateStr}{calendarEvent.location ? ` · ${calendarEvent.location}` : ""}
+              </p>
+            </div>
+          </div>
+
+          {/* Section tabs */}
+          <div style={{ display: "flex", gap: 4, paddingBottom: 12 }}>
+            {sections.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setActiveSection(s.key)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: activeSection === s.key ? 500 : 400,
+                  background: activeSection === s.key ? "#3E1540" : "transparent",
+                  color: activeSection === s.key ? "#F6F4EF" : "#8A8497",
+                  transition: "background 0.15s, color 0.15s",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 24px 80px" }}>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        ) : (
+          <>
+            {/* ── Overview ── */}
+            {activeSection === 'overview' && (
+              <div>
+                {/* Event info block */}
+                <div style={{ ...cardStyle, background: "#F4F0F8", border: "1px solid #DDD5E8" }}>
+                  <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 4px" }}><strong style={{ color: "#13101A" }}>Date</strong> · {dateStr}</p>
+                  {calendarEvent.location && (
+                    <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 4px" }}><strong style={{ color: "#13101A" }}>Location</strong> · {calendarEvent.location}</p>
+                  )}
+                  {calendarEvent.description && (
+                    <p style={{ fontSize: 14, color: "#5A5466", margin: "4px 0 0", lineHeight: 1.6 }}>{calendarEvent.description}</p>
+                  )}
+                </div>
+
+                {/* Editable fields */}
+                <div style={cardStyle}>
+                  <p style={sectionHeadingStyle}>Planning Details</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Expected turnout</label>
+                      <input
+                        type="number"
+                        value={turnout}
+                        onChange={(e) => setTurnout(e.target.value)}
+                        placeholder="e.g. 80"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Budget allocated ($)</label>
+                      <input
+                        type="number"
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        placeholder="e.g. 500"
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Overview notes</label>
+                    <textarea
+                      value={overviewNotes}
+                      onChange={(e) => setOverviewNotes(e.target.value)}
+                      placeholder="High-level notes about this event..."
+                      rows={4}
+                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+                    />
+                  </div>
+                  {canEdit && (
+                    <button
+                      onClick={handleSaveOverview}
+                      disabled={savingOverview}
+                      style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: savingOverview ? "not-allowed" : "pointer", opacity: savingOverview ? 0.7 : 1 }}
+                    >
+                      {savingOverview ? "Saving…" : "Save"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Checklist ── */}
+            {activeSection === 'checklist' && (
+              <div style={cardStyle}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <p style={sectionHeadingStyle}>Checklist</p>
+                  <span style={{ fontSize: 12, color: "#8A8497" }}>{incompleteTasks.length} remaining</span>
+                </div>
+
+                {/* Add task form */}
+                {canEdit && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20, padding: "16px", background: "#F4F0F8", borderRadius: 10 }}>
+                    <input
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      placeholder="New task..."
+                      style={inputStyle}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleAddTask() }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select
+                        value={newTaskAssignee}
+                        onChange={(e) => setNewTaskAssignee(e.target.value)}
+                        style={{ ...selectStyle, flex: 1 }}
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={newTaskDue}
+                        onChange={(e) => setNewTaskDue(e.target.value)}
+                        style={{ ...inputStyle, width: "auto" }}
+                      />
+                      <button
+                        onClick={handleAddTask}
+                        disabled={addingTask || !newTaskTitle.trim()}
+                        style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", opacity: addingTask || !newTaskTitle.trim() ? 0.6 : 1, whiteSpace: "nowrap" }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Incomplete tasks */}
+                {incompleteTasks.length === 0 && completedTasks.length === 0 && (
+                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No tasks yet.</p>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {incompleteTasks.map((task) => (
+                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={task.completed}
+                        onChange={() => handleToggleTask(task)}
+                        style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#3E1540", flexShrink: 0 }}
+                      />
+                      <span style={{ flex: 1, fontSize: 14, color: "#13101A" }}>{task.title}</span>
+                      {task.assigned_name && (
+                        <span style={chipStyle}>{task.assigned_name}</span>
+                      )}
+                      {task.due_date && (
+                        <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
+                          {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, color: "#C4C4C4" }}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Completed tasks */}
+                {completedTasks.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 16, marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 500 }}>Completed</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {completedTasks.map((task) => (
+                        <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8, opacity: 0.5 }}>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleTask(task)}
+                            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#3E1540", flexShrink: 0 }}
+                          />
+                          <span style={{ flex: 1, fontSize: 14, color: "#13101A", textDecoration: "line-through" }}>{task.title}</span>
+                          {task.assigned_name && (
+                            <span style={chipStyle}>{task.assigned_name}</span>
+                          )}
+                          {task.due_date && (
+                            <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
+                              {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
+                          {canEdit && (
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, color: "#C4C4C4" }}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Roles & Leads ── */}
+            {activeSection === 'roles' && (
+              <div style={cardStyle}>
+                <p style={sectionHeadingStyle}>Roles & Leads</p>
+
+                {roles.length === 0 && (
+                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No roles defined yet.</p>
+                )}
+
+                {/* Roles table */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                  {roles.map((role) => (
+                    <div key={role.id}>
+                      {editingRoleId === role.id ? (
+                        <div style={{ border: "1px solid #3E1540", borderRadius: 8, padding: "12px" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                            <input
+                              value={editRoleName}
+                              onChange={(e) => setEditRoleName(e.target.value)}
+                              placeholder="Role name"
+                              style={inputStyle}
+                            />
+                            <select
+                              value={editRoleAssignee}
+                              onChange={(e) => setEditRoleAssignee(e.target.value)}
+                              style={{ ...selectStyle, width: "100%" }}
+                            >
+                              <option value="">Unassigned</option>
+                              {members.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <input
+                            value={editRoleNotes}
+                            onChange={(e) => setEditRoleNotes(e.target.value)}
+                            placeholder="Notes (optional)"
+                            style={{ ...inputStyle, marginBottom: 8 }}
+                          />
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => handleSaveRoleEdit(role.id)}
+                              style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingRoleId(null)}
+                              style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "#5A5466", cursor: "pointer" }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{role.role_name}</span>
+                            {role.notes && (
+                              <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0" }}>{role.notes}</p>
+                            )}
+                          </div>
+                          {role.assigned_name ? (
+                            <span style={chipStyle}>{role.assigned_name}</span>
+                          ) : (
+                            <span style={{ ...chipStyle, color: "#C4C4C4" }}>Unassigned</span>
+                          )}
+                          {canEdit && (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                onClick={() => {
+                                  setEditingRoleId(role.id)
+                                  setEditRoleName(role.role_name)
+                                  setEditRoleAssignee(role.assigned_to ?? "")
+                                  setEditRoleNotes(role.notes ?? "")
+                                }}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#8A8497" }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRole(role.id)}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add role form */}
+                {canEdit && (
+                  <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 16 }}>
+                    <p style={{ fontSize: 12, color: "#8A8497", margin: "0 0 8px" }}>Add a role</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                      <input
+                        value={newRoleName}
+                        onChange={(e) => setNewRoleName(e.target.value)}
+                        placeholder="Role name"
+                        style={inputStyle}
+                      />
+                      <select
+                        value={newRoleAssignee}
+                        onChange={(e) => setNewRoleAssignee(e.target.value)}
+                        style={{ ...selectStyle, width: "100%" }}
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        value={newRoleNotes}
+                        onChange={(e) => setNewRoleNotes(e.target.value)}
+                        placeholder="Notes (optional)"
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <button
+                        onClick={handleAddRole}
+                        disabled={addingRole || !newRoleName.trim()}
+                        style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.6 : 1, whiteSpace: "nowrap" }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Transition Notes ── */}
+            {activeSection === 'notes' && (
+              <div style={cardStyle}>
+                <div style={{ marginBottom: 16 }}>
+                  <p style={sectionHeadingStyle}>Transition Notes</p>
+                  <p style={{ fontSize: 13, color: "#8A8497", margin: "-8px 0 0" }}>Institutional memory — never deleted</p>
+                </div>
+
+                {/* Add note form */}
+                {canEdit && (
+                  <div style={{ marginBottom: 20, padding: "16px", background: "#F4F0F8", borderRadius: 10 }}>
+                    <textarea
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      placeholder="Write a note for future leaders..."
+                      rows={3}
+                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 8 }}
+                    />
+                    <button
+                      onClick={handleAddNote}
+                      disabled={addingNote || !newNote.trim()}
+                      style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.6 : 1 }}
+                    >
+                      {addingNote ? "Adding…" : "Add note"}
+                    </button>
+                  </div>
+                )}
+
+                {notes.length === 0 && (
+                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No notes yet. Add institutional knowledge for future leaders.</p>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {notes.map((note) => (
+                    <div key={note.id} style={{ borderBottom: "1px solid #E5E0D2", paddingBottom: 16 }}>
+                      <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>{note.content}</p>
+                      <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
+                        {note.created_by_name ?? "Someone"} · {new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── CreateTeamOverlay ─────────────────────────────────────────────────────────
 
 type CreateStep = "preset" | "customize" | "members"
@@ -4434,7 +6044,7 @@ function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
   userId: string
   ministryId: string
   onClose: () => void
-  onCreated: () => void
+  onCreated: (teamId: string) => void
 }) {
   const supabase = createClient()
   const [step, setStep] = useState<CreateStep>("preset")
@@ -4529,19 +6139,23 @@ function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
 
     if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
 
-    if (selectedMembers.length > 0) {
-      const { error: membersErr } = await supabase.from("team_members").insert(
-        selectedMembers.map((m) => ({
-          team_id: team.id,
-          user_id: m.userId,
-          role_id: createdRoles[m.roleIdx]?.id ?? createdRoles[0].id,
-          added_by: userId,
-        }))
-      )
-      if (membersErr) { setError(membersErr.message); setSaving(false); return }
-    }
+    // Build members list — always include creator, then any additionally selected members
+    const creatorAlreadySelected = selectedMembers.some((m) => m.userId === userId)
+    const allMembers = creatorAlreadySelected
+      ? selectedMembers
+      : [{ userId, roleIdx: 0 }, ...selectedMembers]
 
-    onCreated()
+    const { error: membersErr } = await supabase.from("team_members").insert(
+      allMembers.map((m) => ({
+        team_id: team.id,
+        user_id: m.userId,
+        role_id: createdRoles[m.roleIdx]?.id ?? createdRoles[0].id,
+        added_by: userId,
+      }))
+    )
+    if (membersErr) { setError(membersErr.message); setSaving(false); return }
+
+    onCreated(team.id)
   }
 
   const filteredMembers = ministryMembers.filter((m) =>
@@ -5133,10 +6747,11 @@ interface DesktopSidebarProps {
   onLogout: () => void
   isAdmin?: boolean
   onCreateTeam?: () => void
+  activeTeamId: string | null
+  onActiveTeamChange: (id: string) => void
 }
 
-function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam }: DesktopSidebarProps) {
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(userTeams[0]?.teamId ?? null)
+function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange }: DesktopSidebarProps) {
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
@@ -5239,7 +6854,7 @@ function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, sho
             userTeams.map((t) => {
               const isActive = t.teamId === activeTeamId
               return (
-                <button key={t.teamId} onClick={() => setActiveTeamId(t.teamId)} style={{
+                <button key={t.teamId} onClick={() => onActiveTeamChange(t.teamId)} style={{
                   display: "flex", alignItems: "center", gap: "10px",
                   padding: "9px 8px", borderRadius: "8px", cursor: "pointer",
                   background: isActive ? "#EFEAE0" : "transparent",
@@ -5442,6 +7057,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)")
@@ -5554,6 +7170,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
     })
     setUserTeams(teams)
+    setActiveTeamId((prev) => prev ?? teams[0]?.teamId ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
@@ -5697,6 +7314,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         onLogout={handleLogout}
         isAdmin={isAdmin}
         onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
+        activeTeamId={activeTeamId}
+        onActiveTeamChange={setActiveTeamId}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -5731,7 +7350,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           {activeTab === "chats" && (
             <div className="md:flex md:h-full md:overflow-hidden">
               {/* Left: chat list */}
-              <div className="md:w-[320px] md:flex-shrink-0 md:border-r md:border-[#ECE8DE] md:overflow-y-auto md:h-full">
+              <div className="md:w-[232px] md:flex-shrink-0 md:border-r md:border-[#ECE8DE] md:overflow-y-auto md:h-full">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}
@@ -5783,6 +7402,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}
+                activeTeamId={activeTeamId}
+                onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); setActiveTeamId(teamId) }}
               />
             </div>
           )}
