@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Search, Calendar, ChevronRight, ChevronDown, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
-  MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera,
+  MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera, Home, MessageCircle, User,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -208,30 +209,47 @@ interface HomeTabProps {
 function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+  const [moreAnnouncements, setMoreAnnouncements] = useState<Announcement[]>([])
+  const [featuredPrayer, setFeaturedPrayer] = useState<{ name: string; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [userHasRsvped, setUserHasRsvped] = useState(false)
   const [rsvping, setRsvping] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const { data: ann } = await supabase
+      const { data: anns } = await supabase
         .from("announcements")
         .select("*")
         .eq("ministry_id", ministryId)
+        .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (ann) {
-        setAnnouncement(ann)
-        if (ann.is_event) {
+        .limit(4)
+      const list = anns ?? []
+      if (list.length > 0) {
+        setAnnouncement(list[0])
+        setMoreAnnouncements(list.slice(1))
+        const first = list[0]
+        if (first.is_event) {
           const { data: rsvpData } = await supabase
             .from("rsvps")
             .select("announcement_id")
-            .eq("announcement_id", ann.id)
+            .eq("announcement_id", first.id)
             .eq("user_id", profile.id)
             .maybeSingle()
           setUserHasRsvped(!!rsvpData)
         }
+      }
+      // Fetch a featured prayer from the community
+      const { data: prayerProfile } = await supabase
+        .from("profiles")
+        .select("name, pray_for_me")
+        .eq("ministry_id", ministryId)
+        .not("pray_for_me", "is", null)
+        .neq("id", profile.id)
+        .limit(1)
+        .maybeSingle()
+      if (prayerProfile?.pray_for_me) {
+        setFeaturedPrayer({ name: prayerProfile.name, text: prayerProfile.pray_for_me })
       }
       setLoading(false)
     }
@@ -252,11 +270,24 @@ function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, o
 
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
+  const firstName = profile.name.split(" ")[0]
+  const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "11px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
 
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="pb-2 md:pb-0">
+      {/* ── Desktop Topbar ── */}
+      <DesktopTopbar crumbs={["Central", "Home"]} />
+
+      {/* ── Mobile Header ── */}
+      <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
@@ -279,90 +310,241 @@ function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, o
       </div>
 
       {loading ? (
-        <Spinner />
+        <div className="px-5 md:px-14"><Spinner /></div>
       ) : (
-        <div className="flex flex-col gap-8">
-          {/* Latest Announcement */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                Latest announcement
-              </h2>
-              <button
-                onClick={onSeeAnnouncements}
-                className="text-[13px] text-[#5A5466] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors"
-              >
-                See all <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+        <>
+          {/* ── Desktop Editorial Header ── */}
+          <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
+            <div style={{ maxWidth: "640px" }}>
+              <p style={monoStyle}>{dateLabel}</p>
+              <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
+                {getGreeting()}, {firstName}.
+              </h1>
+              <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px" }}>
+                {totalUnread > 0 ? `${totalUnread} unread message${totalUnread !== 1 ? "s" : ""} waiting for you.` : "You're all caught up."}
+              </p>
             </div>
+            <div className="flex gap-6 pb-1.5">
+              {[
+                { label: "Unread", value: String(totalUnread) },
+                { label: "Going", value: String(moreAnnouncements.filter(a => a.is_event).length + (announcement?.is_event && userHasRsvped ? 1 : 0)) },
+                { label: "In ministry", value: "—" },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p style={monoStyle}>{label}</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", marginTop: "2px", fontVariantNumeric: "tabular-nums", color: "#13101A" }}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            {announcement ? (
-              <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
-                <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.33)_0%,transparent_70%)]" />
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[10px] font-bold tracking-[.22em] uppercase text-[#9E85A0]">
-                      {announcement.is_event ? "Up Next" : "Latest"}
-                    </span>
-                    {announcement.is_event && (
-                      <span className="px-2 py-0.5 bg-[#C9A34B] text-[#13101A] rounded-full text-[9px] font-bold tracking-[.14em] uppercase">
-                        Event
-                      </span>
-                    )}
+          {/* ── Desktop Content Grid ── */}
+          <div className="hidden md:block px-14 py-7">
+            {/* Hero + chats row */}
+            <div className="grid gap-5" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
+              {/* Hero announcement */}
+              {announcement ? (
+                <div
+                  className="relative overflow-hidden rounded-2xl text-[#F6F4EF] flex flex-col"
+                  style={{
+                    background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)",
+                    padding: "32px 32px 24px",
+                    minHeight: "320px",
+                  }}
+                >
+                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+                  <div className="relative flex justify-between items-start" style={{ fontSize: "11px" }}>
+                    <span style={{ ...monoStyle, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Up next" : "Latest"}</span>
                   </div>
-                  <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>
+                  <h2 className="relative" style={{ margin: "28px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 0.98, letterSpacing: "-0.01em" }}>
                     {announcement.title}
-                  </h3>
-                  <p className="text-[13px] text-[#CFB8D1] leading-relaxed mb-5 line-clamp-2">
+                  </h2>
+                  <p className="relative mt-2.5 text-[13px] leading-relaxed line-clamp-3" style={{ opacity: 0.78, maxWidth: "420px" }}>
                     {announcement.body}
                   </p>
-                  <div className="flex items-center gap-4">
+                  <div className="relative mt-auto pt-9 flex items-center gap-3">
                     {announcement.is_event && (
                       <button
                         onClick={handleHomeRsvp}
                         disabled={userHasRsvped || rsvping}
-                        className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${
-                          userHasRsvped
-                            ? "bg-white/20 text-[#F6F4EF] cursor-default"
-                            : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white"
-                        }`}
+                        style={{
+                          background: userHasRsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF",
+                          color: userHasRsvped ? "#F6F4EF" : "#13101A",
+                          border: 0, padding: "9px 18px", borderRadius: "8px",
+                          fontWeight: 500, fontSize: "13px", cursor: userHasRsvped ? "default" : "pointer",
+                        }}
                       >
-                        {userHasRsvped ? (
-                          <span className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5" />
-                            You&apos;re going!
-                          </span>
-                        ) : (
-                          "RSVP"
-                        )}
+                        {userHasRsvped ? "Going ✓" : "RSVP"}
                       </button>
                     )}
                     <button
                       onClick={onSeeAnnouncements}
-                      className="text-[13px] text-[#9E85A0] font-medium hover:text-[#CFB8D1] transition-colors"
+                      style={{
+                        background: "rgba(255,255,255,0.08)", color: "#F6F4EF",
+                        border: "1px solid rgba(255,255,255,0.18)", padding: "9px 18px",
+                        borderRadius: "8px", fontSize: "13px", cursor: "pointer",
+                      }}
                     >
-                      {announcement.is_event ? "Details" : "View details →"}
+                      Details
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] flex items-center justify-center" style={{ minHeight: "320px" }}>
+                  <div className="text-center">
+                    <Bell className="w-8 h-8 text-[#C4C4C4] mx-auto mb-3" />
+                    <p className="text-[14px] font-semibold text-[#13101A]/50">No announcements yet</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent chats */}
+              <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden flex flex-col">
+                <div className="px-4 py-3.5 border-b border-[#E5E0D2] flex items-center">
+                  <span style={{ fontSize: "13px", fontWeight: 500 }}>Your chats</span>
+                  <span className="flex-1" />
+                  {totalUnread > 0 && <span style={{ fontSize: "11px", color: "#8A8497" }}>{totalUnread} unread</span>}
+                </div>
+                {top3.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center py-10">
+                    <p className="text-[13px] text-[#8A8497]">No recent chats</p>
+                  </div>
+                ) : (
+                  top3.map((c, i) => (
+                    <button
+                      key={c.id}
+                      onClick={() => onOpenChat(c.id, c.groupName)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F4F1E8] transition-colors"
+                      style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: i % 2 === 0 ? "#3E1540" : "#13101A",
+                        color: "#F6F4EF", display: "grid", placeItems: "center",
+                        fontSize: "11px", fontWeight: 600,
+                      }}>
+                        {c.initials}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="flex justify-between gap-2 items-baseline">
+                          <span style={{ fontSize: "13px", fontWeight: c.unreadCount ? 600 : 500 }}>{c.groupName}</span>
+                          {c.time && <span style={{ fontSize: "10px", color: "#8A8497", flexShrink: 0 }}>{c.time}</span>}
+                        </div>
+                        {c.lastMessage && (
+                          <p style={{ fontSize: "12px", color: "#5A5466", marginTop: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {c.lastMessage}
+                          </p>
+                        )}
+                      </div>
+                      {c.unreadCount > 0 && (
+                        <span style={{ background: "#C9A34B", color: "#13101A", fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: 999 }}>{c.unreadCount}</span>
+                      )}
+                    </button>
+                  ))
+                )}
+                <button
+                  onClick={onSeeChats}
+                  className="px-4 py-3 mt-auto border-t border-[#E5E0D2] text-[12px] text-[#8A8497] hover:text-[#13101A] text-left transition-colors"
+                >
+                  See all chats →
+                </button>
               </div>
-            ) : (
-              <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-center text-[13px] text-[#9E85A0] italic">
-                No announcements yet
+            </div>
+
+            {/* 3-col announcement cards */}
+            {moreAnnouncements.length > 0 && (
+              <div className="mt-7 grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+                {moreAnnouncements.slice(0, 3).map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={onSeeAnnouncements}
+                    className="text-left rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-4 hover:bg-[#F4F1E8] transition-colors"
+                  >
+                    <p style={monoStyle}>{a.is_event ? "Event" : "Announcement"}</p>
+                    <h4 style={{ margin: "10px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "20px", lineHeight: 1.15, color: "#13101A" }}>{a.title}</h4>
+                    <p style={{ marginTop: "8px", fontSize: "12px", color: "#5A5466", lineHeight: 1.5 }} className="line-clamp-2">{a.body}</p>
+                    <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px solid #EFEAE0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "11px", color: "#8A8497" }}>{a.is_event ? "Event" : "Post"}</span>
+                      <span style={{ fontSize: "11px", color: "#8A8497" }}>View →</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
-          </section>
 
-          {/* Recent Chats */}
-          {top3.length > 0 && (
-            <ChatsSection
-              chats={top3}
-              totalUnread={totalUnread}
-              onSeeAll={onSeeChats}
-              onOpenChat={onOpenChat}
-            />
-          )}
-        </div>
+            {/* Pray with us strip */}
+            {featuredPrayer && (
+              <div
+                className="mt-6 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2]"
+                style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", alignItems: "center", gap: "24px" }}
+              >
+                <div>
+                  <p style={monoStyle}>Pray with us</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", marginTop: "4px", color: "#13101A" }}>This week&apos;s heart</p>
+                </div>
+                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.4, color: "#13101A" }}>
+                  &ldquo;{featuredPrayer.text}&rdquo;{" "}
+                  <span style={{ fontStyle: "normal", fontFamily: "inherit", color: "#8A8497", fontSize: "12px" }}>— {featuredPrayer.name}</span>
+                </div>
+                <div className="flex justify-end">
+                  <span style={{ fontSize: "13px", color: "#8A8497" }}>🙏 Praying</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Mobile Content ── */}
+          <div className="md:hidden px-5 pb-4">
+            <div className="flex flex-col gap-8">
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                    Latest announcement
+                  </h2>
+                  <button onClick={onSeeAnnouncements} className="text-[12px] text-[#8A8497] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors">
+                    See all <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+                {announcement ? (
+                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
+                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.33)_0%,transparent_70%)]" />
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[10px] font-bold tracking-[.22em] uppercase text-[#9E85A0]">{announcement.is_event ? "Up Next" : "Latest"}</span>
+                        {announcement.is_event && <span className="px-2 py-0.5 bg-[#C9A34B] text-[#13101A] rounded-full text-[9px] font-bold tracking-[.14em] uppercase">Event</span>}
+                      </div>
+                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>{announcement.title}</h3>
+                      <p className="text-[13px] text-[#CFB8D1] leading-relaxed mb-5 line-clamp-3">{announcement.body}</p>
+                      <div className="flex items-center gap-4">
+                        {announcement.is_event && (
+                          <button
+                            onClick={handleHomeRsvp}
+                            disabled={userHasRsvped || rsvping}
+                            className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] cursor-default" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white"}`}
+                          >
+                            {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />You&apos;re going!</span> : "RSVP"}
+                          </button>
+                        )}
+                        <button onClick={onSeeAnnouncements} className="text-[13px] text-[#9E85A0] font-medium hover:text-[#CFB8D1] transition-colors">
+                          {announcement.is_event ? "Details" : "View details →"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-8 text-center text-[13px] text-[#9E85A0] italic">No announcements yet</div>
+                )}
+              </section>
+
+              <div>
+                {top3.length > 0 ? (
+                  <ChatsSection chats={top3} totalUnread={totalUnread} onSeeAll={onSeeChats} onOpenChat={onOpenChat} />
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
@@ -506,7 +688,7 @@ function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSucc
   // Success screen
   if (success) {
     return (
-      <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center gap-4">
+      <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center gap-4 md:left-[296px]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/15 flex items-center justify-center">
           <CheckCircle2 className="w-8 h-8 text-[#3E1540]" />
         </div>
@@ -523,16 +705,16 @@ function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSucc
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-    <div className="max-w-[390px] mx-auto h-full flex flex-col w-full">
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+    <div className="flex flex-col w-full h-full bg-white md:h-auto md:max-h-[88vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
       {/* ── Top nav bar ── */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-white">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-white flex-shrink-0">
         <button
           onClick={onClose}
           className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
         >
-          <ArrowLeft className="w-4 h-4 text-foreground" />
+          <X className="w-4 h-4 text-foreground" />
         </button>
         <h1 className="text-[17px] font-bold text-foreground tracking-tight">
           {isEditing ? "Edit Announcement" : "New Announcement"}
@@ -540,7 +722,7 @@ function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSucc
       </div>
 
       {/* ── Scrollable form fields ── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <form
           id="ann-form"
           onSubmit={handleSubmit}
@@ -687,6 +869,7 @@ function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministry
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [editingAnn, setEditingAnn] = useState<EnrichedAnnouncement | null>(null)
+  const [compact, setCompact] = useState(false)
 
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
 
@@ -789,6 +972,12 @@ function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministry
     setAnnouncements((prev) => prev.filter((ann) => ann.id !== id))
   }
 
+  async function handleDesktopDelete(ann: EnrichedAnnouncement) {
+    const supabase = createClient()
+    setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id))
+    await supabase.from("announcements").delete().eq("id", ann.id)
+  }
+
   function handleEditSuccess(updated: Announcement) {
     setAnnouncements((prev) =>
       prev.map((ann) =>
@@ -797,10 +986,35 @@ function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministry
     )
   }
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "11px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
+  const pinnedAnn = announcements.find(a => a.is_pinned)
+  const unpinned = announcements.filter(a => !a.is_pinned)
+
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="pb-2 md:pb-0">
+      {/* Desktop Topbar */}
+      <DesktopTopbar
+        crumbs={["Central", "Announcements"]}
+        right={isLeaderOrAdmin ? (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] hover:bg-[#2D0F2E] text-[#F6F4EF] rounded-lg text-[12px] font-medium transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New announcement
+          </button>
+        ) : undefined}
+      />
+
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
@@ -810,70 +1024,257 @@ function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministry
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
       </div>
-      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "24px", lineHeight: 1.05 }}>Announcements</h1>
+
+      {/* Mobile title */}
+      <div className="flex items-end justify-between px-5 mb-6 md:hidden">
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Announcements</h1>
+        {isLeaderOrAdmin && (
+          <button onClick={() => setShowCreate(true)} className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors">
+            <Plus className="w-4 h-4 text-white" />
+          </button>
+        )}
+      </div>
+
+      {/* Desktop Editorial Header */}
+      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
+        <div>
+          <p style={monoStyle}>{announcements.length} total · {announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread</p>
+          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+            Announcements
+          </h1>
+          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+            What the ministry is planning, praying for, and showing up to.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 pb-1.5">
+          {/* Cards/Compact toggle */}
+          <div className="flex border border-[#E5E0D2] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setCompact(false)}
+              className="px-3 py-1.5 text-[12px] transition-colors"
+              style={{ background: !compact ? "#EFEAE0" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}
+            >
+              Cards
+            </button>
+            <button
+              onClick={() => setCompact(true)}
+              className="px-3 py-1.5 text-[12px] transition-colors"
+              style={{ background: compact ? "#EFEAE0" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}
+            >
+              Compact
+            </button>
+          </div>
+        </div>
+      </div>
 
       {loading ? (
-        <Spinner />
+        <div className="px-5 md:px-14"><Spinner /></div>
       ) : announcements.length === 0 ? (
-        <EmptyState
-          icon={<Bell className="w-7 h-7" />}
-          title="No announcements yet"
-          subtitle={isLeaderOrAdmin ? "Nothing announced yet." : "Check back soon for updates"}
-        />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {announcements.map((ann, idx) => (
-            <AnnouncementCard
-              key={ann.id}
-              announcement={ann}
-              isPinned={ann.is_pinned && idx === 0}
-              userId={userId}
-              userRole={userRole}
-              onRsvpToggle={handleRsvpToggle}
-              onEdit={(a) => setEditingAnn(a)}
-              onDelete={handleDeleteAnnouncement}
-            />
-          ))}
+        <div className="px-5 md:px-14">
+          <EmptyState
+            icon={<Bell className="w-7 h-7" />}
+            title="No announcements yet"
+            subtitle={isLeaderOrAdmin ? "Nothing announced yet." : "Check back soon for updates"}
+          />
         </div>
+      ) : (
+        <>
+          {/* Mobile card list */}
+          <div className="md:hidden px-5 pb-4 flex flex-col gap-4">
+            {announcements.map((ann, idx) => (
+              <AnnouncementCard
+                key={ann.id}
+                announcement={ann}
+                isPinned={ann.is_pinned && idx === 0}
+                userId={userId}
+                userRole={userRole}
+                onRsvpToggle={handleRsvpToggle}
+                onEdit={(a) => setEditingAnn(a)}
+                onDelete={handleDeleteAnnouncement}
+              />
+            ))}
+          </div>
+
+          {/* Desktop layout */}
+          <div className="hidden md:block px-14 py-7">
+            {/* Filter chips */}
+            <div className="flex gap-2 mb-6">
+              {["All", "Events", "Prayer", "Pinned"].map((t, i) => (
+                <button key={t} style={{
+                  padding: "7px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 500,
+                  border: i === 0 ? "1px solid #13101A" : "1px solid #E5E0D2",
+                  background: i === 0 ? "#13101A" : "transparent",
+                  color: i === 0 ? "#F6F4EF" : "#13101A", cursor: "pointer",
+                }}>{t}</button>
+              ))}
+            </div>
+
+            {/* Pinned hero strip */}
+            {pinnedAnn && (
+              <div
+                className="rounded-xl overflow-hidden mb-6 relative"
+                style={{ background: "#3E1540", color: "#F6F4EF", padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}
+              >
+                <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+                <div className="relative">
+                  <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.75, marginBottom: "8px" }}>📌 Pinned</p>
+                  <h2 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
+                  <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
+                </div>
+                <div className="flex gap-2.5 relative items-center">
+                  {pinnedAnn.is_event && (
+                    <button
+                      onClick={() => handleRsvpToggle(pinnedAnn.id)}
+                      style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: pinnedAnn.user_has_rsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "8px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}
+                    >
+                      {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
+                    </button>
+                  )}
+                  {isLeaderOrAdmin && (
+                    <>
+                      <button
+                        onClick={() => setEditingAnn(pinnedAnn)}
+                        style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }}
+                        title="Edit"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                      </button>
+                      <button
+                        onClick={() => handleDesktopDelete(pinnedAnn)}
+                        style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {compact ? (
+              /* Compact table */
+              <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
+                <div className="grid px-5 py-2.5 border-b border-[#E5E0D2]" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
+                  {["Type", "Title", "When", "Action"].map(h => (
+                    <span key={h} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>{h}</span>
+                  ))}
+                </div>
+                {(pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned).map((ann, i) => (
+                  <div key={ann.id} className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px", borderTop: i ? "1px solid #EFEAE0" : undefined }}>
+                    <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>
+                      {ann.is_event ? "Event" : "Post"}
+                    </span>
+                    <div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2 }}>{ann.title}</div>
+                      <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} className="line-clamp-1">{ann.body}</div>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
+                    <div className="flex justify-end items-center gap-1.5">
+                      {ann.is_event && (
+                        <button
+                          onClick={() => handleRsvpToggle(ann.id)}
+                          style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}
+                        >
+                          {ann.user_has_rsvped ? "Going" : "RSVP"}
+                        </button>
+                      )}
+                      {isLeaderOrAdmin && (
+                        <>
+                          <button
+                            onClick={() => setEditingAnn(ann)}
+                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-[#5A5466]" />
+                          </button>
+                          <button
+                            onClick={() => handleDesktopDelete(ann)}
+                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Editorial 2-col cards */
+              <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                {(pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned).map((ann) => (
+                  <article key={ann.id} className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
+                    <div style={{ padding: "26px 28px 22px" }}>
+                      <div className="flex justify-between items-center mb-4">
+                        <span style={monoStyle}>{formatDate(ann.created_at)}</span>
+                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500 }}>
+                          {ann.is_event ? "Event" : "Post"}
+                        </span>
+                      </div>
+                      <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
+                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
+                      <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {ann.is_event && (
+                            <button
+                              onClick={() => handleRsvpToggle(ann.id)}
+                              style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}
+                            >
+                              {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
+                            </button>
+                          )}
+                          {isLeaderOrAdmin && (
+                            <>
+                              <button
+                                onClick={() => setEditingAnn(ann)}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors"
+                                title="Edit"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-[#5A5466]" />
+                              </button>
+                              <button
+                                onClick={() => handleDesktopDelete(ann)}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* FAB — only for leaders/admins */}
+      {/* FAB — mobile only */}
       {isLeaderOrAdmin && (
         <button
           onClick={() => setShowCreate(true)}
-          style={{
-            position: "fixed",
-            bottom: "6.5rem",
-            right: "max(calc(50% - 195px + 16px), 16px)",
-          }}
-          className="w-12 h-12 bg-[#3E1540] rounded-2xl flex items-center justify-center z-40 hover:bg-[#2D0F2E] active:scale-95 transition-all"
+          style={{ position: "fixed", bottom: "6.5rem", right: "max(calc(50% - 195px + 16px), 16px)" }}
+          className="md:hidden w-12 h-12 bg-[#3E1540] rounded-2xl flex items-center justify-center z-40 hover:bg-[#2D0F2E] active:scale-95 transition-all"
           aria-label="New announcement"
         >
           <Plus className="w-6 h-6 text-white" />
         </button>
       )}
 
-      {/* Create modal */}
       {showCreate && (
-        <CreateAnnouncementModal
-          userId={userId}
-          ministryId={ministryId}
-          onClose={() => setShowCreate(false)}
-          onSuccess={handleNewAnnouncement}
-        />
+        <CreateAnnouncementModal userId={userId} ministryId={ministryId} onClose={() => setShowCreate(false)} onSuccess={handleNewAnnouncement} />
       )}
-
-      {/* Edit modal */}
       {editingAnn && (
         <CreateAnnouncementModal
-          userId={userId}
-          ministryId={ministryId}
-          existing={editingAnn}
+          userId={userId} ministryId={ministryId} existing={editingAnn}
           onClose={() => setEditingAnn(null)}
-          onSuccess={(updated) => {
-            handleEditSuccess(updated)
-            setEditingAnn(null)
-          }}
+          onSuccess={(updated) => { handleEditSuccess(updated); setEditingAnn(null) }}
         />
       )}
     </div>
@@ -907,11 +1308,11 @@ function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: Ann
   const formattedDate = formatDate(announcement.created_at)
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
-    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
+    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
       {/* Header — never grows/shrinks, sits at top */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 bg-white border-b border-[#ECE8DE]">
+      <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
         <button
           onClick={onClose}
           className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"
@@ -1082,7 +1483,7 @@ function AnnouncementCard({ announcement, isPinned, userId, userRole, onRsvpTogg
         >
           {announcement.title}
         </h3>
-        <p className="text-[13px] text-[#CFB8D1] leading-relaxed line-clamp-3 mb-1">
+        <p className="text-[13px] text-[#CFB8D1] leading-relaxed line-clamp-3 md:line-clamp-5 mb-1">
           {announcement.body}
         </p>
         <button
@@ -1239,16 +1640,16 @@ function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, on
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full bg-white md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
         {/* Top nav */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-white">
+        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-white">
           <button
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
+            <X className="w-4 h-4 text-foreground" />
           </button>
           <h1 className="text-[17px] font-bold text-foreground tracking-tight">
             {groupType === "church" ? "New Church Chat" : "New Chat"}
@@ -1256,7 +1657,7 @@ function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, on
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
           {error && (
             <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-600 font-medium">
               {error}
@@ -1488,9 +1889,9 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
 
   if (showAddMembers) {
     return (
-      <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
+      <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -1587,10 +1988,10 @@ function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack,
   }
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col">
-    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
         <button
           onClick={onBack}
           className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -1773,9 +2174,10 @@ interface ChatScreenProps {
   userRole: string
   onClose: () => void
   onRead?: () => void
+  inline?: boolean
 }
 
-function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead }: ChatScreenProps) {
+function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -2204,10 +2606,10 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
 
   return (
     <>
-    <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col">
-    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
+    <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
       {/* ── Top bar ── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-white border-b border-[#ECE8DE]`}>
         <button
           onClick={onClose}
           className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -2231,7 +2633,7 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
       </div>
 
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-5">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
@@ -2349,7 +2751,7 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                   )}
 
                   {/* Incoming group: avatar at bottom-left of last bubble only */}
-                  <div className={`flex items-end gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                  <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                     {!isOwn && (
                       <div className="flex-shrink-0 w-7">
                         {isLastInGroup ? (
@@ -2369,42 +2771,42 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
                     onPointerUp={() => handlePointerUp(msg)}
                     onPointerLeave={handlePointerCancel}
                     onPointerCancel={handlePointerCancel}
-                    className={`max-w-[78%] text-[14px] leading-relaxed select-none ${
+                    className={`max-w-[75%] text-[14px] leading-[1.4] select-none ${
                       msg.deleted
                         ? isOwn
-                          ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2.5`
-                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${incomingRadius} px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                          ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2`
+                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                         : isOwn
                           ? `bg-[#3E1540] text-white ${outgoingRadius}`
                           : `bg-white border border-[#EFEFEF] text-[#13101A] ${incomingRadius} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
-                    } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
+                    } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2" : ""}`}
                   >
                     {msg.deleted ? (
                       <span className="italic text-[13px]">Message deleted</span>
                     ) : (
                       <>
                         {msg.reply_to_id && msg.reply_to_content && (
-                          <div className="px-3 pt-3 pb-0.5">
+                          <div className="px-3 pt-2.5 pb-0">
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={() => scrollToMessage(msg.reply_to_id!)}
-                              className={`w-full text-left px-3 py-2 rounded-[6px] flex flex-col gap-0.5 ${
+                              className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                                 isOwn
-                                  ? "bg-white/25 border-l-[3px] border-white/60"
-                                  : "bg-[#FBF8F2] border-l-[3px] border-[#3E1540]"
+                                  ? "bg-white/20 border-l-[3px] border-white/50"
+                                  : "bg-[#F4F1E8] border-l-[3px] border-[#3E1540]"
                               }`}
                             >
-                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/95" : "text-[#3E1540]"}`}>
+                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[#3E1540]"}`}>
                                 <CornerUpLeft className="w-3 h-3" />
                                 {msg.reply_to_sender}
                               </span>
-                              <span className={`text-[12px] truncate ${isOwn ? "text-white/80" : "text-[#9CA3AF]"}`}>
+                              <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[#8A8497]"}`}>
                                 {msg.reply_to_content.slice(0, 80)}
                               </span>
                             </button>
                           </div>
                         )}
-                        <div className={msg.reply_to_id ? "px-4 py-2.5" : ""}>
+                        <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
                           {msg.content}
                         </div>
                       </>
@@ -2533,7 +2935,7 @@ function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, o
       {/* Overlay to dismiss emoji picker / context menu — inside z-[100] stacking context so picker at z-[160] sits above it */}
       {(emojiPickerFor || contextMenuFor) && (
         <div
-          className="fixed inset-0 z-[155]"
+          className="fixed inset-0 z-[155] md:left-[296px]"
           onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null) }}
         />
       )}
@@ -2568,9 +2970,10 @@ interface ChatsTabProps {
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
   onOpenDirectory: () => void
+  activeGroupId?: string | null
 }
 
-function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory }: ChatsTabProps) {
+function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId }: ChatsTabProps) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
@@ -2675,10 +3078,37 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
     : rawActive
   const showPlusButton = subTab === "my" || (subTab === "church" && isAdminOrLeader)
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "10px",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
+      {/* Desktop Plan C header */}
+      <div className="hidden md:block px-4 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
+        <p style={monoStyle}>Workspace</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>Chats</p>
+      </div>
+
+      {/* Desktop search */}
+      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3 py-2 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] flex-shrink-0">
+        <Search className="w-3.5 h-3.5 flex-shrink-0" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search messages"
+          className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
+        />
+      </div>
+
+      <div className="px-5 pt-14 pb-2 md:pt-2 md:px-2 md:flex-1 md:overflow-y-auto">
+      {/* Mobile header */}
+      <div className="flex items-center justify-between mb-6 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
@@ -2696,25 +3126,27 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
         </button>
       </div>
 
-      {/* Sub-tab switcher */}
-      <div className="flex items-center gap-1 bg-[#FBF8F2] rounded-xl p-1 mb-5">
+      {/* Sub-tab switcher — mobile pill / desktop mono labels */}
+      <div className="flex items-center gap-1 bg-[#FBF8F2] rounded-xl p-1 mb-5 md:bg-transparent md:p-0 md:mb-1 md:mx-1">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
             onClick={() => { setSubTab(t); setSearch("") }}
-            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
-              subTab === t
-                ? "bg-white text-[#3E1540] shadow-sm"
-                : "text-[#9CA3AF] hover:text-[#3E1540]/70"
-            }`}
+            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all
+              md:py-1.5 md:px-2 md:rounded-lg md:text-left md:flex-none
+              ${subTab === t
+                ? "bg-white text-[#3E1540] shadow-sm md:bg-[#EFEAE0] md:shadow-none md:text-[#13101A]"
+                : "text-[#9CA3AF] hover:text-[#3E1540]/70 md:text-[#8A8497] md:hover:bg-[#F4F1E8] md:bg-transparent"
+              }`}
+            style={subTab === t && window?.innerWidth >= 768 ? {} : {}}
           >
             {t === "church" ? "Church Chats" : "My Chats"}
           </button>
         ))}
       </div>
 
-      {/* Search bar */}
-      <div className="relative mb-4">
+      {/* Search bar — mobile only (desktop has one in the panel header above) */}
+      <div className="relative mb-4 md:hidden">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
         <input
           type="text"
@@ -2727,15 +3159,20 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
 
       {/* Section header with + button */}
       <div className="flex items-center justify-between mb-3">
-        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
+        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
+          className="md:hidden">
           {subTab === "church" ? "Church chats" : "My chats"}
         </h3>
+        {/* Desktop mono section label */}
+        <p className="hidden md:block mx-1 mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
+          {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
+        </p>
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all"
+            className="size-8 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
           >
-            <Plus className="w-4 h-4 text-[#3E1540]" />
+            <Plus className="w-4 h-4 text-[#3E1540] md:w-3.5 md:h-3.5" />
           </button>
         )}
       </div>
@@ -2755,9 +3192,9 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
           }
         />
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {active.map((group) => (
-            <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} />
+        <div className="flex flex-col gap-2.5 md:gap-0.5">
+          {active.map((group, i) => (
+            <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
           ))}
 
           {/* Archived section (Church Chats only) */}
@@ -2799,56 +3236,82 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
           }}
         />
       )}
+      </div>{/* end inner scroll div */}
+
+      {/* Desktop: New chat button at bottom */}
+      <div className="hidden md:block mx-3 mt-auto pt-2 pb-3 flex-shrink-0">
+        <button
+          onClick={() => setShowCreateChat("my")}
+          className="w-full flex items-center justify-center gap-1.5 py-2 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          New chat
+        </button>
+      </div>
     </div>
   )
 }
 
-function ChatGroupCard({ group, onClick }: { group: ChatGroup; onClick: () => void }) {
+function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; onClick: () => void; isActive?: boolean }) {
   const avatarBg = getAvatarColor(group.name) === "bg-[#3E1540]" ? "#3E1540" : "#13101A"
   const firstInitial = group.name.charAt(0)
 
   return (
-    <button onClick={onClick} className="w-full bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left">
-      <div className="flex items-center gap-3.5">
-        <Avatar className="w-12 h-12 flex-shrink-0" style={{ background: avatarBg, borderRadius: "16px" }}>
-          <AvatarFallback
-            className="text-[#F6F4EF] bg-transparent"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
-          >
-            {firstInitial}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-[15px] font-semibold text-[#13101A] truncate pr-2">
-              {group.name}
-            </h3>
-            {group.last_message_time && (
-              <span className="text-[11px] text-[#8A8497] flex-shrink-0">
-                {formatRelativeTime(group.last_message_time)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] text-[#5A5466] truncate">
-              {group.last_message
-                ? group.last_sender
-                  ? (
-                    <>
-                      <span className="font-semibold text-[#5A5466]">{group.last_sender}:</span>{" "}
-                      {group.last_message}
-                    </>
-                  )
-                  : group.last_message
-                : <span className="italic text-[#8A8497]">No messages yet</span>}
-            </p>
-            {group.unread_count > 0 && (
-              <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[#13101A] flex items-center justify-center flex-shrink-0">
-                {group.unread_count}
-              </span>
-            )}
+    <button onClick={onClick} className="w-full text-left group">
+      {/* Mobile style */}
+      <div className="md:hidden bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
+        <div className="flex items-center gap-3.5">
+          <Avatar className="w-12 h-12 flex-shrink-0" style={{ background: avatarBg, borderRadius: "16px" }}>
+            <AvatarFallback className="text-[#F6F4EF] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}>
+              {firstInitial}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-[15px] font-semibold text-[#13101A] truncate pr-2">{group.name}</h3>
+              {group.last_message_time && <span className="text-[11px] text-[#8A8497] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] text-[#5A5466] truncate">
+                {group.last_message
+                  ? group.last_sender ? <><span className="font-semibold text-[#5A5466]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
+                  : <span className="italic text-[#8A8497]">No messages yet</span>}
+              </p>
+              {group.unread_count > 0 && (
+                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[#13101A] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
+              )}
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Desktop Plan C panel item style */}
+      <div
+        className="hidden md:flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[#F4F1E8] transition-colors"
+        style={{
+          background: isActive ? "#EFEAE0" : "transparent",
+          borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
+        }}
+      >
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: avatarBg, color: "#F6F4EF",
+          display: "grid", placeItems: "center",
+          fontFamily: "var(--font-instrument-serif)", fontSize: "13px",
+        }}>
+          {firstInitial}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "13px", fontWeight: group.unread_count ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.name}</div>
+          {group.last_message && (
+            <div style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message}
+            </div>
+          )}
+        </div>
+        {group.unread_count > 0 && (
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "#13101A", background: "#C9A34B", padding: "1px 6px", borderRadius: 999 }}>{group.unread_count}</span>
+        )}
       </div>
     </button>
   )
@@ -2893,85 +3356,168 @@ function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName
     m.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "10px",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2.5">
+    <div className="pb-2 md:pb-0">
+      {/* Desktop Topbar */}
+      <DesktopTopbar crumbs={["Central", "Directory"]} right={
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-full bg-[#F4F1E8] text-[#8A8497]" style={{ width: "280px" }}>
+          <Search className="w-3.5 h-3.5 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search by name, year, prayer…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
+          />
+        </div>
+      } />
+
+      {/* Mobile Header */}
+      <div className="px-5 pt-14 pb-5 md:hidden">
+        <div className="flex items-center gap-2.5 mb-4">
           {onBack && (
-            <button
-              onClick={onBack}
-              className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors -ml-1 mr-0.5"
-              aria-label="Back to Chats"
-            >
+            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors -ml-1 mr-0.5" aria-label="Back">
               <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
             </button>
           )}
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+          <input
+            type="text"
+            placeholder="Search members…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
+          />
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
-        <input
-          type="text"
-          placeholder="Search members…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
-        />
+      {/* Desktop Editorial Header */}
+      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
+        <div>
+          <p style={monoStyle}>{members.length} members · {members.filter(m => ["admin","leader"].includes(m.role.toLowerCase())).length} leaders</p>
+          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+            Directory
+          </h1>
+          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+            Names, faces, what they&apos;re carrying. A chance to know and pray.
+          </p>
+        </div>
       </div>
 
       {loading ? (
-        <Spinner />
+        <div className="px-5 md:px-14"><Spinner /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Users className="w-7 h-7" />}
-          title="No members found"
-          subtitle={search ? "Try a different name" : "No members in the directory yet"}
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map((member) => (
-            <button
-              key={member.id}
-              onClick={() => setSelected(member)}
-              className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left"
-            >
-              <div className="flex items-center gap-3.5">
-                <Avatar className="w-11 h-11 bg-[#3E1540]">
-                  <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">
-                    {getInitials(member.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-foreground text-[14px] tracking-tight">{member.name}</h3>
-                    {member.id === currentUserId && (
-                      <span className="text-[10px] bg-[#FBF8F2] text-[#9CA3AF] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide">
-                        You
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {member.graduation_year && (
-                      <span className="text-[11px] text-muted-foreground/60 font-medium">
-                        Class of {member.graduation_year}
-                      </span>
-                    )}
-                    {member.role && (
-                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
-                        {member.role}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#E0DDF0] flex-shrink-0" />
-              </div>
-            </button>
-          ))}
+        <div className="px-5 md:px-14">
+          <EmptyState
+            icon={<Users className="w-7 h-7" />}
+            title="No members found"
+            subtitle={search ? "Try a different name" : "No members in the directory yet"}
+          />
         </div>
+      ) : (
+        <>
+          {/* Mobile card list */}
+          <div className="md:hidden px-5 pb-4 flex flex-col gap-3">
+            {filtered.map((member) => (
+              <button
+                key={member.id}
+                onClick={() => setSelected(member)}
+                className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <Avatar className="w-11 h-11 bg-[#3E1540]">
+                    <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">{getInitials(member.name)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-foreground text-[14px] tracking-tight">{member.name}</h3>
+                      {member.id === currentUserId && (
+                        <span className="text-[10px] bg-[#FBF8F2] text-[#9CA3AF] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide">You</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {member.graduation_year && <span className="text-[11px] text-muted-foreground/60 font-medium">Class of {member.graduation_year}</span>}
+                      {member.role && (
+                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
+                          {member.role}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#E0DDF0] flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block px-14 py-7">
+            <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
+              <div className="grid px-5 py-2.5 border-b border-[#E5E0D2]" style={{ gridTemplateColumns: "1.4fr 100px 1fr 1.4fr 60px", gap: "12px" }}>
+                {["Name", "Class", "Role", "Praying for", ""].map((h, i) => (
+                  <span key={i} style={monoStyle}>{h}</span>
+                ))}
+              </div>
+              {filtered.map((member, i) => (
+                <button
+                  key={member.id}
+                  onClick={() => setSelected(member)}
+                  className="w-full grid px-5 py-3 text-left items-center hover:bg-[#F4F1E8] transition-colors"
+                  style={{ gridTemplateColumns: "1.4fr 100px 1fr 1.4fr 60px", gap: "12px", borderTop: i ? "1px solid #EFEAE0" : undefined }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                      background: i % 2 === 0 ? "#3E1540" : "#13101A",
+                      color: "#F6F4EF", display: "grid", placeItems: "center",
+                      fontSize: "11px", fontWeight: 600,
+                    }}>
+                      {getInitials(member.name)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                        {member.name}
+                        {member.id === currentUserId && (
+                          <span style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.6px", textTransform: "uppercase", marginLeft: "6px" }}>You</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#8A8497" }}>{member.email}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#5A5466", fontVariantNumeric: "tabular-nums" }}>
+                    {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : "—"}
+                  </div>
+                  <div>
+                    <span style={{
+                      fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px",
+                      background: ["admin","leader"].includes(member.role.toLowerCase()) ? "#3E1540" : "#F4F1E8",
+                      color: ["admin","leader"].includes(member.role.toLowerCase()) ? "#F6F4EF" : "#13101A",
+                      border: ["admin","leader"].includes(member.role.toLowerCase()) ? "none" : "1px solid #E5E0D2",
+                      textTransform: "uppercase", fontWeight: 600,
+                    }}>{member.role}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#5A5466", fontStyle: "italic", fontFamily: "var(--font-instrument-serif)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {member.pray_for_me || "—"}
+                  </div>
+                  <div className="flex justify-end">
+                    <ChevronRight className="w-4 h-4 text-[#C4C4C4]" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Member Detail Sheet */}
@@ -3053,11 +3599,11 @@ function MemberSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white md:max-w-[580px] md:h-auto md:max-h-[88vh] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -3257,122 +3803,262 @@ function ProfileTab({
     { key: "pray_for_me" as const, label: "How to pray for me this week", placeholder: "Specific ways others can intercede…" },
   ]
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "10px",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
+  function FieldCard({ fieldKey, label, placeholder }: { fieldKey: keyof typeof draft; label: string; placeholder: string }) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)] md:rounded-xl md:border-[#E5E0D2] md:bg-[#FBF8F2]">
+        <div style={monoStyle}>{fieldKey === "about_me" || fieldKey === "bible_verse" ? "Story" : "Prayer"}</div>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginTop: "4px", marginBottom: "8px", letterSpacing: "-0.01em" }}>
+          {label}
+        </p>
+        {editing ? (
+          <textarea
+            value={draft[fieldKey]}
+            onChange={(e) => setDraft((d) => ({ ...d, [fieldKey]: e.target.value }))}
+            placeholder={placeholder}
+            rows={3}
+            className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]"
+          />
+        ) : (
+          <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
+            {profile[fieldKey] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-          </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {editing ? (
-            <>
-              <button
-                onClick={cancelEdit}
-                className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={saving}
-                className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-bold px-4 py-2 rounded-full hover:bg-[#2D0F2E] transition-colors disabled:opacity-60 shadow-md shadow-[#3E1540]/30"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={startEdit}
-              className="flex items-center gap-1.5 bg-[#FBF8F2] border border-[#EFEFEF] text-[#3E1540] text-[13px] font-medium px-4 py-1.5 rounded-full hover:bg-[#F2EDE0] transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Edit
-            </button>
-          )}
-        </div>
-      </div>
+    <div className="pb-6 md:pb-0">
+      {/* Single hidden file input for avatar upload */}
+      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
-      {/* Avatar + Identity */}
-      <div className="flex flex-col items-center mb-8">
-        <button
-          onClick={() => avatarInputRef.current?.click()}
-          disabled={uploadingAvatar}
-          className="relative w-20 h-20 rounded-full overflow-hidden bg-[#3E1540] mb-4 shadow-lg shadow-[#3E1540]/20 group flex-shrink-0"
-          aria-label="Change profile photo"
-        >
-          {profile.avatar_url ? (
-            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-          ) : (
-            <span className="flex items-center justify-center w-full h-full text-white font-bold text-2xl">
-              {getInitials(profile.name)}
-            </span>
-          )}
-          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Camera className="w-5 h-5 text-white" />
-          </div>
-          {uploadingAvatar && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-        </button>
-        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-        <h1 className="text-2xl font-bold tracking-tight text-[#13101A]">{profile.name}</h1>
-        <div className="flex items-center gap-2.5 mt-2">
-          {profile.graduation_year && (
-            <span className="text-[12px] text-muted-foreground/60 font-medium">
-              Class of {profile.graduation_year}
-            </span>
-          )}
-          <span className="text-[10px] bg-[#3E1540] text-white font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-sm shadow-[#3E1540]/30">
-            {profile.role}
-          </span>
-        </div>
-        <span className="text-[12px] text-muted-foreground/50 mt-1">{profile.email}</span>
-      </div>
-
-      {/* Editable Fields */}
-      <div className="flex flex-col gap-4 mb-8">
-        {fields.map(({ key, label, placeholder }) => (
-          <div
-            key={key}
-            className="bg-white rounded-2xl border border-[#EFEFEF] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-          >
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>{label}</p>
+      {/* Desktop Topbar */}
+      <DesktopTopbar
+        crumbs={["Central", "Profile", "Spiritual profile"]}
+        right={
+          <div className="hidden md:flex items-center gap-2">
             {editing ? (
-              <textarea
-                value={draft[key]}
-                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                placeholder={placeholder}
-                rows={3}
-                className="w-full text-[13px] text-foreground/80 leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-muted-foreground/40"
-              />
+              <>
+                <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">
+                  <X className="w-3.5 h-3.5" />Cancel
+                </button>
+                <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                  <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
+                </button>
+              </>
             ) : (
-              <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
-                {profile[key] || (
-                  <span className="text-[#C4C4C4] italic">{placeholder}</span>
-                )}
-              </p>
+              <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors">
+                <Edit3 className="w-3.5 h-3.5" />Edit profile
+              </button>
             )}
           </div>
-        ))}
+        }
+      />
+
+      {/* Mobile header */}
+      <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
+        <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+          <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
+          <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
+          <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+        </svg>
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
       </div>
 
-      {/* Sign out */}
-      <button
-        onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-[#EFEFEF] text-[#EF4444] text-[14px] font-medium hover:bg-red-50 transition-colors"
-      >
-        <LogOut className="w-4 h-4" />
-        Sign out
-      </button>
+      {/* ── Desktop: taller hero ── */}
+      <div className="hidden md:block px-7 pt-7 pb-0">
+        <div
+          className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
+          style={{
+            background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)",
+            padding: "40px 40px 36px",
+            display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "32px", alignItems: "center",
+            minHeight: "280px",
+          }}
+        >
+          <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+
+          {/* Avatar */}
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={uploadingAvatar}
+            className="relative group flex-shrink-0"
+            style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden" }}
+            aria-label="Change profile photo"
+          >
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "44px" }}>{getInitials(profile.name)}</span>
+            )}
+            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Camera className="w-6 h-6 text-white" />
+            </div>
+            {uploadingAvatar && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </button>
+
+          {/* Name + details */}
+          <div className="relative">
+            <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>
+              {profile.name}
+            </h1>
+            <div className="flex items-center gap-3 mt-3.5" style={{ fontSize: "13px", opacity: 0.85 }}>
+              <span style={{ padding: "3px 10px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 999, fontSize: "10px", letterSpacing: "0.6px", textTransform: "uppercase", fontWeight: 600 }}>
+                {profile.role}
+              </span>
+              {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
+              <span>·</span>
+              <span>{profile.email}</span>
+            </div>
+            {profile.pray_for_me && (
+              <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid rgba(255,255,255,0.12)", maxWidth: "480px" }}>
+                <div style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", opacity: 0.6, marginBottom: "6px" }}>This week</div>
+                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.4, opacity: 0.92 }}>
+                  &ldquo;{profile.pray_for_me}&rdquo;
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stats */}
+          <div className="relative flex flex-col gap-5">
+            {[
+              { label: "Role", value: profile.role.charAt(0).toUpperCase() + profile.role.slice(1) },
+              { label: "Class", value: profile.graduation_year ? `'${String(profile.graduation_year).slice(2)}` : "—" },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <p style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)" }}>{label}</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "24px", marginTop: "2px" }}>{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile identity card */}
+      <div className="md:hidden px-5">
+        <div className="rounded-2xl overflow-hidden border border-[#ECE8DE] shadow-[0_2px_8px_rgba(19,16,26,0.06)] mb-5">
+          <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
+            <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.20)_0%,transparent_65%)]" />
+            <div className="relative z-10 flex flex-col items-center gap-4">
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="relative w-24 h-24 rounded-full overflow-hidden bg-[#5A2060] border-[3px] border-white/20 group flex-shrink-0"
+                aria-label="Change profile photo"
+              >
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="flex items-center justify-center w-full h-full text-[#F6F4EF]" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400 }}>
+                    {getInitials(profile.name)}
+                  </span>
+                )}
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
+                {uploadingAvatar && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </button>
+              <div className="text-center">
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
+                <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+                  <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
+                  {profile.graduation_year && <span className="text-[12px] text-[#BFA8C1] font-medium">Class of {profile.graduation_year}</span>}
+                </div>
+                <p className="text-[12px] text-[#9E85A0]">{profile.email}</p>
+              </div>
+            </div>
+          </div>
+          <div className="px-5 py-3 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between">
+            <span className="text-[10px] text-[#8A8497] font-semibold tracking-[0.12em] uppercase">Spiritual profile</span>
+            <div className="flex items-center gap-2">
+              {editing ? (
+                <>
+                  <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors">
+                    <X className="w-3.5 h-3.5 text-[#5A5466]" />
+                  </button>
+                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                    <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
+                  </button>
+                </>
+              ) : (
+                <button onClick={startEdit} className="flex items-center gap-1.5 text-[#3E1540] text-[12px] font-semibold px-4 py-1.5 rounded-full border border-[#3E1540]/25 bg-[#3E1540]/5 hover:bg-[#3E1540]/10 transition-colors">
+                  <Edit3 className="w-3 h-3" />Edit
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Field cards ── */}
+      {/* Desktop: 2x2 grid */}
+      <div className="hidden md:grid px-7 py-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        {fields.map(({ key, label, placeholder }) => (
+          <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
+        ))}
+        {/* Sign out card */}
+        <button
+          onClick={onLogout}
+          className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 text-left flex items-center gap-2 text-[#EF4444] text-[14px] font-medium hover:bg-red-50/40 transition-colors col-span-2"
+        >
+          <LogOut className="w-4 h-4" />Sign out
+        </button>
+      </div>
+
+      {/* Mobile: stacked sections */}
+      <div className="md:hidden px-5 pb-6">
+        <div className="mb-5">
+          <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
+          <div className="flex flex-col gap-3">
+            {fields.slice(0, 2).map(({ key, label, placeholder }) => (
+              <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
+                {editing ? (
+                  <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                ) : (
+                  <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mb-6">
+          <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Prayer</p>
+          <div className="flex flex-col gap-3">
+            {fields.slice(2).map(({ key, label, placeholder }) => (
+              <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
+                {editing ? (
+                  <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                ) : (
+                  <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#ECE8DE] text-[#EF4444] text-[14px] font-medium hover:bg-red-50/60 transition-colors shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+          <LogOut className="w-4 h-4" />Sign out
+        </button>
+      </div>
     </div>
   )
 }
@@ -3566,102 +4252,156 @@ interface PlanTabProps {
   allTeams: Team[]
   isAdmin: boolean
   onTeamsChange: () => void
+  showCreateTeam: boolean
+  onShowCreateTeam: (v: boolean) => void
 }
 
-function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange }: PlanTabProps) {
-  const [showCreateTeam, setShowCreateTeam] = useState(false)
+function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam }: PlanTabProps) {
+  const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "11px",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
+  const teamsToShow = isAdmin ? allTeams : userTeams.map(t => ({ id: t.teamId, name: t.teamName, icon: t.teamIcon, description: t.teamDescription, created_by: "", member_count: 0 }))
+
   return (
-    <div className="px-5 pt-14 pb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="pb-2 md:pb-0">
+      {/* Desktop Topbar */}
+      <DesktopTopbar crumbs={["Central", "Plan"]} />
+
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
             <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
             <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
-            {ministryName}
-          </span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => setShowCreateTeam(true)}
-            className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors"
-          >
+          <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors">
             <Plus className="w-4 h-4 text-[#F6F4EF]" />
           </button>
         )}
       </div>
 
-      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", marginBottom: "20px", lineHeight: 1.05 }}>
-        Plan
-      </h1>
+      {/* Mobile title */}
+      <div className="flex items-end justify-between px-5 mb-5 md:hidden">
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
+      </div>
 
-      {/* Admin: team management */}
-      {isAdmin && (
-        <div className="mb-8">
-          <PlanSectionHeader>Teams</PlanSectionHeader>
-          {allTeams.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
-              <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">You're not on a team yet.</p>
-              <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {allTeams.map((team) => (
-                <button
-                  key={team.id}
-                  onClick={() => setOpenTeam(team)}
-                  className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
-                >
-                  <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
-                    <p className="text-[12px] text-[#8A8497]">
-                      {team.member_count} member{team.member_count !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Desktop Editorial Header */}
+      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
+        <div>
+          <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+            Plan
+          </h1>
+          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+            The week as it stands. Groups to prepare, people to thank.
+          </p>
         </div>
-      )}
-
-      {/* Tools — compact grid */}
-      <div className="mt-4">
-        <PlanSectionHeader>Tools</PlanSectionHeader>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex gap-6 pb-1.5">
           {[
-            { icon: "set", name: "Set" },
-            { icon: "sparkle", name: "Slides" },
-            { icon: "calendar", name: "Schedule" },
-            { icon: "book", name: "Bible Study" },
-          ].map((tool) => (
-            <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
-              <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
-              <div>
-                <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
-                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
-              </div>
+            { label: "Teams", value: String(teamsToShow.length) },
+            { label: "Your role", value: userTeams.length > 0 ? userTeams[0].roleName : isAdmin ? "Admin" : "—" },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p style={monoStyle}>{label}</p>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", marginTop: "2px", color: "#13101A" }}>{value}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
-        <EmptyState
-          icon={<ClipboardList className="w-6 h-6" />}
-          title="You're not on a team yet."
-          subtitle="Ask a leader to add you."
-        />
-      )}
+      {/* Desktop content */}
+      <div className="hidden md:block px-14 py-7">
+        <h3 style={{ margin: "0 0 16px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "24px", color: "#13101A" }}>Tools</h3>
+        <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+          {[
+            { icon: "set", name: "Set Builder", sub: "Build this week's worship set" },
+            { icon: "sparkle", name: "Slide Generator", sub: "Lyric slides from the set" },
+            { icon: "calendar", name: "Schedule", sub: "Who plays what Sunday" },
+            { icon: "book", name: "Bible Study", sub: "AI study guides" },
+          ].map((tool) => (
+            <div key={tool.name} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-4 opacity-55">
+              <PlanLineIcon iconKey={tool.icon} bg="#F4F1E8" fg="#3E1540" size={32} />
+              <p className="mt-3 text-[14px] font-medium text-[#13101A]">{tool.name}</p>
+              <p style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile content */}
+      <div className="md:hidden px-5 pb-4">
+        {/* Admin: team management */}
+        {isAdmin && (
+          <div className="mb-8">
+            <PlanSectionHeader>Teams</PlanSectionHeader>
+            {allTeams.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet.</p>
+                <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {allTeams.map((team) => (
+                  <button
+                    key={team.id}
+                    onClick={() => setOpenTeam(team)}
+                    className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
+                  >
+                    <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
+                      <p className="text-[12px] text-[#8A8497]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4">
+          <PlanSectionHeader>Tools</PlanSectionHeader>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { icon: "set", name: "Set" },
+              { icon: "sparkle", name: "Slides" },
+              { icon: "calendar", name: "Schedule" },
+              { icon: "book", name: "Bible Study" },
+            ].map((tool) => (
+              <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
+                <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
+                <div>
+                  <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
+                  <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
+          <EmptyState
+            icon={<ClipboardList className="w-6 h-6" />}
+            title="You're not on a team yet."
+            subtitle="Ask a leader to add you."
+          />
+        )}
+      </div>
 
       {showCreateTeam && (
         <CreateTeamOverlay
@@ -3811,9 +4551,9 @@ function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
   const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col">
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
           onClick={step === "preset" ? onClose : () => setStep(step === "members" ? "customize" : "preset")}
           className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
@@ -4134,8 +4874,8 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
   )
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col">
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
           onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : onClose}
           className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
@@ -4347,6 +5087,328 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
   )
 }
 
+// ─── Desktop Topbar ──────────────────────────────────────────────────────────
+
+interface DesktopTopbarProps {
+  crumbs: string[]
+  right?: React.ReactNode
+}
+
+function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
+  return (
+    <div className="hidden md:flex h-14 px-7 items-center gap-4 border-b border-[#E5E0D2] bg-[#FBF8F2] flex-shrink-0">
+      <div className="flex items-center gap-1.5 text-[12px]">
+        {crumbs.map((c, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            <span className={i === crumbs.length - 1 ? "text-[#13101A] font-medium" : "text-[#8A8497]"}>{c}</span>
+            {i < crumbs.length - 1 && <span className="text-[#C4C4C4] select-none">/</span>}
+          </span>
+        ))}
+      </div>
+      <div className="flex-1" />
+      <div className="flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] w-[240px] cursor-default">
+        <Search className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="text-[12px] flex-1">Jump to anything</span>
+        <span className="text-[10px] px-1.5 py-0.5 border border-[#E5E0D2] rounded bg-[#FBF8F2] leading-none">⌘K</span>
+      </div>
+      {right}
+    </div>
+  )
+}
+
+// ─── Desktop Sidebar ─────────────────────────────────────────────────────────
+
+interface DesktopSidebarProps {
+  activeTab: Tab
+  onTabChange: (tab: Tab) => void
+  ministryName: string
+  chatsUnread: number
+  showPlan: boolean
+  userInitials: string
+  userAvatarUrl?: string | null
+  recentChats: ChatPreview[]
+  userTeams: UserTeam[]
+  onOpenChat: (id: string, name: string) => void
+  activeGroupId?: string | null
+  onLogout: () => void
+  isAdmin?: boolean
+  onCreateTeam?: () => void
+}
+
+function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam }: DesktopSidebarProps) {
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(userTeams[0]?.teamId ?? null)
+
+  const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
+    { id: "home", icon: Home },
+    { id: "announcements", icon: Bell },
+    { id: "chats", icon: MessageCircle },
+    ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
+    { id: "directory", icon: Users },
+    { id: "profile", icon: User },
+  ]
+
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "10px",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
+  const subItemStyle = (active?: boolean, danger?: boolean): React.CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    padding: "7px 10px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    background: active ? "#EFEAE0" : "transparent",
+    color: danger ? "#9D2D2D" : "#13101A",
+    fontSize: "13px",
+    fontWeight: active ? 500 : 400,
+    border: "none",
+    width: "100%",
+    textAlign: "left",
+  })
+
+  function renderPanelBody() {
+    if (activeTab === "chats") {
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Recent</p>
+          {recentChats.length === 0 ? (
+            <p className="text-[12px] text-[#8A8497] px-2 py-2">No chats yet</p>
+          ) : (
+            recentChats.slice(0, 6).map((c, i) => {
+              const isActive = activeGroupId === c.id
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => onOpenChat(c.id, c.groupName)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "8px 8px", borderRadius: "8px", cursor: "pointer",
+                    background: isActive ? "#EFEAE0" : "transparent",
+                    borderTop: "none", borderRight: "none", borderBottom: "none",
+                    borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
+                    width: "100%", textAlign: "left",
+                  }}
+                >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                    background: i % 2 === 0 ? "#3E1540" : "#13101A",
+                    color: "#F6F4EF", display: "grid", placeItems: "center",
+                    fontSize: "10px", fontWeight: 600,
+                  }}>
+                    {c.initials}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: c.unreadCount ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.groupName}</div>
+                    {c.lastMessage && (
+                      <div style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.lastMessage}</div>
+                    )}
+                  </div>
+                  {c.unreadCount > 0 && (
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: "#13101A", background: "#C9A34B", padding: "1px 6px", borderRadius: 999 }}>{c.unreadCount}</span>
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+      )
+    }
+
+    if (activeTab === "plan") {
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 6px" }}>
+            <p style={monoStyle}>Your teams · {userTeams.length}</p>
+            {isAdmin && onCreateTeam && (
+              <button
+                onClick={onCreateTeam}
+                style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", borderRadius: 4, padding: 0 }}
+                title="New team"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {userTeams.length === 0 ? (
+            <p className="text-[12px] text-[#8A8497] px-2 py-2">No teams yet</p>
+          ) : (
+            userTeams.map((t) => {
+              const isActive = t.teamId === activeTeamId
+              return (
+                <button key={t.teamId} onClick={() => setActiveTeamId(t.teamId)} style={{
+                  display: "flex", alignItems: "center", gap: "10px",
+                  padding: "9px 8px", borderRadius: "8px", cursor: "pointer",
+                  background: isActive ? "#EFEAE0" : "transparent",
+                  borderTopWidth: 0, borderRightWidth: 0, borderBottomWidth: 0,
+                  borderLeftWidth: 2, borderLeftStyle: "solid",
+                  borderLeftColor: isActive ? "#3E1540" : "transparent",
+                  width: "100%", textAlign: "left",
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                    background: isActive ? "#3E1540" : "#F4F1E8",
+                    color: isActive ? "#F6F4EF" : "#13101A",
+                    display: "grid", placeItems: "center", fontSize: "16px",
+                  }}>
+                    {t.teamIcon ?? "👥"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.teamName}</div>
+                    <div style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.4px" }}>{t.roleName}</div>
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+      )
+    }
+
+    if (activeTab === "directory") {
+      const filters = [
+        { l: "All members", on: true },
+        { l: "Leaders" },
+        { l: "Class of 2025" },
+        { l: "Class of 2026" },
+        { l: "Class of 2027" },
+        { l: "Class of 2028" },
+      ]
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 4px" }}>Filters</p>
+          {filters.map((f, i) => (
+            <button key={i} style={subItemStyle(f.on)}>
+              <span style={{ flex: 1 }}>{f.l}</span>
+            </button>
+          ))}
+        </div>
+      )
+    }
+
+    if (activeTab === "profile") {
+      const items: { label: string; on?: boolean; danger?: boolean; onClick?: () => void }[] = [
+        { label: "Spiritual profile", on: true },
+        { label: "Sign out", danger: true, onClick: onLogout },
+      ]
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Profile</p>
+          {items.map((s, i) => (
+            <button key={i} style={subItemStyle(s.on, s.danger)} onClick={s.onClick}>
+              <span style={{ flex: 1 }}>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )
+    }
+
+    // Home and announcements — static sub-nav
+    const homeItems = [
+      { label: "This week", on: true },
+      { label: "Up next" },
+      { label: "Pray with us" },
+      { label: "Recent activity" },
+    ]
+    const annItems = [
+      { label: "All", on: true },
+      { label: "Events" },
+      { label: "Prayer" },
+      { label: "Pinned" },
+    ]
+    const items = activeTab === "announcements" ? annItems : homeItems
+    const sectionLabel = activeTab === "announcements" ? "Announcements" : "Home"
+
+    return (
+      <div className="flex-1 overflow-y-auto px-2 pb-3">
+        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>{sectionLabel}</p>
+        {items.map((s, i) => (
+          <button key={i} style={subItemStyle(s.on)}>
+            <span style={{ flex: 1 }}>{s.label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Icon Rail */}
+      <div className="hidden md:flex flex-col w-16 flex-shrink-0 h-screen bg-[#13101A] items-center py-4 gap-1">
+        {/* Logo */}
+        <div className="w-9 h-9 rounded-[10px] bg-[#3E1540] flex items-center justify-center mb-3.5 flex-shrink-0">
+          <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
+            <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
+            <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
+          </svg>
+        </div>
+
+        {navItems.map(({ id, icon: Icon }) => {
+          const isActive = activeTab === id
+          return (
+            <button
+              key={id}
+              onClick={() => onTabChange(id)}
+              className="relative w-10 h-10 rounded-[10px] flex items-center justify-center transition-colors"
+              style={{
+                background: isActive ? "rgba(255,255,255,0.10)" : "transparent",
+                color: isActive ? "#F6F4EF" : "rgba(246,244,239,0.45)",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <Icon className="w-[18px] h-[18px]" />
+              {isActive && (
+                <span className="absolute left-[-9px] top-2 bottom-2 w-0.5 bg-[#C9A34B] rounded-full" />
+              )}
+              {id === "chats" && chatsUnread > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#C9A34B] rounded-full" />
+              )}
+            </button>
+          )
+        })}
+
+        <div className="flex-1" />
+
+        {/* User avatar */}
+        <div className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center overflow-hidden flex-shrink-0">
+          {userAvatarUrl ? (
+            <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-[11px] font-semibold text-[#F6F4EF]">{userInitials}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Context Panel — hidden for chats/directory (those tabs have their own left panel) */}
+      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}>
+        {/* Workspace header */}
+        <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
+          <p style={monoStyle}>Workspace</p>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>
+            Central
+          </p>
+          <p className="text-[11px] text-[#8A8497] mt-0.5 leading-tight">{ministryName}</p>
+        </div>
+
+        {renderPanelBody()}
+
+        {/* Verse card */}
+        <div className="mx-3 mb-4 p-3 border border-[#E5E0D2] rounded-[10px] bg-[#F4F1E8] flex-shrink-0">
+          <p style={{ ...monoStyle, marginBottom: "6px" }}>Verse · Psalm 46:10</p>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "14px", lineHeight: 1.4, color: "#13101A" }}>
+            &ldquo;Be still, and know that I am God.&rdquo;
+          </p>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── HomeApp (root) ──────────────────────────────────────────────────────────
 
 interface HomeAppProps {
@@ -4358,7 +5420,19 @@ interface HomeAppProps {
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
   const supabase = createClient()
-  const [activeTab, setActiveTab] = useState<Tab>("home")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "profile"]
+  const initialTab = (searchParams.get("tab") as Tab | null)
+  const [activeTab, setActiveTabState] = useState<Tab>(
+    initialTab && validTabs.includes(initialTab) ? initialTab : "home"
+  )
+
+  function setActiveTab(tab: Tab) {
+    setActiveTabState(tab)
+    router.replace(`/home?tab=${tab}`, { scroll: false })
+  }
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
   const [totalChatsUnread, setTotalChatsUnread] = useState(0)
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
@@ -4366,6 +5440,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [userTeams, setUserTeams] = useState<UserTeam[]>([])
   const [allTeams, setAllTeams] = useState<Team[]>([])
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [showCreateTeam, setShowCreateTeam] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)")
+    setIsDesktop(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
 
   const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
 
@@ -4582,88 +5666,168 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     setChatRefreshKey((k) => k + 1)
   }
 
+  function handleSidebarTabChange(tab: Tab) {
+    setGlobalOpenChat(null)
+    setActiveTab(tab)
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
     window.location.href = "/login"
   }
 
-  return (
-    <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto">
-      {/* Scrollable content area */}
-      <div className="overflow-y-auto pb-28 min-h-screen">
-        {activeTab === "home" && (
-          <HomeTab
-            profile={initialProfile}
-            ministryId={ministryId}
-            ministryName={ministryName}
-            recentChats={recentChats}
-            onSeeChats={() => setActiveTab("chats")}
-            onSeeAnnouncements={() => setActiveTab("announcements")}
-            onOpenChat={handleOpenChat}
-            onGoToProfile={() => setActiveTab("profile")}
-            avatarUrl={avatarUrl}
-          />
-        )}
-        {activeTab === "announcements" && (
-          <AnnouncementsTab userId={userId} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} />
-        )}
-        {activeTab === "chats" && (
-          <ChatsTab
-            userId={userId}
-            userProfile={initialProfile}
-            userRole={initialProfile.role}
-            ministryId={ministryId}
-            ministryName={ministryName}
-            onOpenChat={handleOpenChat}
-            onTotalUnreadChange={setTotalChatsUnread}
-            refreshKey={chatRefreshKey}
-            onOpenDirectory={() => setActiveTab("directory")}
-          />
-        )}
-        {activeTab === "plan" && (
-          <PlanTab
-            userId={userId}
-            ministryId={ministryId}
-            ministryName={ministryName}
-            userTeams={userTeams}
-            allTeams={allTeams}
-            isAdmin={isAdmin}
-            onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
-          />
-        )}
-        {activeTab === "directory" && (
-          <DirectoryTab
-            currentUserId={userId}
-            currentUserName={initialProfile.name}
-            ministryId={ministryId}
-            ministryName={ministryName}
-            onBack={() => setActiveTab("chats")}
-            onOpenChat={(id, name) => {
-              setActiveTab("chats")
-              handleOpenChat(id, name)
-            }}
-          />
-        )}
-        {activeTab === "profile" && (
-          <ProfileTab
-            userId={userId}
-            initialProfile={{ ...initialProfile, avatar_url: avatarUrl }}
-            ministryName={ministryName}
-            onLogout={handleLogout}
-            onAvatarChange={(url) => setAvatarUrl(url)}
-          />
-        )}
-      </div>
+  const showPlanTab = isAdmin || userTeams.length > 0
 
-      <BottomNav
+  return (
+    <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[#F4F1E8]">
+
+      {/* Desktop sidebar — hidden on mobile */}
+      <DesktopSidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleSidebarTabChange}
+        ministryName={ministryName}
         chatsUnread={totalChatsUnread}
-        showPlan={isAdmin || userTeams.length > 0}
+        showPlan={showPlanTab}
+        userInitials={getInitials(initialProfile.name)}
+        userAvatarUrl={avatarUrl}
+        recentChats={recentChats}
+        userTeams={userTeams}
+        onOpenChat={handleOpenChat}
+        activeGroupId={globalOpenChat?.id}
+        onLogout={handleLogout}
+        isAdmin={isAdmin}
+        onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
       />
 
-      {/* Global ChatScreen — rendered above everything including bottom nav */}
-      {globalOpenChat && (
+      {/* Content + bottom nav wrapper */}
+      <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
+
+        {/* Scrollable content area */}
+        <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
+
+          {activeTab === "home" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <HomeTab
+                profile={initialProfile}
+                ministryId={ministryId}
+                ministryName={ministryName}
+                recentChats={recentChats}
+                onSeeChats={() => setActiveTab("chats")}
+                onSeeAnnouncements={() => setActiveTab("announcements")}
+                onOpenChat={handleOpenChat}
+                onGoToProfile={() => setActiveTab("profile")}
+                avatarUrl={avatarUrl}
+              />
+            </div>
+          )}
+
+          {activeTab === "announcements" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <AnnouncementsTab userId={userId} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} />
+            </div>
+          )}
+
+          {/* Chats tab: mobile = normal stack, desktop = two-column split */}
+          {activeTab === "chats" && (
+            <div className="md:flex md:h-full md:overflow-hidden">
+              {/* Left: chat list */}
+              <div className="md:w-[320px] md:flex-shrink-0 md:border-r md:border-[#ECE8DE] md:overflow-y-auto md:h-full">
+                <ChatsTab
+                  userId={userId}
+                  userProfile={initialProfile}
+                  userRole={initialProfile.role}
+                  ministryId={ministryId}
+                  ministryName={ministryName}
+                  onOpenChat={handleOpenChat}
+                  onTotalUnreadChange={setTotalChatsUnread}
+                  refreshKey={chatRefreshKey}
+                  onOpenDirectory={() => setActiveTab("directory")}
+                  activeGroupId={globalOpenChat?.id}
+                />
+              </div>
+              {/* Right: chat content — desktop only */}
+              {globalOpenChat ? (
+                <div className="hidden md:flex md:flex-1 md:overflow-hidden">
+                  <ChatScreen
+                    groupId={globalOpenChat.id}
+                    groupName={globalOpenChat.name}
+                    userId={userId}
+                    userName={initialProfile.name}
+                    userRole={initialProfile.role}
+                    onClose={handleChatClose}
+                    onRead={recountTotalUnread}
+                    inline
+                  />
+                </div>
+              ) : (
+                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[#FDFBF7]">
+                  <div className="text-center">
+                    <MessageCircle className="w-10 h-10 text-[#C4C4C4] mx-auto mb-3" />
+                    <p className="text-[14px] font-semibold text-[#8A8497]">Select a chat</p>
+                    <p className="text-[12px] text-[#C4C4C4] mt-1">Choose a conversation on the left</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "plan" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <PlanTab
+                userId={userId}
+                ministryId={ministryId}
+                ministryName={ministryName}
+                userTeams={userTeams}
+                allTeams={allTeams}
+                isAdmin={isAdmin}
+                onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
+                showCreateTeam={showCreateTeam}
+                onShowCreateTeam={setShowCreateTeam}
+              />
+            </div>
+          )}
+
+          {activeTab === "directory" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <DirectoryTab
+                currentUserId={userId}
+                currentUserName={initialProfile.name}
+                ministryId={ministryId}
+                ministryName={ministryName}
+                onBack={() => setActiveTab("chats")}
+                onOpenChat={(id, name) => {
+                  setActiveTab("chats")
+                  handleOpenChat(id, name)
+                }}
+              />
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <ProfileTab
+                userId={userId}
+                initialProfile={{ ...initialProfile, avatar_url: avatarUrl }}
+                ministryName={ministryName}
+                onLogout={handleLogout}
+                onAvatarChange={(url) => setAvatarUrl(url)}
+              />
+            </div>
+          )}
+
+        </div>
+
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          chatsUnread={totalChatsUnread}
+          showPlan={showPlanTab}
+        />
+
+      </div>
+
+      {/* Global ChatScreen overlay — mobile always, desktop only when not on chats tab */}
+      {globalOpenChat && !(isDesktop && activeTab === "chats") && (
         <ChatScreen
           groupId={globalOpenChat.id}
           groupName={globalOpenChat.name}
