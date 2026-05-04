@@ -1,29 +1,13 @@
 import sharp from "sharp"
-import { writeFileSync } from "fs"
+import { readFileSync } from "fs"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, "../public")
+const svgPath = join(__dirname, "../../Downloads/central_app_icon.svg")
 
-// SVG template: plum rounded square + "C" in ivory Instrument Serif
-function makeSvg(size) {
-  const radius = size * 0.18
-  const fontSize = size * 0.58
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-  <rect width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="#3E1540"/>
-  <text
-    x="${size / 2}"
-    y="${size / 2}"
-    font-family="Georgia, 'Times New Roman', serif"
-    font-size="${fontSize}"
-    font-weight="400"
-    fill="#F6F4EF"
-    text-anchor="middle"
-    dominant-baseline="central"
-  >C</text>
-</svg>`
-}
+const svgBuffer = readFileSync(svgPath)
 
 const sizes = [
   { name: "icon-192x192.png", size: 192 },
@@ -32,9 +16,9 @@ const sizes = [
 ]
 
 for (const { name, size } of sizes) {
-  const svg = Buffer.from(makeSvg(size))
-  await sharp(svg)
+  await sharp(svgBuffer)
+    .resize(size, size)
     .png()
     .toFile(join(publicDir, name))
-  console.log(`Generated ${name}`)
+  console.log(`Generated ${name} (${size}x${size})`)
 }
