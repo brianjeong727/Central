@@ -4705,6 +4705,36 @@ interface DraftRole {
   permissions: string[]
 }
 
+interface RoleDescription {
+  id: string
+  team_id: string
+  role_name: string
+  description: string
+  updated_by: string | null
+  updated_at: string
+}
+
+interface RoleLink {
+  id: string
+  team_id: string
+  role_name: string
+  title: string
+  description: string
+  url: string
+  created_at: string
+}
+
+interface MeetingNote {
+  id: string
+  team_id: string
+  note_number: number
+  date: string
+  title: string
+  body: string
+  created_by: string
+  created_at: string
+}
+
 const PERMISSION_LABELS: Record<string, string> = {
   can_manage_worship_set: "Manage worship set",
   can_view_worship_set: "View worship set",
@@ -4815,6 +4845,572 @@ const MINISTRY_FEATURES = [
   { icon: "dollar", name: "Finances", desc: "Budget tracking and expense reporting for your ministry." },
 ]
 
+// ── Student Org Board role tab content ────────────────────────────────────────
+
+function LinkForm({
+  form,
+  setForm,
+  onSave,
+  onCancel,
+  saving,
+  isNew,
+}: {
+  form: { title: string; description: string; url: string }
+  setForm: (f: { title: string; description: string; url: string }) => void
+  onSave: () => void
+  onCancel: () => void
+  saving: boolean
+  isNew: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[12px] font-medium text-[#8A8497]">Title</label>
+        <input
+          value={form.title}
+          onChange={e => setForm({ ...form, title: e.target.value })}
+          placeholder="e.g. Officer Handbook"
+          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[12px] font-medium text-[#8A8497]">Description</label>
+        <input
+          value={form.description}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+          placeholder="Optional short description"
+          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[12px] font-medium text-[#8A8497]">URL</label>
+        <input
+          value={form.url}
+          onChange={e => setForm({ ...form, url: e.target.value })}
+          placeholder="https://…"
+          type="url"
+          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onSave}
+          disabled={saving || !form.title.trim() || !form.url.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
+        >
+          <Check className="w-3.5 h-3.5" />
+          {saving ? "Saving…" : isNew ? "Add Link" : "Save"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[#5A5466] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StudentOrgRoleTabContent({
+  teamId,
+  roleName,
+  userId,
+  canWrite,
+}: {
+  teamId: string | null
+  roleName: string
+  userId: string
+  canWrite: boolean
+}) {
+  const supabase = createClient()
+
+  const [description, setDescription] = useState<RoleDescription | null>(null)
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descDraft, setDescDraft] = useState("")
+  const [savingDesc, setSavingDesc] = useState(false)
+
+  const [links, setLinks] = useState<RoleLink[]>([])
+  const [addingLink, setAddingLink] = useState(false)
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
+  const [linkForm, setLinkForm] = useState({ title: "", description: "", url: "" })
+  const [savingLink, setSavingLink] = useState(false)
+
+  const loadContent = useCallback(async () => {
+    if (!teamId) return
+    const [{ data: desc }, { data: linkRows }] = await Promise.all([
+      supabase.from("team_role_descriptions").select("*").eq("team_id", teamId).eq("role_name", roleName).maybeSingle(),
+      supabase.from("team_role_links").select("*").eq("team_id", teamId).eq("role_name", roleName).order("created_at", { ascending: true }),
+    ])
+    setDescription((desc as RoleDescription | null) ?? null)
+    setLinks((linkRows ?? []) as RoleLink[])
+  }, [teamId, roleName])
+
+  useEffect(() => { loadContent() }, [loadContent])
+
+  async function saveDescription() {
+    if (!teamId) return
+    setSavingDesc(true)
+    const now = new Date().toISOString()
+    if (description) {
+      await supabase.from("team_role_descriptions").update({ description: descDraft.trim(), updated_by: userId, updated_at: now }).eq("id", description.id)
+    } else {
+      await supabase.from("team_role_descriptions").insert({ team_id: teamId, role_name: roleName, description: descDraft.trim(), created_by: userId, updated_by: userId, updated_at: now })
+    }
+    setSavingDesc(false)
+    setEditingDesc(false)
+    loadContent()
+  }
+
+  async function saveLink() {
+    if (!teamId) return
+    setSavingLink(true)
+    const now = new Date().toISOString()
+    if (editingLinkId) {
+      await supabase.from("team_role_links").update({ title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), updated_by: userId, updated_at: now }).eq("id", editingLinkId)
+    } else {
+      await supabase.from("team_role_links").insert({ team_id: teamId, role_name: roleName, title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), created_by: userId, updated_by: userId, updated_at: now })
+    }
+    setSavingLink(false)
+    setAddingLink(false)
+    setEditingLinkId(null)
+    setLinkForm({ title: "", description: "", url: "" })
+    loadContent()
+  }
+
+  async function deleteLink(id: string) {
+    await supabase.from("team_role_links").delete().eq("id", id)
+    setLinks(prev => prev.filter(l => l.id !== id))
+  }
+
+  function startEditLink(link: RoleLink) {
+    setLinkForm({ title: link.title, description: link.description, url: link.url })
+    setEditingLinkId(link.id)
+    setAddingLink(false)
+  }
+
+  function cancelLink() {
+    setAddingLink(false)
+    setEditingLinkId(null)
+    setLinkForm({ title: "", description: "", url: "" })
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: "#FBF8F2",
+    border: "1px solid #ECE8DE",
+    borderRadius: 16,
+    padding: "16px 20px",
+    boxShadow: "0 1px 4px rgba(19,16,26,0.06)",
+  }
+
+  return (
+    <div>
+      {/* Role Description */}
+      <div className="mb-10">
+        <div className="flex items-center justify-between mb-3">
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+            Role Description
+          </span>
+          {canWrite && !editingDesc && (
+            <button
+              onClick={() => { setDescDraft(description?.description ?? ""); setEditingDesc(true) }}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
+        </div>
+        {editingDesc ? (
+          <div style={cardStyle}>
+            <textarea
+              value={descDraft}
+              onChange={e => setDescDraft(e.target.value)}
+              rows={5}
+              placeholder={`Describe the ${roleName} role…`}
+              className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all resize-none"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={saveDescription}
+                disabled={savingDesc}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {savingDesc ? "Saving…" : "Save"}
+              </button>
+              <button
+                onClick={() => setEditingDesc(false)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[#5A5466] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={cardStyle}>
+            {description?.description ? (
+              <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#5A5466", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" }}>
+                {description.description}
+              </p>
+            ) : (
+              <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4", margin: 0 }}>
+                {canWrite ? "No description yet. Click Edit to add one." : "No description yet."}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Relevant Links */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+            Relevant Links
+          </span>
+          {canWrite && !addingLink && editingLinkId === null && (
+            <button
+              onClick={() => { setLinkForm({ title: "", description: "", url: "" }); setEditingLinkId(null); setAddingLink(true) }}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Link
+            </button>
+          )}
+        </div>
+
+        {addingLink && (
+          <div style={{ ...cardStyle, marginBottom: 10 }}>
+            <LinkForm form={linkForm} setForm={setLinkForm} onSave={saveLink} onCancel={cancelLink} saving={savingLink} isNew />
+          </div>
+        )}
+
+        {links.length === 0 && !addingLink ? (
+          <div style={{ ...cardStyle, textAlign: "center", padding: "28px 20px" }}>
+            <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#8A8497", margin: 0 }}>
+              {canWrite ? "No links yet. Add one to get started." : "No links yet."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {links.map(link =>
+              editingLinkId === link.id ? (
+                <div key={link.id} style={cardStyle}>
+                  <LinkForm form={linkForm} setForm={setLinkForm} onSave={saveLink} onCancel={cancelLink} saving={savingLink} isNew={false} />
+                </div>
+              ) : (
+                <div key={link.id} style={cardStyle}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontFamily: "var(--font-inter)", fontSize: 14, fontWeight: 600, color: "#3E1540", textDecoration: "underline", textUnderlineOffset: 2, wordBreak: "break-word" }}
+                      >
+                        {link.title}
+                      </a>
+                      {link.description && (
+                        <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#5A5466", margin: "3px 0 0", lineHeight: 1.55 }}>
+                          {link.description}
+                        </p>
+                      )}
+                      <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#8A8497", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {link.url}
+                      </p>
+                    </div>
+                    {canWrite && (
+                      <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                        <button
+                          onClick={() => startEditLink(link)}
+                          className="p-1.5 rounded-lg hover:bg-[#EFEAE0] transition-colors"
+                          title="Edit link"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-[#8A8497]" />
+                        </button>
+                        <button
+                          onClick={() => deleteLink(link.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Delete link"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-[#8A8497] hover:text-red-500" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Meeting Notes ─────────────────────────────────────────────────────────────
+
+function MeetingNoteCard({
+  note,
+  isExpanded,
+  onToggle,
+  onSaveTitle,
+  onSaveBody,
+}: {
+  note: MeetingNote
+  isExpanded: boolean
+  onToggle: () => void
+  onSaveTitle: (id: string, title: string) => Promise<void>
+  onSaveBody: (id: string, body: string) => Promise<void>
+}) {
+  const [localTitle, setLocalTitle] = useState(note.title)
+  const [localBody, setLocalBody] = useState(note.body)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { setLocalTitle(note.title) }, [note.id, note.title])
+  useEffect(() => { setLocalBody(note.body) }, [note.id, note.body])
+
+  useEffect(() => {
+    if (isExpanded && bodyRef.current) {
+      const ta = bodyRef.current
+      ta.style.height = "auto"
+      ta.style.height = Math.max(ta.scrollHeight, 200) + "px"
+    }
+  }, [isExpanded])
+
+  const noteDateLabel = (() => {
+    const d = new Date(note.date + "T12:00:00")
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+  })()
+
+  if (!isExpanded) {
+    return (
+      <div
+        onClick={onToggle}
+        style={{
+          background: "white",
+          borderRadius: 12,
+          border: "1px solid #ECE8DE",
+          padding: "13px 18px",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          boxShadow: "0 1px 3px rgba(19,16,26,0.04)",
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {note.title || "(Untitled)"}
+          </p>
+          <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0" }}>{noteDateLabel}</p>
+        </div>
+        <ChevronRight size={14} style={{ color: "#C4C4C4", flexShrink: 0 }} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", boxShadow: "0 2px 12px rgba(19,16,26,0.08)", overflow: "hidden" }}>
+      {/* Collapse strip */}
+      <div
+        onClick={onToggle}
+        style={{
+          padding: "11px 20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid #F0EDE8",
+          cursor: "pointer",
+          background: "#FDFBF7",
+        }}
+      >
+        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          {noteDateLabel}
+        </span>
+        <ChevronDown size={14} style={{ color: "#C4C4C4" }} />
+      </div>
+
+      {/* Document body */}
+      <div style={{ padding: "28px 32px 44px" }}>
+        <input
+          value={localTitle}
+          onChange={e => setLocalTitle(e.target.value)}
+          onBlur={() => { if (localTitle !== note.title) onSaveTitle(note.id, localTitle) }}
+          placeholder="Untitled"
+          style={{
+            fontFamily: "var(--font-instrument-serif)",
+            fontSize: 26,
+            fontWeight: 400,
+            color: "#13101A",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.2,
+            width: "100%",
+            border: "none",
+            background: "transparent",
+            outline: "none",
+            padding: 0,
+            display: "block",
+          }}
+        />
+        <div style={{ height: 1, background: "#F0EDE8", margin: "18px 0 22px" }} />
+        <textarea
+          ref={bodyRef}
+          value={localBody}
+          onChange={e => {
+            setLocalBody(e.target.value)
+            const ta = e.target
+            ta.style.height = "auto"
+            ta.style.height = Math.max(ta.scrollHeight, 200) + "px"
+          }}
+          onBlur={() => { if (localBody !== note.body) onSaveBody(note.id, localBody) }}
+          placeholder="Start writing your meeting notes here…"
+          style={{
+            width: "100%",
+            border: "none",
+            background: "transparent",
+            outline: "none",
+            resize: "none",
+            padding: 0,
+            fontFamily: "var(--font-inter)",
+            fontSize: 15,
+            lineHeight: 1.9,
+            color: "#374151",
+            overflow: "hidden",
+            minHeight: 200,
+            display: "block",
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function MeetingNotesSection({
+  teamId,
+  userId,
+  canWrite,
+}: {
+  teamId: string | null
+  userId: string
+  canWrite: boolean
+}) {
+  const supabase = createClient()
+  const [notes, setNotes] = useState<MeetingNote[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    if (!teamId) return
+    setNotes([])
+    setExpandedIds(new Set())
+    setLoading(true)
+    supabase
+      .from("meeting_notes")
+      .select("*")
+      .eq("team_id", teamId)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        const rows = (data ?? []) as MeetingNote[]
+        setNotes(rows)
+        if (rows.length > 0) setExpandedIds(new Set([rows[0].id]))
+        setLoading(false)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId])
+
+  async function createNote() {
+    if (!teamId || creating) return
+    setCreating(true)
+    const noteNumber = notes.length + 1
+    const today = new Date()
+    const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    const title = `Meeting ${noteNumber} — ${dateStr}`
+    const dateIso = today.toISOString().split("T")[0]
+    const { data, error } = await supabase
+      .from("meeting_notes")
+      .insert({ team_id: teamId, note_number: noteNumber, date: dateIso, title, body: "", created_by: userId })
+      .select()
+      .single()
+    setCreating(false)
+    if (!error && data) {
+      const newNote = data as MeetingNote
+      setNotes(prev => [newNote, ...prev])
+      setExpandedIds(prev => new Set([newNote.id, ...prev]))
+    }
+  }
+
+  async function saveTitle(id: string, title: string) {
+    await supabase.from("meeting_notes").update({ title }).eq("id", id)
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, title } : n))
+  }
+
+  async function saveBody(id: string, body: string) {
+    await supabase.from("meeting_notes").update({ body }).eq("id", id)
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, body } : n))
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center justify-between mb-3">
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+          Meeting Notes
+        </span>
+        {canWrite && (
+          <button
+            onClick={createNote}
+            disabled={creating}
+            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: creating ? "default" : "pointer", fontFamily: "var(--font-inter)", fontWeight: 500, opacity: creating ? 0.5 : 1 }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {creating ? "Creating…" : "Create"}
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+      ) : notes.length === 0 ? (
+        <div style={{ background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 14, padding: "32px 20px", textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, fontWeight: 400, color: "#13101A", margin: "0 0 6px" }}>No meeting notes yet.</p>
+          <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
+            {canWrite ? "Create your first note to get started." : "No notes have been created yet."}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {notes.map(note => (
+            <MeetingNoteCard
+              key={note.id}
+              note={note}
+              isExpanded={expandedIds.has(note.id)}
+              onToggle={() => toggleExpand(note.id)}
+              onSaveTitle={saveTitle}
+              onSaveBody={saveBody}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Plan tab helpers ───────────────────────────────────────────────────────────
+
 function PlanSectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 mb-3">
@@ -4863,6 +5459,8 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
+  const [studentOrgTab, setStudentOrgTab] = useState("General")
+  useEffect(() => { setStudentOrgTab("General") }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
@@ -4875,6 +5473,18 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
   }
 
   const teamsToShow = isAdmin ? allTeams : userTeams.map(t => ({ id: t.teamId, name: t.teamName, icon: t.teamIcon, description: t.teamDescription, created_by: "", member_count: 0 }))
+
+  const isStudentOrgBoard = activeTeamName === "Student Org Board"
+  const studentOrgUserTeam = isStudentOrgBoard ? userTeams.find(t => t.teamId === activeTeamId) : null
+  const studentOrgRole = studentOrgUserTeam?.roleName ?? ""
+  const studentOrgTabs: string[] = (() => {
+    if (!isStudentOrgBoard) return []
+    if (isAdmin || studentOrgRole === "President") return ["General", "President", "Treasurer", "Secretary", "Event Coordinator"]
+    if (studentOrgRole === "Treasurer") return ["General", "Treasurer"]
+    if (studentOrgRole === "Secretary") return ["General", "Secretary"]
+    if (studentOrgRole === "Event Coordinator") return ["General", "Event Coordinator"]
+    return ["General"]
+  })()
 
   return (
     <div className="pb-2 md:pb-0">
@@ -4932,26 +5542,140 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
       </div>
 
       {/* Desktop content */}
-      <div className="hidden md:block px-14 py-7">
-        {(() => {
-          const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
-          const perms = activeUserTeam?.permissions ?? []
-          const showCalendar = perms.includes('can_plan_events')
-          if (!showCalendar) return null
-          const canEdit = isAdmin || perms.includes('can_plan_events')
-          return (
-            <MinistryCalendar
-              ministryId={ministryId}
-              teamId={activeTeamId}
-              userId={userId}
-              canEdit={canEdit}
-            />
-          )
-        })()}
+      <div className="hidden md:block">
+        {isStudentOrgBoard && studentOrgTabs.length > 0 && (
+          <div style={{ borderBottom: "1px solid #ECE8DE", overflowX: "auto", paddingLeft: "56px" }}>
+            <div style={{ display: "flex" }}>
+              {studentOrgTabs.map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setStudentOrgTab(tab)}
+                  style={{
+                    padding: "12px 16px",
+                    fontSize: 14,
+                    fontFamily: "var(--font-inter)",
+                    fontWeight: studentOrgTab === tab ? 600 : 400,
+                    color: studentOrgTab === tab ? "#3E1540" : "#8A8497",
+                    boxShadow: studentOrgTab === tab ? "inset 0 -2px 0 0 #3E1540" : "none",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    outline: "none",
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="px-14 py-7">
+          {(() => {
+            if (isStudentOrgBoard) {
+              const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
+              const perms = activeUserTeam?.permissions ?? []
+              const canEdit = isAdmin || perms.includes('can_plan_events')
+              if (studentOrgTab === "General") {
+                return (
+                  <>
+                    <MinistryCalendar
+                      ministryId={ministryId}
+                      teamId={activeTeamId}
+                      userId={userId}
+                      canEdit={canEdit}
+                    />
+                    <MeetingNotesSection
+                      teamId={activeTeamId}
+                      userId={userId}
+                      canWrite={isAdmin || !!studentOrgUserTeam}
+                    />
+                  </>
+                )
+              }
+              const canWrite = studentOrgRole === "President" || studentOrgRole === studentOrgTab
+              return (
+                <StudentOrgRoleTabContent
+                  teamId={activeTeamId}
+                  roleName={studentOrgTab}
+                  userId={userId}
+                  canWrite={canWrite}
+                />
+              )
+            }
+            const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
+            const perms = activeUserTeam?.permissions ?? []
+            const showCalendar = perms.includes('can_plan_events')
+            if (!showCalendar) return null
+            const canEdit = isAdmin || perms.includes('can_plan_events')
+            return (
+              <MinistryCalendar
+                ministryId={ministryId}
+                teamId={activeTeamId}
+                userId={userId}
+                canEdit={canEdit}
+              />
+            )
+          })()}
+        </div>
       </div>
 
       {/* Mobile content */}
       <div className="md:hidden px-5 pb-4">
+        {/* Student Org Board tabs — mobile */}
+        {isStudentOrgBoard && studentOrgTabs.length > 0 && (
+          <div className="mb-6">
+            <div style={{ borderBottom: "1px solid #ECE8DE", marginLeft: -20, marginRight: -20, paddingLeft: 20, overflowX: "auto" }}>
+              <div style={{ display: "flex" }}>
+                {studentOrgTabs.map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setStudentOrgTab(tab)}
+                    style={{
+                      padding: "12px 16px",
+                      fontSize: 14,
+                      fontFamily: "var(--font-inter)",
+                      fontWeight: studentOrgTab === tab ? 600 : 400,
+                      color: studentOrgTab === tab ? "#3E1540" : "#8A8497",
+                      boxShadow: studentOrgTab === tab ? "inset 0 -2px 0 0 #3E1540" : "none",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      outline: "none",
+                    }}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pt-5">
+              {studentOrgTab === "General" ? (
+                <>
+                  <MinistryCalendar
+                    ministryId={ministryId}
+                    teamId={activeTeamId}
+                    userId={userId}
+                    canEdit={isAdmin || (userTeams.find(t => t.teamId === activeTeamId)?.permissions?.includes('can_plan_events') ?? false)}
+                  />
+                  <MeetingNotesSection
+                    teamId={activeTeamId}
+                    userId={userId}
+                    canWrite={isAdmin || !!studentOrgUserTeam}
+                  />
+                </>
+              ) : (
+                <StudentOrgRoleTabContent
+                  teamId={activeTeamId}
+                  roleName={studentOrgTab}
+                  userId={userId}
+                  canWrite={studentOrgRole === "President" || studentOrgRole === studentOrgTab}
+                />
+              )}
+            </div>
+          </div>
+        )}
         {/* Admin: team management */}
         {isAdmin && (
           <div className="mb-8">
@@ -5575,7 +6299,7 @@ function MinistryCalendar({
   canEdit: boolean
 }) {
   const supabase = createClient()
-  const [view, setView] = useState<"month" | "list">("month")
+  const [view, setView] = useState<"month" | "list">("list")
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [plannedEventIds, setPlannedEventIds] = useState<Set<string>>(new Set())
   const [currentMonth, setCurrentMonth] = useState(new Date())
