@@ -3182,7 +3182,7 @@ function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onO
                 ? "bg-white text-[#3E1540] shadow-sm md:bg-[#EFEAE0] md:shadow-none md:text-[#13101A]"
                 : "text-[#9CA3AF] hover:text-[#3E1540]/70 md:text-[#8A8497] md:hover:bg-[#F4F1E8] md:bg-transparent"
               }`}
-            style={subTab === t && window?.innerWidth >= 768 ? {} : {}}
+
           >
             {t === "church" ? "Church Chats" : "My Chats"}
           </button>
