@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import PWARegister from "@/components/pwa-register";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,6 +18,7 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Central",
   description: "College ministry community",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -26,9 +28,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="theme-color" content="#3E1540" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body
         className={`${inter.variable} ${instrumentSerif.variable} antialiased font-sans`}
       >
+        <PWARegister />
         {children}
       </body>
     </html>

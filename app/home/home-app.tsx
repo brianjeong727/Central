@@ -7,7 +7,17 @@ import {
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
   MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera, Home, MessageCircle, User,
   List, Grid3x3, BookOpen,
+  Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
+  Indent, Outdent, AlignLeft, AlignCenter, AlignRight,
 } from "lucide-react"
+import { useEditor, EditorContent } from "@tiptap/react"
+import { Editor } from "@tiptap/core"
+import StarterKit from "@tiptap/starter-kit"
+import { Underline as TiptapUnderline } from "@tiptap/extension-underline"
+import { TextAlign } from "@tiptap/extension-text-align"
+import { TextStyle } from "@tiptap/extension-text-style"
+import { Color } from "@tiptap/extension-color"
+import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { BottomNav } from "@/components/ui/bottom-nav"
@@ -3836,23 +3846,33 @@ function JournalDevotionalsTab({ userId, ministryId }: { userId: string; ministr
       </div>
 
       {showEditor && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
-          <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 8, letterSpacing: "-0.02em" }} />
-          <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#3E1540", borderBottom: "1px solid #ECE8DE", marginBottom: 18, paddingBottom: 10 }} />
-          <textarea placeholder="Write your reflections here…" value={draft.content} onChange={e => setDraft(d => ({ ...d, content: e.target.value }))} rows={6} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 14, fontFamily: "inherit" }} />
-          {draft.image_url ? (
-            <div style={{ position: "relative", marginBottom: 14, display: "inline-block" }}>
-              <img src={draft.image_url} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 8 }} />
-              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+          <RoleDescriptionEditor
+            key={editingEntry?.id ?? "new"}
+            initialContent={draft.content}
+            onChange={html => setDraft(d => ({ ...d, content: html }))}
+            placeholder="Write your reflections here…"
+          >
+            <div style={{ padding: "18px 26px 0" }}>
+              <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 6, letterSpacing: "-0.02em" }} />
+              <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#3E1540", borderBottom: "1px solid #F0EDE8", marginBottom: 0, paddingBottom: 10 }} />
             </div>
-          ) : (
-            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8A8497", background: "transparent", border: "1px dashed #D4CFC7", borderRadius: 7, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
-              <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
-            </button>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</button>
+          </RoleDescriptionEditor>
+          <div style={{ padding: "0 26px 20px" }}>
+            {draft.image_url ? (
+              <div style={{ position: "relative", marginBottom: 14, display: "inline-block" }}>
+                <img src={draft.image_url} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 8 }} />
+                <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+              </div>
+            ) : (
+              <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8A8497", background: "transparent", border: "1px dashed #D4CFC7", borderRadius: 7, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
+                <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
+              </button>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</button>
+            </div>
           </div>
         </div>
       )}
@@ -3898,7 +3918,7 @@ function JournalDevotionalsTab({ userId, ministryId }: { userId: string; ministr
                 </div>
                 {isExpanded && (
                   <div style={{ padding: "12px 20px 20px" }}>
-                    {entry.content && <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.85, whiteSpace: "pre-wrap", margin: 0, marginBottom: entry.image_url ? 14 : 0 }}>{entry.content}</p>}
+                    {entry.content && <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: entry.content }} style={{ marginBottom: entry.image_url ? 14 : 0 }} />}
                     {entry.image_url && <img src={entry.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, objectFit: "cover", display: "block" }} />}
                   </div>
                 )}
@@ -4004,21 +4024,31 @@ function JournalPrayersTab({ userId, ministryId }: { userId: string; ministryId:
       </div>
 
       {showEditor && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
-          <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 14, letterSpacing: "-0.02em" }} />
-          <textarea placeholder="Write your prayer here…" value={draft.content} onChange={e => setDraft(d => ({ ...d, content: e.target.value }))} rows={5} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-            <span style={{ fontSize: 12, color: "#8A8497" }}>Status</span>
-            {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
-              const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
-              return (
-                <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "#8A8497", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "none" : "1px solid #ECE8DE", cursor: "pointer" }}>{cfg.label}</button>
-              )
-            })}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</button>
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+          <RoleDescriptionEditor
+            key={editingEntry?.id ?? "new"}
+            initialContent={draft.content}
+            onChange={html => setDraft(d => ({ ...d, content: html }))}
+            placeholder="Write your prayer here…"
+          >
+            <div style={{ padding: "18px 26px 0" }}>
+              <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid #F0EDE8", paddingBottom: 10 }} />
+            </div>
+          </RoleDescriptionEditor>
+          <div style={{ padding: "0 26px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+              <span style={{ fontSize: 12, color: "#8A8497" }}>Status</span>
+              {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
+                const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
+                return (
+                  <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "#8A8497", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "none" : "1px solid #ECE8DE", cursor: "pointer" }}>{cfg.label}</button>
+                )
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</button>
+            </div>
           </div>
         </div>
       )}
@@ -4038,9 +4068,10 @@ function JournalPrayersTab({ userId, ministryId }: { userId: string; ministryId:
             const isFirst = idx === 0 && !searchQuery.trim()
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
             const menuOpen = openMenuId === entry.id
+            const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
               <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
-                <div style={{ padding: isExpanded ? "18px 20px 0" : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
@@ -4062,9 +4093,9 @@ function JournalPrayersTab({ userId, ministryId }: { userId: string; ministryId:
                     </div>
                   </div>
                 </div>
-                {isExpanded && entry.content && (
+                {isExpanded && hasBody && (
                   <div style={{ padding: "12px 20px 18px" }}>
-                    <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.85, whiteSpace: "pre-wrap", margin: 0 }}>{entry.content}</p>
+                    <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: entry.content! }} />
                   </div>
                 )}
               </div>
@@ -4913,6 +4944,42 @@ function LinkForm({
   )
 }
 
+function RoleDescriptionEditor({
+  initialContent,
+  onChange,
+  placeholder,
+  children,
+}: {
+  initialContent: string
+  onChange: (html: string) => void
+  placeholder?: string
+  children?: React.ReactNode
+}) {
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit,
+      TiptapUnderline,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextStyle,
+      Color,
+      Placeholder.configure({ placeholder: placeholder ?? "Describe this role…" }),
+    ],
+    content: initialContent || "",
+    onUpdate: ({ editor: e }) => { onChange(e.getHTML()) },
+  })
+
+  return (
+    <div className="role-description-editor">
+      <TiptapToolbar editor={editor} />
+      {children}
+      <div style={{ padding: "14px 16px" }}>
+        <EditorContent editor={editor} />
+      </div>
+    </div>
+  )
+}
+
 function StudentOrgRoleTabContent({
   teamId,
   roleName,
@@ -5023,16 +5090,13 @@ function StudentOrgRoleTabContent({
           )}
         </div>
         {editingDesc ? (
-          <div style={cardStyle}>
-            <textarea
-              value={descDraft}
-              onChange={e => setDescDraft(e.target.value)}
-              rows={5}
+          <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+            <RoleDescriptionEditor
+              initialContent={descDraft}
+              onChange={setDescDraft}
               placeholder={`Describe the ${roleName} role…`}
-              className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all resize-none"
-              autoFocus
             />
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2" style={{ padding: "10px 16px", borderTop: "1px solid #F0EDE8" }}>
               <button
                 onClick={saveDescription}
                 disabled={savingDesc}
@@ -5053,9 +5117,7 @@ function StudentOrgRoleTabContent({
         ) : (
           <div style={cardStyle}>
             {description?.description ? (
-              <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#5A5466", lineHeight: 1.75, margin: 0, whiteSpace: "pre-wrap" }}>
-                {description.description}
-              </p>
+              <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: description.description }} />
             ) : (
               <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4", margin: 0 }}>
                 {canWrite ? "No description yet. Click Edit to add one." : "No description yet."}
@@ -5153,6 +5215,185 @@ function StudentOrgRoleTabContent({
 
 // ── Meeting Notes ─────────────────────────────────────────────────────────────
 
+const NOTE_COLORS = [
+  "#000000", "#374151", "#6B7280",
+  "#EF4444", "#F97316", "#EAB308",
+  "#22C55E", "#3B82F6", "#8B5CF6",
+  "#EC4899", "#3E1540",
+]
+
+function TiptapToolbar({ editor }: { editor: Editor | null }) {
+  const [showColors, setShowColors] = useState(false)
+  const colorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (colorRef.current && !colorRef.current.contains(e.target as Node)) setShowColors(false)
+    }
+    document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [])
+
+  if (!editor) return null
+
+  const btn = (active: boolean, action: () => void, title: string, icon: React.ReactNode) => (
+    <button
+      key={title}
+      type="button"
+      title={title}
+      onMouseDown={e => { e.preventDefault(); action() }}
+      style={{
+        padding: "4px 5px",
+        borderRadius: 5,
+        border: "none",
+        background: active ? "rgba(62,21,64,0.10)" : "transparent",
+        color: active ? "#3E1540" : "#5A5466",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+    >
+      {icon}
+    </button>
+  )
+
+  const div = <div style={{ width: 1, height: 14, background: "#ECE8DE", margin: "0 3px", flexShrink: 0 }} />
+  const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid #F0EDE8", flexWrap: "wrap", background: "#FDFBF7" }}>
+      {btn(editor.isActive("bold"),      () => editor.chain().focus().toggleBold().run(),   "Bold",          <Bold size={12} />)}
+      {btn(editor.isActive("italic"),    () => editor.chain().focus().toggleItalic().run(), "Italic",        <Italic size={12} />)}
+      {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "Underline",  <UnderlineIcon size={12} />)}
+      {btn(editor.isActive("strike"),    () => editor.chain().focus().toggleStrike().run(), "Strikethrough", <Strikethrough size={12} />)}
+      {div}
+      {btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), "Heading 1",
+        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H1</span>)}
+      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2",
+        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H2</span>)}
+      {div}
+      {btn(editor.isActive("bulletList"),  () => editor.chain().focus().toggleBulletList().run(),  "Bullet List",   <List size={12} />)}
+      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List",  <ListOrdered size={12} />)}
+      {btn(false, () => editor.chain().focus().sinkListItem("listItem").run(),  "Indent",  <Indent size={12} />)}
+      {btn(false, () => editor.chain().focus().liftListItem("listItem").run(),  "Outdent", <Outdent size={12} />)}
+      {div}
+      {btn(editor.isActive({ textAlign: "left" }),   () => editor.chain().focus().setTextAlign("left").run(),   "Align Left",   <AlignLeft size={12} />)}
+      {btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), "Align Center", <AlignCenter size={12} />)}
+      {btn(editor.isActive({ textAlign: "right" }),  () => editor.chain().focus().setTextAlign("right").run(),  "Align Right",  <AlignRight size={12} />)}
+      {div}
+      {/* Color picker */}
+      <div ref={colorRef} style={{ position: "relative" }}>
+        <button
+          type="button"
+          title="Text color"
+          onMouseDown={e => { e.preventDefault(); setShowColors(v => !v) }}
+          style={{
+            padding: "3px 5px",
+            borderRadius: 5,
+            border: "none",
+            background: showColors ? "rgba(62,21,64,0.10)" : "transparent",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#5A5466", lineHeight: 1 }}>A</span>
+          <div style={{ width: 14, height: 2.5, borderRadius: 2, background: currentColor ?? "#374151" }} />
+        </button>
+        {showColors && (
+          <div style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "white",
+            border: "1px solid #ECE8DE",
+            borderRadius: 8,
+            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
+            padding: 8,
+            display: "grid",
+            gridTemplateColumns: "repeat(6, 1fr)",
+            gap: 4,
+            zIndex: 200,
+            minWidth: 136,
+          }}>
+            {NOTE_COLORS.map(c => (
+              <button
+                key={c}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); editor.chain().focus().setColor(c).run(); setShowColors(false) }}
+                style={{
+                  width: 18, height: 18, borderRadius: 4,
+                  background: c,
+                  border: currentColor === c ? "2px solid #3E1540" : "1.5px solid rgba(0,0,0,0.10)",
+                  cursor: "pointer", padding: 0,
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              title="Remove color"
+              onMouseDown={e => { e.preventDefault(); editor.chain().focus().unsetColor().run(); setShowColors(false) }}
+              style={{
+                width: 18, height: 18, borderRadius: 4,
+                background: "white", border: "1.5px solid #ECE8DE",
+                cursor: "pointer", fontSize: 9, color: "#8A8497",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              }}
+            >✕</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MeetingNoteEditor({
+  initialContent,
+  onSave,
+  onEditorReady,
+}: {
+  initialContent: string
+  onSave: (html: string) => Promise<void>
+  onEditorReady?: (editor: Editor | null) => void
+}) {
+  const lastSavedRef = useRef(initialContent)
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit,
+      TiptapUnderline,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextStyle,
+      Color,
+      Placeholder.configure({ placeholder: "Start writing your meeting notes here…" }),
+    ],
+    content: initialContent || "",
+    onBlur: ({ editor: e }) => {
+      const html = e.getHTML()
+      if (html !== lastSavedRef.current) {
+        lastSavedRef.current = html
+        onSave(html)
+      }
+    },
+  })
+
+  useEffect(() => { onEditorReady?.(editor) }, [editor])
+
+  return (
+    <div className="meeting-note-editor">
+      <div style={{ padding: "20px 32px 44px" }}>
+        <EditorContent editor={editor} />
+      </div>
+    </div>
+  )
+}
+
 function MeetingNoteCard({
   note,
   isExpanded,
@@ -5167,19 +5408,8 @@ function MeetingNoteCard({
   onSaveBody: (id: string, body: string) => Promise<void>
 }) {
   const [localTitle, setLocalTitle] = useState(note.title)
-  const [localBody, setLocalBody] = useState(note.body)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
-
   useEffect(() => { setLocalTitle(note.title) }, [note.id, note.title])
-  useEffect(() => { setLocalBody(note.body) }, [note.id, note.body])
-
-  useEffect(() => {
-    if (isExpanded && bodyRef.current) {
-      const ta = bodyRef.current
-      ta.style.height = "auto"
-      ta.style.height = Math.max(ta.scrollHeight, 200) + "px"
-    }
-  }, [isExpanded])
+  const [noteEditor, setNoteEditor] = useState<Editor | null>(null)
 
   const noteDateLabel = (() => {
     const d = new Date(note.date + "T12:00:00")
@@ -5235,8 +5465,10 @@ function MeetingNoteCard({
         <ChevronDown size={14} style={{ color: "#C4C4C4" }} />
       </div>
 
+      <TiptapToolbar editor={noteEditor} />
+
       {/* Document body */}
-      <div style={{ padding: "28px 32px 44px" }}>
+      <div style={{ padding: "28px 32px 0" }}>
         <input
           value={localTitle}
           onChange={e => setLocalTitle(e.target.value)}
@@ -5257,35 +5489,14 @@ function MeetingNoteCard({
             display: "block",
           }}
         />
-        <div style={{ height: 1, background: "#F0EDE8", margin: "18px 0 22px" }} />
-        <textarea
-          ref={bodyRef}
-          value={localBody}
-          onChange={e => {
-            setLocalBody(e.target.value)
-            const ta = e.target
-            ta.style.height = "auto"
-            ta.style.height = Math.max(ta.scrollHeight, 200) + "px"
-          }}
-          onBlur={() => { if (localBody !== note.body) onSaveBody(note.id, localBody) }}
-          placeholder="Start writing your meeting notes here…"
-          style={{
-            width: "100%",
-            border: "none",
-            background: "transparent",
-            outline: "none",
-            resize: "none",
-            padding: 0,
-            fontFamily: "var(--font-inter)",
-            fontSize: 15,
-            lineHeight: 1.9,
-            color: "#374151",
-            overflow: "hidden",
-            minHeight: 200,
-            display: "block",
-          }}
-        />
+        <div style={{ height: 1, background: "#F0EDE8", margin: "18px 0 0" }} />
       </div>
+      <MeetingNoteEditor
+        key={note.id}
+        initialContent={note.body}
+        onSave={(html) => onSaveBody(note.id, html)}
+        onEditorReady={setNoteEditor}
+      />
     </div>
   )
 }
