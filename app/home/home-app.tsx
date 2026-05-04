@@ -6,7 +6,7 @@ import {
   Search, Calendar, ChevronRight, ChevronDown, ChevronLeft, Edit3, Check, X,
   LogOut, Bell, Users, Plus, ImageIcon, CheckCircle2, ArrowLeft, Send, Settings,
   MoreHorizontal, Trash2, CornerUpLeft, ClipboardList, Camera, Home, MessageCircle, User,
-  List, Grid3x3,
+  List, Grid3x3, BookOpen,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -30,6 +30,39 @@ interface Profile {
   pray_for_me: string | null
   ministry_id?: string | null
   avatar_url?: string | null
+}
+
+interface Devotional {
+  id: string
+  user_id: string
+  ministry_id: string
+  title: string
+  passage: string
+  content: string
+  image_url: string | null
+  created_at: string
+}
+
+type PrayerStatus = 'praying' | 'answered' | 'ongoing'
+
+interface Prayer {
+  id: string
+  user_id: string
+  ministry_id: string
+  title: string
+  content: string
+  status: PrayerStatus
+  created_at: string
+}
+
+interface Verse {
+  id: string
+  user_id: string
+  ministry_id: string
+  reference: string
+  verse_text: string
+  note: string
+  created_at: string
 }
 
 interface Announcement {
@@ -3716,6 +3749,491 @@ function MemberSheet({
   )
 }
 
+// ─── Journal Section ─────────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  praying:  { label: "Praying",  bg: "#EDE5F0", text: "#3E1540" },
+  answered: { label: "Answered", bg: "#D1FAE5", text: "#065F46" },
+  ongoing:  { label: "Ongoing",  bg: "#FEF3C7", text: "#92400E" },
+}
+
+function fmtJournalDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+function JournalDevotionalsTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+  const supabase = createClient()
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [entries, setEntries] = useState<Devotional[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<Devotional | null>(null)
+  const [draft, setDraft] = useState({ title: "", passage: "", content: "", image_url: null as string | null })
+  const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      if (data) setEntries(data)
+      setLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return entries
+    const q = searchQuery.toLowerCase()
+    return entries.filter(e => e.title.toLowerCase().includes(q) || e.passage.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
+  }, [entries, searchQuery])
+
+  function openNew() { setEditingEntry(null); setDraft({ title: "", passage: "", content: "", image_url: null }); setShowEditor(true); setOpenMenuId(null) }
+  function openEdit(entry: Devotional) { setEditingEntry(entry); setDraft({ title: entry.title, passage: entry.passage, content: entry.content, image_url: entry.image_url }); setShowEditor(true); setOpenMenuId(null) }
+
+  async function handleSave() {
+    if (!draft.title.trim()) return
+    setSaving(true)
+    if (editingEntry) {
+      const { data, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).select().single()
+      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Devotional) : e))
+    } else {
+      const { data, error } = await supabase.from("devotionals").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).select().single()
+      if (!error && data) setEntries(prev => [data as Devotional, ...prev])
+    }
+    setSaving(false); setShowEditor(false); setEditingEntry(null)
+  }
+
+  async function handleDelete(id: string) { await supabase.from("devotionals").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    setUploadingImage(true)
+    const ext = file.name.split(".").pop()
+    const { data: uploadData, error } = await supabase.storage.from("devotionals").upload(`${userId}/${Date.now()}.${ext}`, file, { upsert: false })
+    if (!error && uploadData) { const { data: { publicUrl } } = supabase.storage.from("devotionals").getPublicUrl(uploadData.path); setDraft(d => ({ ...d, image_url: publicUrl })) }
+    setUploadingImage(false); if (imageInputRef.current) imageInputRef.current.value = ""
+  }
+
+  function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
+  const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+
+  return (
+    <div>
+      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+        </div>
+        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+          <Plus size={14} />New entry
+        </button>
+      </div>
+
+      {showEditor && (
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
+          <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 8, letterSpacing: "-0.02em" }} />
+          <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#3E1540", borderBottom: "1px solid #ECE8DE", marginBottom: 18, paddingBottom: 10 }} />
+          <textarea placeholder="Write your reflections here…" value={draft.content} onChange={e => setDraft(d => ({ ...d, content: e.target.value }))} rows={6} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 14, fontFamily: "inherit" }} />
+          {draft.image_url ? (
+            <div style={{ position: "relative", marginBottom: 14, display: "inline-block" }}>
+              <img src={draft.image_url} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 8 }} />
+              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+            </div>
+          ) : (
+            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8A8497", background: "transparent", border: "1px dashed #D4CFC7", borderRadius: 7, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
+              <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
+            </button>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", paddingTop: 48 }}>
+          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No entries match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No devotionals yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Write your first entry to get started.</p></>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map((entry, idx) => {
+            const isFirst = idx === 0 && !searchQuery.trim()
+            const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
+            const menuOpen = openMenuId === entry.id
+            return (
+              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isExpanded ? 19 : 15, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.25, margin: 0, marginBottom: entry.passage ? 3 : 0 }}>{entry.title}</h3>
+                      {entry.passage && <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 13, color: "#3E1540", lineHeight: 1.4, margin: 0 }}>{entry.passage}</p>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <div style={{ position: "relative" }}>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        {menuOpen && (
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "#F0EDE8" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          </div>
+                        )}
+                      </div>
+                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                    </div>
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div style={{ padding: "12px 20px 20px" }}>
+                    {entry.content && <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.85, whiteSpace: "pre-wrap", margin: 0, marginBottom: entry.image_url ? 14 : 0 }}>{entry.content}</p>}
+                    {entry.image_url && <img src={entry.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, objectFit: "cover", display: "block" }} />}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JournalPrayersTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+  const supabase = createClient()
+  const [entries, setEntries] = useState<Prayer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<Prayer | null>(null)
+  const [draft, setDraft] = useState({ title: "", content: "", status: "praying" as PrayerStatus })
+  const [saving, setSaving] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      if (data) setEntries(data)
+      setLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return entries
+    const q = searchQuery.toLowerCase()
+    return entries.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
+  }, [entries, searchQuery])
+
+  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "", status: "praying" }); setShowEditor(true); setOpenMenuId(null) }
+  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content, status: entry.status }); setShowEditor(true); setOpenMenuId(null) }
+
+  async function handleSave() {
+    if (!draft.title.trim()) return
+    setSaving(true)
+    if (editingEntry) {
+      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).select().single()
+      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e))
+    } else {
+      const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
+      if (!error && data) setEntries(prev => [data as Prayer, ...prev])
+    }
+    setSaving(false); setShowEditor(false); setEditingEntry(null)
+  }
+
+  async function handleDelete(id: string) { await supabase.from("prayers").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+
+  async function updateStatus(id: string, status: PrayerStatus) {
+    const { data, error } = await supabase.from("prayers").update({ status }).eq("id", id).select().single()
+    if (!error && data) setEntries(prev => prev.map(e => e.id === id ? (data as Prayer) : e))
+    setStatusMenuId(null)
+  }
+
+  function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
+
+  function StatusBadge({ status, entryId }: { status: PrayerStatus; entryId: string }) {
+    const cfg = STATUS_CONFIG[status]
+    const isOpen = statusMenuId === entryId
+    return (
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <button onClick={e => { e.stopPropagation(); setStatusMenuId(isOpen ? null : entryId); setOpenMenuId(null) }} style={{ padding: "2px 9px", borderRadius: 20, background: cfg.bg, color: cfg.text, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer", letterSpacing: "0.03em" }}>
+          {cfg.label}
+        </button>
+        {isOpen && (
+          <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, overflow: "hidden", minWidth: 130 }}>
+            {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => (
+              <button key={s} onClick={e => { e.stopPropagation(); updateStatus(entryId, s) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: s === status ? "#F8F5FF" : "transparent", border: "none", cursor: "pointer" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_CONFIG[s].text, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: "#13101A" }}>{STATUS_CONFIG[s].label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+        </div>
+        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+          <Plus size={14} />New prayer
+        </button>
+      </div>
+
+      {showEditor && (
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
+          <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 14, letterSpacing: "-0.02em" }} />
+          <textarea placeholder="Write your prayer here…" value={draft.content} onChange={e => setDraft(d => ({ ...d, content: e.target.value }))} rows={5} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+            <span style={{ fontSize: 12, color: "#8A8497" }}>Status</span>
+            {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
+              const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
+              return (
+                <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "#8A8497", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "none" : "1px solid #ECE8DE", cursor: "pointer" }}>{cfg.label}</button>
+              )
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", paddingTop: 48 }}>
+          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No prayers match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No prayers yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Record your first prayer request.</p></>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map((entry, idx) => {
+            const isFirst = idx === 0 && !searchQuery.trim()
+            const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
+            const menuOpen = openMenuId === entry.id
+            return (
+              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+                <div style={{ padding: isExpanded ? "18px 20px 0" : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
+                      <div onClick={e => e.stopPropagation()}><StatusBadge status={entry.status} entryId={entry.id} /></div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <div style={{ position: "relative" }}>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id); setStatusMenuId(null) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        {menuOpen && (
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "#F0EDE8" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          </div>
+                        )}
+                      </div>
+                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                    </div>
+                  </div>
+                </div>
+                {isExpanded && entry.content && (
+                  <div style={{ padding: "12px 20px 18px" }}>
+                    <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.85, whiteSpace: "pre-wrap", margin: 0 }}>{entry.content}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JournalVersesTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+  const supabase = createClient()
+  const [entries, setEntries] = useState<Verse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<Verse | null>(null)
+  const [draft, setDraft] = useState({ reference: "", verse_text: "", note: "" })
+  const [saving, setSaving] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase.from("verses").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      if (data) setEntries(data)
+      setLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return entries
+    const q = searchQuery.toLowerCase()
+    return entries.filter(e => e.reference.toLowerCase().includes(q) || e.verse_text.toLowerCase().includes(q) || e.note.toLowerCase().includes(q))
+  }, [entries, searchQuery])
+
+  function openNew() { setEditingEntry(null); setDraft({ reference: "", verse_text: "", note: "" }); setShowEditor(true); setOpenMenuId(null) }
+  function openEdit(entry: Verse) { setEditingEntry(entry); setDraft({ reference: entry.reference, verse_text: entry.verse_text, note: entry.note }); setShowEditor(true); setOpenMenuId(null) }
+
+  async function handleSave() {
+    if (!draft.reference.trim() || !draft.verse_text.trim()) return
+    setSaving(true)
+    if (editingEntry) {
+      const { data, error } = await supabase.from("verses").update({ reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).eq("id", editingEntry.id).select().single()
+      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Verse) : e))
+    } else {
+      const { data, error } = await supabase.from("verses").insert({ user_id: userId, ministry_id: ministryId, reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).select().single()
+      if (!error && data) setEntries(prev => [data as Verse, ...prev])
+    }
+    setSaving(false); setShowEditor(false); setEditingEntry(null)
+  }
+
+  async function handleDelete(id: string) { await supabase.from("verses").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+  function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
+  const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+        </div>
+        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+          <Plus size={14} />Add verse
+        </button>
+      </div>
+
+      {showEditor && (
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
+          <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#3E1540", marginBottom: 12, letterSpacing: "-0.01em" }} />
+          <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#13101A", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
+          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.reference.trim() || !draft.verse_text.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", paddingTop: 48 }}>
+          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No verses match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No verses saved yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Save a verse that has spoken to you.</p></>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map((entry, idx) => {
+            const isFirst = idx === 0 && !searchQuery.trim()
+            const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
+            const menuOpen = openMenuId === entry.id
+            const preview = entry.verse_text.length > 90 ? entry.verse_text.slice(0, 90) + "…" : entry.verse_text
+            return (
+              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isExpanded ? 18 : 15, fontWeight: 400, color: "#3E1540", letterSpacing: "-0.01em", margin: 0, marginBottom: !isExpanded ? 3 : 0 }}>{entry.reference}</p>
+                      {!isExpanded && <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 13, color: "#5A5466", lineHeight: 1.5, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</p>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <div style={{ position: "relative" }}>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        {menuOpen && (
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "#F0EDE8" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          </div>
+                        )}
+                      </div>
+                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                    </div>
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div style={{ padding: "14px 20px 20px" }}>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 16, color: "#13101A", lineHeight: 1.75, margin: 0, marginBottom: entry.note ? 16 : 0 }}>
+                      &ldquo;{entry.verse_text}&rdquo;
+                    </p>
+                    {entry.note && (
+                      <div style={{ paddingTop: 14, borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: "#F5F2EC" }}>
+                        <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 0 }}>Reflection</p>
+                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{entry.note}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JournalSection({ userId, ministryId }: { userId: string; ministryId: string }) {
+  const [journalTab, setJournalTab] = useState<'devotionals' | 'prayers' | 'verses'>('devotionals')
+  const tabs: { id: 'devotionals' | 'prayers' | 'verses'; label: string }[] = [
+    { id: 'devotionals', label: 'Devotionals' },
+    { id: 'prayers', label: 'Prayers' },
+    { id: 'verses', label: 'Verses' },
+  ]
+  return (
+    <div style={{ padding: "24px 28px 52px" }}>
+      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {journalTab === 'devotionals' && <JournalDevotionalsTab userId={userId} ministryId={ministryId} />}
+      {journalTab === 'prayers' && <JournalPrayersTab userId={userId} ministryId={ministryId} />}
+      {journalTab === 'verses' && <JournalVersesTab userId={userId} ministryId={ministryId} />}
+    </div>
+  )
+}
+
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
 function ProfileTab({
@@ -3724,12 +4242,16 @@ function ProfileTab({
   ministryName,
   onLogout,
   onAvatarChange,
+  activeSection,
+  onSectionChange,
 }: {
   userId: string
   initialProfile: Profile
   ministryName: string
   onLogout: () => void
   onAvatarChange?: (url: string) => void
+  activeSection: "spiritual-profile" | "journal"
+  onSectionChange: (s: "spiritual-profile" | "journal") => void
 }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile)
@@ -3843,24 +4365,26 @@ function ProfileTab({
 
       {/* Desktop Topbar */}
       <DesktopTopbar
-        crumbs={["Central", "Profile", "Spiritual profile"]}
+        crumbs={["Central", "Profile", activeSection === "journal" ? "Journal" : "Spiritual profile"]}
         right={
-          <div className="hidden md:flex items-center gap-2">
-            {editing ? (
-              <>
-                <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">
-                  <X className="w-3.5 h-3.5" />Cancel
+          activeSection === "spiritual-profile" ? (
+            <div className="hidden md:flex items-center gap-2">
+              {editing ? (
+                <>
+                  <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">
+                    <X className="w-3.5 h-3.5" />Cancel
+                  </button>
+                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                    <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
+                  </button>
+                </>
+              ) : (
+                <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors">
+                  <Edit3 className="w-3.5 h-3.5" />Edit profile
                 </button>
-                <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
-                  <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
-                </button>
-              </>
-            ) : (
-              <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors">
-                <Edit3 className="w-3.5 h-3.5" />Edit profile
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          ) : null
         }
       />
 
@@ -3874,8 +4398,15 @@ function ProfileTab({
         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
       </div>
 
-      {/* ── Desktop: taller hero ── */}
-      <div className="hidden md:block px-7 pt-7 pb-0">
+      {/* ── Desktop: journal section ── */}
+      {activeSection === "journal" && (
+        <div className="hidden md:block">
+          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
+        </div>
+      )}
+
+      {/* ── Desktop: taller hero (spiritual profile only) ── */}
+      <div className={`px-7 pt-7 pb-0 ${activeSection === "journal" ? "hidden" : "hidden md:block"}`}>
         <div
           className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
           style={{
@@ -3987,31 +4518,46 @@ function ProfileTab({
               </div>
             </div>
           </div>
-          <div className="px-5 py-3 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between">
-            <span className="text-[10px] text-[#8A8497] font-semibold tracking-[0.12em] uppercase">Spiritual profile</span>
-            <div className="flex items-center gap-2">
-              {editing ? (
-                <>
-                  <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors">
-                    <X className="w-3.5 h-3.5 text-[#5A5466]" />
-                  </button>
-                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
-                    <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
-                  </button>
-                </>
-              ) : (
-                <button onClick={startEdit} className="flex items-center gap-1.5 text-[#3E1540] text-[12px] font-semibold px-4 py-1.5 rounded-full border border-[#3E1540]/25 bg-[#3E1540]/5 hover:bg-[#3E1540]/10 transition-colors">
-                  <Edit3 className="w-3 h-3" />Edit
-                </button>
-              )}
+          <div className="px-4 py-2.5 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between gap-2">
+            <div className="flex gap-1">
+              <button
+                onClick={() => onSectionChange("spiritual-profile")}
+                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: activeSection === "spiritual-profile" ? "#3E1540" : "transparent", color: activeSection === "spiritual-profile" ? "#F6F4EF" : "#8A8497", border: "none", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
+              >
+                Spiritual profile
+              </button>
+              <button
+                onClick={() => onSectionChange("journal")}
+                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: activeSection === "journal" ? "#3E1540" : "transparent", color: activeSection === "journal" ? "#F6F4EF" : "#8A8497", border: "none", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
+              >
+                Journal
+              </button>
             </div>
+            {activeSection === "spiritual-profile" && (
+              <div className="flex items-center gap-2">
+                {editing ? (
+                  <>
+                    <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors">
+                      <X className="w-3.5 h-3.5 text-[#5A5466]" />
+                    </button>
+                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                      <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={startEdit} className="flex items-center gap-1.5 text-[#3E1540] text-[12px] font-semibold px-4 py-1.5 rounded-full border border-[#3E1540]/25 bg-[#3E1540]/5 hover:bg-[#3E1540]/10 transition-colors">
+                    <Edit3 className="w-3 h-3" />Edit
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── Field cards ── */}
-      {/* Desktop: 2x2 grid */}
-      <div className="hidden md:grid px-7 py-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      {/* Desktop: 2x2 grid — hidden when journal active */}
+      <div className={`px-7 py-6 gap-4 ${activeSection === "journal" ? "hidden" : "hidden md:grid"}`} style={{ gridTemplateColumns: "1fr 1fr" }}>
         {fields.map(({ key, label, placeholder }) => (
           <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
         ))}
@@ -4025,41 +4571,47 @@ function ProfileTab({
       </div>
 
       {/* Mobile: stacked sections */}
-      <div className="md:hidden px-5 pb-6">
-        <div className="mb-5">
-          <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
-          <div className="flex flex-col gap-3">
-            {fields.slice(0, 2).map(({ key, label, placeholder }) => (
-              <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
-                {editing ? (
-                  <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
-                ) : (
-                  <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
-                )}
-              </div>
-            ))}
-          </div>
+      {activeSection === "journal" ? (
+        <div className="md:hidden">
+          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
         </div>
-        <div className="mb-6">
-          <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Prayer</p>
-          <div className="flex flex-col gap-3">
-            {fields.slice(2).map(({ key, label, placeholder }) => (
-              <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
-                {editing ? (
-                  <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
-                ) : (
-                  <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
-                )}
-              </div>
-            ))}
+      ) : (
+        <div className="md:hidden px-5 pb-6">
+          <div className="mb-5">
+            <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
+            <div className="flex flex-col gap-3">
+              {fields.slice(0, 2).map(({ key, label, placeholder }) => (
+                <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
+                  {editing ? (
+                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                  ) : (
+                    <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
+          <div className="mb-6">
+            <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Prayer</p>
+            <div className="flex flex-col gap-3">
+              {fields.slice(2).map(({ key, label, placeholder }) => (
+                <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
+                  {editing ? (
+                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                  ) : (
+                    <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#ECE8DE] text-[#EF4444] text-[14px] font-medium hover:bg-red-50/60 transition-colors shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <LogOut className="w-4 h-4" />Sign out
+          </button>
         </div>
-        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#ECE8DE] text-[#EF4444] text-[14px] font-medium hover:bg-red-50/60 transition-colors shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-          <LogOut className="w-4 h-4" />Sign out
-        </button>
-      </div>
+      )}
     </div>
   )
 }
@@ -6701,6 +7253,191 @@ function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChang
   )
 }
 
+// ─── Command Palette ─────────────────────────────────────────────────────────
+
+type PaletteItemType = "nav" | "person" | "chat" | "announcement"
+
+interface PaletteItem {
+  type: PaletteItemType
+  id: string
+  label: string
+  sublabel?: string
+  tab?: Tab
+}
+
+const NAV_ITEMS: PaletteItem[] = [
+  { type: "nav", id: "home",          label: "Home",          tab: "home" },
+  { type: "nav", id: "announcements", label: "Announcements", tab: "announcements" },
+  { type: "nav", id: "chats",         label: "Chats",         tab: "chats" },
+  { type: "nav", id: "directory",     label: "Directory",     tab: "directory" },
+  { type: "nav", id: "plan",          label: "Plan",          tab: "plan" },
+  { type: "nav", id: "profile",       label: "Profile",       tab: "profile" },
+]
+
+interface CommandPaletteProps {
+  open: boolean
+  onClose: () => void
+  ministryId: string
+  onTabChange: (tab: Tab) => void
+  onOpenChat: (id: string, name: string) => void
+}
+
+function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenChat }: CommandPaletteProps) {
+  const supabase = createClient()
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PaletteItem[]>(NAV_ITEMS)
+  const [selectedIdx, setSelectedIdx] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setQuery("")
+      setResults(NAV_ITEMS)
+      setSelectedIdx(0)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!query.trim()) {
+      setResults(NAV_ITEMS)
+      setSelectedIdx(0)
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      const q = query.toLowerCase()
+      const [profilesRes, groupsRes, announcementsRes] = await Promise.all([
+        supabase.from("profiles").select("id, name, email, role").eq("ministry_id", ministryId).ilike("name", `%${q}%`).limit(5),
+        supabase.from("groups").select("id, name, type").eq("ministry_id", ministryId).eq("archived", false).ilike("name", `%${q}%`).limit(5),
+        supabase.from("announcements").select("id, title").eq("ministry_id", ministryId).ilike("title", `%${q}%`).limit(5),
+      ])
+      const items: PaletteItem[] = []
+      const navMatches = NAV_ITEMS.filter((n) => n.label.toLowerCase().includes(q))
+      items.push(...navMatches)
+      for (const p of (profilesRes.data ?? []) as { id: string; name: string; email: string; role: string }[]) {
+        items.push({ type: "person", id: p.id, label: p.name, sublabel: p.email })
+      }
+      for (const g of (groupsRes.data ?? []) as { id: string; name: string; type: string }[]) {
+        items.push({ type: "chat", id: g.id, label: g.name, sublabel: g.type === "church" ? "Church chat" : g.type === "dm" ? "Direct message" : "Group chat" })
+      }
+      for (const a of (announcementsRes.data ?? []) as { id: string; title: string }[]) {
+        items.push({ type: "announcement", id: a.id, label: a.title, sublabel: "Announcement" })
+      }
+      setResults(items)
+      setSelectedIdx(0)
+      setLoading(false)
+    }, 120)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, ministryId])
+
+  function selectItem(item: PaletteItem) {
+    onClose()
+    if (item.type === "nav" && item.tab) { onTabChange(item.tab); return }
+    if (item.type === "person") { onTabChange("directory"); return }
+    if (item.type === "chat") { onTabChange("chats"); onOpenChat(item.id, item.label); return }
+    if (item.type === "announcement") { onTabChange("announcements"); return }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, results.length - 1)) }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)) }
+    else if (e.key === "Enter" && results[selectedIdx]) { selectItem(results[selectedIdx]) }
+    else if (e.key === "Escape") { onClose() }
+  }
+
+  const grouped: { label: string; items: PaletteItem[] }[] = []
+  const navItems = results.filter((r) => r.type === "nav")
+  const peopleItems = results.filter((r) => r.type === "person")
+  const chatItems = results.filter((r) => r.type === "chat")
+  const annItems = results.filter((r) => r.type === "announcement")
+  if (navItems.length) grouped.push({ label: query ? "Navigation" : "Go to", items: navItems })
+  if (peopleItems.length) grouped.push({ label: "People", items: peopleItems })
+  if (chatItems.length) grouped.push({ label: "Chats", items: chatItems })
+  if (annItems.length) grouped.push({ label: "Announcements", items: annItems })
+
+  const typeIcon: Record<PaletteItemType, React.ReactNode> = {
+    nav: <List className="w-3.5 h-3.5" />,
+    person: <User className="w-3.5 h-3.5" />,
+    chat: <MessageCircle className="w-3.5 h-3.5" />,
+    announcement: <Bell className="w-3.5 h-3.5" />,
+  }
+
+  if (!open) return null
+
+  let flatIdx = 0
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh]"
+      style={{ background: "rgba(19,16,26,0.45)" }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        className="w-full max-w-[560px] mx-4 rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(19,16,26,0.22)]"
+        style={{ background: "#FBF8F2", border: "1px solid #ECE8DE" }}
+      >
+        {/* Search input */}
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#ECE8DE]">
+          <Search className="w-4 h-4 text-[#8A8497] flex-shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Jump to anything…"
+            className="flex-1 bg-transparent text-[14px] text-[#13101A] placeholder-[#C4C4C4] outline-none"
+          />
+          {loading && <div className="w-4 h-4 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin flex-shrink-0" />}
+          <kbd className="text-[10px] px-1.5 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] text-[#8A8497] leading-none flex-shrink-0">esc</kbd>
+        </div>
+
+        {/* Results */}
+        <div className="max-h-[360px] overflow-y-auto py-2">
+          {grouped.length === 0 && !loading && (
+            <div className="px-4 py-8 text-center text-[13px] text-[#8A8497]">No results for &ldquo;{query}&rdquo;</div>
+          )}
+          {grouped.map((group) => (
+            <div key={group.label}>
+              <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#C4C4C4]">{group.label}</div>
+              {group.items.map((item) => {
+                const idx = flatIdx++
+                const active = idx === selectedIdx
+                return (
+                  <button
+                    key={item.id}
+                    onMouseEnter={() => setSelectedIdx(idx)}
+                    onMouseDown={() => selectItem(item)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                    style={{ background: active ? "#EDE5F0" : "transparent" }}
+                  >
+                    <span style={{ color: active ? "#3E1540" : "#8A8497" }}>{typeIcon[item.type]}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-medium text-[#13101A] truncate">{item.label}</span>
+                      {item.sublabel && <span className="block text-[11px] text-[#8A8497] truncate">{item.sublabel}</span>}
+                    </span>
+                    {active && <ChevronRight className="w-3.5 h-3.5 text-[#3E1540] flex-shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center gap-3 px-4 py-2.5 border-t border-[#ECE8DE] text-[10px] text-[#C4C4C4]">
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↑</kbd><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↓</kbd> navigate</span>
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↵</kbd> select</span>
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Desktop Topbar ──────────────────────────────────────────────────────────
 
 interface DesktopTopbarProps {
@@ -6720,7 +7457,10 @@ function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
         ))}
       </div>
       <div className="flex-1" />
-      <div className="flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] w-[240px] cursor-default">
+      <div
+        onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+        className="flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] w-[240px] cursor-pointer hover:bg-[#ECE8DE] transition-colors select-none"
+      >
         <Search className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-[12px] flex-1">Jump to anything</span>
         <span className="text-[10px] px-1.5 py-0.5 border border-[#E5E0D2] rounded bg-[#FBF8F2] leading-none">⌘K</span>
@@ -6749,9 +7489,11 @@ interface DesktopSidebarProps {
   onCreateTeam?: () => void
   activeTeamId: string | null
   onActiveTeamChange: (id: string) => void
+  profileSection: "spiritual-profile" | "journal"
+  onProfileSectionChange: (s: "spiritual-profile" | "journal") => void
 }
 
-function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange }: DesktopSidebarProps) {
+function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange }: DesktopSidebarProps) {
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
@@ -6905,15 +7647,20 @@ function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, sho
     }
 
     if (activeTab === "profile") {
-      const items: { label: string; on?: boolean; danger?: boolean; onClick?: () => void }[] = [
-        { label: "Spiritual profile", on: true },
+      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
+        { label: "Spiritual profile", section: "spiritual-profile" },
+        { label: "Journal", section: "journal" },
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Profile</p>
           {items.map((s, i) => (
-            <button key={i} style={subItemStyle(s.on, s.danger)} onClick={s.onClick}>
+            <button
+              key={i}
+              style={subItemStyle(s.section ? profileSection === s.section : undefined, s.danger)}
+              onClick={s.section ? () => onProfileSectionChange(s.section!) : s.onClick}
+            >
               <span style={{ flex: 1 }}>{s.label}</span>
             </button>
           ))}
@@ -7058,6 +7805,21 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [isDesktop, setIsDesktop] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
+  const [profileSection, setProfileSection] = useState<"spiritual-profile" | "journal">("spiritual-profile")
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPaletteOpen(true) }
+    }
+    function handleOpenEvent() { setPaletteOpen(true) }
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("open-command-palette", handleOpenEvent)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("open-command-palette", handleOpenEvent)
+    }
+  }, [])
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)")
@@ -7316,6 +8078,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
         activeTeamId={activeTeamId}
         onActiveTeamChange={setActiveTeamId}
+        profileSection={profileSection}
+        onProfileSectionChange={setProfileSection}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -7432,6 +8196,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 ministryName={ministryName}
                 onLogout={handleLogout}
                 onAvatarChange={(url) => setAvatarUrl(url)}
+                activeSection={profileSection}
+                onSectionChange={setProfileSection}
               />
             </div>
           )}
@@ -7459,6 +8225,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           onRead={recountTotalUnread}
         />
       )}
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        ministryId={ministryId}
+        onTabChange={(tab) => { setPaletteOpen(false); handleSidebarTabChange(tab) }}
+        onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
+      />
     </div>
   )
 }
