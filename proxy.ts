@@ -31,12 +31,17 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  const isPublicPage =
+    pathname === '/' ||
+    pathname.startsWith('/landing') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/join')
   const isHomePage = pathname.startsWith('/home')
 
   // Unauthenticated user trying to access a protected page
-  if (!user && !isAuthPage) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!user && !isPublicPage) {
+    return NextResponse.redirect(new URL('/landing', request.url))
   }
 
   // Authenticated user on /login → send home (no reason to see the login form)
