@@ -41,7 +41,7 @@ export default function LandingPage() {
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <section
         style={{
-          minHeight: "100svh",
+          minHeight: "88svh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -88,7 +88,7 @@ export default function LandingPage() {
             Register my ministry
           </Link>
           <Link
-            href="/join"
+            href="/join?mode=join"
             style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "13px 28px", background: "transparent", color: "#13101A", border: "1.5px solid #D4CFC7", borderRadius: 12, fontSize: 15, fontWeight: 500, textDecoration: "none", letterSpacing: "-0.01em", whiteSpace: "nowrap" }}
           >
             Join a ministry
