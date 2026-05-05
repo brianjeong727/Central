@@ -118,7 +118,7 @@ export default function LandingPage() {
           Built for how ministries actually work
         </h2>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
           {features.map((f) => (
             <div
               key={f.title}
