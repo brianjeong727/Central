@@ -536,7 +536,7 @@ export function ProfileTab({
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState({
     about_me: initialProfile.about_me ?? "",
     bible_verse: initialProfile.bible_verse ?? "",
@@ -580,12 +580,21 @@ export function ProfileTab({
     const file = e.target.files?.[0]
     if (!file) return
     setUploadingAvatar(true)
-    const ext = file.name.split(".").pop()
+    setAvatarError(null)
+    // Derive extension; default to png for extensionless files (e.g. iOS share)
+    const raw = file.name.split(".").pop()?.toLowerCase()
+    const ext = raw && raw !== file.name.toLowerCase() ? raw : "png"
     const fileName = `${userId}.${ext}`
     const { data: uploadData, error } = await supabase.storage
       .from("profile-images")
-      .upload(fileName, file, { upsert: true })
-    if (!error && uploadData) {
+      .upload(fileName, file, { upsert: true, contentType: file.type || "image/png" })
+    if (error) {
+      setAvatarError(error.message)
+      setUploadingAvatar(false)
+      e.target.value = ""
+      return
+    }
+    if (uploadData) {
       const { data: { publicUrl } } = supabase.storage
         .from("profile-images")
         .getPublicUrl(uploadData.path)
@@ -594,7 +603,7 @@ export function ProfileTab({
       onAvatarChange?.(publicUrl)
     }
     setUploadingAvatar(false)
-    if (avatarInputRef.current) avatarInputRef.current.value = ""
+    e.target.value = ""
   }
 
   const fields = [
@@ -638,8 +647,6 @@ export function ProfileTab({
 
   return (
     <div className="pb-6 md:pb-0">
-      {/* Single hidden file input for avatar upload */}
-      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
       {/* Desktop Topbar */}
       <DesktopTopbar
@@ -697,14 +704,19 @@ export function ProfileTab({
           <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
           <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
 
-          {/* Avatar */}
-          <button
-            onClick={() => avatarInputRef.current?.click()}
-            disabled={uploadingAvatar}
+          {/* Avatar — label wraps input for reliable iOS file picker */}
+          <label
             className="relative group flex-shrink-0"
-            style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden" }}
+            style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }}
             aria-label="Change profile photo"
           >
+            <input
+              type="file"
+              accept="image/*"
+              style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
+              onChange={handleAvatarUpload}
+              disabled={uploadingAvatar}
+            />
             {profile.avatar_url ? (
               <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
             ) : (
@@ -718,10 +730,13 @@ export function ProfileTab({
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-          </button>
+          </label>
 
           {/* Name + details */}
           <div className="relative">
+            {avatarError && (
+              <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6, maxWidth: 220 }}>{avatarError}</p>
+            )}
             <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>
               {profile.name}
             </h1>
@@ -764,12 +779,18 @@ export function ProfileTab({
           <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
             <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.20)_0%,transparent_65%)]" />
             <div className="relative z-10 flex flex-col items-center gap-4">
-              <button
-                onClick={() => avatarInputRef.current?.click()}
-                disabled={uploadingAvatar}
+              <label
                 className="relative w-24 h-24 rounded-full overflow-hidden bg-[#5A2060] border-[3px] border-white/20 group flex-shrink-0"
+                style={{ cursor: uploadingAvatar ? "not-allowed" : "pointer", display: "block" }}
                 aria-label="Change profile photo"
               >
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
@@ -785,8 +806,11 @@ export function ProfileTab({
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
-              </button>
+              </label>
               <div className="text-center">
+                {avatarError && (
+                  <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6 }}>{avatarError}</p>
+                )}
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
                 <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
                   <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
