@@ -384,6 +384,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
               {globalOpenChat ? (
                 <div className="hidden md:flex md:flex-1 md:overflow-hidden">
                   <ChatScreen
+                    key={globalOpenChat.id}
                     groupId={globalOpenChat.id}
                     groupName={globalOpenChat.name}
                     userId={userId}

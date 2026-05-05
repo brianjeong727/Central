@@ -21,7 +21,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
     async function load() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me")
+        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
         .eq("ministry_id", ministryId)
         .order("name")
       setMembers(data ?? [])
@@ -116,6 +116,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
               >
                 <div className="flex items-center gap-3.5">
                   <Avatar className="w-11 h-11 bg-[#3E1540]">
+                    {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                     <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">{getInitials(member.name)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -160,9 +161,11 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
                       width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                       background: i % 2 === 0 ? "#3E1540" : "#13101A",
                       color: "#F6F4EF", display: "grid", placeItems: "center",
-                      fontSize: "11px", fontWeight: 600,
+                      fontSize: "11px", fontWeight: 600, overflow: "hidden",
                     }}>
-                      {getInitials(member.name)}
+                      {member.avatar_url
+                        ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : getInitials(member.name)}
                     </div>
                     <div>
                       <div style={{ fontSize: "13px", fontWeight: 500 }}>
@@ -290,6 +293,7 @@ export function MemberSheet({
             <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
           </button>
           <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(member.name)}`}>
+            {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
             <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
               {getInitials(member.name)}
             </AvatarFallback>
@@ -304,6 +308,7 @@ export function MemberSheet({
           {/* Avatar hero + name + meta */}
           <div className="flex flex-col items-center mb-7">
             <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4 shadow-lg shadow-[#3E1540]/20`}>
+              {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
               <AvatarFallback className="text-white font-bold text-2xl bg-transparent">
                 {getInitials(member.name)}
               </AvatarFallback>

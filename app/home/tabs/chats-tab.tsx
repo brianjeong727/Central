@@ -14,7 +14,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   const supabase = createClient()
   const [chatName, setChatName] = useState("")
   const [search, setSearch] = useState("")
-  const [allMembers, setAllMembers] = useState<{ id: string; name: string; graduation_year: number | null; role: string }[]>([])
+  const [allMembers, setAllMembers] = useState<{ id: string; name: string; graduation_year: number | null; role: string; avatar_url: string | null }[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +23,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
     async function loadMembers() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, name, graduation_year, role")
+        .select("id, name, graduation_year, role, avatar_url")
         .eq("ministry_id", ministryId)
         .neq("id", userId)
         .order("name")
@@ -163,7 +163,8 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                           : "border-[#EFEFEF] bg-white hover:border-[#3E1540]/30"
                       }`}
                     >
-                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm`}>
+                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm overflow-hidden`}>
+                        {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                         <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">
                           {getInitials(member.name)}
                         </AvatarFallback>
@@ -235,13 +236,13 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
     setLoading(true)
     const { data } = await supabase
       .from("group_members")
-      .select("user_id, profiles!user_id(name, role, graduation_year)")
+      .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
       .eq("group_id", groupId)
 
     if (data) {
       const mapped: GroupMember[] = data.map((m: {
         user_id: string
-        profiles: { name: string; role: string; graduation_year: number | null } | { name: string; role: string; graduation_year: number | null }[] | null
+        profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
       }) => {
         const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
         return {
@@ -249,6 +250,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
           name: p?.name ?? "Unknown",
           role: p?.role ?? "",
           graduation_year: p?.graduation_year ?? null,
+          avatar_url: p?.avatar_url ?? null,
         }
       })
       setMembers(mapped)
@@ -260,7 +262,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
     const memberIds = new Set(members.map((m) => m.user_id))
     const { data } = await supabase
       .from("profiles")
-      .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me")
+      .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
       .order("name")
     setAllProfiles((data ?? []).filter((p: Profile) => !memberIds.has(p.id)))
   }
@@ -360,7 +362,8 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                         : "bg-white border-[#EFEFEF]"
                     }`}
                   >
-                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(profile.name)}`}>
+                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(profile.name)} overflow-hidden`}>
+                      {profile.avatar_url && <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover rounded-full" />}
                       <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
                         {getInitials(profile.name)}
                       </AvatarFallback>
@@ -454,7 +457,8 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                   key={member.user_id}
                   className="bg-white rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
                 >
-                  <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)}`}>
+                  <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
+                    {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                     <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
                       {getInitials(member.name)}
                     </AvatarFallback>
@@ -601,11 +605,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
+  const avatarCache = useRef<Record<string, string | null>>({})
   const messagesRef = useRef<Message[]>([])
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
-  const [memberReadMap, setMemberReadMap] = useState<Record<string, { name: string; lastReadAt: string | null }>>({})
+  const [memberReadMap, setMemberReadMap] = useState<Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }>>({})
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -668,15 +673,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
     async function loadMemberReadStates() {
       const { data } = await supabase
         .from("group_members")
-        .select("user_id, last_read_at, profiles!user_id(name)")
+        .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
         .eq("group_id", groupId)
         .neq("user_id", userId)
 
       if (data) {
-        const map: Record<string, { name: string; lastReadAt: string | null }> = {}
+        const map: Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }> = {}
         for (const m of data) {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          map[m.user_id] = { name: (p as { name: string } | null)?.name ?? "?", lastReadAt: m.last_read_at }
+          const prof = p as { name: string; avatar_url: string | null } | null
+          map[m.user_id] = { name: prof?.name ?? "?", lastReadAt: m.last_read_at, avatarUrl: prof?.avatar_url ?? null }
         }
         setMemberReadMap(map)
       }
@@ -727,7 +733,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, profiles!sender_id(name), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -737,7 +743,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
         const enriched: Message[] = data.map((m: any) => {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
           const name = p?.name ?? "Unknown"
+          const avatarUrl = p?.avatar_url ?? null
           profilesCache.current[m.sender_id] = name
+          avatarCache.current[m.sender_id] = avatarUrl
 
           const replyRaw = m.reply_to ?? null
           const replyProfile = replyRaw?.profiles
@@ -747,6 +755,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
           return {
             id: m.id, group_id: m.group_id, sender_id: m.sender_id,
             content: m.content, created_at: m.created_at, sender_name: name,
+            sender_avatar_url: avatarUrl,
             reply_to_id: m.reply_to_id ?? null,
             reply_to_content: replyRaw?.content ?? null,
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
@@ -829,6 +838,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
           setMessages((prev) => [...prev, {
             ...raw,
             sender_name: senderName,
+            sender_avatar_url: avatarCache.current[raw.sender_id] ?? null,
             reply_to_id: raw.reply_to_id ?? null,
             reply_to_content: replyToContent,
             reply_to_sender: replyToSender,
@@ -956,10 +966,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
 
   // For each own message: which other members have it as their most-recently-read own message
   const readReceiptMap = useMemo(() => {
-    const map: Record<string, string[]> = {}
+    const map: Record<string, { name: string; avatarUrl: string | null }[]> = {}
     const ownMsgs = messages.filter((m) => m.sender_id === userId)
     if (ownMsgs.length === 0) return map
-    for (const { name, lastReadAt } of Object.values(memberReadMap)) {
+    for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
       if (!lastReadAt) continue
       let target: Message | null = null
       for (const m of ownMsgs) {
@@ -968,7 +978,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
       }
       if (target) {
         if (!map[target.id]) map[target.id] = []
-        map[target.id].push(name)
+        map[target.id].push({ name, avatarUrl })
       }
     }
     return map
@@ -1164,10 +1174,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                       <div className="flex-shrink-0 w-7">
                         {isLastInGroup ? (
                           <div
-                            className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(msg.sender_name)}`}
+                            className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name)}`}
                             style={{ borderRadius: "10px" }}
                           >
-                            {msg.sender_name.charAt(0).toUpperCase()}
+                            {msg.sender_avatar_url
+                              ? <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-full h-full object-cover" />
+                              : msg.sender_name.charAt(0).toUpperCase()
+                            }
                           </div>
                         ) : (
                           <div className="w-7 h-7" />
@@ -1271,12 +1284,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                     <div className={`flex items-center gap-1.5 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
                       {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
                         <div className="flex items-center">
-                          {[userName, ...readReceiptMap[msg.id]].map((name, idx) => (
+                          {readReceiptMap[msg.id].map(({ name, avatarUrl }, idx) => (
                             <Avatar
                               key={`${name}-${idx}`}
-                              title={idx === 0 ? "You" : `Read by ${name}`}
-                              className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
+                              title={`Read by ${name}`}
+                              className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] overflow-hidden ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
                             >
+                              {avatarUrl && <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />}
                               <AvatarFallback
                                 className="text-white bg-transparent"
                                 style={{ fontSize: "6px", fontWeight: 700 }}

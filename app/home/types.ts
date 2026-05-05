@@ -83,6 +83,7 @@ export interface GroupMember {
   name: string
   role: string
   graduation_year: number | null
+  avatar_url?: string | null
 }
 
 export interface Message {
@@ -92,6 +93,7 @@ export interface Message {
   content: string
   created_at: string
   sender_name: string
+  sender_avatar_url?: string | null
   reply_to_id: string | null
   reply_to_content: string | null
   reply_to_sender: string | null
@@ -204,6 +206,7 @@ export interface DirectoryMember {
   bible_verse: string | null
   prayer_request: string | null
   pray_for_me: string | null
+  avatar_url: string | null
 }
 
 export interface UserTeam {
