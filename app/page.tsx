@@ -1,12 +1,28 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
+import LandingPage from "@/components/landing-page"
+
+export const metadata: Metadata = {
+  title: "Central — College Ministry Communication Platform",
+  description:
+    "The all-in-one communication and planning app built for college ministries. Chat, announcements, member directory, and team planning tools.",
+  keywords: [
+    "college ministry",
+    "campus ministry",
+    "church communication app",
+    "student ministry platform",
+    "ministry planning",
+    "church chat",
+    "ministry directory",
+  ],
+}
 
 export default async function RootPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Unauthenticated → landing page for new visitors
-  // Authenticated → home (proxy handles /join redirect if no ministry_id)
-  if (!user) redirect("/landing")
-  redirect("/home")
+  if (user) redirect("/home")
+
+  return <LandingPage />
 }
