@@ -5688,6 +5688,10 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
   const isStudentOrgBoard = activeTeamName === "Student Org Board"
   const studentOrgUserTeam = isStudentOrgBoard ? userTeams.find(t => t.teamId === activeTeamId) : null
   const studentOrgRole = studentOrgUserTeam?.roleName ?? ""
+
+  const isPraiseTeam = activeTeamName === "Praise Team"
+  const praiseTeamPerms = isPraiseTeam ? (userTeams.find(t => t.teamId === activeTeamId)?.permissions ?? []) : []
+  const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
   const studentOrgTabs: string[] = (() => {
     if (!isStudentOrgBoard) return []
     if (isAdmin || studentOrgRole === "President") return ["General", "President", "Treasurer", "Secretary", "Event Coordinator"]
@@ -5783,6 +5787,16 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
         )}
         <div className="px-14 py-7">
           {(() => {
+            if (isPraiseTeam && activeTeamId) {
+              return (
+                <PraiseTeamTab
+                  teamId={activeTeamId}
+                  ministryId={ministryId}
+                  userId={userId}
+                  canManage={canManageWorship}
+                />
+              )
+            }
             if (isStudentOrgBoard) {
               const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
               const perms = activeUserTeam?.permissions ?? []
@@ -5833,6 +5847,16 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
 
       {/* Mobile content */}
       <div className="md:hidden px-5 pb-4">
+        {/* Praise Team — replaces default mobile content */}
+        {isPraiseTeam && activeTeamId ? (
+          <PraiseTeamTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            canManage={canManageWorship}
+          />
+        ) : (
+        <>
         {/* Student Org Board tabs — mobile */}
         {isStudentOrgBoard && studentOrgTabs.length > 0 && (
           <div className="mb-6">
@@ -5944,6 +5968,8 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
             subtitle="Ask a leader to add you."
           />
         )}
+        </>
+        )}
       </div>
 
       {showCreateTeam && (
@@ -5964,6 +5990,501 @@ function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmi
           onClose={() => setOpenTeam(null)}
           onChanged={() => { setOpenTeam(null); onTeamsChange() }}
         />
+      )}
+    </div>
+  )
+}
+
+// ── PraiseTeamTab ─────────────────────────────────────────────────────────────
+
+const WORSHIP_ROLE_OPTIONS = ["Vocals", "Keys", "Guitar", "Bass", "Drums", "Other"]
+
+interface WorshipWeek {
+  id: string
+  week_date: string
+  leader_id: string | null
+  leader_name: string | null
+  status: "draft" | "filled" | "confirmed"
+  roles: WorshipRoleRow[]
+}
+
+interface WorshipRoleRow {
+  id: string
+  user_id: string
+  user_name: string
+  role_name: string
+}
+
+interface PraiseTeamMember {
+  user_id: string
+  name: string
+}
+
+function worshipWeekDateLabel(dateStr: string) {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric",
+  })
+}
+
+function WorshipStatusBadge({ status, onChange }: { status: "draft" | "filled" | "confirmed"; onChange?: (s: string) => void }) {
+  const cfg = {
+    draft:     { label: "Draft",     bg: "#F3F0F7", color: "#5A5466" },
+    filled:    { label: "Filled",    bg: "#FFF7E6", color: "#C9A34B" },
+    confirmed: { label: "Confirmed", bg: "#EDFAF3", color: "#2D7A4F" },
+  }[status]
+  if (onChange) {
+    return (
+      <select
+        value={status}
+        onChange={e => onChange(e.target.value)}
+        style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase" as const, border: "none", outline: "none", cursor: "pointer", borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color, appearance: "none" as const }}
+      >
+        <option value="draft">Draft</option>
+        <option value="filled">Filled</option>
+        <option value="confirmed">Confirmed</option>
+      </select>
+    )
+  }
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase" as const, borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+  )
+}
+
+function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
+  const supabase = createClient()
+  const [subTab, setSubTab] = useState<"schedule" | "availability">("schedule")
+
+  // Schedule state
+  const [weeks, setWeeks] = useState<WorshipWeek[]>([])
+  const [scheduleLoading, setScheduleLoading] = useState(true)
+  const [teamMembers, setTeamMembers] = useState<PraiseTeamMember[]>([])
+
+  // Add week form
+  const [showAddWeek, setShowAddWeek] = useState(false)
+  const [newDate, setNewDate] = useState("")
+  const [newLeaderId, setNewLeaderId] = useState("")
+  const [addingWeek, setAddingWeek] = useState(false)
+
+  // Add member to week form
+  const [addMemberToWeekId, setAddMemberToWeekId] = useState<string | null>(null)
+  const [addMemberUserId, setAddMemberUserId] = useState("")
+  const [addMemberRole, setAddMemberRole] = useState("Vocals")
+  const [addMemberSearch, setAddMemberSearch] = useState("")
+  const [addingMember, setAddingMember] = useState(false)
+
+  // Availability state
+  const [availLoading, setAvailLoading] = useState(false)
+  const [myAvailability, setMyAvailability] = useState<Record<string, boolean>>({})
+  const [allAvailability, setAllAvailability] = useState<Record<string, Record<string, boolean>>>({})
+  const [savingAvail, setSavingAvail] = useState<string | null>(null)
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A8497" }
+  const subTabStyle = (active: boolean): React.CSSProperties => ({
+    padding: "12px 16px", fontSize: 14, fontFamily: "var(--font-inter)", fontWeight: active ? 600 : 400,
+    color: active ? "#3E1540" : "#8A8497", boxShadow: active ? "inset 0 -2px 0 0 #3E1540" : "none",
+    background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, outline: "none",
+  })
+
+  async function loadSchedule() {
+    setScheduleLoading(true)
+    const { data: weeksData } = await supabase
+      .from("worship_weeks")
+      .select("id, week_date, leader_id, status, profiles!leader_id(name)")
+      .eq("team_id", teamId)
+      .gte("week_date", monthStart)
+      .lte("week_date", monthEnd)
+      .order("week_date")
+
+    if (!weeksData) { setScheduleLoading(false); return }
+
+    const weekIds = weeksData.map(w => w.id)
+    const { data: rolesData } = weekIds.length > 0
+      ? await supabase.from("worship_roles").select("id, week_id, user_id, role_name, profiles!user_id(name)").in("week_id", weekIds)
+      : { data: [] as { id: string; week_id: string; user_id: string; role_name: string; profiles: { name: string } | { name: string }[] | null }[] }
+
+    const rolesByWeek: Record<string, WorshipRoleRow[]> = {}
+    for (const r of rolesData ?? []) {
+      const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+      if (!rolesByWeek[r.week_id]) rolesByWeek[r.week_id] = []
+      rolesByWeek[r.week_id].push({ id: r.id, user_id: r.user_id, user_name: p?.name ?? "Unknown", role_name: r.role_name })
+    }
+
+    setWeeks(weeksData.map(w => {
+      const raw = w as unknown as { id: string; week_date: string; leader_id: string | null; status: string; profiles: { name: string } | { name: string }[] | null }
+      const p = Array.isArray(raw.profiles) ? raw.profiles[0] : raw.profiles
+      return { id: raw.id, week_date: raw.week_date, leader_id: raw.leader_id, leader_name: p?.name ?? null, status: raw.status as WorshipWeek["status"], roles: rolesByWeek[raw.id] ?? [] }
+    }))
+    setScheduleLoading(false)
+  }
+
+  async function loadTeamMembers() {
+    const { data } = await supabase
+      .from("team_members")
+      .select("user_id, profiles!user_id(name)")
+      .eq("team_id", teamId)
+    type Raw = { user_id: string; profiles: { name: string } | { name: string }[] | null }
+    setTeamMembers((data ?? []).map((m: Raw) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+      return { user_id: m.user_id, name: p?.name ?? "Unknown" }
+    }))
+  }
+
+  async function loadAvailability() {
+    setAvailLoading(true)
+    if (canManage) {
+      const { data } = await supabase
+        .from("worship_availability")
+        .select("user_id, week_date, is_available")
+        .eq("team_id", teamId)
+        .gte("week_date", monthStart)
+        .lte("week_date", monthEnd)
+      const mine: Record<string, boolean> = {}
+      const all: Record<string, Record<string, boolean>> = {}
+      for (const row of data ?? []) {
+        if (row.user_id === userId) mine[row.week_date] = row.is_available
+        if (!all[row.user_id]) all[row.user_id] = {}
+        all[row.user_id][row.week_date] = row.is_available
+      }
+      setMyAvailability(mine)
+      setAllAvailability(all)
+    } else {
+      const { data } = await supabase
+        .from("worship_availability")
+        .select("week_date, is_available")
+        .eq("team_id", teamId)
+        .eq("user_id", userId)
+        .gte("week_date", monthStart)
+        .lte("week_date", monthEnd)
+      const mine: Record<string, boolean> = {}
+      for (const row of data ?? []) mine[row.week_date] = row.is_available
+      setMyAvailability(mine)
+    }
+    setAvailLoading(false)
+  }
+
+  useEffect(() => {
+    loadSchedule()
+    loadTeamMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId])
+
+  useEffect(() => {
+    if (subTab === "availability") loadAvailability()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTab, teamId])
+
+  async function handleAddWeek() {
+    if (!newDate) return
+    setAddingWeek(true)
+    const { error } = await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newDate, leader_id: newLeaderId || null, status: "draft" })
+    if (!error) { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); await loadSchedule() }
+    setAddingWeek(false)
+  }
+
+  async function handleAddMember(weekId: string) {
+    if (!addMemberUserId) return
+    setAddingMember(true)
+    const { error } = await supabase.from("worship_roles").insert({ week_id: weekId, user_id: addMemberUserId, role_name: addMemberRole })
+    if (!error) { setAddMemberToWeekId(null); setAddMemberUserId(""); setAddMemberRole("Vocals"); setAddMemberSearch(""); await loadSchedule() }
+    setAddingMember(false)
+  }
+
+  async function handleRemoveMember(roleId: string) {
+    await supabase.from("worship_roles").delete().eq("id", roleId)
+    setWeeks(prev => prev.map(w => ({ ...w, roles: w.roles.filter(r => r.id !== roleId) })))
+  }
+
+  async function handleLeaderChange(weekId: string, leaderId: string) {
+    await supabase.from("worship_weeks").update({ leader_id: leaderId || null }).eq("id", weekId)
+    const member = teamMembers.find(m => m.user_id === leaderId)
+    setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, leader_id: leaderId || null, leader_name: member?.name ?? null } : w))
+  }
+
+  async function handleStatusChange(weekId: string, status: string) {
+    await supabase.from("worship_weeks").update({ status }).eq("id", weekId)
+    setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, status: status as WorshipWeek["status"] } : w))
+  }
+
+  async function handleToggleAvailability(weekDate: string) {
+    const current = myAvailability[weekDate]
+    const next = current === undefined ? true : !current
+    setSavingAvail(weekDate)
+    const { error } = await supabase.from("worship_availability")
+      .upsert({ team_id: teamId, user_id: userId, week_date: weekDate, is_available: next }, { onConflict: "team_id,user_id,week_date" })
+    if (!error) {
+      setMyAvailability(prev => ({ ...prev, [weekDate]: next }))
+      if (canManage) setAllAvailability(prev => ({ ...prev, [userId]: { ...(prev[userId] ?? {}), [weekDate]: next } }))
+    }
+    setSavingAvail(null)
+  }
+
+  const visibleWeeks = canManage ? weeks : weeks.filter(w => w.roles.some(r => r.user_id === userId))
+  const weekDates = weeks.map(w => w.week_date)
+  const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+
+  return (
+    <div>
+      {/* Sub-tabs */}
+      <div style={{ borderBottom: "1px solid #ECE8DE", marginBottom: 24, display: "flex" }}>
+        <button style={subTabStyle(subTab === "schedule")} onClick={() => setSubTab("schedule")}>Schedule</button>
+        <button style={subTabStyle(subTab === "availability")} onClick={() => setSubTab("availability")}>Availability</button>
+      </div>
+
+      {/* ── Schedule ── */}
+      {subTab === "schedule" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <p style={{ ...monoStyle, fontSize: 11 }}>{monthLabel}</p>
+            {canManage && !showAddWeek && (
+              <button
+                onClick={() => setShowAddWeek(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add week
+              </button>
+            )}
+          </div>
+
+          {/* Add week inline form */}
+          {showAddWeek && (
+            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: 20, marginBottom: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New worship week</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
+                  <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Leader <span style={{ color: "#8A8497", fontWeight: 400 }}>(optional)</span></label>
+                  <select value={newLeaderId} onChange={e => setNewLeaderId(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}>
+                    <option value="">Unassigned</option>
+                    {teamMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={handleAddWeek} disabled={!newDate || addingWeek}
+                    style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
+                    {addingWeek ? "Adding…" : "Add"}
+                  </button>
+                  <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId("") }}
+                    style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Weeks list */}
+          {scheduleLoading ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+          ) : visibleWeeks.length === 0 ? (
+            <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
+              <p style={{ fontSize: 13, color: "#8A8497" }}>{canManage ? "Add one to get started." : "Check back later or set your availability."}</p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {visibleWeeks.map(week => {
+                const isThisWeekAddTarget = addMemberToWeekId === week.id
+                const isLeader = week.leader_id === userId
+                const canChangeStatus = canManage || isLeader
+                const alreadyAssigned = new Set(week.roles.map(r => r.user_id))
+                const filteredMembers = teamMembers.filter(m =>
+                  !alreadyAssigned.has(m.user_id) && m.name.toLowerCase().includes(addMemberSearch.toLowerCase())
+                )
+                return (
+                  <div key={week.id} style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+                    {/* Card header */}
+                    <div style={{ padding: "16px 18px", borderBottom: "1px solid #ECE8DE" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
+                          {worshipWeekDateLabel(week.week_date)}
+                        </p>
+                        <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
+                      </div>
+                      {/* Leader row */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={monoStyle}>Leader</span>
+                        {canManage ? (
+                          <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
+                            style={{ flex: 1, fontSize: 13, color: "#13101A", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
+                            <option value="">Unassigned</option>
+                            {teamMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: 13, color: "#13101A" }}>{week.leader_name ?? "Unassigned"}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Roster */}
+                    <div style={{ padding: "12px 18px" }}>
+                      {week.roles.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "#8A8497", paddingBottom: 4 }}>No members assigned yet.</p>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 2 }}>
+                          {week.roles.map(role => (
+                            <div key={role.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ ...monoStyle, minWidth: 52 }}>{role.role_name}</span>
+                                <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
+                              </div>
+                              {canManage && (
+                                <button onClick={() => handleRemoveMember(role.id)}
+                                  style={{ padding: "1px 6px", fontSize: 12, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1 }}>
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {canManage && !isThisWeekAddTarget && (
+                        <button onClick={() => { setAddMemberToWeekId(week.id); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberRole("Vocals") }}
+                          style={{ marginTop: 10, fontSize: 13, color: "#3E1540", fontWeight: 500, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                          + Add member
+                        </button>
+                      )}
+
+                      {/* Inline add-member form */}
+                      {isThisWeekAddTarget && (
+                        <div style={{ marginTop: 12, padding: 14, background: "#FBF8F2", borderRadius: 10, border: "1px solid #ECE8DE" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ position: "relative" }}>
+                              <input type="text" placeholder="Search member…" value={addMemberSearch}
+                                onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
+                                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                              {addMemberSearch && filteredMembers.length > 0 && (
+                                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #ECE8DE", borderRadius: 8, background: "white", maxHeight: 140, overflowY: "auto", zIndex: 10 }}>
+                                  {filteredMembers.map(m => (
+                                    <button key={m.user_id}
+                                      onClick={() => { setAddMemberUserId(m.user_id); setAddMemberSearch(m.name) }}
+                                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                      {m.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <select value={addMemberRole} onChange={e => setAddMemberRole(e.target.value)}
+                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
+                              {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
+                                style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
+                                {addingMember ? "Adding…" : "Add"}
+                              </button>
+                              <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId("") }}
+                                style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Availability ── */}
+      {subTab === "availability" && (
+        <div>
+          {availLoading ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+          ) : (
+            <>
+              {/* My availability */}
+              <div style={{ marginBottom: canManage ? 32 : 0 }}>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>My availability</p>
+                {weekDates.length === 0 ? (
+                  <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
+                    <p style={{ fontSize: 13, color: "#8A8497" }}>No weeks scheduled this month. Check the Schedule tab.</p>
+                  </div>
+                ) : (
+                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+                    {weekDates.map((date, i) => {
+                      const avail = myAvailability[date]
+                      const isSaving = savingAvail === date
+                      return (
+                        <div key={date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: i < weekDates.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                          <p style={{ fontSize: 14, color: "#13101A" }}>{worshipWeekDateLabel(date)}</p>
+                          <button
+                            onClick={() => handleToggleAvailability(date)}
+                            disabled={isSaving}
+                            style={{
+                              padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: "none",
+                              cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1,
+                              background: avail === true ? "#EDFAF3" : avail === false ? "#FEF2F2" : "#F3F0F7",
+                              color: avail === true ? "#2D7A4F" : avail === false ? "#B91C1C" : "#8A8497",
+                            }}
+                          >
+                            {avail === true ? "Available" : avail === false ? "Unavailable" : "Set availability"}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Manager view: all members' availability */}
+              {canManage && weekDates.length > 0 && teamMembers.length > 0 && (
+                <div>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>Team availability</p>
+                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflowX: "auto", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #ECE8DE" }}>
+                          <th style={{ textAlign: "left", padding: "10px 16px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>Member</th>
+                          {weekDates.map(d => (
+                            <th key={d} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>
+                              {new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teamMembers.map((member, i) => (
+                          <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                            <td style={{ padding: "10px 16px", color: "#13101A", fontWeight: 500, whiteSpace: "nowrap" as const }}>{member.name}</td>
+                            {weekDates.map(d => {
+                              const a = allAvailability[member.user_id]?.[d]
+                              return (
+                                <td key={d} style={{ textAlign: "center", padding: "10px 12px" }}>
+                                  {a === true
+                                    ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#EDFAF3", color: "#2D7A4F", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✓</span>
+                                    : a === false
+                                      ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#FEF2F2", color: "#B91C1C", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✕</span>
+                                      : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
+                                  }
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   )
@@ -8687,9 +9208,8 @@ function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, sho
         <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
           <p style={monoStyle}>Workspace</p>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>
-            Central
+            {ministryName}
           </p>
-          <p className="text-[11px] text-[#8A8497] mt-0.5 leading-tight">{ministryName}</p>
         </div>
 
         {renderPanelBody()}

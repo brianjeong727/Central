@@ -768,6 +768,173 @@ On completion: ministry created in DB, admin's profile linked to ministry, redir
 
 ---
 
+### 8.12 Praise Team Plan Tab
+
+**Purpose:** Replace Planning Center, Google Drive, and Messenger for praise team coordination. The President sets up the monthly schedule, Leaders fill out their assigned weeks, and Members only see what's relevant to them.
+
+**UI location:** Praise Team tab inside the Plan tab. Four sub-tabs: **Schedule** (default), **Set Builder**, **Slides**, **Charts**.
+
+---
+
+#### Roles & Visibility
+
+| Role | What They See | What They Can Edit |
+|------|--------------|-------------------|
+| **President** | Full monthly schedule — all weeks, all assignments, all members | Create weeks, assign leaders, assign members to roles, edit any week's set list and roster |
+| **Leader** | All weeks for the team | Only weeks they are assigned to lead — set list, key assignments, role roster |
+| **Member** | Only weeks they are personally assigned to | Cannot edit — read-only view of their role, the song list, and their week's roster |
+
+---
+
+#### Weekly Set Card
+
+Each week in the month is a card displaying:
+- **Date** of the Sunday service
+- **Assigned leader** for that week
+- **Set list** — ordered songs, each with a title, key, and assigned song leader
+- **Role roster** — each member with their instrument or vocal part
+- **Status badge** — `Draft` → `Filled Out` → `Confirmed`
+
+---
+
+#### President Flow
+1. Creates weeks for the month (one card per Sunday).
+2. Assigns a leader to each week.
+3. Assigns members to roles for each week.
+4. Can view and edit any week at any time.
+5. Can move members between weeks to handle conflicts or availability.
+
+#### Leader Flow
+1. Assigned weeks are highlighted in the schedule.
+2. Fills out the set list — adds songs, sets keys, assigns who leads each song.
+3. Fills out the role roster — confirms who is playing what instrument/part.
+4. Sends in-app notifications to members for their assigned week.
+5. Can rearrange roles without touching Google Drive.
+
+#### Member Flow
+1. Receives an in-app notification when assigned to a week.
+2. Sees only their assigned weeks, their specific role, the full song list, and the roster for that week.
+3. Can mark availability for upcoming weeks using the availability system.
+
+---
+
+#### Availability System
+- Members mark which Sundays they are available on a simple monthly calendar view.
+- Leaders and the President see each member's availability when building the roster for a week.
+- Unavailable members are visually flagged when being assigned to a week.
+
+---
+
+#### Song Set List
+- Each week has an ordered set list of songs.
+- Each song has: **title**, **key** (e.g. G, A♭), **assigned song leader**.
+- Songs are reorderable by drag-and-drop.
+- Only the President and the assigned Leader can edit the set list for a given week.
+
+---
+
+#### Lyric Slide Generator
+- From any week's set list, the President or Leader can trigger slide generation.
+- CENTRAL auto-generates a lyrics slide deck from the ordered song list.
+- Slides are viewable in-app and exportable.
+- Replaces the manual slide creation process entirely.
+
+---
+
+#### SongSelect / Charts Integration
+- Each song in the set list can have a **chord chart** attached.
+- Charts are either uploaded as a PDF or pulled from SongSelect (when integration is available).
+- Charts are viewable in-app by all members assigned to that week.
+- The Leader can add **annotations** to a chart; annotations are visible to all members on the same week.
+- This is the key feature that competes with the Charts app.
+
+---
+
+#### New Database Tables
+
+### `worship_weeks`
+One row per Sunday service week for a praise team.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `team_id` | UUID | FK → teams(id) |
+| `ministry_id` | UUID | FK → ministries(id) |
+| `week_date` | date | The Sunday date |
+| `leader_id` | UUID? | FK → profiles(id) — assigned leader for this week |
+| `status` | text | `"draft"`, `"filled_out"`, `"confirmed"` |
+| `created_at` | timestamptz | |
+
+### `worship_songs`
+Songs in a week's set list, ordered by `order_index`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `week_id` | UUID | FK → worship_weeks(id) |
+| `title` | text | Song name |
+| `key` | text | e.g. `"G"`, `"Ab"` |
+| `song_leader_id` | UUID? | FK → profiles(id) |
+| `order_index` | int | Sort order (drag-and-drop) |
+| `created_at` | timestamptz | |
+
+### `worship_roles`
+Role roster for a given week — who is playing or singing what.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `week_id` | UUID | FK → worship_weeks(id) |
+| `user_id` | UUID | FK → profiles(id) |
+| `role_name` | text | e.g. `"keys"`, `"drums"`, `"vocals"`, `"guitar"`, `"bass"` |
+| `created_at` | timestamptz | |
+
+### `worship_availability`
+Member availability declarations per week date.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `team_id` | UUID | FK → teams(id) |
+| `user_id` | UUID | FK → profiles(id) |
+| `week_date` | date | The Sunday in question |
+| `is_available` | boolean | |
+| `created_at` | timestamptz | |
+
+**Constraint:** `UNIQUE(team_id, user_id, week_date)`
+
+### `worship_charts`
+Chord chart file attached to a specific song.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `song_id` | UUID | FK → worship_songs(id) |
+| `chart_url` | text | PDF URL from Supabase Storage |
+| `uploaded_by` | UUID | FK → profiles(id) |
+| `created_at` | timestamptz | |
+
+### `worship_annotations`
+Leader annotations on a chord chart, visible to all members on that week.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `chart_id` | UUID | FK → worship_charts(id) |
+| `user_id` | UUID | FK → profiles(id) |
+| `annotation_data` | JSONB | Position, text, color, etc. |
+| `created_at` | timestamptz | |
+
+#### RLS for Worship Tables
+- **`worship_weeks` / `worship_songs` / `worship_roles` / `worship_charts` / `worship_annotations`**
+  - **SELECT:** Any ministry member on the praise team. Members additionally filtered — only see weeks where they have a `worship_roles` row.
+  - **INSERT/UPDATE:** President (full access) or the assigned Leader for that week.
+- **`worship_availability`**
+  - **SELECT:** Team members (leaders/president need to see everyone's).
+  - **INSERT/UPDATE/DELETE:** Own rows only.
+
+---
+
 ## 9. Realtime Architecture
 
 | Channel | Table | Events | Consumer |
