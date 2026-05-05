@@ -279,6 +279,15 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
+  // On desktop, auto-select the most recent chat when arriving at the chats tab
+  useEffect(() => {
+    if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats.length > 0) {
+      const top = recentChats[0]
+      setGlobalOpenChat({ id: top.id, name: top.groupName })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktop, activeTab, recentChats])
+
   function handleOpenChat(id: string, name: string) {
     setGlobalOpenChat({ id, name })
   }

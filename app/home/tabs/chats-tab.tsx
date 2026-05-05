@@ -1484,7 +1484,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Desktop Plan C header */}
       <div className="hidden md:block px-4 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>Chats</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
       </div>
 
       {/* Desktop search */}
