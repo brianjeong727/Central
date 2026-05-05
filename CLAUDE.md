@@ -25,7 +25,7 @@ Next.js (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwind C
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `app/home/home-app.tsx` | **Entire app shell** — all tabs + all components (~3200 lines, intentionally one file) |
+| `app/home/home-app.tsx` | **Entire app shell** — all tabs + all components (~9000 lines, intentionally one file) |
 | `app/home/page.tsx` | Server component — auth check, profile load, renders `<HomeApp>` |
 | `app/(auth)/login/page.tsx` | Email + password login |
 | `app/(auth)/signup/page.tsx` | Signup with name, email, password, graduation year |
