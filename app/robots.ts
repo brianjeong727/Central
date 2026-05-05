@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: ["/", "/landing", "/login", "/signup", "/join"],
       disallow: ["/home", "/api/"],
     },
-    sitemap: "https://central727.vercel.app/sitemap.xml",
+    sitemap: "https://joincentral.app/sitemap.xml",
   }
 }
