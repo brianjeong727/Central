@@ -35,7 +35,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/landing') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
-    pathname.startsWith('/join')
+    pathname.startsWith('/join') ||
+    pathname.startsWith('/auth/')
   const isHomePage = pathname.startsWith('/home')
 
   if (!user && !isPublicPage) {
