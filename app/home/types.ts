@@ -369,6 +369,7 @@ export interface WorshipSong {
   song_leader_id: string | null
   song_leader_name: string | null
   order_index: number
+  chart_url?: string | null
 }
 
 export interface WorshipInvite {

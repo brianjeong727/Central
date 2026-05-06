@@ -1230,7 +1230,7 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
 
 export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "charts" | "availability">("schedule")
+  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "availability">("schedule")
 
   // Schedule state
   const [weeks, setWeeks] = useState<WorshipWeek[]>([])
@@ -1258,39 +1258,24 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   const [allAvailability, setAllAvailability] = useState<Record<string, Record<string, AvailStatus>>>({})
   const [savingAvail, setSavingAvail] = useState<string | null>(null)
 
-  // Set List state
+  // Songs / Set List state
   const [songsByWeek, setSongsByWeek] = useState<Record<string, WorshipSong[]>>({})
   const [songsLoading, setSongsLoading] = useState(false)
-  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
-  const [addSongToWeekId, setAddSongToWeekId] = useState<string | null>(null)
-  const [newSongTitle, setNewSongTitle] = useState("")
-  const [newSongKey, setNewSongKey] = useState("G")
-  const [newSongLeaderId, setNewSongLeaderId] = useState("")
-  const [addingSong, setAddingSong] = useState(false)
-
-  // Invites state
-  const [invitesByWeek, setInvitesByWeek] = useState<Record<string, WorshipInvite[]>>({})
-  const [sendingInvites, setSendingInvites] = useState<string | null>(null)
-  const [myPendingInvites, setMyPendingInvites] = useState<Array<{ id: string; week_id: string; week_date: string }>>([])
-  const [respondingInvite, setRespondingInvite] = useState<string | null>(null)
+  const [uploadingChartWeek, setUploadingChartWeek] = useState<string | null>(null)
+  const [editingSong, setEditingSong] = useState<{ songId: string; field: "title" | "key"; value: string } | null>(null)
+  const [viewingChart, setViewingChart] = useState<WorshipSong | null>(null)
+  const [ocrInProgress, setOcrInProgress] = useState<Set<string>>(new Set())
 
   // Slides state
   const [slidesWeekId, setSlidesWeekId] = useState<string | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
   const [slideDeckActive, setSlideDeckActive] = useState(false)
 
-  // Charts state
-  const [chartsWeekId, setChartsWeekId] = useState<string | null>(null)
-  const [chartsBySong, setChartsBySong] = useState<Record<string, WorshipChart | null>>({})
-  const [chartsLoading, setChartsLoading] = useState(false)
-  const [annotationsBySong, setAnnotationsBySong] = useState<Record<string, AnnotationObj[]>>({})
-  const [annotationChartId, setAnnotationChartId] = useState<Record<string, string>>({})
-  const [uploadingChart, setUploadingChart] = useState<string | null>(null)
-  const [pendingAnnotation, setPendingAnnotation] = useState<{ songId: string; x: number; y: number } | null>(null)
-  const [pendingAnnotationText, setPendingAnnotationText] = useState("")
-  const [pendingAnnotationColor, setPendingAnnotationColor] = useState("#FDE68A")
-  const [savingAnnotation, setSavingAnnotation] = useState(false)
-  const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null)
+  // Generation counter to cancel stale loadSchedule results
+  const loadScheduleGenRef = useRef(0)
+
+  // Week delete confirmation
+  const [confirmDeleteWeekId, setConfirmDeleteWeekId] = useState<string | null>(null)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
@@ -1304,6 +1289,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   })
 
   async function loadSchedule() {
+    const gen = ++loadScheduleGenRef.current
     setScheduleLoading(true)
     const { data: weeksData } = await supabase
       .from("worship_weeks")
@@ -1313,12 +1299,15 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
       .lte("week_date", monthEnd)
       .order("week_date")
 
+    if (gen !== loadScheduleGenRef.current) return
     if (!weeksData) { setScheduleLoading(false); return }
 
     const weekIds = weeksData.map(w => w.id)
     const { data: rolesData } = weekIds.length > 0
       ? await supabase.from("worship_roles").select("id, week_id, user_id, role_name, profiles!user_id(name)").in("week_id", weekIds)
       : { data: [] as { id: string; week_id: string; user_id: string; role_name: string; profiles: { name: string } | { name: string }[] | null }[] }
+
+    if (gen !== loadScheduleGenRef.current) return
 
     const rolesByWeek: Record<string, WorshipRoleRow[]> = {}
     for (const r of rolesData ?? []) {
@@ -1384,7 +1373,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   useEffect(() => {
     loadSchedule()
     loadTeamMembers()
-    loadMyPendingInvites()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId])
 
@@ -1394,20 +1382,14 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
     const todayStr = new Date().toISOString().split("T")[0]
     const upcoming = weeks.find(w => w.week_date >= todayStr) ?? weeks[0]
     setSlidesWeekId(prev => prev ?? upcoming.id)
-    setChartsWeekId(prev => prev ?? upcoming.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weeks])
 
   useEffect(() => {
     if (subTab === "availability") loadAvailability()
-    if (["setlist", "slides", "charts"].includes(subTab)) loadSetList()
+    if (["setlist", "slides"].includes(subTab)) loadSetList()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subTab, teamId])
-
-  useEffect(() => {
-    if (subTab === "charts" && chartsWeekId) loadCharts(chartsWeekId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subTab, chartsWeekId])
 
   async function handleAddWeek() {
     if (!newDate) return
@@ -1441,6 +1423,17 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
     setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, status: status as WorshipWeek["status"] } : w))
   }
 
+  async function handleDeleteWeek(weekId: string) {
+    setConfirmDeleteWeekId(null)
+    setWeeks(prev => prev.filter(w => w.id !== weekId))
+    setSongsByWeek(prev => { const next = { ...prev }; delete next[weekId]; return next })
+    loadScheduleGenRef.current++
+    await supabase.from("worship_songs").delete().eq("week_id", weekId)
+    await supabase.from("worship_roles").delete().eq("week_id", weekId)
+    await supabase.from("worship_weeks").delete().eq("id", weekId)
+    await loadSchedule()
+  }
+
   async function handleSetAvailability(weekDate: string, status: AvailStatus) {
     setSavingAvail(weekDate)
     const { error } = await supabase.from("worship_availability")
@@ -1465,67 +1458,122 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
       .lte("week_date", monthEnd)
     const ids = (weekRows ?? []).map(w => w.id)
     if (ids.length === 0) { setSongsLoading(false); return }
-
     const { data: songsData } = await supabase
       .from("worship_songs")
-      .select("id, week_id, title, key, song_leader_id, order_index, profiles!song_leader_id(name)")
+      .select("id, week_id, title, key, song_leader_id, order_index, chart_url")
       .in("week_id", ids)
       .order("order_index")
-    type RawSong = { id: string; week_id: string; title: string; key: string; song_leader_id: string | null; order_index: number; profiles: { name: string } | { name: string }[] | null }
+    type RawSong = { id: string; week_id: string; title: string; key: string; song_leader_id: string | null; order_index: number; chart_url: string | null }
     const songMap: Record<string, WorshipSong[]> = {}
     for (const s of ((songsData ?? []) as RawSong[])) {
-      const p = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
       if (!songMap[s.week_id]) songMap[s.week_id] = []
-      songMap[s.week_id].push({ id: s.id, week_id: s.week_id, title: s.title, key: s.key, song_leader_id: s.song_leader_id, song_leader_name: p?.name ?? null, order_index: s.order_index })
+      songMap[s.week_id].push({ id: s.id, week_id: s.week_id, title: s.title, key: s.key, song_leader_id: s.song_leader_id, song_leader_name: null, order_index: s.order_index, chart_url: s.chart_url })
     }
     setSongsByWeek(songMap)
-
-    const { data: invitesData } = await supabase
-      .from("worship_invites")
-      .select("id, week_id, user_id, status, sent_at, responded_at, profiles!user_id(name)")
-      .in("week_id", ids)
-    type RawInvite = { id: string; week_id: string; user_id: string; status: string; sent_at: string; responded_at: string | null; profiles: { name: string } | { name: string }[] | null }
-    const inviteMap: Record<string, WorshipInvite[]> = {}
-    for (const inv of ((invitesData ?? []) as RawInvite[])) {
-      const p = Array.isArray(inv.profiles) ? inv.profiles[0] : inv.profiles
-      if (!inviteMap[inv.week_id]) inviteMap[inv.week_id] = []
-      inviteMap[inv.week_id].push({ id: inv.id, week_id: inv.week_id, user_id: inv.user_id, user_name: p?.name ?? "Unknown", status: inv.status as WorshipInvite["status"], sent_at: inv.sent_at, responded_at: inv.responded_at })
-    }
-    setInvitesByWeek(inviteMap)
     setSongsLoading(false)
   }
 
-  async function loadMyPendingInvites() {
-    const today = new Date().toISOString().split("T")[0]
-    const { data } = await supabase
-      .from("worship_invites")
-      .select("id, week_id, worship_weeks!week_id(week_date, team_id)")
-      .eq("user_id", userId)
-      .eq("status", "pending")
-    type RawPending = { id: string; week_id: string; worship_weeks: { week_date: string; team_id: string } | null }
-    const upcoming = ((data ?? []) as unknown as RawPending[])
-      .filter(inv => inv.worship_weeks && inv.worship_weeks.team_id === teamId && inv.worship_weeks.week_date >= today)
-      .map(inv => ({ id: inv.id, week_id: inv.week_id, week_date: inv.worship_weeks!.week_date }))
-    setMyPendingInvites(upcoming)
+  // SongSelect chord chart PDFs are image-only (no extractable text), so we OCR
+  // the rendered first page. Runs in the background after upload completes.
+  async function runOcrOnChart(songId: string, weekId: string, arrayBuffer: ArrayBuffer) {
+    setOcrInProgress(prev => { const next = new Set(prev); next.add(songId); return next })
+
+    let title = ""
+    let key = ""
+
+    try {
+      const ocrPromise = (async () => {
+        const pdfjsLib = await import("pdfjs-dist")
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise
+        const page = await pdf.getPage(1)
+        const viewport = page.getViewport({ scale: 2 })
+        const canvas = document.createElement("canvas")
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        const ctx = canvas.getContext("2d")
+        if (!ctx) throw new Error("canvas 2d context unavailable")
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise
+
+        const { createWorker } = await import("tesseract.js")
+        const worker = await createWorker("eng")
+        const result = await worker.recognize(canvas)
+        await worker.terminate()
+        const rawText = result.data.text
+        console.log("[OCR] raw text:", rawText)
+
+        const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0)
+
+        // Title: first line — strip "%" and everything after (CCLI watermark artifacts),
+        // then strip "SongSelect" and everything after (logo text OCR'd onto same line)
+        const rawTitle = lines[0] ?? ""
+        const ocrTitle = rawTitle.split("%")[0].split("SongSelect")[0].trim()
+
+        // Key: find line starting with "Key", handle two OCR formats:
+        //   "Key - D | Tempo..."  → standard
+        //   "KeyD1 Tempo..."      → OCR misread of "Key - D |"
+        let ocrKey = ""
+        for (const line of lines) {
+          if (!line.includes("Key")) continue
+          const m = line.match(/Key\s*-\s*([A-G][b#]?)/) ?? line.match(/Key([A-G][b#]?)/)
+          if (m) { ocrKey = m[1]; break }
+        }
+        return { title: ocrTitle, key: ocrKey }
+      })()
+
+      const timeoutPromise = new Promise<{ title: string; key: string }>((_, reject) =>
+        setTimeout(() => reject(new Error("OCR timeout (15s)")), 15000)
+      )
+
+      const out = await Promise.race([ocrPromise, timeoutPromise])
+      title = out.title
+      key = out.key
+    } catch (err) {
+      console.error("[OCR] failed:", err)
+    }
+
+    await supabase.from("worship_songs").update({ title, key }).eq("id", songId)
+    setSongsByWeek(prev => ({
+      ...prev,
+      [weekId]: (prev[weekId] ?? []).map(s => s.id === songId ? { ...s, title, key } : s),
+    }))
+    setOcrInProgress(prev => { const next = new Set(prev); next.delete(songId); return next })
   }
 
-  async function handleAddSong(weekId: string) {
-    if (!newSongTitle.trim()) return
-    setAddingSong(true)
-    const songs = songsByWeek[weekId] ?? []
-    const nextIndex = songs.length > 0 ? Math.max(...songs.map(s => s.order_index)) + 1 : 0
-    const { data, error } = await supabase.from("worship_songs")
-      .insert({ week_id: weekId, title: newSongTitle.trim(), key: newSongKey, song_leader_id: newSongLeaderId || null, order_index: nextIndex })
-      .select("id").single()
-    if (!error && data) {
-      const leaderName = teamMembers.find(m => m.user_id === newSongLeaderId)?.name ?? null
-      setSongsByWeek(prev => ({
-        ...prev,
-        [weekId]: [...(prev[weekId] ?? []), { id: data.id, week_id: weekId, title: newSongTitle.trim(), key: newSongKey, song_leader_id: newSongLeaderId || null, song_leader_name: leaderName, order_index: nextIndex }],
-      }))
-      setAddSongToWeekId(null); setNewSongTitle(""); setNewSongKey("G"); setNewSongLeaderId("")
+  async function handleUploadChartForWeek(weekId: string, file: File) {
+    setUploadingChartWeek(weekId)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const existingSongs = songsByWeek[weekId] ?? []
+      const orderIndex = existingSongs.length > 0 ? Math.max(...existingSongs.map(s => s.order_index)) + 1 : 0
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("worship_songs")
+        .insert({ week_id: weekId, title: "", key: "", order_index: orderIndex })
+        .select("id")
+        .single()
+      if (insErr || !inserted) return
+
+      const songId = (inserted as { id: string }).id
+
+      const path = `${teamId}/${weekId}/${songId}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from("worship-charts")
+        .upload(path, file, { contentType: "application/pdf" })
+      if (upErr) { await supabase.from("worship_songs").delete().eq("id", songId); return }
+
+      const { data: urlData } = supabase.storage.from("worship-charts").getPublicUrl(path)
+      const chartUrl = urlData.publicUrl
+      await supabase.from("worship_songs").update({ chart_url: chartUrl }).eq("id", songId)
+
+      const newSong: WorshipSong = { id: songId, week_id: weekId, title: "", key: "", song_leader_id: null, song_leader_name: null, order_index: orderIndex, chart_url: chartUrl }
+      setSongsByWeek(prev => ({ ...prev, [weekId]: [...(prev[weekId] ?? []), newSong] }))
+
+      // Fire-and-forget — OCR runs in background, never blocks upload
+      void runOcrOnChart(songId, weekId, arrayBuffer)
+    } finally {
+      setUploadingChartWeek(null)
     }
-    setAddingSong(false)
   }
 
   async function handleDeleteSong(weekId: string, songId: string) {
@@ -1533,148 +1581,32 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
     setSongsByWeek(prev => ({ ...prev, [weekId]: (prev[weekId] ?? []).filter(s => s.id !== songId) }))
   }
 
-  async function handleMoveSong(weekId: string, songId: string, direction: "up" | "down") {
+  async function handleReorderSong(weekId: string, songId: string, direction: "up" | "down") {
     const songs = [...(songsByWeek[weekId] ?? [])].sort((a, b) => a.order_index - b.order_index)
     const idx = songs.findIndex(s => s.id === songId)
-    if (direction === "up" && idx === 0) return
-    if (direction === "down" && idx === songs.length - 1) return
     const swapIdx = direction === "up" ? idx - 1 : idx + 1
-    const [a, b] = [songs[idx], songs[swapIdx]]
-    await Promise.all([
-      supabase.from("worship_songs").update({ order_index: b.order_index }).eq("id", a.id),
-      supabase.from("worship_songs").update({ order_index: a.order_index }).eq("id", b.id),
-    ])
-    setSongsByWeek(prev => ({
-      ...prev,
-      [weekId]: songs.map(s => s.id === a.id ? { ...s, order_index: b.order_index } : s.id === b.id ? { ...s, order_index: a.order_index } : s).sort((x, y) => x.order_index - y.order_index),
-    }))
+    if (swapIdx < 0 || swapIdx >= songs.length) return
+    const a = songs[idx], b = songs[swapIdx]
+    await supabase.from("worship_songs").update({ order_index: b.order_index }).eq("id", a.id)
+    await supabase.from("worship_songs").update({ order_index: a.order_index }).eq("id", b.id)
+    const updated = songs.map(s => s.id === a.id ? { ...s, order_index: b.order_index } : s.id === b.id ? { ...s, order_index: a.order_index } : s)
+    setSongsByWeek(prev => ({ ...prev, [weekId]: updated }))
   }
 
-  async function handleSendInvites(weekId: string) {
-    const week = weeks.find(w => w.id === weekId)
-    if (!week) return
-    setSendingInvites(weekId)
-    const existingUserIds = new Set((invitesByWeek[weekId] ?? []).map(inv => inv.user_id))
-    const toInvite = week.roles.filter(r => !existingUserIds.has(r.user_id))
-    if (toInvite.length === 0) { setSendingInvites(null); return }
-    const rows = toInvite.map(r => ({ week_id: weekId, user_id: r.user_id, status: "pending", sent_at: new Date().toISOString() }))
-    const { data } = await supabase.from("worship_invites").insert(rows)
-      .select("id, week_id, user_id, status, sent_at, responded_at, profiles!user_id(name)")
-    type RawInvite = { id: string; week_id: string; user_id: string; status: string; sent_at: string; responded_at: string | null; profiles: { name: string } | { name: string }[] | null }
-    if (data) {
-      const newInvites: WorshipInvite[] = ((data as unknown) as RawInvite[]).map(inv => {
-        const p = Array.isArray(inv.profiles) ? inv.profiles[0] : inv.profiles
-        return { id: inv.id, week_id: inv.week_id, user_id: inv.user_id, user_name: p?.name ?? "Unknown", status: inv.status as WorshipInvite["status"], sent_at: inv.sent_at, responded_at: inv.responded_at }
-      })
-      setInvitesByWeek(prev => ({ ...prev, [weekId]: [...(prev[weekId] ?? []), ...newInvites] }))
-    }
-    setSendingInvites(null)
-  }
-
-  async function handleRespondToInvite(inviteId: string, status: "accepted" | "declined") {
-    setRespondingInvite(inviteId)
-    const { error } = await supabase.from("worship_invites")
-      .update({ status, responded_at: new Date().toISOString() })
-      .eq("id", inviteId)
-      .eq("user_id", userId)
-    if (!error) {
-      setMyPendingInvites(prev => prev.filter(inv => inv.id !== inviteId))
-      const now2 = new Date().toISOString()
-      setInvitesByWeek(prev => {
-        const next = { ...prev }
-        for (const wid in next) next[wid] = next[wid].map(inv => inv.id === inviteId ? { ...inv, status, responded_at: now2 } : inv)
-        return next
-      })
-    }
-    setRespondingInvite(null)
-  }
-
-  async function loadCharts(weekId: string) {
-    setChartsLoading(true)
-    const { data: songRows } = await supabase
-      .from("worship_songs").select("id").eq("week_id", weekId).order("order_index")
-    const songIds = (songRows ?? []).map(s => s.id)
-    if (songIds.length === 0) { setChartsLoading(false); return }
-
-    const { data: chartsData } = await supabase
-      .from("worship_charts").select("id, song_id, chart_url, uploaded_by, created_at").in("song_id", songIds)
-    const cBySong: Record<string, WorshipChart | null> = {}
-    const cIdBySong: Record<string, string> = {}
-    for (const id of songIds) cBySong[id] = null
-    for (const c of (chartsData ?? []) as WorshipChart[]) { cBySong[c.song_id] = c; cIdBySong[c.song_id] = c.id }
-    setChartsBySong(cBySong)
-    setAnnotationChartId(cIdBySong)
-
-    const chartIds = Object.values(cIdBySong)
-    if (chartIds.length > 0) {
-      const { data: annData } = await supabase
-        .from("worship_annotations").select("chart_id, annotation_data").in("chart_id", chartIds)
-      const aBySong: Record<string, AnnotationObj[]> = {}
-      for (const row of annData ?? []) {
-        const songId = Object.keys(cIdBySong).find(sid => cIdBySong[sid] === row.chart_id)
-        if (songId) aBySong[songId] = (row.annotation_data ?? []) as AnnotationObj[]
+  async function handleSaveInlineEdit() {
+    if (!editingSong) return
+    const { songId, field, value } = editingSong
+    if (!value.trim()) { setEditingSong(null); return }
+    await supabase.from("worship_songs").update({ [field]: value.trim() }).eq("id", songId)
+    setSongsByWeek(prev => {
+      const next = { ...prev }
+      for (const wid of Object.keys(next)) {
+        next[wid] = next[wid].map(s => s.id === songId ? { ...s, [field]: value.trim() } : s)
       }
-      setAnnotationsBySong(aBySong)
-    }
-    setChartsLoading(false)
-  }
-
-  async function handleUploadChart(songId: string, file: File) {
-    setUploadingChart(songId)
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin"
-    const path = `${teamId}/${songId}/${Date.now()}.${ext}`
-    const { error: upErr } = await supabase.storage.from("worship-charts").upload(path, file, { upsert: true })
-    if (upErr) { setUploadingChart(null); return }
-    const { data: urlData } = supabase.storage.from("worship-charts").getPublicUrl(path)
-    const { data, error } = await supabase.from("worship_charts")
-      .upsert({ song_id: songId, chart_url: urlData.publicUrl, uploaded_by: userId }, { onConflict: "song_id" })
-      .select("id, song_id, chart_url, uploaded_by, created_at").single()
-    if (!error && data) {
-      const chart = data as WorshipChart
-      setChartsBySong(prev => ({ ...prev, [songId]: chart }))
-      setAnnotationChartId(prev => ({ ...prev, [songId]: chart.id }))
-    }
-    setUploadingChart(null)
-  }
-
-  function handleChartClick(e: React.MouseEvent<HTMLDivElement>, songId: string) {
-    if (pendingAnnotation) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
-    setPendingAnnotation({ songId, x, y })
-    setPendingAnnotationText("")
-  }
-
-  async function handleSaveAnnotation(songId: string) {
-    if (!pendingAnnotationText.trim() || !pendingAnnotation) { setPendingAnnotation(null); return }
-    const chartId = annotationChartId[songId]
-    if (!chartId) return
-    setSavingAnnotation(true)
-    const newAnn: AnnotationObj = {
-      id: crypto.randomUUID(),
-      x: pendingAnnotation.x,
-      y: pendingAnnotation.y,
-      color: pendingAnnotationColor,
-      text: pendingAnnotationText.trim(),
-    }
-    const updated = [...(annotationsBySong[songId] ?? []), newAnn]
-    const { error } = await supabase.from("worship_annotations")
-      .upsert({ chart_id: chartId, user_id: userId, annotation_data: updated, updated_at: new Date().toISOString() }, { onConflict: "chart_id" })
-    if (!error) setAnnotationsBySong(prev => ({ ...prev, [songId]: updated }))
-    setPendingAnnotation(null)
-    setPendingAnnotationText("")
-    setSavingAnnotation(false)
-  }
-
-  async function handleDeleteAnnotation(songId: string, annId: string) {
-    const chartId = annotationChartId[songId]
-    if (!chartId) return
-    const updated = (annotationsBySong[songId] ?? []).filter(a => a.id !== annId)
-    await supabase.from("worship_annotations")
-      .upsert({ chart_id: chartId, user_id: userId, annotation_data: updated, updated_at: new Date().toISOString() }, { onConflict: "chart_id" })
-    setAnnotationsBySong(prev => ({ ...prev, [songId]: updated }))
-    setHoveredAnnotationId(null)
+      return next
+    })
+    if (viewingChart?.id === songId) setViewingChart(prev => prev ? { ...prev, [field]: value.trim() } : null)
+    setEditingSong(null)
   }
 
   function handleExportSlides(songs: WorshipSong[]) {
@@ -1714,33 +1646,23 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
 
   return (
     <div>
-      {/* Pending invite banners */}
-      {myPendingInvites.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {myPendingInvites.map(inv => (
-            <div key={inv.id} style={{ background: "#F4F0F8", border: "1px solid #D4C5E0", borderRadius: 14, padding: "14px 16px", marginBottom: 8 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#3E1540", marginBottom: 10 }}>
-                You&apos;re invited to serve on {worshipWeekDateLabel(inv.week_date)}
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => handleRespondToInvite(inv.id, "accepted")}
-                  disabled={respondingInvite === inv.id}
-                  style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: respondingInvite === inv.id ? 0.6 : 1 }}
-                >
-                  Accept
-                </button>
-                <button
-                  onClick={() => handleRespondToInvite(inv.id, "declined")}
-                  disabled={respondingInvite === inv.id}
-                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 13, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer", opacity: respondingInvite === inv.id ? 0.6 : 1 }}
-                >
-                  Decline
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+      {viewingChart && (
+        <SetListPdfViewer
+          song={viewingChart}
+          canManage={canManage}
+          userId={userId}
+          onClose={() => setViewingChart(null)}
+          onSongUpdate={(field, value) => {
+            setSongsByWeek(prev => {
+              const next = { ...prev }
+              for (const wid of Object.keys(next)) {
+                next[wid] = next[wid].map(s => s.id === viewingChart.id ? { ...s, [field]: value } : s)
+              }
+              return next
+            })
+            setViewingChart(prev => prev ? { ...prev, [field]: value } : null)
+          }}
+        />
       )}
 
       {/* Sub-tabs */}
@@ -1748,7 +1670,6 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         <button style={subTabStyle(subTab === "schedule")} onClick={() => setSubTab("schedule")}>Schedule</button>
         <button style={subTabStyle(subTab === "setlist")} onClick={() => setSubTab("setlist")}>Set List</button>
         <button style={subTabStyle(subTab === "slides")} onClick={() => setSubTab("slides")}>Slides</button>
-        <button style={subTabStyle(subTab === "charts")} onClick={() => setSubTab("charts")}>Charts</button>
         <button style={subTabStyle(subTab === "availability")} onClick={() => setSubTab("availability")}>Availability</button>
       </div>
 
@@ -1826,8 +1747,26 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
                           {worshipWeekDateLabel(week.week_date)}
                         </p>
-                        <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
+                          {canManage && (
+                            <button
+                              onClick={() => setConfirmDeleteWeekId(confirmDeleteWeekId === week.id ? null : week.id)}
+                              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center", borderRadius: 6 }}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {confirmDeleteWeekId === week.id && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #ECE8DE" }}>
+                          <span style={{ fontSize: 13, color: "#5A5466" }}>Delete this week?</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                            <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                            <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
+                          </div>
+                        </div>
+                      )}
                       {/* Leader row */}
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={monoStyle}>Leader</span>
@@ -1924,9 +1863,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
       {/* ── Set List ── */}
       {subTab === "setlist" && (
         <div>
-          {songsLoading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
-          ) : weeks.length === 0 ? (
+          {weeks.length === 0 ? (
             <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
               <p style={{ fontSize: 13, color: "#8A8497" }}>Add a week in the Schedule tab first.</p>
@@ -1934,180 +1871,115 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {weeks.map(week => {
-                const songs = (songsByWeek[week.id] ?? []).sort((a, b) => a.order_index - b.order_index)
-                const invites = invitesByWeek[week.id] ?? []
-                const isExpanded = expandedWeeks.has(week.id)
-                const isAddingThisWeek = addSongToWeekId === week.id
-                const isLeader = week.leader_id === userId
-                const canEditSongs = canManage || isLeader
-                const uninvitedRoles = week.roles.filter(r => !invites.find(inv => inv.user_id === r.user_id))
-
+                const songs = [...(songsByWeek[week.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
+                const isUploadingThis = uploadingChartWeek === week.id
                 return (
                   <div key={week.id} style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)", overflow: "hidden" }}>
-                    {/* Card header — collapse toggle */}
-                    <button
-                      onClick={() => setExpandedWeeks(prev => { const next = new Set(prev); isExpanded ? next.delete(week.id) : next.add(week.id); return next })}
-                      style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" as const }}
-                    >
-                      <div>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
-                          {worshipWeekDateLabel(week.week_date)}
-                        </p>
-                        {!isExpanded && (
-                          <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>
-                            {songs.length === 0 ? "No songs yet" : `${songs.length} song${songs.length !== 1 ? "s" : ""}`}
-                          </p>
-                        )}
-                      </div>
-                      <ChevronDown style={{ width: 18, height: 18, color: "#8A8497", transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
-                    </button>
+                    {/* Card header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid #ECE8DE" : "none" }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
+                        {worshipWeekDateLabel(week.week_date)}
+                      </p>
+                      {canManage && (
+                        <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isUploadingThis ? "not-allowed" : "pointer", opacity: isUploadingThis ? 0.6 : 1 }}>
+                          <Plus className="w-3.5 h-3.5" />
+                          {isUploadingThis ? "Uploading…" : "Upload Chart"}
+                          <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={isUploadingThis}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadChartForWeek(week.id, f); e.target.value = "" }} />
+                        </label>
+                      )}
+                    </div>
 
-                    {isExpanded && (
-                      <div style={{ borderTop: "1px solid #ECE8DE" }}>
-                        {/* Songs section */}
-                        <div style={{ padding: "14px 18px" }}>
-                          <p style={monoStyle}>Song list</p>
-                          {songs.length === 0 ? (
-                            <p style={{ fontSize: 13, color: "#8A8497", marginTop: 8 }}>No songs added yet.</p>
-                          ) : (
-                            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                              {songs.map((song, i) => (
-                                <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  {/* Reorder arrows */}
-                                  {canEditSongs && (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                      <button
-                                        onClick={() => handleMoveSong(week.id, song.id, "up")}
-                                        disabled={i === 0}
-                                        style={{ padding: "1px 4px", background: "transparent", border: "none", cursor: i === 0 ? "default" : "pointer", opacity: i === 0 ? 0.25 : 0.6, lineHeight: 1 }}
-                                        title="Move up"
-                                      >
-                                        <ChevronDown style={{ width: 13, height: 13, color: "#5A5466", transform: "rotate(180deg)" }} />
-                                      </button>
-                                      <button
-                                        onClick={() => handleMoveSong(week.id, song.id, "down")}
-                                        disabled={i === songs.length - 1}
-                                        style={{ padding: "1px 4px", background: "transparent", border: "none", cursor: i === songs.length - 1 ? "default" : "pointer", opacity: i === songs.length - 1 ? 0.25 : 0.6, lineHeight: 1 }}
-                                        title="Move down"
-                                      >
-                                        <ChevronDown style={{ width: 13, height: 13, color: "#5A5466" }} />
-                                      </button>
-                                    </div>
-                                  )}
-                                  {/* Song info */}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <span style={{ fontSize: 14, color: "#13101A", fontWeight: 500 }}>{song.title}</span>
-                                    {song.song_leader_name && (
-                                      <span style={{ fontSize: 12, color: "#8A8497", marginLeft: 6 }}>— {song.song_leader_name}</span>
-                                    )}
-                                  </div>
-                                  {/* Key badge */}
-                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "2px 8px", flexShrink: 0 }}>{song.key}</span>
-                                  {/* Delete */}
-                                  {canEditSongs && (
-                                    <button onClick={() => handleDeleteSong(week.id, song.id)}
-                                      style={{ padding: "2px 5px", fontSize: 12, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>
-                                      ✕
+                    {/* Song list */}
+                    {songs.length === 0 && !isUploadingThis ? (
+                      <div style={{ padding: "20px 18px", textAlign: "center" }}>
+                        <p style={{ fontSize: 13, color: "#C4C4C4" }}>No charts uploaded yet.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {songs.map((song, idx) => {
+                          const isEditingTitle = editingSong?.songId === song.id && editingSong?.field === "title"
+                          const isEditingKey = editingSong?.songId === song.id && editingSong?.field === "key"
+                          const needsTitle = !song.title
+                          const needsKey = !song.key
+                          const isOcr = ocrInProgress.has(song.id)
+                          return (
+                            <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                              {/* Position number */}
+                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
+
+                              {/* Title */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {isOcr ? (
+                                  <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading chart…</span>
+                                ) : isEditingTitle || needsTitle ? (
+                                  <input
+                                    autoFocus={isEditingTitle || (needsTitle && !needsKey)}
+                                    value={isEditingTitle ? (editingSong?.value ?? "") : (needsTitle ? (editingSong?.songId === song.id ? (editingSong?.value ?? "") : "") : song.title)}
+                                    placeholder="Song title…"
+                                    onChange={e => setEditingSong({ songId: song.id, field: "title", value: e.target.value })}
+                                    onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
+                                    onBlur={handleSaveInlineEdit}
+                                    onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                    style={{ width: "100%", border: "none", outline: "none", fontSize: 14, color: "#13101A", background: "transparent", padding: "2px 0", borderBottom: "1px solid #ECE8DE" }}
+                                  />
+                                ) : (
+                                  <button
+                                    onClick={() => song.chart_url ? setViewingChart(song) : setEditingSong({ songId: song.id, field: "title", value: song.title })}
+                                    style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}
+                                  >
+                                    {song.title}
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Key — hidden during OCR */}
+                              {!isOcr && (
+                                <div style={{ flexShrink: 0 }}>
+                                  {isEditingKey || needsKey ? (
+                                    <input
+                                      autoFocus={isEditingKey}
+                                      value={isEditingKey ? (editingSong?.value ?? "") : ""}
+                                      placeholder="Key"
+                                      onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
+                                      onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
+                                      onBlur={handleSaveInlineEdit}
+                                      onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                      style={{ width: 52, border: "none", outline: "none", fontSize: 12, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "3px 8px", textAlign: "center" as const }}
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
+                                      style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "3px 8px", border: "none", cursor: "pointer" }}
+                                    >
+                                      {song.key || "—"}
                                     </button>
                                   )}
                                 </div>
-                              ))}
-                            </div>
-                          )}
+                              )}
 
-                          {/* Add song */}
-                          {canEditSongs && !isAddingThisWeek && (
-                            <button
-                              onClick={() => { setAddSongToWeekId(week.id); setNewSongTitle(""); setNewSongKey("G"); setNewSongLeaderId("") }}
-                              style={{ marginTop: 12, fontSize: 13, color: "#3E1540", fontWeight: 500, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                            >
-                              + Add song
-                            </button>
-                          )}
-
-                          {isAddingThisWeek && (
-                            <div style={{ marginTop: 12, padding: 14, background: "#FBF8F2", borderRadius: 10, border: "1px solid #ECE8DE" }}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                <input
-                                  type="text"
-                                  placeholder="Song title"
-                                  value={newSongTitle}
-                                  onChange={e => setNewSongTitle(e.target.value)}
-                                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }}
-                                />
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <select value={newSongKey} onChange={e => setNewSongKey(e.target.value)}
-                                    style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
-                                    {["G", "A", "Bb", "C", "D", "E", "F", "Ab", "Eb"].map(k => <option key={k} value={k}>{k}</option>)}
-                                  </select>
-                                  <select value={newSongLeaderId} onChange={e => setNewSongLeaderId(e.target.value)}
-                                    style={{ flex: 2, padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
-                                    <option value="">No song leader</option>
-                                    {teamMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-                                  </select>
-                                </div>
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <button onClick={() => handleAddSong(week.id)} disabled={!newSongTitle.trim() || addingSong}
-                                    style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newSongTitle.trim() || addingSong ? 0.6 : 1 }}>
-                                    {addingSong ? "Adding…" : "Add"}
-                                  </button>
-                                  <button onClick={() => setAddSongToWeekId(null)}
-                                    style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #ECE8DE", cursor: "pointer" }}>
-                                    Cancel
+                              {/* Actions */}
+                              {canManage && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                                  <button onClick={() => handleReorderSong(week.id, song.id, "up")} disabled={idx === 0}
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#E5E0D2" : "#8A8497", fontSize: 13, lineHeight: 1 }}>↑</button>
+                                  <button onClick={() => handleReorderSong(week.id, song.id, "down")} disabled={idx === songs.length - 1}
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "#E5E0D2" : "#8A8497", fontSize: 13, lineHeight: 1 }}>↓</button>
+                                  <button onClick={() => handleDeleteSong(week.id, song.id)}
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center" }}>
+                                    <Trash2 className="w-3 h-3" />
                                   </button>
                                 </div>
-                              </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Divider */}
-                        <div style={{ height: 1, background: "#ECE8DE", margin: "0 18px" }} />
-
-                        {/* Invites section */}
-                        <div style={{ padding: "14px 18px" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                            <p style={monoStyle}>Invites</p>
-                            {canManage && week.roles.length > 0 && uninvitedRoles.length > 0 && (
-                              <button
-                                onClick={() => handleSendInvites(week.id)}
-                                disabled={sendingInvites === week.id}
-                                style={{ fontSize: 12, fontWeight: 600, color: "#3E1540", background: "#F4F0F8", border: "none", borderRadius: 8, padding: "5px 12px", cursor: "pointer", opacity: sendingInvites === week.id ? 0.6 : 1 }}
-                              >
-                                {sendingInvites === week.id ? "Sending…" : `Send invites (${uninvitedRoles.length})`}
-                              </button>
-                            )}
+                          )
+                        })}
+                        {isUploadingThis && (
+                          <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #ECE8DE" : "none", display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>—</span>
+                            <span style={{ fontSize: 13, color: "#8A8497" }}>Parsing chart…</span>
                           </div>
-                          {week.roles.length === 0 ? (
-                            <p style={{ fontSize: 13, color: "#8A8497" }}>No members assigned. Add members in the Schedule tab.</p>
-                          ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                              {week.roles.map(role => {
-                                const invite = invites.find(inv => inv.user_id === role.user_id)
-                                const statusCfg = invite ? ({
-                                  pending:  { label: "Pending",  bg: "#FFF7E6", color: "#C9A34B" },
-                                  accepted: { label: "Accepted", bg: "#EDFAF3", color: "#2D7A4F" },
-                                  declined: { label: "Declined", bg: "#FEF2F2", color: "#B91C1C" },
-                                } as const)[invite.status] : null
-                                return (
-                                  <div key={role.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                    <div>
-                                      <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
-                                      <span style={{ fontSize: 11, color: "#8A8497", marginLeft: 6 }}>{role.role_name}</span>
-                                    </div>
-                                    {statusCfg ? (
-                                      <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 9px", background: statusCfg.bg, color: statusCfg.color, flexShrink: 0 }}>
-                                        {statusCfg.label}
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: 11, color: "#C4C4C4", flexShrink: 0 }}>Not invited</span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2234,173 +2106,6 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         )
       })()}
 
-      {/* ── Charts ── */}
-      {subTab === "charts" && (() => {
-        const todayStr = new Date().toISOString().split("T")[0]
-        const chartsWeek = weeks.find(w => w.id === chartsWeekId)
-        const chartsSongs = (songsByWeek[chartsWeekId ?? ""] ?? []).sort((a, b) => a.order_index - b.order_index)
-        const isChartsLeader = chartsWeek?.leader_id === userId
-        const canAnnotate = canManage || isChartsLeader
-        const ANNOTATION_COLORS = ["#FDE68A", "#FCA5A5", "#86EFAC", "#7DD3FC", "#C4B5FD"]
-        return (
-          <div>
-            {/* Week selector */}
-            {weeks.length > 1 && (
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 6 }}>Week</label>
-                <select
-                  value={chartsWeekId ?? ""}
-                  onChange={e => { setChartsWeekId(e.target.value); setPendingAnnotation(null) }}
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}
-                >
-                  {weeks.map(w => (
-                    <option key={w.id} value={w.id}>{worshipWeekDateLabel(w.week_date)}{w.week_date < todayStr ? " (past)" : ""}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {chartsLoading ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
-            ) : chartsSongs.length === 0 ? (
-              <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No songs in the set list yet.</p>
-                <p style={{ fontSize: 13, color: "#8A8497" }}>Add songs in the Set List tab first.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                {chartsSongs.map(song => {
-                  const chart = chartsBySong[song.id]
-                  const annotations = annotationsBySong[song.id] ?? []
-                  const isPdf = chart?.chart_url.toLowerCase().includes(".pdf") || chart?.chart_url.toLowerCase().includes("application/pdf")
-                  const isUploading = uploadingChart === song.id
-                  const isPending = pendingAnnotation?.songId === song.id
-
-                  return (
-                    <div key={song.id} style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)", overflow: "hidden" }}>
-                      {/* Song header */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #ECE8DE" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#13101A" }}>{song.title}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "2px 8px" }}>{song.key}</span>
-                        </div>
-                        {/* Upload button (only if no chart, or replace) */}
-                        <label style={{ fontSize: 12, fontWeight: 600, color: chart ? "#8A8497" : "#3E1540", background: chart ? "transparent" : "#F4F0F8", border: chart ? "1px solid #ECE8DE" : "none", borderRadius: 8, padding: "5px 12px", cursor: isUploading ? "not-allowed" : "pointer", opacity: isUploading ? 0.6 : 1 }}>
-                          {isUploading ? "Uploading…" : chart ? "Replace" : "Upload chart"}
-                          <input type="file" accept="image/*,.pdf" style={{ display: "none" }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadChart(song.id, f); e.target.value = "" }}
-                            disabled={isUploading}
-                          />
-                        </label>
-                      </div>
-
-                      {/* Chart display + annotation layer */}
-                      {chart ? (
-                        <div style={{ position: "relative" }}>
-                          {/* Chart */}
-                          <div
-                            style={{ position: "relative", cursor: canAnnotate && !isPending ? "crosshair" : "default", userSelect: "none" as const }}
-                            onClick={canAnnotate ? e => handleChartClick(e, song.id) : undefined}
-                          >
-                            {isPdf ? (
-                              <embed src={chart.chart_url} type="application/pdf" style={{ width: "100%", height: 520, display: "block", border: "none" }} />
-                            ) : (
-                              <img src={chart.chart_url} alt={`${song.title} chart`} style={{ width: "100%", display: "block", maxHeight: 600, objectFit: "contain", background: "#FAFAFA" }} />
-                            )}
-
-                            {/* Saved annotations */}
-                            {annotations.map(ann => (
-                              <div
-                                key={ann.id}
-                                onMouseEnter={() => setHoveredAnnotationId(ann.id)}
-                                onMouseLeave={() => setHoveredAnnotationId(null)}
-                                onClick={e => { e.stopPropagation(); if (canAnnotate) handleDeleteAnnotation(song.id, ann.id) }}
-                                style={{
-                                  position: "absolute",
-                                  left: `${ann.x}%`,
-                                  top: `${ann.y}%`,
-                                  transform: "translate(-50%, -50%)",
-                                  background: ann.color,
-                                  borderRadius: 8,
-                                  padding: "5px 10px",
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  color: "#13101A",
-                                  boxShadow: "0 2px 8px rgba(19,16,26,0.18)",
-                                  cursor: canAnnotate ? "pointer" : "default",
-                                  maxWidth: 160,
-                                  wordBreak: "break-word" as const,
-                                  zIndex: 5,
-                                  opacity: hoveredAnnotationId === ann.id && canAnnotate ? 0.7 : 1,
-                                  transition: "opacity 0.15s",
-                                }}
-                                title={canAnnotate ? "Click to remove" : undefined}
-                              >
-                                {ann.text}
-                                {hoveredAnnotationId === ann.id && canAnnotate && (
-                                  <span style={{ marginLeft: 6, color: "#5A5466", fontSize: 11 }}>✕</span>
-                                )}
-                              </div>
-                            ))}
-
-                            {/* Pending annotation input */}
-                            {isPending && (
-                              <div
-                                onClick={e => e.stopPropagation()}
-                                style={{ position: "absolute", left: `${pendingAnnotation!.x}%`, top: `${pendingAnnotation!.y}%`, transform: "translate(-50%, -50%)", zIndex: 20, background: "white", border: "1.5px solid #3E1540", borderRadius: 10, padding: 10, boxShadow: "0 4px 16px rgba(19,16,26,0.18)", minWidth: 180 }}
-                              >
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  placeholder="Annotation text…"
-                                  value={pendingAnnotationText}
-                                  onChange={e => setPendingAnnotationText(e.target.value)}
-                                  onKeyDown={e => { if (e.key === "Enter") handleSaveAnnotation(song.id); if (e.key === "Escape") setPendingAnnotation(null) }}
-                                  style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ECE8DE", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
-                                />
-                                {/* Color picker */}
-                                <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
-                                  {ANNOTATION_COLORS.map(c => (
-                                    <button key={c} onClick={() => setPendingAnnotationColor(c)}
-                                      style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: pendingAnnotationColor === c ? "2.5px solid #3E1540" : "1.5px solid transparent", cursor: "pointer" }} />
-                                  ))}
-                                </div>
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <button onClick={() => handleSaveAnnotation(song.id)} disabled={!pendingAnnotationText.trim() || savingAnnotation}
-                                    style={{ flex: 1, padding: "6px 0", background: "#3E1540", color: "#F6F4EF", borderRadius: 7, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !pendingAnnotationText.trim() || savingAnnotation ? 0.6 : 1 }}>
-                                    {savingAnnotation ? "Saving…" : "Save"}
-                                  </button>
-                                  <button onClick={() => setPendingAnnotation(null)}
-                                    style={{ padding: "6px 10px", background: "transparent", color: "#8A8497", borderRadius: 7, fontSize: 12, border: "1px solid #ECE8DE", cursor: "pointer" }}>
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Annotation hint */}
-                          {canAnnotate && !isPending && (
-                            <p style={{ fontSize: 11, color: "#8A8497", padding: "8px 18px", borderTop: "1px solid #ECE8DE" }}>
-                              Click anywhere on the chart to add an annotation. Click an annotation to remove it.
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        /* No chart uploaded yet */
-                        <div style={{ padding: "36px 24px", textAlign: "center" }}>
-                          <p style={{ fontSize: 13, color: "#8A8497" }}>No chart uploaded yet. Upload a PDF or image above.</p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
       {/* ── Availability ── */}
       {subTab === "availability" && (
         <div>
@@ -2411,17 +2116,18 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               {/* My availability */}
               <div style={{ marginBottom: canManage ? 32 : 0 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>My availability</p>
-                {weekDates.length === 0 ? (
+                {weeks.length === 0 ? (
                   <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
                     <p style={{ fontSize: 13, color: "#8A8497" }}>No weeks scheduled this month. Check the Schedule tab.</p>
                   </div>
                 ) : (
                   <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
-                    {weekDates.map((date, i) => {
+                    {weeks.map((week, i) => {
+                      const date = week.week_date
                       const avail = myAvailability[date]
                       const isSaving = savingAvail === date
                       return (
-                        <div key={date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weekDates.length - 1 ? "1px solid #ECE8DE" : "none", flexWrap: "wrap" as const }}>
+                        <div key={week.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weeks.length - 1 ? "1px solid #ECE8DE" : "none", flexWrap: "wrap" as const }}>
                           <p style={{ fontSize: 14, color: "#13101A", flexShrink: 0 }}>{worshipWeekDateLabel(date)}</p>
                           <div style={{ display: "flex", gap: 6, opacity: isSaving ? 0.5 : 1, pointerEvents: isSaving ? "none" : "auto" }}>
                             {(["available", "busy", "unsure"] as AvailStatus[]).map(s => {
@@ -2453,7 +2159,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               </div>
 
               {/* Manager view: all members' availability */}
-              {canManage && weekDates.length > 0 && teamMembers.length > 0 && (
+              {canManage && weeks.length > 0 && teamMembers.length > 0 && (
                 <div>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>Team availability</p>
                   <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflowX: "auto", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
@@ -2461,9 +2167,9 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       <thead>
                         <tr style={{ borderBottom: "1px solid #ECE8DE" }}>
                           <th style={{ textAlign: "left", padding: "10px 16px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>Member</th>
-                          {weekDates.map(d => (
-                            <th key={d} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>
-                              {new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {weeks.map(w => (
+                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>
+                              {new Date(w.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </th>
                           ))}
                         </tr>
@@ -2472,10 +2178,10 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                         {teamMembers.map((member, i) => (
                           <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid #ECE8DE" : "none" }}>
                             <td style={{ padding: "10px 16px", color: "#13101A", fontWeight: 500, whiteSpace: "nowrap" as const }}>{member.name}</td>
-                            {weekDates.map(d => {
-                              const a = allAvailability[member.user_id]?.[d]
+                            {weeks.map(w => {
+                              const a = allAvailability[member.user_id]?.[w.week_date]
                               return (
-                                <td key={d} style={{ textAlign: "center", padding: "10px 12px" }}>
+                                <td key={w.id} style={{ textAlign: "center", padding: "10px 12px" }}>
                                   {a === "available"
                                     ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#EDFAF3", color: "#2D7A4F", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✓</span>
                                     : a === "busy"
@@ -2496,6 +2202,257 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               )}
             </>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── SetListPdfViewer ──────────────────────────────────────────────────────────
+
+function SetListPdfViewer({
+  song,
+  canManage,
+  userId,
+  onClose,
+  onSongUpdate,
+}: {
+  song: WorshipSong
+  canManage: boolean
+  userId: string
+  onClose: () => void
+  onSongUpdate: (field: "title" | "key", value: string) => void
+}) {
+  const supabase = createClient()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
+  const [pdfDoc, setPdfDoc] = useState<{ numPages: number; getPage: (n: number) => Promise<unknown> } | null>(null)
+  const [numPages, setNumPages] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [annotations, setAnnotations] = useState<AnnotationObj[]>([])
+  const [pendingAnnotation, setPendingAnnotation] = useState<{ x: number; y: number } | null>(null)
+  const [pendingText, setPendingText] = useState("")
+  const [savingAnnotation, setSavingAnnotation] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [editingField, setEditingField] = useState<"title" | "key" | null>(null)
+  const [editValue, setEditValue] = useState("")
+
+  useEffect(() => {
+    if (!song.chart_url) { setLoading(false); return }
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const pdfjsLib = await import("pdfjs-dist")
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+      try {
+        const doc = await pdfjsLib.getDocument(song.chart_url!).promise
+        if (!cancelled) { setPdfDoc(doc as typeof pdfDoc); setNumPages(doc.numPages); setLoading(false) }
+      } catch { if (!cancelled) setLoading(false) }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [song.chart_url])
+
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return
+    let cancelled = false
+    async function render() {
+      if (renderTaskRef.current) { renderTaskRef.current.cancel(); renderTaskRef.current = null }
+      const page = await (pdfDoc as { getPage: (n: number) => Promise<unknown> }).getPage(currentPage) as {
+        getViewport: (o: { scale: number }) => { width: number; height: number }
+        render: (o: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number } }) => { promise: Promise<void>; cancel: () => void }
+      }
+      if (cancelled) return
+      const canvas = canvasRef.current!
+      const containerWidth = containerRef.current?.clientWidth ?? 360
+      const vp1 = page.getViewport({ scale: 1 })
+      const scale = (containerWidth - 32) / vp1.width
+      const viewport = page.getViewport({ scale })
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      const ctx = canvas.getContext("2d")!
+      const task = page.render({ canvasContext: ctx, viewport })
+      renderTaskRef.current = task
+      try { await task.promise } catch { /* cancelled */ }
+    }
+    render()
+    return () => { cancelled = true }
+  }, [pdfDoc, currentPage])
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("worship_annotations")
+        .select("annotation_data")
+        .eq("chart_id", song.id)
+        .single()
+      setAnnotations((data?.annotation_data ?? []) as AnnotationObj[])
+    }
+    load()
+  }, [song.id])
+
+  async function handleSaveAnnotation() {
+    if (!pendingText.trim() || !pendingAnnotation) return
+    setSavingAnnotation(true)
+    const newAnn: AnnotationObj = { id: crypto.randomUUID(), x: pendingAnnotation.x, y: pendingAnnotation.y, color: "#FDE68A", text: pendingText.trim() }
+    const updated = [...annotations, newAnn]
+    await supabase.from("worship_annotations")
+      .upsert({ chart_id: song.id, user_id: userId, annotation_data: updated, updated_at: new Date().toISOString() }, { onConflict: "chart_id" })
+    setAnnotations(updated)
+    setPendingAnnotation(null)
+    setPendingText("")
+    setSavingAnnotation(false)
+  }
+
+  async function handleDeleteAnnotation(annId: string) {
+    const updated = annotations.filter(a => a.id !== annId)
+    await supabase.from("worship_annotations")
+      .upsert({ chart_id: song.id, user_id: userId, annotation_data: updated, updated_at: new Date().toISOString() }, { onConflict: "chart_id" })
+    setAnnotations(updated)
+  }
+
+  function handlePdfAreaClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!canManage || pendingAnnotation || !canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    setPendingAnnotation({ x, y })
+    setPendingText("")
+  }
+
+  async function handleSaveFieldEdit() {
+    if (!editingField || !editValue.trim()) { setEditingField(null); return }
+    await supabase.from("worship_songs").update({ [editingField]: editValue.trim() }).eq("id", song.id)
+    onSongUpdate(editingField, editValue.trim())
+    setEditingField(null)
+  }
+
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497" }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#13101A", display: "flex", flexDirection: "column" }}>
+      {/* Toolbar */}
+      <div style={{ background: "#1E1825", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", paddingTop: 52, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <button onClick={onClose} style={{ padding: 6, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", display: "flex", alignItems: "center", flexShrink: 0 }}>
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editingField === "title" ? (
+            <input
+              autoFocus
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onBlur={handleSaveFieldEdit}
+              onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
+              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#F6F4EF", padding: "2px 0" }}
+            />
+          ) : (
+            <button onClick={canManage ? () => { setEditingField("title"); setEditValue(song.title) } : undefined}
+              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#F6F4EF", padding: 0, textAlign: "left", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" }}>
+              {song.title || <span style={{ color: "#5A5466" }}>Untitled</span>}
+            </button>
+          )}
+          {editingField === "key" ? (
+            <input
+              autoFocus
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onBlur={handleSaveFieldEdit}
+              onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
+              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "#C9A34B", padding: "2px 0", width: 60 }}
+            />
+          ) : (
+            <button onClick={canManage ? () => { setEditingField("key"); setEditValue(song.key) } : undefined}
+              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", ...monoStyle, color: song.key ? "#C9A34B" : "#5A5466", padding: 0 }}>
+              {song.key || "NO KEY"}
+            </button>
+          )}
+        </div>
+        {numPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", opacity: currentPage === 1 ? 0.4 : 1, display: "flex" }}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span style={{ fontSize: 12, color: "#8A8497", minWidth: 36, textAlign: "center" as const }}>{currentPage}/{numPages}</span>
+            <button onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage === numPages}
+              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", opacity: currentPage === numPages ? 0.4 : 1, display: "flex" }}>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* PDF + annotation area */}
+      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", padding: 16, background: "#13101A" }}
+        onClick={handlePdfAreaClick}>
+        {loading ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+        ) : !song.chart_url ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497", fontSize: 14 }}>No chart uploaded for this song.</div>
+        ) : (
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <canvas ref={canvasRef} style={{ display: "block", borderRadius: 6, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }} />
+
+            {/* Saved annotations */}
+            {annotations.map(ann => (
+              <div key={ann.id}
+                onClick={e => { e.stopPropagation(); if (canManage) handleDeleteAnnotation(ann.id) }}
+                title={canManage ? "Click to delete" : undefined}
+                style={{
+                  position: "absolute", left: `${ann.x}%`, top: `${ann.y}%`,
+                  transform: "translate(-50%, -50%)",
+                  background: ann.color, borderRadius: 6, padding: "4px 8px",
+                  fontSize: 11, fontWeight: 600, color: "#13101A",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+                  maxWidth: 160, wordBreak: "break-word" as const,
+                  cursor: canManage ? "pointer" : "default",
+                  zIndex: 10, pointerEvents: "auto",
+                }}>
+                {ann.text}
+              </div>
+            ))}
+
+            {/* Pending annotation input */}
+            {pendingAnnotation && (
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  position: "absolute", left: `${pendingAnnotation.x}%`, top: `${pendingAnnotation.y}%`,
+                  transform: "translate(-50%, -50%)",
+                  background: "white", borderRadius: 10, padding: 12,
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.5)", zIndex: 20, width: 190,
+                }}>
+                <input
+                  autoFocus
+                  value={pendingText}
+                  onChange={e => setPendingText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSaveAnnotation(); if (e.key === "Escape") setPendingAnnotation(null) }}
+                  placeholder="Add note…"
+                  style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "#13101A", marginBottom: 8, boxSizing: "border-box" as const }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={handleSaveAnnotation} disabled={savingAnnotation || !pendingText.trim()}
+                    style={{ flex: 1, padding: "5px 8px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
+                    Save
+                  </button>
+                  <button onClick={() => setPendingAnnotation(null)}
+                    style={{ padding: "5px 8px", background: "#F0EDE8", color: "#5A5466", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Hint bar */}
+      {canManage && !loading && song.chart_url && (
+        <div style={{ padding: "10px 16px", background: "#1E1825", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, textAlign: "center" }}>
+          <p style={{ fontSize: 11, color: "#5A5466" }}>Tap anywhere on the chart to add a note · tap a note to delete it</p>
         </div>
       )}
     </div>
