@@ -1,8 +1,8 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList, Heart } from "lucide-react"
 
-type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "profile"
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile"
 
 interface BottomNavProps {
   activeTab: Tab
@@ -11,18 +11,16 @@ interface BottomNavProps {
   showPlan?: boolean
 }
 
-const BASE_TABS = [
-  { id: "home" as const, label: "Home", icon: Home },
-  { id: "chats" as const, label: "Chats", icon: MessageCircle },
-  { id: "profile" as const, label: "You", icon: User },
-]
-
+const HOME_TAB = { id: "home" as const, label: "Home", icon: Home }
+const CHATS_TAB = { id: "chats" as const, label: "Chats", icon: MessageCircle }
 const PLAN_TAB = { id: "plan" as const, label: "Plan", icon: ClipboardList }
+const GIVING_TAB = { id: "giving" as const, label: "Give", icon: Heart }
+const PROFILE_TAB = { id: "profile" as const, label: "You", icon: User }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
   const tabs = showPlan
-    ? [BASE_TABS[0], BASE_TABS[1], PLAN_TAB, BASE_TABS[2]]
-    : BASE_TABS
+    ? [HOME_TAB, CHATS_TAB, PLAN_TAB, GIVING_TAB, PROFILE_TAB]
+    : [HOME_TAB, CHATS_TAB, GIVING_TAB, PROFILE_TAB]
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 px-1 md:hidden">

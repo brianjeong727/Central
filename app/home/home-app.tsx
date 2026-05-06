@@ -21,6 +21,7 @@ import { AnnouncementsTab } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
 import { PlanTab } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
+import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
@@ -437,6 +438,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                   setActiveTab("chats")
                   handleOpenChat(id, name)
                 }}
+              />
+            </div>
+          )}
+
+          {activeTab === "giving" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <GivingTab
+                ministryId={ministryId}
+                userId={userId}
+                isAdmin={isAdmin}
               />
             </div>
           )}

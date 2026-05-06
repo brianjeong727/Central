@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Bell, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight } from "lucide-react"
+import { Home, Bell, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -41,6 +41,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     { id: "chats", icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
     { id: "directory", icon: Users },
+    { id: "giving", icon: Heart },
     { id: "profile", icon: User },
   ]
 
@@ -165,7 +166,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    if (activeTab === "directory") {
+    if (activeTab === "directory" || activeTab === "giving") {
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
 
@@ -254,7 +255,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       </div>
 
       {/* Context Panel — hidden for chats/directory (those tabs have their own left panel) */}
-      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}>
+      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" || activeTab === "giving" ? "" : "md:flex"}`}>
         {/* Workspace header */}
         <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
           <p style={monoStyle}>Workspace</p>
