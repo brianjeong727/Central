@@ -359,6 +359,7 @@ export interface WorshipRoleRow {
 export interface PraiseTeamMember {
   user_id: string
   name: string
+  role_name: string
 }
 
 export interface WorshipSong {

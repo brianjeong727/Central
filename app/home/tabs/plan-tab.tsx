@@ -38,6 +38,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   can_view_finances: "View finances",
   can_manage_members: "Manage members",
   can_manage_team: "Manage team",
+  can_manage_schedule: "Manage schedule",
 }
 
 const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS)
@@ -49,6 +50,7 @@ const TEAM_PRESETS = [
     icon: "🎵",
     description: "Worship and music ministry",
     roles: [
+      { name: "President", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
       { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
       { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
     ],
@@ -891,6 +893,7 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
   const isPraiseTeam = activeTeamName === "Praise Team"
   const praiseTeamPerms = isPraiseTeam ? (userTeams.find(t => t.teamId === activeTeamId)?.permissions ?? []) : []
   const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
+  const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
   const studentOrgTabs: string[] = (() => {
     if (!isStudentOrgBoard) return []
     if (isAdmin || studentOrgRole === "President") return ["General", "President", "Treasurer", "Secretary", "Event Coordinator"]
@@ -993,6 +996,7 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
                   ministryId={ministryId}
                   userId={userId}
                   canManage={canManageWorship}
+                  canManageSchedule={canManageSchedule}
                 />
               )
             }
@@ -1053,6 +1057,7 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
+            canManageSchedule={canManageSchedule}
           />
         ) : (
         <>
@@ -1228,7 +1233,7 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
   )
 }
 
-export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
+export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManageSchedule }: { teamId: string; ministryId: string; userId: string; canManage: boolean; canManageSchedule: boolean }) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "availability">("schedule")
 
@@ -1240,6 +1245,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   // Add week form
   const [showAddWeek, setShowAddWeek] = useState(false)
   const [newDate, setNewDate] = useState("")
+  const [newLeaderError, setNewLeaderError] = useState(false)
   const [newLeaderId, setNewLeaderId] = useState("")
   const [addingWeek, setAddingWeek] = useState(false)
 
@@ -1331,46 +1337,34 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   async function loadTeamMembers() {
     const { data } = await supabase
       .from("team_members")
-      .select("user_id, profiles!user_id(name)")
+      .select("user_id, profiles!user_id(name), team_roles!role_id(name)")
       .eq("team_id", teamId)
-    type Raw = { user_id: string; profiles: { name: string } | { name: string }[] | null }
+    type Raw = { user_id: string; profiles: { name: string } | { name: string }[] | null; team_roles: { name: string } | { name: string }[] | null }
     setTeamMembers((data ?? []).map((m: Raw) => {
       const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-      return { user_id: m.user_id, name: p?.name ?? "Unknown" }
+      const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+      return { user_id: m.user_id, name: p?.name ?? "Unknown", role_name: r?.name ?? "" }
     }))
   }
 
   async function loadAvailability() {
     setAvailLoading(true)
-    if (canManage) {
-      const { data } = await supabase
-        .from("worship_availability")
-        .select("user_id, week_date, status")
-        .eq("team_id", teamId)
-        .gte("week_date", monthStart)
-        .lte("week_date", monthEnd)
-      const mine: Record<string, AvailStatus> = {}
-      const all: Record<string, Record<string, AvailStatus>> = {}
-      for (const row of data ?? []) {
-        const s = (row.status ?? "available") as AvailStatus
-        if (row.user_id === userId) mine[row.week_date] = s
-        if (!all[row.user_id]) all[row.user_id] = {}
-        all[row.user_id][row.week_date] = s
-      }
-      setMyAvailability(mine)
-      setAllAvailability(all)
-    } else {
-      const { data } = await supabase
-        .from("worship_availability")
-        .select("week_date, status")
-        .eq("team_id", teamId)
-        .eq("user_id", userId)
-        .gte("week_date", monthStart)
-        .lte("week_date", monthEnd)
-      const mine: Record<string, AvailStatus> = {}
-      for (const row of data ?? []) mine[row.week_date] = (row.status ?? "available") as AvailStatus
-      setMyAvailability(mine)
+    const { data } = await supabase
+      .from("worship_availability")
+      .select("user_id, week_date, status")
+      .eq("team_id", teamId)
+      .gte("week_date", monthStart)
+      .lte("week_date", monthEnd)
+    const mine: Record<string, AvailStatus> = {}
+    const all: Record<string, Record<string, AvailStatus>> = {}
+    for (const row of data ?? []) {
+      const s = (row.status ?? "available") as AvailStatus
+      if (row.user_id === userId) mine[row.week_date] = s
+      if (!all[row.user_id]) all[row.user_id] = {}
+      all[row.user_id][row.week_date] = s
     }
+    setMyAvailability(mine)
+    setAllAvailability(all)
     setAvailLoading(false)
   }
 
@@ -1397,8 +1391,10 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
 
   async function handleAddWeek() {
     if (!newDate) return
+    if (!newLeaderId) { setNewLeaderError(true); return }
+    setNewLeaderError(false)
     setAddingWeek(true)
-    const { error } = await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newDate, leader_id: newLeaderId || null, status: "draft" })
+    const { error } = await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newDate, leader_id: newLeaderId, status: "draft" })
     if (!error) { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); await loadSchedule() }
     setAddingWeek(false)
   }
@@ -1447,7 +1443,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
       )
     if (!error) {
       setMyAvailability(prev => ({ ...prev, [weekDate]: status }))
-      if (canManage) setAllAvailability(prev => ({ ...prev, [userId]: { ...(prev[userId] ?? {}), [weekDate]: status } }))
+      setAllAvailability(prev => ({ ...prev, [userId]: { ...(prev[userId] ?? {}), [weekDate]: status } }))
     }
     setSavingAvail(null)
   }
@@ -1723,7 +1719,8 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
     return () => window.removeEventListener("keydown", onKey)
   }, [slidesOverlayOpen, slidesDeck])
 
-  const visibleWeeks = canManage ? weeks : weeks.filter(w => w.roles.some(r => r.user_id === userId))
+  const visibleWeeks = weeks
+  const worshipLeaders = teamMembers.filter(m => m.role_name === "Worship Leader")
   const weekDates = weeks.map(w => w.week_date)
   const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
 
@@ -1819,7 +1816,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <p style={{ ...monoStyle, fontSize: 11 }}>{monthLabel}</p>
-            {canManage && !showAddWeek && (
+            {canManageSchedule && !showAddWeek && (
               <button
                 onClick={() => setShowAddWeek(true)}
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
@@ -1841,11 +1838,13 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                     style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Leader <span style={{ color: "#8A8497", fontWeight: 400 }}>(optional)</span></label>
-                  <select value={newLeaderId} onChange={e => setNewLeaderId(e.target.value)}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}>
-                    <option value="">Unassigned</option>
-                    {teamMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "#DC2626" : "#5A5466", marginBottom: 4 }}>
+                    Leader <span style={{ color: newLeaderError ? "#DC2626" : "#8A8497", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
+                  </label>
+                  <select value={newLeaderId} onChange={e => { setNewLeaderId(e.target.value); setNewLeaderError(false) }}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "#ECE8DE"}`, background: "#FBF8F2", fontSize: 14, color: newLeaderId ? "#13101A" : "#8A8497", outline: "none" }}>
+                    <option value="">Select Worship Leader…</option>
+                    {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1868,7 +1867,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
           ) : visibleWeeks.length === 0 ? (
             <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
-              <p style={{ fontSize: 13, color: "#8A8497" }}>{canManage ? "Add one to get started." : "Check back later or set your availability."}</p>
+              <p style={{ fontSize: 13, color: "#8A8497" }}>{canManageSchedule ? "Add one to get started." : "Check back later or set your availability."}</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1910,15 +1909,17 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       )}
                       {/* Leader row */}
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={monoStyle}>Leader</span>
-                        {canManage ? (
+                        <span style={{ ...monoStyle, color: !week.leader_id ? "#DC2626" : undefined }}>Leader</span>
+                        {canManageSchedule ? (
                           <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
-                            style={{ flex: 1, fontSize: 13, color: "#13101A", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
-                            <option value="">Unassigned</option>
-                            {teamMembers.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                            style={{ flex: 1, fontSize: 13, color: week.leader_id ? "#13101A" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
+                            <option value="">— required —</option>
+                            {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                           </select>
                         ) : (
-                          <span style={{ fontSize: 13, color: "#13101A" }}>{week.leader_name ?? "Unassigned"}</span>
+                          <span style={{ fontSize: 13, color: week.leader_name ? "#13101A" : "#DC2626" }}>
+                            {week.leader_name ?? "Not assigned"}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1935,7 +1936,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                                 <span style={{ ...monoStyle, minWidth: 52 }}>{role.role_name}</span>
                                 <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
                               </div>
-                              {canManage && (
+                              {(canManageSchedule || isLeader) && (
                                 <button onClick={() => handleRemoveMember(role.id)}
                                   style={{ padding: "1px 6px", fontSize: 12, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1 }}>
                                   ✕
@@ -1946,7 +1947,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                         </div>
                       )}
 
-                      {canManage && !isThisWeekAddTarget && (
+                      {(canManageSchedule || isLeader) && !isThisWeekAddTarget && (
                         <button onClick={() => { setAddMemberToWeekId(week.id); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberRole("Vocals") }}
                           style={{ marginTop: 10, fontSize: 13, color: "#3E1540", fontWeight: 500, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
                           + Add member
@@ -2208,7 +2209,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
           ) : (
             <>
               {/* My availability */}
-              <div style={{ marginBottom: canManage ? 32 : 0 }}>
+              <div style={{ marginBottom: 32 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>My availability</p>
                 {weeks.length === 0 ? (
                   <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
@@ -2252,8 +2253,8 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 )}
               </div>
 
-              {/* Manager view: all members' availability */}
-              {canManage && weeks.length > 0 && teamMembers.length > 0 && (
+              {/* Team availability — visible to all members */}
+              {weeks.length > 0 && teamMembers.length > 0 && (
                 <div>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>Team availability</p>
                   <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflowX: "auto", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
