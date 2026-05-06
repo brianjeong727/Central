@@ -5,7 +5,6 @@ const SYSTEM_PROMPT =
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  console.log("[generate-slides] ANTHROPIC_API_KEY prefix:", apiKey ? apiKey.slice(0, 10) : "NOT SET")
 
   if (!apiKey) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 })
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
     const errBody = await anthropicRes.text()
     console.error(`[generate-slides] Anthropic returned ${anthropicRes.status}:`, errBody)
     return NextResponse.json(
-      { error: `Anthropic API error ${anthropicRes.status}`, detail: errBody },
+      { error: `Anthropic API error ${anthropicRes.status}` },
       { status: 500 }
     )
   }
@@ -75,7 +74,6 @@ export async function POST(req: NextRequest) {
 
   const text = data.content?.[0]?.text ?? ""
   console.log("[generate-slides] Claude response length:", text.length)
-  console.log("[generate-slides] Claude response preview:", text.slice(0, 200))
 
   // Parse Claude's plain-text response into {section, lyrics} pairs.
   // Section headers are short ALL-CAPS lines (VERSE 1, CHORUS, BRIDGE, etc.).

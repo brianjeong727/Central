@@ -6,12 +6,19 @@ dotenv.config({ path: path.resolve(__dirname, "../.env.local") })
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-const PASSWORD = "CentralTest123!"
+const PASSWORD = process.env.SEED_USER_PASSWORD
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error("\n❌  Missing env vars. Add to .env.local:\n")
+  console.error("  NEXT_PUBLIC_SUPABASE_URL=<your project URL>\n")
   console.error("  SUPABASE_SERVICE_ROLE_KEY=<your service role key>\n")
-  console.error("Find it in Supabase Dashboard → Project Settings → API → service_role\n")
+  console.error("Find the service role key in Supabase Dashboard → Project Settings → API\n")
+  process.exit(1)
+}
+
+if (!PASSWORD) {
+  console.error("\n❌  Missing SEED_USER_PASSWORD. Add to .env.local (dev only):\n")
+  console.error("  SEED_USER_PASSWORD=<password for seeded test users>\n")
   process.exit(1)
 }
 
