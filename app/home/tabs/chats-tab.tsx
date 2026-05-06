@@ -1380,7 +1380,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
   const supabase = createClient()
   const [subTab, setSubTab] = useState<"church" | "my">("church")
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
@@ -1483,7 +1483,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
-  const showPlusButton = subTab === "my" || (subTab === "church" && isAdminOrLeader)
+  const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
   const monoStyle: React.CSSProperties = {
     fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",

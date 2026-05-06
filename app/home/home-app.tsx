@@ -309,6 +309,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   }
 
   const showPlanTab = isAdmin || userTeams.length > 0
+  // Church chat creation: admins/leaders + DGL members + Student Org Board members
+  const canCreateChurchChat = isAdmin ||
+    userTeams.some(t => t.teamName === "Small Group Leaders" || t.teamName === "Student Org Board")
 
   return (
     <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[#F4F1E8]">
@@ -379,6 +382,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                   refreshKey={chatRefreshKey}
                   onOpenDirectory={() => setActiveTab("directory")}
                   activeGroupId={globalOpenChat?.id}
+                  canCreateChurchChat={canCreateChurchChat}
                 />
               </div>
               {/* Right: chat content — desktop only */}

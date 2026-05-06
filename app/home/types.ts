@@ -194,6 +194,7 @@ export interface ChatsTabProps {
   refreshKey: number
   onOpenDirectory: () => void
   activeGroupId?: string | null
+  canCreateChurchChat: boolean
 }
 
 export interface DirectoryMember {
