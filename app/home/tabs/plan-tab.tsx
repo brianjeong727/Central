@@ -1268,8 +1268,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
 
   // Slides state
   const [slidesWeekId, setSlidesWeekId] = useState<string | null>(null)
-  const [slideIndex, setSlideIndex] = useState(0)
-  const [slideDeckActive, setSlideDeckActive] = useState(false)
+  const [rawOcrBySong, setRawOcrBySong] = useState<Record<string, string>>({})
+  type SlidePage = { songTitle: string; songKey: string; section: string; lyrics: string }
+  const [slidesDeck, setSlidesDeck] = useState<SlidePage[] | null>(null)
+  const [slidesGenerating, setSlidesGenerating] = useState(false)
+  const [slidesOverlayOpen, setSlidesOverlayOpen] = useState(false)
+  const [slidesActiveIndex, setSlidesActiveIndex] = useState(0)
 
   // Generation counter to cancel stale loadSchedule results
   const loadScheduleGenRef = useRef(0)
@@ -1501,6 +1505,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
         await worker.terminate()
         const rawText = result.data.text
         console.log("[OCR] raw text:", rawText)
+        setRawOcrBySong(prev => ({ ...prev, [songId]: rawText }))
 
         const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0)
 
@@ -1640,6 +1645,81 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
     URL.revokeObjectURL(url)
   }
 
+  async function handleGenerateSlides(songs: WorshipSong[]) {
+    setSlidesGenerating(true)
+    const allSlides: { songTitle: string; songKey: string; section: string; lyrics: string }[] = []
+
+    for (const song of songs) {
+      let ocrText = rawOcrBySong[song.id]
+
+      // If no cached OCR text but chart is available, re-fetch and OCR the PDF
+      if (!ocrText && song.chart_url) {
+        try {
+          const buf = await fetch(song.chart_url).then(r => r.arrayBuffer())
+          const pdfjsLib = await import("pdfjs-dist")
+          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise
+          const page = await pdf.getPage(1)
+          const viewport = page.getViewport({ scale: 2 })
+          const canvas = document.createElement("canvas")
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          const ctx = canvas.getContext("2d")
+          if (ctx) {
+            await page.render({ canvasContext: ctx, viewport, canvas }).promise
+            const { createWorker } = await import("tesseract.js")
+            const worker = await createWorker("eng")
+            const result = await worker.recognize(canvas)
+            await worker.terminate()
+            ocrText = result.data.text
+            setRawOcrBySong(prev => ({ ...prev, [song.id]: ocrText }))
+          }
+        } catch { /* fall through to fallback */ }
+      }
+
+      if (ocrText) {
+        try {
+          const res = await fetch("/api/generate-slides", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ocrText }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            for (const s of (data.sections ?? [])) {
+              allSlides.push({ songTitle: song.title, songKey: song.key, section: s.section, lyrics: s.lyrics })
+            }
+            continue
+          }
+        } catch { /* fall through to fallback */ }
+      }
+
+      // Fallback: single title slide
+      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: song.title })
+    }
+
+    setSlidesDeck(allSlides)
+    setSlidesActiveIndex(0)
+    setSlidesOverlayOpen(true)
+    setSlidesGenerating(false)
+  }
+
+  // Keyboard navigation for the slides overlay
+  useEffect(() => {
+    if (!slidesOverlayOpen || !slidesDeck) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        setSlidesActiveIndex(i => Math.max(i - 1, 0))
+      } else if (e.key === "Escape") {
+        setSlidesOverlayOpen(false)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [slidesOverlayOpen, slidesDeck])
+
   const visibleWeeks = canManage ? weeks : weeks.filter(w => w.roles.some(r => r.user_id === userId))
   const weekDates = weeks.map(w => w.week_date)
   const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
@@ -1664,6 +1744,64 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
           }}
         />
       )}
+
+      {/* ── Slides full-screen overlay ── */}
+      {slidesOverlayOpen && slidesDeck && (() => {
+        const slide = slidesDeck[slidesActiveIndex]
+        const isFallback = slide.section === "" && slide.lyrics === slide.songTitle
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
+            {/* Radial glow */}
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(201,163,75,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
+
+            {/* Close button */}
+            <button
+              onClick={() => setSlidesOverlayOpen(false)}
+              style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#F6F4EF" }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Left tap zone */}
+            <div
+              onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))}
+              style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }}
+            />
+            {/* Right tap zone */}
+            <div
+              onClick={() => setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))}
+              style={{ position: "absolute", right: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex < slidesDeck.length - 1 ? "pointer" : "default" }}
+            />
+
+            {/* Slide content */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 40px 80px", textAlign: "center", position: "relative", zIndex: 6 }}>
+              {/* Song title */}
+              {!isFallback && (
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6, letterSpacing: "0.01em" }}>{slide.songTitle}</p>
+              )}
+              {/* Section label */}
+              {slide.section && (
+                <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>
+              )}
+              {/* Lyrics */}
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>
+                {isFallback ? slide.songTitle : slide.lyrics}
+              </p>
+              {/* Key on fallback */}
+              {isFallback && slide.songKey && (
+                <p style={{ marginTop: 18, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 16, color: "rgba(246,244,239,0.45)", letterSpacing: "0.18em", textTransform: "uppercase" as const }}>{slide.songKey}</p>
+              )}
+            </div>
+
+            {/* Counter */}
+            <div style={{ position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center", zIndex: 6 }}>
+              <span style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "rgba(246,244,239,0.4)", letterSpacing: "0.04em" }}>
+                {slidesActiveIndex + 1} / {slidesDeck.length}
+              </span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Sub-tabs */}
       <div style={{ borderBottom: "1px solid #ECE8DE", marginBottom: 24, display: "flex", overflowX: "auto", scrollbarWidth: "none" }}>
@@ -1993,10 +2131,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
       {/* ── Slides ── */}
       {subTab === "slides" && (() => {
         const todayStr = new Date().toISOString().split("T")[0]
-        const slidesWeek = weeks.find(w => w.id === slidesWeekId)
         const slidesSongs = (songsByWeek[slidesWeekId ?? ""] ?? []).sort((a, b) => a.order_index - b.order_index)
-        const canGenerate = canManage
-        const currentSlide = slidesSongs[slideIndex]
         return (
           <div>
             {/* Week selector */}
@@ -2005,7 +2140,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 6 }}>Week</label>
                 <select
                   value={slidesWeekId ?? ""}
-                  onChange={e => { setSlidesWeekId(e.target.value); setSlideIndex(0); setSlideDeckActive(false) }}
+                  onChange={e => { setSlidesWeekId(e.target.value) }}
                   style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}
                 >
                   {weeks.map(w => (
@@ -2022,28 +2157,32 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No songs in the set list yet.</p>
                 <p style={{ fontSize: 13, color: "#8A8497" }}>Add songs in the Set List tab first.</p>
               </div>
-            ) : !slideDeckActive ? (
-              /* Song list preview + generate button */
+            ) : (
               <div>
+                {/* Song list preview */}
                 <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(19,16,26,0.06)", marginBottom: 16 }}>
                   {slidesSongs.map((song, i) => (
                     <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: i < slidesSongs.length - 1 ? "1px solid #ECE8DE" : "none" }}>
                       <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-                      <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{song.title}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "2px 8px" }}>{song.key}</span>
+                      <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{song.title || <span style={{ color: "#C4C4C4" }}>Untitled</span>}</span>
+                      {song.key && <span style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "2px 8px" }}>{song.key}</span>}
+                      {!rawOcrBySong[song.id] && !song.chart_url && (
+                        <span style={{ fontSize: 11, color: "#C4C4C4" }}>no chart</span>
+                      )}
                     </div>
                   ))}
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
-                  {canGenerate && (
+                  {canManage && (
                     <button
-                      onClick={() => { setSlideDeckActive(true); setSlideIndex(0) }}
-                      style={{ flex: 1, padding: "11px 0", background: "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
+                      onClick={() => handleGenerateSlides(slidesSongs)}
+                      disabled={slidesGenerating}
+                      style={{ flex: 1, padding: "11px 0", background: slidesGenerating ? "#8A8497" : "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer" }}
                     >
-                      Generate slides
+                      {slidesGenerating ? "Generating…" : "Generate slides"}
                     </button>
                   )}
-                  {canGenerate && (
+                  {canManage && (
                     <button
                       onClick={() => handleExportSlides(slidesSongs)}
                       style={{ padding: "11px 18px", background: "transparent", color: "#3E1540", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "1.5px solid #3E1540", cursor: "pointer" }}
@@ -2051,54 +2190,6 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       Export HTML
                     </button>
                   )}
-                </div>
-              </div>
-            ) : (
-              /* Slide viewer */
-              <div>
-                {/* Slide card */}
-                <div style={{ background: "#3E1540", borderRadius: 20, padding: "60px 32px", textAlign: "center", marginBottom: 16, minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", boxShadow: "0 8px 32px rgba(62,21,64,0.25)" }}>
-                  {/* Radial gold glow */}
-                  <div style={{ position: "absolute", inset: 0, borderRadius: 20, background: "radial-gradient(ellipse at 50% 60%, rgba(201,163,75,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px,8vw,52px)", color: "#F6F4EF", lineHeight: 1.2, fontWeight: 400, position: "relative" }}>
-                    {currentSlide?.title ?? ""}
-                  </p>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 16, color: "rgba(246,244,239,0.55)", letterSpacing: "0.2em", textTransform: "uppercase", marginTop: 20, position: "relative" }}>
-                    {currentSlide?.key ?? ""}
-                  </p>
-                </div>
-
-                {/* Nav controls */}
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button
-                    onClick={() => setSlideIndex(i => Math.max(0, i - 1))}
-                    disabled={slideIndex === 0}
-                    style={{ flex: 1, padding: "10px 0", background: "white", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, fontWeight: 500, color: slideIndex === 0 ? "#C4C4C4" : "#13101A", cursor: slideIndex === 0 ? "default" : "pointer" }}
-                  >
-                    ← Prev
-                  </button>
-                  <span style={{ fontSize: 13, color: "#8A8497", whiteSpace: "nowrap" as const }}>{slideIndex + 1} / {slidesSongs.length}</span>
-                  <button
-                    onClick={() => setSlideIndex(i => Math.min(slidesSongs.length - 1, i + 1))}
-                    disabled={slideIndex === slidesSongs.length - 1}
-                    style={{ flex: 1, padding: "10px 0", background: "white", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, fontWeight: 500, color: slideIndex === slidesSongs.length - 1 ? "#C4C4C4" : "#13101A", cursor: slideIndex === slidesSongs.length - 1 ? "default" : "pointer" }}
-                  >
-                    Next →
-                  </button>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                  <button
-                    onClick={() => setSlideDeckActive(false)}
-                    style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}
-                  >
-                    Back to list
-                  </button>
-                  <button
-                    onClick={() => handleExportSlides(slidesSongs)}
-                    style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#3E1540", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "1.5px solid #3E1540", cursor: "pointer" }}
-                  >
-                    Export HTML
-                  </button>
                 </div>
               </div>
             )}

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,7 +25,6 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh session — must not use getSession() here per Supabase docs
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -39,20 +38,14 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/join')
   const isHomePage = pathname.startsWith('/home')
 
-  // Unauthenticated user trying to access a protected page
   if (!user && !isPublicPage) {
     return NextResponse.redirect(new URL('/landing', request.url))
   }
 
-  // Authenticated user on /login → send home (no reason to see the login form)
-  // /signup is intentionally excluded: authenticated users may reach it via the
-  // "Sign up" link on /join, and blocking it creates a redirect loop.
   if (user && pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/home', request.url))
   }
 
-  // Authenticated user accessing /home without a ministry → send to /join
-  // /join itself is always accessible to authenticated users regardless of ministry status.
   if (user && isHomePage) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -70,6 +63,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
