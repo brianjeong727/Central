@@ -1674,7 +1674,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
             ocrText = result.data.text
             setRawOcrBySong(prev => ({ ...prev, [song.id]: ocrText }))
           }
-        } catch { /* fall through to fallback */ }
+        } catch (e) { console.error("[slides] OCR failed for", song.title, e) }
       }
 
       if (ocrText) {
@@ -1690,8 +1690,11 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               allSlides.push({ songTitle: song.title, songKey: song.key, section: s.section, lyrics: s.lyrics })
             }
             continue
+          } else {
+            const errBody = await res.text().catch(() => "")
+            console.error("[slides] generate-slides returned", res.status, errBody)
           }
-        } catch { /* fall through to fallback */ }
+        } catch (e) { console.error("[slides] fetch generate-slides failed", e) }
       }
 
       // Fallback: single title slide
