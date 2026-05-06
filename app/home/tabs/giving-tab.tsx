@@ -19,6 +19,15 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [zelleFallback, setZelleFallback] = useState(false)
+
+  useEffect(() => {
+    setIsMobile(
+      window.innerWidth < 768 ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    )
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -59,7 +68,11 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
   }
 
   function handleOpenZelle() {
+    setZelleFallback(false)
     window.location.href = "zelle://"
+    const t = setTimeout(() => setZelleFallback(true), 500)
+    const onHide = () => { clearTimeout(t); document.removeEventListener("visibilitychange", onHide) }
+    document.addEventListener("visibilitychange", onHide)
   }
 
   return (
@@ -145,13 +158,27 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                       <p style={{ fontSize: 17, fontWeight: 600, color: "#13101A", wordBreak: "break-all" }}>{zelleInfo}</p>
                     </div>
                     {/* Action buttons */}
-                    <button
-                      onClick={handleOpenZelle}
-                      style={{ width: "100%", padding: "13px 0", background: "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Open Zelle
-                    </button>
+                    {isMobile ? (
+                      <>
+                        <button
+                          onClick={handleOpenZelle}
+                          style={{ width: "100%", padding: "13px 0", background: "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open Zelle
+                        </button>
+                        {zelleFallback && (
+                          <p style={{ fontSize: 13, color: "#5A5466", textAlign: "center", lineHeight: 1.5, padding: "2px 0" }}>
+                            Open Zelle on your phone and send to <strong style={{ color: "#13101A" }}>{zelleInfo}</strong>
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 12, padding: "14px 16px", textAlign: "center" }}>
+                        <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 2 }}>Send via Zelle on your mobile device</p>
+                        <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A" }}>{zelleInfo}</p>
+                      </div>
+                    )}
                     <button
                       onClick={handleCopy}
                       style={{ width: "100%", padding: "11px 0", background: "transparent", color: copied ? "#2D7A4F" : "#3E1540", borderRadius: 12, fontSize: 14, fontWeight: 600, border: `1.5px solid ${copied ? "#6EE7B7" : "#3E1540"}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.15s" }}
