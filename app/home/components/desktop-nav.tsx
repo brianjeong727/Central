@@ -166,29 +166,12 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     if (activeTab === "directory") {
-      const filters = [
-        { l: "All members", on: true },
-        { l: "Leaders" },
-        { l: "Class of 2025" },
-        { l: "Class of 2026" },
-        { l: "Class of 2027" },
-        { l: "Class of 2028" },
-      ]
-      return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 4px" }}>Filters</p>
-          {filters.map((f, i) => (
-            <button key={i} style={subItemStyle(f.on)}>
-              <span style={{ flex: 1 }}>{f.l}</span>
-            </button>
-          ))}
-        </div>
-      )
+      return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
 
     if (activeTab === "profile") {
       const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
-        { label: "Spiritual profile", section: "spiritual-profile" },
+        { label: "Profile", section: "spiritual-profile" },
         { label: "Journal", section: "journal" },
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
@@ -208,30 +191,14 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    // Home and announcements — static sub-nav
-    const homeItems = [
-      { label: "This week", on: true },
-      { label: "Up next" },
-      { label: "Pray with us" },
-      { label: "Recent activity" },
-    ]
-    const annItems = [
-      { label: "All", on: true },
-      { label: "Events" },
-      { label: "Prayer" },
-      { label: "Pinned" },
-    ]
-    const items = activeTab === "announcements" ? annItems : homeItems
-    const sectionLabel = activeTab === "announcements" ? "Announcements" : "Home"
-
+    // Home / announcements — single contextual row per tab
+    const singleLabel = activeTab === "announcements" ? "Announcements" : "Home"
     return (
       <div className="flex-1 overflow-y-auto px-2 pb-3">
-        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>{sectionLabel}</p>
-        {items.map((s, i) => (
-          <button key={i} style={subItemStyle(s.on)}>
-            <span style={{ flex: 1 }}>{s.label}</span>
-          </button>
-        ))}
+        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>{singleLabel}</p>
+        <div style={{ ...subItemStyle(true), cursor: "default" }} aria-current="page">
+          <span style={{ flex: 1 }}>{singleLabel}</span>
+        </div>
       </div>
     )
   }

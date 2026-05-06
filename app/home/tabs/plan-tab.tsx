@@ -870,7 +870,7 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [studentOrgTab, setStudentOrgTab] = useState("General")
-  useEffect(() => { setStudentOrgTab("General") }, [activeTeamId])
+  useEffect(() => { setStudentOrgTab("General"); setOpenTeam(null) }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
@@ -1248,12 +1248,14 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
   const [addMemberUserId, setAddMemberUserId] = useState("")
   const [addMemberRole, setAddMemberRole] = useState("Vocals")
   const [addMemberSearch, setAddMemberSearch] = useState("")
+  const [addMemberFocused, setAddMemberFocused] = useState(false)
   const [addingMember, setAddingMember] = useState(false)
 
   // Availability state
+  type AvailStatus = "available" | "busy" | "unsure"
   const [availLoading, setAvailLoading] = useState(false)
-  const [myAvailability, setMyAvailability] = useState<Record<string, boolean>>({})
-  const [allAvailability, setAllAvailability] = useState<Record<string, Record<string, boolean>>>({})
+  const [myAvailability, setMyAvailability] = useState<Record<string, AvailStatus>>({})
+  const [allAvailability, setAllAvailability] = useState<Record<string, Record<string, AvailStatus>>>({})
   const [savingAvail, setSavingAvail] = useState<string | null>(null)
 
   // Set List state
@@ -1350,29 +1352,30 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
     if (canManage) {
       const { data } = await supabase
         .from("worship_availability")
-        .select("user_id, week_date, is_available")
+        .select("user_id, week_date, status")
         .eq("team_id", teamId)
         .gte("week_date", monthStart)
         .lte("week_date", monthEnd)
-      const mine: Record<string, boolean> = {}
-      const all: Record<string, Record<string, boolean>> = {}
+      const mine: Record<string, AvailStatus> = {}
+      const all: Record<string, Record<string, AvailStatus>> = {}
       for (const row of data ?? []) {
-        if (row.user_id === userId) mine[row.week_date] = row.is_available
+        const s = (row.status ?? "available") as AvailStatus
+        if (row.user_id === userId) mine[row.week_date] = s
         if (!all[row.user_id]) all[row.user_id] = {}
-        all[row.user_id][row.week_date] = row.is_available
+        all[row.user_id][row.week_date] = s
       }
       setMyAvailability(mine)
       setAllAvailability(all)
     } else {
       const { data } = await supabase
         .from("worship_availability")
-        .select("week_date, is_available")
+        .select("week_date, status")
         .eq("team_id", teamId)
         .eq("user_id", userId)
         .gte("week_date", monthStart)
         .lte("week_date", monthEnd)
-      const mine: Record<string, boolean> = {}
-      for (const row of data ?? []) mine[row.week_date] = row.is_available
+      const mine: Record<string, AvailStatus> = {}
+      for (const row of data ?? []) mine[row.week_date] = (row.status ?? "available") as AvailStatus
       setMyAvailability(mine)
     }
     setAvailLoading(false)
@@ -1438,15 +1441,16 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamI
     setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, status: status as WorshipWeek["status"] } : w))
   }
 
-  async function handleToggleAvailability(weekDate: string) {
-    const current = myAvailability[weekDate]
-    const next = current === undefined ? true : !current
+  async function handleSetAvailability(weekDate: string, status: AvailStatus) {
     setSavingAvail(weekDate)
     const { error } = await supabase.from("worship_availability")
-      .upsert({ team_id: teamId, user_id: userId, week_date: weekDate, is_available: next }, { onConflict: "team_id,user_id,week_date" })
+      .upsert(
+        { team_id: teamId, user_id: userId, week_date: weekDate, status, is_available: status === "available" },
+        { onConflict: "team_id,user_id,week_date" }
+      )
     if (!error) {
-      setMyAvailability(prev => ({ ...prev, [weekDate]: next }))
-      if (canManage) setAllAvailability(prev => ({ ...prev, [userId]: { ...(prev[userId] ?? {}), [weekDate]: next } }))
+      setMyAvailability(prev => ({ ...prev, [weekDate]: status }))
+      if (canManage) setAllAvailability(prev => ({ ...prev, [userId]: { ...(prev[userId] ?? {}), [weekDate]: status } }))
     }
     setSavingAvail(null)
   }
@@ -1876,12 +1880,14 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                             <div style={{ position: "relative" }}>
                               <input type="text" placeholder="Search member…" value={addMemberSearch}
                                 onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
+                                onFocus={() => setAddMemberFocused(true)}
+                                onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
                                 style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
-                              {addMemberSearch && filteredMembers.length > 0 && (
-                                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #ECE8DE", borderRadius: 8, background: "white", maxHeight: 140, overflowY: "auto", zIndex: 10 }}>
+                              {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
+                                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #ECE8DE", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                                   {filteredMembers.map(m => (
                                     <button key={m.user_id}
-                                      onClick={() => { setAddMemberUserId(m.user_id); setAddMemberSearch(m.name) }}
+                                      onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
                                       style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
                                       {m.name}
                                     </button>
@@ -1898,7 +1904,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                                 style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
                                 {addingMember ? "Adding…" : "Add"}
                               </button>
-                              <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId("") }}
+                              <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
                                 style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #ECE8DE", cursor: "pointer" }}>
                                 Cancel
                               </button>
@@ -2415,20 +2421,30 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       const avail = myAvailability[date]
                       const isSaving = savingAvail === date
                       return (
-                        <div key={date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: i < weekDates.length - 1 ? "1px solid #ECE8DE" : "none" }}>
-                          <p style={{ fontSize: 14, color: "#13101A" }}>{worshipWeekDateLabel(date)}</p>
-                          <button
-                            onClick={() => handleToggleAvailability(date)}
-                            disabled={isSaving}
-                            style={{
-                              padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: "none",
-                              cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1,
-                              background: avail === true ? "#EDFAF3" : avail === false ? "#FEF2F2" : "#F3F0F7",
-                              color: avail === true ? "#2D7A4F" : avail === false ? "#B91C1C" : "#8A8497",
-                            }}
-                          >
-                            {avail === true ? "Available" : avail === false ? "Unavailable" : "Set availability"}
-                          </button>
+                        <div key={date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weekDates.length - 1 ? "1px solid #ECE8DE" : "none", flexWrap: "wrap" as const }}>
+                          <p style={{ fontSize: 14, color: "#13101A", flexShrink: 0 }}>{worshipWeekDateLabel(date)}</p>
+                          <div style={{ display: "flex", gap: 6, opacity: isSaving ? 0.5 : 1, pointerEvents: isSaving ? "none" : "auto" }}>
+                            {(["available", "busy", "unsure"] as AvailStatus[]).map(s => {
+                              const active = avail === s
+                              const cfg = {
+                                available: { label: "Available", activeBg: "#EDFAF3", activeColor: "#2D7A4F", activeBorder: "#6EE7B7" },
+                                busy:      { label: "Busy",      activeBg: "#FEF2F2", activeColor: "#B91C1C", activeBorder: "#FCA5A5" },
+                                unsure:    { label: "Unsure",    activeBg: "#FFFBEB", activeColor: "#92400E", activeBorder: "#FCD34D" },
+                              }[s]
+                              return (
+                                <button key={s} onClick={() => handleSetAvailability(date, s)}
+                                  style={{
+                                    padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                                    border: `1px solid ${active ? cfg.activeBorder : "#ECE8DE"}`,
+                                    background: active ? cfg.activeBg : "white",
+                                    color: active ? cfg.activeColor : "#8A8497",
+                                    cursor: "pointer", transition: "all 0.15s",
+                                  }}>
+                                  {cfg.label}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       )
                     })}
@@ -2460,11 +2476,13 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                               const a = allAvailability[member.user_id]?.[d]
                               return (
                                 <td key={d} style={{ textAlign: "center", padding: "10px 12px" }}>
-                                  {a === true
+                                  {a === "available"
                                     ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#EDFAF3", color: "#2D7A4F", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✓</span>
-                                    : a === false
+                                    : a === "busy"
                                       ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#FEF2F2", color: "#B91C1C", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✕</span>
-                                      : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
+                                      : a === "unsure"
+                                        ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#FFFBEB", color: "#92400E", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>?</span>
+                                        : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
                                   }
                                 </td>
                               )
@@ -4478,7 +4496,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
-    onChanged()
   }
 
   const filteredAdd = ministryMembers.filter((m) =>

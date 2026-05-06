@@ -650,7 +650,7 @@ export function ProfileTab({
 
       {/* Desktop Topbar */}
       <DesktopTopbar
-        crumbs={["Central", "Profile", activeSection === "journal" ? "Journal" : "Spiritual profile"]}
+        crumbs={["Central", "Profile", activeSection === "journal" ? "Journal" : "Profile"]}
         right={
           activeSection === "spiritual-profile" ? (
             <div className="hidden md:flex items-center gap-2">
@@ -826,7 +826,7 @@ export function ProfileTab({
                 onClick={() => onSectionChange("spiritual-profile")}
                 style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: activeSection === "spiritual-profile" ? "#3E1540" : "transparent", color: activeSection === "spiritual-profile" ? "#F6F4EF" : "#8A8497", border: "none", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
               >
-                Spiritual profile
+                Profile
               </button>
               <button
                 onClick={() => onSectionChange("journal")}
