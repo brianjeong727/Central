@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase-server"
+import { createAdminClient } from "@/lib/supabase-admin"
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -23,7 +24,8 @@ export async function joinMinistryByCode(
   if (findErr) return { ministryName: null, error: findErr.message }
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
 
-  const { data: updatedRows, error: updateErr } = await supabase
+  const admin = createAdminClient()
+  const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministry.id })
     .eq("id", user.id)
@@ -73,7 +75,8 @@ export async function registerMinistry(data: {
 
   if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create ministry." }
 
-  const { data: updatedRows, error: profileErr } = await supabase
+  const admin = createAdminClient()
+  const { data: updatedRows, error: profileErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministry.id, role: "admin" })
     .eq("id", user.id)

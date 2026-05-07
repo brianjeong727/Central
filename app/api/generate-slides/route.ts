@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase-server"
 
 const SYSTEM_PROMPT =
   "You are a lyrics extractor. Given OCR text from a chord chart, extract only the song lyrics organized by section. Remove all chord names like D, Em, G, Asus, G2, A/C#, all musical notation, all copyright text, CCLI numbers, tempo, key, and time signature metadata. Return only section headers like VERSE 1, CHORUS, BRIDGE followed by the lyrics for that section. Plain text only, no markdown."
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
 
   if (!apiKey) {
