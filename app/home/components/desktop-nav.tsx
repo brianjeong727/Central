@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Bell, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart } from "lucide-react"
+import { Home, Bell, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart, Settings } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -43,6 +43,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     { id: "directory", icon: Users },
     { id: "giving", icon: Heart },
     { id: "profile", icon: User },
+    ...(isAdmin ? [{ id: "settings" as Tab, icon: Settings }] : []),
   ]
 
   const monoStyle: React.CSSProperties = {
@@ -171,23 +172,41 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     if (activeTab === "profile") {
-      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
+      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void; muted?: boolean }[] = [
         { label: "Profile", section: "spiritual-profile" },
         { label: "Journal", section: "journal" },
+        { label: "Prayer requests", section: "journal", muted: false },
+        { label: "Notifications", muted: true },
+        { label: "Settings", muted: true },
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Profile</p>
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>You</p>
           {items.map((s, i) => (
             <button
               key={i}
-              style={subItemStyle(s.section ? profileSection === s.section : undefined, s.danger)}
-              onClick={s.section ? () => onProfileSectionChange(s.section!) : s.onClick}
+              style={{
+                ...subItemStyle(s.section ? profileSection === s.section : undefined, s.danger),
+                opacity: s.muted ? 0.45 : 1,
+                cursor: s.muted ? "default" : "pointer",
+              }}
+              onClick={!s.muted ? (s.section ? () => onProfileSectionChange(s.section!) : s.onClick) : undefined}
             >
               <span style={{ flex: 1 }}>{s.label}</span>
             </button>
           ))}
+        </div>
+      )
+    }
+
+    if (activeTab === "settings") {
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Settings</p>
+          <div style={{ ...subItemStyle(true), cursor: "default" }} aria-current="page">
+            <span style={{ flex: 1 }}>General</span>
+          </div>
         </div>
       )
     }

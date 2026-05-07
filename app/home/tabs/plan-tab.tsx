@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
-  Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList,
+  Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -4232,6 +4232,9 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
 
   const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
 
+  const STEPS = ["Choose a shape", "Customize", "Invite"]
+  const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
+
   return (
     <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
       {/* Header */}
@@ -4264,42 +4267,99 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5">
+      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-10 md:py-8 md:max-w-[900px] md:mx-auto md:w-full">
         {error && (
           <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium mb-4">{error}</div>
         )}
 
+        {/* Desktop: serif hero + stepper */}
+        <div className="hidden md:block mb-8">
+          <p className="text-[11px] tracking-[0.14em] uppercase text-[#8A8497] mb-2">Step {stepIndex + 1} of {STEPS.length}</p>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, lineHeight: 1, color: "#13101A", fontWeight: 400, marginBottom: 8 }}>
+            {step === "preset" && "Pick the shape it should take."}
+            {step === "customize" && "Tune the details."}
+            {step === "members" && "Bring people in."}
+          </h1>
+          {step === "preset" && (
+            <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 560, lineHeight: 1.6 }}>
+              Start from a preset that fits your ministry. You can rename it, add or remove roles, and adjust permissions — nothing here is locked in.
+            </p>
+          )}
+          {step === "members" && (
+            <p style={{ fontSize: 14, color: "#5A5466" }}>Add members now, or skip and invite later.</p>
+          )}
+          {/* Stepper */}
+          <div style={{ display: "flex", gap: 28, marginTop: 22 }}>
+            {STEPS.map((s, i) => (
+              <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, opacity: i === stepIndex ? 1 : 0.45 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 999,
+                  background: i < stepIndex ? "#3E1540" : i === stepIndex ? "#13101A" : "transparent",
+                  border: i > stepIndex ? "1px solid #ECE8DE" : "none",
+                  color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11,
+                }}>
+                  {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
+                </div>
+                <span style={{ fontSize: 13, color: "#13101A" }}>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Step 1: Preset picker */}
         {step === "preset" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-[13px] text-[#8A8497] mb-1">Start with a preset or build from scratch.</p>
-            {TEAM_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => applyPreset(preset)}
-                className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)]"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-[22px]">{preset.icon}</span>
-                  <p className="text-[14px] font-bold text-[#13101A]">{preset.name}</p>
-                </div>
-                <p className="text-[12px] text-[#8A8497] mb-3">{preset.description}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {preset.roles.map((r) => (
-                    <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
-                      {r.name}
-                    </span>
-                  ))}
-                </div>
-              </button>
-            ))}
+          <div>
+            {/* Mobile intro */}
+            <p className="md:hidden text-[13px] text-[#8A8497] mb-3">Start with a preset or build from scratch.</p>
+
+            {/* Desktop: 2-col grid; mobile: stack */}
+            <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              {TEAM_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPreset(preset)}
+                  className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/40 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)] md:p-5"
+                  style={{ boxShadow: "none" }}
+                >
+                  <div className="flex items-start gap-3 mb-2">
+                    <span className="text-[22px] mt-0.5">{preset.icon}</span>
+                    <div className="flex-1">
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[#13101A] leading-tight">{preset.name}</p>
+                      <p className="text-[12px] text-[#8A8497] mt-1">{preset.description}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-[#ECE8DE]">
+                    <p className="text-[10px] tracking-[0.12em] uppercase text-[#8A8497] mb-2">Roles · {preset.roles.length}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {preset.roles.map((r) => (
+                        <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                          {r.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={() => { setTeamName(""); setTeamIcon("👥"); setTeamDesc(""); setRoles([{ name: "Member", permissions: [] }]); setStep("customize") }}
-              className="w-full bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-4 text-center hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all"
+              className="w-full mt-3 bg-transparent rounded-2xl border border-dashed border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all flex items-center gap-3 md:mt-4"
             >
-              <p className="text-[14px] font-semibold text-[#5A5466]">Start from scratch</p>
-              <p className="text-[12px] text-[#8A8497] mt-0.5">Build custom roles and permissions</p>
+              <div className="w-8 h-8 rounded-lg border border-dashed border-[#C4C4C4] flex items-center justify-center text-[#8A8497] flex-shrink-0">
+                <Plus className="w-4 h-4" />
+              </div>
+              <div>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17 }} className="text-[#13101A]">Start from scratch</p>
+                <p className="text-[12px] text-[#8A8497] mt-0.5">Build custom roles and permissions</p>
+              </div>
             </button>
+
+            {/* Desktop: footer nav */}
+            <div className="hidden md:flex justify-end mt-8 pt-6 border-t border-[#ECE8DE]">
+              <p className="text-[12px] text-[#8A8497] flex-1 self-center">You can change everything later.</p>
+            </div>
           </div>
         )}
 
@@ -4478,6 +4538,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeRole, setActiveRole] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -4554,9 +4615,88 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     m.name.toLowerCase().includes(addSearch.toLowerCase())
   )
 
+  const addMemberForm = (
+    <div className="flex flex-col gap-4 pb-24">
+      {roles.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px] font-medium text-[#5A5466]">Assign role</label>
+          <div className="flex gap-2 flex-wrap">
+            {roles.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setSelectedRoleId(r.id)}
+                className={`text-[12px] font-semibold px-3 py-1.5 rounded-xl border transition-all ${
+                  selectedRoleId === r.id
+                    ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
+                    : "bg-white border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
+                }`}
+              >
+                {r.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {ministryMembers.filter((m) => selectedIds.has(m.id)).map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setSelectedIds((prev) => { const next = new Set(prev); next.delete(m.id); return next })}
+              className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
+            >
+              {m.name.split(" ")[0]}
+              <X className="w-3 h-3 opacity-70" />
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+        <input
+          type="text"
+          value={addSearch}
+          onChange={(e) => setAddSearch(e.target.value)}
+          placeholder="Search members…"
+          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {filteredAdd.length === 0 && (
+          <p className="text-[13px] text-[#8A8497] text-center py-6">No members to add.</p>
+        )}
+        {filteredAdd.map((member) => {
+          const selected = selectedIds.has(member.id)
+          return (
+            <button
+              key={member.id}
+              onClick={() => setSelectedIds((prev) => {
+                const next = new Set(prev)
+                if (next.has(member.id)) next.delete(member.id)
+                else next.add(member.id)
+                return next
+              })}
+              className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                selected ? "bg-[#3E1540]/5 border-[#3E1540]/30" : "bg-white border-[#ECE8DE] hover:bg-[#FDFBF7]"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(member.name)}`}>
+                {getInitials(member.name)}
+              </div>
+              <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
+              {selected && <Check className="w-4 h-4 text-[#3E1540]" />}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
     <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+
+      {/* ── Mobile header ── */}
+      <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
           onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : onClose}
           className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
@@ -4579,6 +4719,29 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       </div>
 
+      {/* ── Desktop topbar ── */}
+      <DesktopTopbar
+        crumbs={showAddMember
+          ? ["Central", "Plan", team.name, "Settings", "Add member"]
+          : ["Central", "Plan", team.name, "Settings"]
+        }
+        right={isAdmin && !showAddMember ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
+          >
+            <Trash2 style={{ width: 13, height: 13 }} /> Delete team
+          </button>
+        ) : showAddMember ? (
+          <button
+            onClick={() => { setShowAddMember(false); setError(null) }}
+            style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
+          >
+            <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+          </button>
+        ) : undefined}
+      />
+
       {confirmDelete && (
         <div className="mx-5 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-3">
           <span className="text-[13px] text-red-700 font-medium">Delete this team?</span>
@@ -4589,165 +4752,228 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-5 py-5">
+      <div className="flex-1 overflow-y-auto">
         {error && (
-          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium mb-4">{error}</div>
+          <div className="mx-5 mt-4 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>
         )}
 
-        {!showAddMember && (
-          <>
-            {loading ? <Spinner /> : (
-              <div className="flex flex-col gap-6">
-                {/* Roles */}
-                <div>
-                  <PlanSectionHeader>Roles</PlanSectionHeader>
-                  <div className="flex flex-col gap-2">
-                    {roles.length === 0 && (
-                      <p className="text-[13px] text-[#8A8497] text-center py-4">No roles defined.</p>
-                    )}
-                    {roles.map((role) => (
-                      <div key={role.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4">
-                        <p className="text-[14px] font-semibold text-[#13101A] mb-2">{role.name}</p>
-                        {role.permissions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {role.permissions.map((p) => (
-                              <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
-                                {PERMISSION_LABELS[p] ?? p}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-[12px] text-[#8A8497]">No permissions assigned</p>
-                        )}
+        {/* ── Mobile content ── */}
+        <div className="md:hidden px-5 py-5">
+          {!showAddMember && (
+            <>
+              {loading ? <Spinner /> : (
+                <div className="flex flex-col gap-6">
+                  <div>
+                    <PlanSectionHeader>Roles</PlanSectionHeader>
+                    <div className="flex flex-col gap-2">
+                      {roles.length === 0 && (
+                        <p className="text-[13px] text-[#8A8497] text-center py-4">No roles defined.</p>
+                      )}
+                      {roles.map((role) => (
+                        <div key={role.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4">
+                          <p className="text-[14px] font-semibold text-[#13101A] mb-2">{role.name}</p>
+                          {role.permissions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {role.permissions.map((p) => (
+                                <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                                  {PERMISSION_LABELS[p] ?? p}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[12px] text-[#8A8497]">No permissions assigned</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3 flex-1 mr-3">
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>Members</span>
+                        <div className="flex-1 h-px bg-[#ECE8DE]" />
                       </div>
-                    ))}
+                      {isAdmin && (
+                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 flex-shrink-0">
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {members.length === 0 && <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>}
+                      {members.map((m) => (
+                        <div key={m.user_id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(m.name)}`}>
+                            {getInitials(m.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
+                            <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                          </div>
+                          {isAdmin && m.user_id !== userId && (
+                            <button onClick={() => handleRemoveMember(m.user_id)} className="text-[#C4C4C4] hover:text-[#3E1540] transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+          {showAddMember && addMemberForm}
+        </div>
 
-                {/* Members */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3 flex-1 mr-3">
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
-                        Members
-                      </span>
-                      <div className="flex-1 h-px bg-[#ECE8DE]" />
+        {/* ── Desktop content ── */}
+        {!showAddMember ? (
+          <div className="hidden md:block px-10 py-8">
+            {loading ? <Spinner /> : (
+              <>
+                {/* Hero strip */}
+                <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
+                  <div style={{ width: 76, height: 76, borderRadius: 20, background: "#3E1540", color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, flexShrink: 0 }}>
+                    {team.icon ?? "👥"}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1 }}>{team.name}</p>
+                    <p style={{ color: "#5A5466", fontSize: 14, marginTop: 6 }}>
+                      {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
+                    </p>
+                  </div>
+                  {isAdmin && (
+                    <button style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>
+                      <Pencil style={{ width: 13, height: 13 }} /> Edit details
+                    </button>
+                  )}
+                </div>
+
+                {/* Roles & permissions */}
+                <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Roles & permissions</p>
+                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+                  {roles.length === 0 ? (
+                    <p style={{ padding: "24px", textAlign: "center", color: "#8A8497", fontSize: 13 }}>No roles defined.</p>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr" }}>
+                      {/* Role left nav */}
+                      <div style={{ borderRight: "1px solid #ECE8DE", background: "#FBF8F2" }}>
+                        {roles.map((role, i) => {
+                          const roleCount = members.filter(m => m.role_id === role.id).length
+                          return (
+                            <div
+                              key={role.id}
+                              onClick={() => setActiveRole(i)}
+                              style={{
+                                padding: "16px 20px",
+                                borderBottom: i < roles.length - 1 ? "1px solid #ECE8DE" : "none",
+                                borderLeft: activeRole === i ? "2px solid #3E1540" : "2px solid transparent",
+                                background: activeRole === i ? "white" : "transparent",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A" }}>{role.name}</span>
+                                <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {isAdmin && (
+                          <div style={{ padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}>
+                            <Plus style={{ width: 14, height: 14 }} /> Add role
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Permission grid */}
+                      <div style={{ padding: "20px 24px" }}>
+                        {roles[activeRole] && (
+                          <>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                              <div>
+                                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
+                                <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
+                                  {roles[activeRole].permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
+                                </p>
+                              </div>
+                              {isAdmin && (
+                                <button style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 7, color: "#8A8497", fontSize: 12, cursor: "pointer" }}>
+                                  <Pencil style={{ width: 11, height: 11 }} /> Rename
+                                </button>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                              {ALL_PERMISSIONS.map((perm, pi) => {
+                                const on = roles[activeRole].permissions.includes(perm)
+                                return (
+                                  <div key={perm} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: pi < ALL_PERMISSIONS.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                                    <p style={{ flex: 1, fontSize: 14, color: "#13101A", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
+                                    <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "#3E1540" : "#ECE8DE", position: "relative", flexShrink: 0 }}>
+                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Members roster */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Members</p>
+                  {isAdmin && (
                     <button
                       onClick={() => setShowAddMember(true)}
-                      className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 flex-shrink-0"
+                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#3E1540", border: "none", borderRadius: 8, color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                     >
-                      + Add
+                      + Add member
                     </button>
+                  )}
+                </div>
+                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 60px", padding: "10px 22px", borderBottom: "1px solid #ECE8DE", color: "#8A8497", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                    <span />
+                    <span>Name</span>
+                    <span>Role</span>
+                    <span />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    {members.length === 0 && (
-                      <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>
-                    )}
-                    {members.map((m) => (
-                      <div key={m.user_id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(m.name)}`}>
-                          {getInitials(m.name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
-                          <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
-                        </div>
+                  {members.length === 0 && (
+                    <p style={{ padding: "24px", textAlign: "center", color: "#8A8497", fontSize: 13 }}>No one&apos;s here yet.</p>
+                  )}
+                  {members.map((m, i) => (
+                    <div key={m.user_id} style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 60px", alignItems: "center", padding: "13px 22px", borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] ${getAvatarColor(m.name)}`}>
+                        {getInitials(m.name)}
+                      </div>
+                      <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
+                      <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
                         {isAdmin && m.user_id !== userId && (
-                          <button onClick={() => handleRemoveMember(m.user_id)} className="text-[#C4C4C4] hover:text-[#3E1540] transition-colors">
-                            <X className="w-3.5 h-3.5" />
+                          <button
+                            onClick={() => handleRemoveMember(m.user_id)}
+                            style={{ height: 28, width: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 6, cursor: "pointer", color: "#8A8497" }}
+                          >
+                            <X style={{ width: 13, height: 13 }} />
                           </button>
                         )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {showAddMember && (
-          <div className="flex flex-col gap-4 pb-24">
-            {/* Role picker — single role applies to all selected */}
-            {roles.length > 1 && (
-              <div className="flex flex-col gap-2">
-                <label className="text-[12px] font-medium text-[#5A5466]">Assign role</label>
-                <div className="flex gap-2 flex-wrap">
-                  {roles.map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => setSelectedRoleId(r.id)}
-                      className={`text-[12px] font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-                        selectedRoleId === r.id
-                          ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
-                          : "bg-white border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
-                      }`}
-                    >
-                      {r.name}
-                    </button>
+                    </div>
                   ))}
                 </div>
-              </div>
+              </>
             )}
-
-            {/* Selected chips */}
-            {selectedIds.size > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {ministryMembers.filter((m) => selectedIds.has(m.id)).map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedIds((prev) => { const next = new Set(prev); next.delete(m.id); return next })}
-                    className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
-                  >
-                    {m.name.split(" ")[0]}
-                    <X className="w-3 h-3 opacity-70" />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
-              <input
-                type="text"
-                value={addSearch}
-                onChange={(e) => setAddSearch(e.target.value)}
-                placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-              />
-            </div>
-
-            {/* Member list */}
-            <div className="flex flex-col gap-1.5">
-              {filteredAdd.length === 0 && (
-                <p className="text-[13px] text-[#8A8497] text-center py-6">No members to add.</p>
-              )}
-              {filteredAdd.map((member) => {
-                const selected = selectedIds.has(member.id)
-                return (
-                  <button
-                    key={member.id}
-                    onClick={() => setSelectedIds((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(member.id)) next.delete(member.id)
-                      else next.add(member.id)
-                      return next
-                    })}
-                    className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
-                      selected ? "bg-[#3E1540]/5 border-[#3E1540]/30" : "bg-white border-[#ECE8DE] hover:bg-[#FDFBF7]"
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(member.name)}`}>
-                      {getInitials(member.name)}
-                    </div>
-                    <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
-                    {selected && <Check className="w-4 h-4 text-[#3E1540]" />}
-                  </button>
-                )
-              })}
-            </div>
+          </div>
+        ) : (
+          <div className="hidden md:block px-10 py-8 max-w-[640px]">
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1, marginBottom: 6 }}>Add members</p>
+            <p style={{ fontSize: 14, color: "#5A5466", marginBottom: 24 }}>Select members below and assign them a role.</p>
+            {addMemberForm}
           </div>
         )}
       </div>

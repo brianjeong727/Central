@@ -1,16 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 
 export default function LoginPage() {
   const router = useRouter()
+  const [intent, setIntent] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setIntent(new URLSearchParams(window.location.search).get("intent"))
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +31,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/home")
+    router.push(intent === "register" ? "/onboarding" : "/home")
     router.refresh()
   }
 
@@ -34,7 +39,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/auth/callback" },
+      options: { redirectTo: window.location.origin + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
     })
   }
 

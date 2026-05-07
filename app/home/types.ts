@@ -1,6 +1,6 @@
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings"
 
 export interface Profile {
   id: string

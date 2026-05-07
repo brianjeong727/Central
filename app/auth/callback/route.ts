@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase-server"
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
+  const intent = searchParams.get("intent")
 
   if (!code) {
     return NextResponse.redirect(new URL("/login", origin))
@@ -25,8 +26,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", origin))
   }
 
-  // New Google users get a profile row via the handle_new_user trigger, but
-  // ministry_id will be null until they join or register a ministry.
+  // If the user came from the "Create workspace" flow, always send to onboarding
+  // regardless of whether they already belong to a ministry.
+  if (intent === "register") {
+    return NextResponse.redirect(new URL("/onboarding", origin))
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("ministry_id")

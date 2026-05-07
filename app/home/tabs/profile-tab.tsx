@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { ChevronRight, ChevronDown, X, Check, ArrowLeft, Camera, Edit3, BookOpen, Search, ImageIcon, LogOut, MoreHorizontal, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
+import { updateMinistryPublic } from "@/app/actions/ministry"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
@@ -499,18 +500,27 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
     { id: 'verses', label: 'Verses' },
   ]
   return (
-    <div style={{ padding: "24px 28px 52px" }}>
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
-            {t.label}
-          </button>
-        ))}
+    <>
+      {/* ── Mobile: tab strip + single column ── */}
+      <div className="md:hidden" style={{ padding: "24px 24px 52px" }}>
+        <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {journalTab === 'devotionals' && <JournalDevotionalsTab userId={userId} ministryId={ministryId} />}
+        {journalTab === 'prayers' && <JournalPrayersTab userId={userId} ministryId={ministryId} />}
+        {journalTab === 'verses' && <JournalVersesTab userId={userId} ministryId={ministryId} />}
       </div>
-      {journalTab === 'devotionals' && <JournalDevotionalsTab userId={userId} ministryId={ministryId} />}
-      {journalTab === 'prayers' && <JournalPrayersTab userId={userId} ministryId={ministryId} />}
-      {journalTab === 'verses' && <JournalVersesTab userId={userId} ministryId={ministryId} />}
-    </div>
+
+      {/* ── Desktop: two-column (devotionals left, prayers right) ── */}
+      <div className="hidden md:grid" style={{ padding: "28px 28px 52px", gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
+        <JournalDevotionalsTab userId={userId} ministryId={ministryId} />
+        <JournalPrayersTab userId={userId} ministryId={ministryId} />
+      </div>
+    </>
   )
 }
 
@@ -518,6 +528,8 @@ export function ProfileTab({
   userId,
   initialProfile,
   ministryName,
+  isAdmin,
+  ministryIsPublic: initialMinistryIsPublic,
   onLogout,
   onAvatarChange,
   activeSection,
@@ -526,6 +538,8 @@ export function ProfileTab({
   userId: string
   initialProfile: Profile
   ministryName: string
+  isAdmin?: boolean
+  ministryIsPublic?: boolean
   onLogout: () => void
   onAvatarChange?: (url: string) => void
   activeSection: "spiritual-profile" | "journal"
@@ -533,6 +547,8 @@ export function ProfileTab({
 }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile)
+  const [ministryIsPublic, setMinistryIsPublic] = useState(initialMinistryIsPublic ?? false)
+  const [togglingPublic, setTogglingPublic] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -543,6 +559,15 @@ export function ProfileTab({
     prayer_request: initialProfile.prayer_request ?? "",
     pray_for_me: initialProfile.pray_for_me ?? "",
   })
+
+  async function handleTogglePublic() {
+    if (!isAdmin || togglingPublic) return
+    setTogglingPublic(true)
+    const next = !ministryIsPublic
+    const { error } = await updateMinistryPublic(next)
+    if (!error) setMinistryIsPublic(next)
+    setTogglingPublic(false)
+  }
 
   const startEdit = () => {
     setDraft({
@@ -683,22 +708,14 @@ export function ProfileTab({
         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
       </div>
 
-      {/* ── Desktop: journal section ── */}
-      {activeSection === "journal" && (
-        <div className="hidden md:block">
-          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
-        </div>
-      )}
-
-      {/* ── Desktop: taller hero (spiritual profile only) ── */}
-      <div className={`px-7 pt-7 pb-0 ${activeSection === "journal" ? "hidden" : "hidden md:block"}`}>
+      {/* ── Desktop: hero (always visible) ── */}
+      <div className="hidden md:block px-7 pt-7 pb-0">
         <div
           className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
           style={{
             background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)",
             padding: "40px 40px 36px",
-            display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "32px", alignItems: "center",
-            minHeight: "280px",
+            display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center",
           }}
         >
           <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
@@ -740,13 +757,18 @@ export function ProfileTab({
             <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>
               {profile.name}
             </h1>
-            <div className="flex items-center gap-3 mt-3.5" style={{ fontSize: "13px", opacity: 0.85 }}>
-              <span style={{ padding: "3px 10px", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 999, fontSize: "10px", letterSpacing: "0.6px", textTransform: "uppercase", fontWeight: 600 }}>
-                {profile.role}
-              </span>
-              {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
-              <span>·</span>
-              <span>{profile.email}</span>
+            <div style={{ marginTop: 12, display: "flex", gap: 24, color: "rgba(246,244,239,0.85)", fontSize: 13.5 }}>
+              <div>
+                <span style={{ color: "#C9A34B" }}>Role · </span>
+                {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
+              </div>
+              {profile.graduation_year && (
+                <div>
+                  <span style={{ color: "#C9A34B" }}>Class · </span>
+                  {profile.graduation_year}
+                </div>
+              )}
+              <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
             </div>
             {profile.pray_for_me && (
               <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid rgba(255,255,255,0.12)", maxWidth: "480px" }}>
@@ -758,20 +780,38 @@ export function ProfileTab({
             )}
           </div>
 
-          {/* Stats */}
-          <div className="relative flex flex-col gap-5">
-            {[
-              { label: "Role", value: profile.role.charAt(0).toUpperCase() + profile.role.slice(1) },
-              { label: "Class", value: profile.graduation_year ? `'${String(profile.graduation_year).slice(2)}` : "—" },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)" }}>{label}</p>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "24px", marginTop: "2px" }}>{value}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
+
+      {/* ── Desktop: tab strip ── */}
+      <div className="hidden md:flex px-7 pt-5 gap-0" style={{ borderBottom: "1px solid #ECE8DE" }}>
+        {(["spiritual-profile", "journal"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => onSectionChange(s)}
+            style={{
+              padding: "10px 20px",
+              background: "transparent",
+              border: "none",
+              borderBottom: activeSection === s ? "2px solid #3E1540" : "2px solid transparent",
+              color: activeSection === s ? "#13101A" : "#8A8497",
+              fontWeight: activeSection === s ? 500 : 400,
+              fontSize: 13.5,
+              cursor: "pointer",
+              marginBottom: -1,
+            }}
+          >
+            {s === "spiritual-profile" ? "Profile" : "Journal"}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Desktop: journal content ── */}
+      {activeSection === "journal" && (
+        <div className="hidden md:block">
+          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
+        </div>
+      )}
 
       {/* Mobile identity card */}
       <div className="md:hidden px-5">
@@ -870,6 +910,35 @@ export function ProfileTab({
         >
           <LogOut className="w-4 h-4" />Sign out
         </button>
+
+        {/* Ministry settings — admin only */}
+        {isAdmin && (
+          <div className="col-span-2 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5">
+            <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">Ministry settings</p>
+            <button
+              type="button"
+              onClick={handleTogglePublic}
+              disabled={togglingPublic}
+              className="flex items-center justify-between w-full"
+            >
+              <div className="text-left">
+                <p className="text-[14px] font-medium text-[#13101A]">Public discovery</p>
+                <p className="text-[12px] text-[#8A8497] mt-0.5">
+                  {ministryIsPublic ? "Anyone can find and join this ministry" : "Only joinable via invite code"}
+                </p>
+              </div>
+              <div
+                className="w-10 h-6 rounded-full relative transition-colors flex-shrink-0 ml-4"
+                style={{ background: ministryIsPublic ? "#3E1540" : "#E5E0D2" }}
+              >
+                <div
+                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
+                  style={{ transform: ministryIsPublic ? "translateX(18px)" : "translateX(2px)" }}
+                />
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile: stacked sections */}
@@ -912,6 +981,35 @@ export function ProfileTab({
           <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#ECE8DE] text-[#EF4444] text-[14px] font-medium hover:bg-red-50/60 transition-colors shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
             <LogOut className="w-4 h-4" />Sign out
           </button>
+
+          {/* Ministry settings — admin only */}
+          {isAdmin && (
+            <div className="mt-3 rounded-2xl bg-white border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+              <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">Ministry settings</p>
+              <button
+                type="button"
+                onClick={handleTogglePublic}
+                disabled={togglingPublic}
+                className="flex items-center justify-between w-full"
+              >
+                <div className="text-left">
+                  <p className="text-[14px] font-medium text-[#13101A]">Public discovery</p>
+                  <p className="text-[12px] text-[#8A8497] mt-0.5">
+                    {ministryIsPublic ? "Anyone can find and join" : "Invite code only"}
+                  </p>
+                </div>
+                <div
+                  className="w-10 h-6 rounded-full relative transition-colors flex-shrink-0 ml-4"
+                  style={{ background: ministryIsPublic ? "#3E1540" : "#E5E0D2" }}
+                >
+                  <div
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
+                    style={{ transform: ministryIsPublic ? "translateX(18px)" : "translateX(2px)" }}
+                  />
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

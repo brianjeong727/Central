@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -218,6 +218,8 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
   const [addingMembers, setAddingMembers] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [muted, setMuted] = useState(false)
+  const [pinned, setPinned] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
@@ -314,6 +316,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
     return (
       <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
+
         <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
@@ -411,178 +414,307 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
     )
   }
 
+  const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
+
   return (
     <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
-        <button
-          onClick={onBack}
-          className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
-        >
+
+      {/* ── Mobile header (hidden on desktop) ── */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-white border-b border-[#ECE8DE]">
+        <button onClick={onBack} className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
           <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
         <h2 className="flex-1 text-[15px] font-bold text-foreground tracking-tight">Chat Info</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* ── CHAT INFO ── */}
-        <div className="px-5 pt-6 pb-2">
-          <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
-            Chat info
-          </h3>
+      {/* ── Desktop topbar ── */}
+      <div className="hidden md:block flex-shrink-0">
+        <DesktopTopbar
+          crumbs={["Central", "Chats", displayGroupName, "Info"]}
+          right={
+            <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
+            </button>
+          }
+        />
+      </div>
 
-          {/* Avatar + name + count card */}
-          <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)}`}>
-              <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">
+      <div className="flex-1 overflow-y-auto">
+
+        {/* ── Desktop: plum hero ── */}
+        <div className="hidden md:block px-10 pt-8 pb-6">
+          <div style={{
+            background: "radial-gradient(circle at 90% 20%, rgba(201,163,75,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(201,163,75,0.08) 0%, transparent 35%), #3E1540",
+            borderRadius: 20, padding: "28px 32px", position: "relative", overflow: "hidden",
+            display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 24, alignItems: "center",
+          }}>
+            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(201,163,75,0.20) 1px, transparent 1.4px)", backgroundSize: "18px 18px", opacity: 0.35, pointerEvents: "none" }} />
+            {/* Avatar */}
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div style={{ width: 72, height: 72, borderRadius: 999, background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-instrument-serif)", fontSize: 24, color: "#F6F4EF" }}>
                 {getInitials(displayGroupName)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="text-[16px] font-bold text-foreground tracking-tight">{displayGroupName}</h3>
-              <p className="text-[12px] text-muted-foreground/60 mt-0.5">
+              </div>
+            </div>
+            {/* Name + meta */}
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)", marginBottom: 6 }}>{typeLabel}</p>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05 }}>{displayGroupName}</h2>
+              <p style={{ color: "rgba(246,244,239,0.65)", fontSize: 13, marginTop: 8 }}>
                 {members.length} member{members.length !== 1 ? "s" : ""}
               </p>
             </div>
+            {/* Action buttons */}
+            {canManage && (
+              <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 10, color: "#F6F4EF", fontSize: 13, cursor: "pointer" }}>
+                  <Edit3 style={{ width: 13, height: 13 }} /> Rename
+                </button>
+                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 10, color: "#F6F4EF", fontSize: 13, cursor: "pointer" }}>
+                  <Plus style={{ width: 13, height: 13 }} /> Add members
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Desktop: two-column body ── */}
+        <div className="hidden md:grid px-10 pb-10 gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
+
+          {/* Members */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400 }}>Members</h3>
+              <span style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>{members.length} people</span>
+            </div>
+            {loading ? <Spinner /> : (
+              <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
+                {members.map((member, i) => (
+                  <div key={member.user_id} style={{
+                    display: "grid", gridTemplateColumns: "40px 1fr auto auto",
+                    alignItems: "center", gap: 14, padding: "15px 20px",
+                    borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
+                  }}>
+                    <Avatar className={`w-10 h-10 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
+                      {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
+                      <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500 }}>{member.name}</p>
+                        {member.user_id === userId && (
+                          <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#FBF8F2", color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>
+                        )}
+                      </div>
+                      {member.graduation_year && (
+                        <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Class of {member.graduation_year}</p>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {member.role && (
+                        <span style={{
+                          fontSize: 11, padding: "3px 10px", borderRadius: 999,
+                          background: ["admin","leader"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : "#FBF8F2",
+                          color: ["admin","leader"].includes(member.role.toLowerCase()) ? "#3E1540" : "#8A8497",
+                          letterSpacing: "0.04em", textTransform: "uppercase" as const,
+                        }}>
+                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                        </span>
+                      )}
+                    </div>
+                    {canManage && member.user_id !== userId && (
+                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} style={{ width: 28, height: 28, borderRadius: 999, border: "none", background: "transparent", color: "#C4C4C4", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} className="hover:text-red-400 transition-colors disabled:opacity-40">
+                        <X style={{ width: 14, height: 14 }} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {canManage && (
+                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", borderTop: "1px solid #ECE8DE", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+                    <Plus style={{ width: 14, height: 14 }} /> Add members from directory
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Members list */}
-          {loading ? (
-            <Spinner />
-          ) : (
-            <div className="flex flex-col gap-2 mb-6">
-              {members.map((member) => (
-                <div
-                  key={member.user_id}
-                  className="bg-white rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
-                >
-                  <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
-                    {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                    <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
-                      {getInitials(member.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-[13px] font-semibold text-foreground truncate">{member.name}</p>
-                      {member.user_id === userId && (
-                        <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">
-                          You
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {member.role && (
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
-                          {member.role}
-                        </span>
-                      )}
-                      {member.graduation_year && (
-                        <span className="text-[11px] text-muted-foreground/50">
-                          Class of {member.graduation_year}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {canManage && member.user_id !== userId && (
-                    <button
-                      onClick={() => handleRemoveMember(member.user_id)}
-                      disabled={removingId === member.user_id}
-                      className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+          {/* Preferences + Manage */}
+          <div>
+            {/* Preferences */}
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Preferences</h3>
+            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #ECE8DE" }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Mute notifications</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
                 </div>
-              ))}
+                <div
+                  onClick={() => setMuted(!muted)}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "#3E1540" : "#ECE8DE", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                >
+                  <div style={{ position: "absolute", top: 3, left: muted ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Pin to top of chats</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Keeps it above the fold.</p>
+                </div>
+                <div
+                  onClick={() => setPinned(!pinned)}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "#3E1540" : "#ECE8DE", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                >
+                  <div style={{ position: "absolute", top: 3, left: pinned ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                </div>
+              </div>
+            </div>
+
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
+            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
+              {/* Rename row */}
+              {renaming ? (
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #ECE8DE", display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ECE8DE", borderRadius: 8, fontSize: 13, color: "#13101A", background: "#FBF8F2", outline: "none" }}
+                  />
+                  <button onClick={handleRename} disabled={saving} style={{ width: 32, height: 32, borderRadius: 999, background: "#3E1540", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Check style={{ width: 13, height: 13 }} />
+                  </button>
+                  <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} style={{ width: 32, height: 32, borderRadius: 999, background: "#F4F1E8", border: "none", color: "#8A8497", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <X style={{ width: 13, height: 13 }} />
+                  </button>
+                </div>
+              ) : canManage ? (
+                <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", cursor: "pointer" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
+                    <Edit3 style={{ width: 13, height: 13 }} />
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Rename chat</p>
+                    <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Change how it appears in everyone&apos;s list</p>
+                  </div>
+                  <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
+                </button>
+              ) : null}
+              {canManage && (
+                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", cursor: "pointer" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
+                    <Plus style={{ width: 13, height: 13 }} />
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Add members</p>
+                    <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Invite from the directory</p>
+                  </div>
+                  <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
+                </button>
+              )}
+              <button style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer" }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
+                  <Download style={{ width: 13, height: 13 }} />
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Export transcript</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Download as a text file</p>
+                </div>
+                <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
+              </button>
+            </div>
+
+            {/* Danger */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {canArchive && (
+                <button onClick={handleArchive} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                  Archive chat
+                </button>
+              )}
+              {canLeave && (
+                <button onClick={handleLeave} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "none", cursor: "pointer" }}>
+                  Leave conversation
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Mobile: original layout ── */}
+        <div className="md:hidden">
+          {/* CHAT INFO */}
+          <div className="px-5 pt-6 pb-2">
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
+              Chat info
+            </h3>
+            <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)}`}>
+                <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">{getInitials(displayGroupName)}</AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="text-[16px] font-bold text-foreground tracking-tight">{displayGroupName}</h3>
+                <p className="text-[12px] text-muted-foreground/60 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
+              </div>
+            </div>
+            {loading ? <Spinner /> : (
+              <div className="flex flex-col gap-2 mb-6">
+                {members.map((member) => (
+                  <div key={member.user_id} className="bg-white rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3">
+                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
+                      {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
+                      <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-[13px] font-semibold text-foreground truncate">{member.name}</p>
+                        {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>{member.role}</span>}
+                        {member.graduation_year && <span className="text-[11px] text-muted-foreground/50">Class of {member.graduation_year}</span>}
+                      </div>
+                    </div>
+                    {canManage && member.user_id !== userId && (
+                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {canManage && (
+            <div className="px-5 pb-4">
+              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
+              <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+                {renaming ? (
+                  <div className="p-4 flex items-center gap-3 border-b border-[#ECE8DE]">
+                    <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }} className="flex-1 text-[13px] text-foreground bg-[#FBF8F2] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3E1540]/30" />
+                    <button onClick={handleRename} disabled={saving} className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center disabled:opacity-50 hover:bg-[#2D0F2E] transition-colors"><Check className="w-3.5 h-3.5 text-white" /></button>
+                    <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"><X className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors border-b border-[#ECE8DE]">
+                    <div className="w-8 h-8 rounded-xl bg-[#3E1540]/8 flex items-center justify-center flex-shrink-0"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" /></div>
+                    <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Rename Chat</span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                  </button>
+                )}
+                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[#3E1540]" /></div>
+                  <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Add Members</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                </button>
+              </div>
+            </div>
+          )}
+          {(canArchive || canLeave) && (
+            <div className="px-5 pb-10">
+              {canArchive && <button onClick={handleArchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
+              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Leave chat</button>}
             </div>
           )}
         </div>
 
-        {/* ── MANAGE CHAT ── */}
-        {canManage && (
-          <div className="px-5 pb-4">
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
-              Manage chat
-            </h3>
-            <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-              {/* Rename row */}
-              {renaming ? (
-                <div className="p-4 flex items-center gap-3 border-b border-[#ECE8DE]">
-                  <input
-                    autoFocus
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRename()
-                      if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) }
-                    }}
-                    className="flex-1 text-[13px] text-foreground bg-[#FBF8F2] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3E1540]/30"
-                  />
-                  <button
-                    onClick={handleRename}
-                    disabled={saving}
-                    className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center disabled:opacity-50 hover:bg-[#2D0F2E] transition-colors"
-                  >
-                    <Check className="w-3.5 h-3.5 text-white" />
-                  </button>
-                  <button
-                    onClick={() => { setRenaming(false); setNewName(displayGroupName) }}
-                    className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setRenaming(true); setNewName(displayGroupName) }}
-                  className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors border-b border-[#ECE8DE]"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-[#3E1540]/8 flex items-center justify-center flex-shrink-0">
-                    <Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />
-                  </div>
-                  <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Rename Chat</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-                </button>
-              )}
-
-              {/* Add members row */}
-              <button
-                onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
-                className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors"
-              >
-                <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0">
-                  <Plus className="w-3.5 h-3.5 text-[#3E1540]" />
-                </div>
-                <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Add Members</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── DANGER ZONE ── */}
-        {(canArchive || canLeave) && (
-          <div className="px-5 pb-10">
-            {canArchive && (
-              <button
-                onClick={handleArchive}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]"
-              >
-                Archive chat
-              </button>
-            )}
-            {canLeave && (
-              <button
-                onClick={handleLeave}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]"
-              >
-                Leave chat
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
     </div>

@@ -23,13 +23,14 @@ import { PlanTab } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
 import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
+import { SettingsTab } from "./tabs/settings-tab"
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "profile"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "profile", "settings"]
   const initialTab = (searchParams.get("tab") as Tab | null)
   const [activeTab, setActiveTabState] = useState<Tab>(
     initialTab && validTabs.includes(initialTab) ? initialTab : "home"
@@ -51,6 +52,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
   const [profileSection, setProfileSection] = useState<"spiritual-profile" | "journal">("spiritual-profile")
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [ministryIsPublic, setMinistryIsPublic] = useState(false)
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -207,6 +209,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     loadUserTeams()
     loadAllTeams()
   }, [loadUserTeams, loadAllTeams])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase.from("ministries").select("is_public").eq("id", ministryId).maybeSingle()
+      .then(({ data }) => { if (data) setMinistryIsPublic(data.is_public ?? false) })
+  }, [isAdmin, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: keep recentChats preview fresh as messages arrive
   useEffect(() => {
@@ -462,12 +470,23 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 userId={userId}
                 initialProfile={{ ...initialProfile, avatar_url: avatarUrl }}
                 ministryName={ministryName}
+                isAdmin={isAdmin}
+                ministryIsPublic={ministryIsPublic}
                 onLogout={handleLogout}
                 onAvatarChange={(url) => setAvatarUrl(url)}
                 activeSection={profileSection}
                 onSectionChange={setProfileSection}
               />
             </div>
+          )}
+
+          {activeTab === "settings" && isAdmin && (
+            <SettingsTab
+              ministryId={ministryId}
+              ministryName={ministryName}
+              ministryIsPublic={ministryIsPublic}
+              onPublicChange={setMinistryIsPublic}
+            />
           )}
 
         </div>

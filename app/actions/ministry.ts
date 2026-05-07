@@ -3,8 +3,20 @@
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 
+const ADMIN_EMAIL = "brianjeong13@gmail.com"
+
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
+}
+
+async function uniqueInviteCode(supabase: ReturnType<typeof createAdminClient>): Promise<string> {
+  let code = generateInviteCode()
+  for (let i = 0; i < 5; i++) {
+    const { data } = await supabase.from("ministries").select("id").eq("invite_code", code).maybeSingle()
+    if (!data) break
+    code = generateInviteCode()
+  }
+  return code
 }
 
 export async function joinMinistryByCode(
@@ -15,16 +27,18 @@ export async function joinMinistryByCode(
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { ministryName: null, error: "Not authenticated." }
 
-  const { data: ministry, error: findErr } = await supabase
+  const admin = createAdminClient()
+
+  const { data: ministry, error: findErr } = await admin
     .from("ministries")
-    .select("id, name")
+    .select("id, name, status")
     .eq("invite_code", inviteCode.trim().toUpperCase())
     .maybeSingle()
 
   if (findErr) return { ministryName: null, error: findErr.message }
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
-
-  const admin = createAdminClient()
+  if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
+  if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministry.id })
@@ -39,6 +53,136 @@ export async function joinMinistryByCode(
   return { ministryName: ministry.name, error: null }
 }
 
+export async function getPublicMinistries(search?: string): Promise<{
+  data: Array<{ id: string; name: string; university: string; size: string; location: string | null }> | null
+  error: string | null
+}> {
+  const admin = createAdminClient()
+  let query = admin
+    .from("ministries")
+    .select("id, name, university, size, location")
+    .eq("is_public", true)
+    .eq("status", "active")
+    .order("name")
+
+  if (search?.trim()) {
+    query = query.or(`name.ilike.%${search.trim()}%,university.ilike.%${search.trim()}%`)
+  }
+
+  const { data, error } = await query
+  return { data, error: error?.message ?? null }
+}
+
+export async function joinMinistryById(ministryId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const admin = createAdminClient()
+
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("id, status, is_public")
+    .eq("id", ministryId)
+    .maybeSingle()
+
+  if (!ministry) return { error: "Ministry not found." }
+  if (ministry.status !== "active") return { error: "This ministry is not currently active." }
+  if (!ministry.is_public) return { error: "This ministry is not publicly joinable." }
+
+  const { error: updateErr } = await admin
+    .from("profiles")
+    .update({ ministry_id: ministryId })
+    .eq("id", user.id)
+
+  return { error: updateErr?.message ?? null }
+}
+
+export async function updateMinistryPublic(isPublic: boolean): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (!["admin", "leader"].includes(profile.role.toLowerCase())) return { error: "Unauthorized." }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ is_public: isPublic })
+    .eq("id", profile.ministry_id)
+
+  return { error: error?.message ?? null }
+}
+
+export async function submitMinistryApplication(data: {
+  name: string
+  university: string
+  location: string
+  size: "small" | "medium" | "large"
+  teams: Array<{ name: string; icon: string }>
+  isPublic?: boolean
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const admin = createAdminClient()
+  const inviteCode = await uniqueInviteCode(admin)
+
+  const { data: ministry, error: createErr } = await admin
+    .from("ministries")
+    .insert({
+      name: data.name.trim(),
+      university: data.university.trim(),
+      location: data.location.trim(),
+      size: data.size,
+      invite_code: inviteCode,
+      created_by: user.id,
+      status: "pending",
+      is_public: data.isPublic ?? false,
+    })
+    .select("id")
+    .single()
+
+  if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create application." }
+
+  // Link user to ministry as admin
+  const { data: updatedRows, error: profileErr } = await admin
+    .from("profiles")
+    .update({ ministry_id: ministry.id, role: "admin" })
+    .eq("id", user.id)
+    .select("id")
+
+  if (profileErr) return { error: profileErr.message }
+  if (!updatedRows || updatedRows.length === 0) {
+    return { error: "Profile not found. Please sign out and sign back in, then try again." }
+  }
+
+  // Create teams
+  if (data.teams.length > 0) {
+    const { error: teamsErr } = await admin.from("teams").insert(
+      data.teams.map((t) => ({
+        ministry_id: ministry.id,
+        name: t.name,
+        icon: t.icon,
+        created_by: user.id,
+      }))
+    )
+    if (teamsErr) return { error: teamsErr.message }
+  }
+
+  return { error: null }
+}
+
+// Legacy — kept for backwards compatibility; new ministries should use submitMinistryApplication
 export async function registerMinistry(data: {
   name: string
   university: string
@@ -49,19 +193,10 @@ export async function registerMinistry(data: {
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
-  // Generate a unique invite code, retrying on collision (extremely rare)
-  let inviteCode = generateInviteCode()
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data: existing } = await supabase
-      .from("ministries")
-      .select("id")
-      .eq("invite_code", inviteCode)
-      .maybeSingle()
-    if (!existing) break
-    inviteCode = generateInviteCode()
-  }
+  const admin = createAdminClient()
+  const inviteCode = await uniqueInviteCode(admin)
 
-  const { data: ministry, error: createErr } = await supabase
+  const { data: ministry, error: createErr } = await admin
     .from("ministries")
     .insert({
       name: data.name.trim(),
@@ -69,13 +204,13 @@ export async function registerMinistry(data: {
       size: data.size,
       invite_code: inviteCode,
       created_by: user.id,
+      status: "pending",
     })
     .select("id")
     .single()
 
   if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create ministry." }
 
-  const admin = createAdminClient()
   const { data: updatedRows, error: profileErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministry.id, role: "admin" })
@@ -88,4 +223,95 @@ export async function registerMinistry(data: {
   }
 
   return { error: null }
+}
+
+export async function getPendingMinistries(): Promise<{
+  data: Array<{
+    id: string
+    name: string
+    university: string
+    location: string | null
+    size: string
+    invite_code: string
+    created_at: string
+    created_by: string
+    creatorName: string | null
+    creatorEmail: string | null
+    teams: Array<{ name: string; icon: string | null }>
+  }> | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.email !== ADMIN_EMAIL) return { data: null, error: "Unauthorized" }
+
+  const admin = createAdminClient()
+
+  const { data: ministries, error: ministriesErr } = await admin
+    .from("ministries")
+    .select("id, name, university, location, size, invite_code, created_at, created_by")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+
+  if (ministriesErr) return { data: null, error: ministriesErr.message }
+  if (!ministries || ministries.length === 0) return { data: [], error: null }
+
+  // Fetch creator profiles
+  const creatorIds = [...new Set(ministries.map((m) => m.created_by))]
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, name, email")
+    .in("id", creatorIds)
+
+  const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]))
+
+  // Fetch teams
+  const ministryIds = ministries.map((m) => m.id)
+  const { data: teams } = await admin
+    .from("teams")
+    .select("ministry_id, name, icon")
+    .in("ministry_id", ministryIds)
+
+  const teamsMap: Record<string, Array<{ name: string; icon: string | null }>> = {}
+  for (const t of teams ?? []) {
+    if (!teamsMap[t.ministry_id]) teamsMap[t.ministry_id] = []
+    teamsMap[t.ministry_id].push({ name: t.name, icon: t.icon })
+  }
+
+  const result = ministries.map((m) => ({
+    ...m,
+    creatorName: profileMap[m.created_by]?.name ?? null,
+    creatorEmail: profileMap[m.created_by]?.email ?? null,
+    teams: teamsMap[m.id] ?? [],
+  }))
+
+  return { data: result, error: null }
+}
+
+export async function approveMinistry(ministryId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.email !== ADMIN_EMAIL) return { error: "Unauthorized" }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ status: "active" })
+    .eq("id", ministryId)
+
+  return { error: error?.message ?? null }
+}
+
+export async function rejectMinistry(ministryId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.email !== ADMIN_EMAIL) return { error: "Unauthorized" }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ status: "rejected" })
+    .eq("id", ministryId)
+
+  return { error: error?.message ?? null }
 }

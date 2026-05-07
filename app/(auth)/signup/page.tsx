@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 
@@ -8,12 +8,17 @@ const CURRENT_YEAR = new Date().getFullYear()
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
 
 export default function SignupPage() {
+  const [intent, setIntent] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [graduationYear, setGraduationYear] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setIntent(new URLSearchParams(window.location.search).get("intent"))
+  }, [])
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -37,14 +42,16 @@ export default function SignupPage() {
     }
 
     // Replace so /signup is not in the browser history stack — back button won't return here.
-    window.location.replace("/join")
+    const intent = new URLSearchParams(window.location.search).get("intent")
+    window.location.replace(intent === "register" ? "/onboarding" : "/join")
   }
 
   async function handleGoogleSignup() {
     const supabase = createClient()
+    const intent = new URLSearchParams(window.location.search).get("intent")
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/auth/callback" },
+      options: { redirectTo: window.location.origin + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
     })
   }
 
@@ -170,7 +177,10 @@ export default function SignupPage() {
 
         <p className="text-center text-[13px] text-[#8A8497] mt-5">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
+          <Link
+            href={intent === "register" ? "/login?intent=register" : "/login"}
+            className="font-semibold text-[#3E1540] hover:underline underline-offset-2"
+          >
             Sign in
           </Link>
         </p>
