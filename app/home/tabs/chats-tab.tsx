@@ -83,9 +83,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <X className="w-4 h-4 text-foreground" />
+            <X className="w-4 h-4 text-[#13101A]" />
           </button>
-          <h1 className="text-[17px] font-bold text-foreground tracking-tight">
+          <h1 className="text-[17px] font-bold text-[#13101A] tracking-tight">
             {groupType === "church" ? "New Church Chat" : "New Chat"}
           </h1>
         </div>
@@ -93,7 +93,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-600 font-medium">
+            <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
               {error}
             </div>
           )}
@@ -136,7 +136,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               )}
             </label>
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
               <input
                 type="text"
                 value={search}
@@ -148,7 +148,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
             <div className="flex flex-col gap-2">
               {filtered.length === 0 ? (
-                <p className="text-center text-[13px] text-muted-foreground/50 py-6">No members found</p>
+                <p className="text-center text-[13px] text-[#8A8497]/50 py-6">No members found</p>
               ) : (
                 filtered.map((member) => {
                   const isSelected = selectedIds.has(member.id)
@@ -170,9 +170,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-foreground">{member.name}</p>
+                        <p className="text-[13px] font-semibold text-[#13101A]">{member.name}</p>
                         {member.graduation_year && (
-                          <p className="text-[11px] text-muted-foreground/60">Class of {member.graduation_year}</p>
+                          <p className="text-[11px] text-[#8A8497]/60">Class of {member.graduation_year}</p>
                         )}
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
@@ -322,9 +322,9 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-foreground" />
+            <ArrowLeft className="w-4 h-4 text-[#13101A]" />
           </button>
-          <h2 className="flex-1 text-[15px] font-bold text-foreground tracking-tight">Add Members</h2>
+          <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Add Members</h2>
           {selectedToAdd.length > 0 && (
             <span className="text-[12px] font-semibold text-[#3E1540]">{selectedToAdd.length} selected</span>
           )}
@@ -332,7 +332,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
 
         <div className="px-4 pt-4 pb-2">
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
             <input
               type="text"
               placeholder="Search members…"
@@ -347,7 +347,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
         <div className="flex-1 overflow-y-auto px-4 py-2">
           {filteredProfiles.length === 0 ? (
             <div className="flex items-center justify-center h-24">
-              <p className="text-[13px] text-muted-foreground/40">No members to add</p>
+              <p className="text-[13px] text-[#8A8497]/40">No members to add</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -372,7 +372,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-foreground truncate">{profile.name}</p>
+                      <p className="text-[13px] font-semibold text-[#13101A] truncate">{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {profile.role && (
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${profile.role.toLowerCase() === "admin" || profile.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
@@ -380,7 +380,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                           </span>
                         )}
                         {profile.graduation_year && (
-                          <span className="text-[11px] text-muted-foreground/50">Class of {profile.graduation_year}</span>
+                          <span className="text-[11px] text-[#8A8497]/50">Class of {profile.graduation_year}</span>
                         )}
                       </div>
                     </div>
@@ -423,9 +423,9 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
       {/* ── Mobile header (hidden on desktop) ── */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-white border-b border-[#ECE8DE]">
         <button onClick={onBack} className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
-          <ArrowLeft className="w-4 h-4 text-foreground" />
+          <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
-        <h2 className="flex-1 text-[15px] font-bold text-foreground tracking-tight">Chat Info</h2>
+        <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Chat Info</h2>
       </div>
 
       {/* ── Desktop topbar ── */}
@@ -650,8 +650,8 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                 <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">{getInitials(displayGroupName)}</AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-[16px] font-bold text-foreground tracking-tight">{displayGroupName}</h3>
-                <p className="text-[12px] text-muted-foreground/60 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
+                <h3 className="text-[16px] font-bold text-[#13101A] tracking-tight">{displayGroupName}</h3>
+                <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
               </div>
             </div>
             {loading ? <Spinner /> : (
@@ -664,16 +664,16 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-[13px] font-semibold text-foreground truncate">{member.name}</p>
+                        <p className="text-[13px] font-semibold text-[#13101A] truncate">{member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>{member.role}</span>}
-                        {member.graduation_year && <span className="text-[11px] text-muted-foreground/50">Class of {member.graduation_year}</span>}
+                        {member.graduation_year && <span className="text-[11px] text-[#8A8497]/50">Class of {member.graduation_year}</span>}
                       </div>
                     </div>
                     {canManage && member.user_id !== userId && (
-                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} className="w-7 h-7 rounded-full bg-muted/50 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40">
+                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -688,21 +688,21 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
               <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
                 {renaming ? (
                   <div className="p-4 flex items-center gap-3 border-b border-[#ECE8DE]">
-                    <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }} className="flex-1 text-[13px] text-foreground bg-[#FBF8F2] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3E1540]/30" />
+                    <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }} className="flex-1 text-[13px] text-[#13101A] bg-[#FBF8F2] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3E1540]/30" />
                     <button onClick={handleRename} disabled={saving} className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center disabled:opacity-50 hover:bg-[#2D0F2E] transition-colors"><Check className="w-3.5 h-3.5 text-white" /></button>
-                    <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"><X className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                    <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} className="w-8 h-8 rounded-full bg-[#F4F1E8] flex items-center justify-center hover:bg-[#F4F1E8] transition-colors"><X className="w-3.5 h-3.5 text-[#8A8497]" /></button>
                   </div>
                 ) : (
                   <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors border-b border-[#ECE8DE]">
                     <div className="w-8 h-8 rounded-xl bg-[#3E1540]/8 flex items-center justify-center flex-shrink-0"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" /></div>
-                    <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Rename Chat</span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                    <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Rename Chat</span>
+                    <ChevronRight className="w-4 h-4 text-[#8A8497]/30" />
                   </button>
                 )}
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
                   <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[#3E1540]" /></div>
-                  <span className="flex-1 text-[14px] font-semibold text-foreground text-left">Add Members</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+                  <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Add Members</span>
+                  <ChevronRight className="w-4 h-4 text-[#8A8497]/30" />
                 </button>
               </div>
             </div>
@@ -1164,7 +1164,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
           onClick={onClose}
           className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
         >
-          <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
+          <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
         </button>
         <div className="flex-1 min-w-0">
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.1 }} className="truncate">
@@ -1178,7 +1178,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
           onClick={() => setShowSettings(true)}
           className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
         >
-          <Settings className="w-4 h-4 text-[#6B7280]" />
+          <Settings className="w-4 h-4 text-[#5A5466]" />
         </button>
       </div>
 
@@ -1189,8 +1189,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-[14px] font-semibold text-foreground/40">No messages yet</p>
-              <p className="text-[12px] text-muted-foreground/40 mt-1">Say hello! 👋</p>
+              <p className="text-[14px] font-semibold text-[#13101A]/40">No messages yet</p>
+              <p className="text-[12px] text-[#8A8497]/40 mt-1">Say hello! 👋</p>
             </div>
           </div>
         ) : (
@@ -1270,7 +1270,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                           }}
                           className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                         >
-                          <CornerUpLeft className="w-4 h-4 text-[#6B7280]" />
+                          <CornerUpLeft className="w-4 h-4 text-[#5A5466]" />
                           Reply
                         </button>
                         {isOwn && (
@@ -1328,7 +1328,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                       msg.deleted
                         ? isOwn
                           ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                          : `bg-white border border-[#EFEFEF] text-[#9CA3AF] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                          : `bg-white border border-[#EFEFEF] text-[#8A8497] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
                         : isOwn
                           ? `bg-[#3E1540] text-white ${outgoingRadius}`
                           : `bg-white border border-[#EFEFEF] text-[#13101A] ${incomingRadius} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
@@ -1396,7 +1396,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                       className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
                       onPointerDown={(e) => e.stopPropagation()}
                     >
-                      <span className="text-[12px] text-[#6B7280]">Delete this message?</span>
+                      <span className="text-[12px] text-[#5A5466]">Delete this message?</span>
                       <button
                         onClick={() => handleDeleteMessage(msg.id)}
                         className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors"
@@ -1405,7 +1405,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                       </button>
                       <button
                         onClick={() => setDeletingId(null)}
-                        className="text-[12px] text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
+                        className="text-[12px] text-[#8A8497] hover:text-[#5A5466] transition-colors"
                       >
                         Cancel
                       </button>
@@ -1454,13 +1454,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
               {replyingTo.sender_name}
             </p>
-            <p className="text-[12px] text-[#9CA3AF] truncate">
+            <p className="text-[12px] text-[#8A8497] truncate">
               {replyingTo.content.slice(0, 60)}
             </p>
           </div>
           <button
             onClick={() => setReplyingTo(null)}
-            className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[#6B7280] transition-colors"
+            className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[#5A5466] transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -1675,7 +1675,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               md:py-1.5 md:px-2 md:rounded-lg md:text-left md:flex-none
               ${subTab === t
                 ? "bg-white text-[#3E1540] shadow-sm md:bg-[#EFEAE0] md:shadow-none md:text-[#13101A]"
-                : "text-[#9CA3AF] hover:text-[#3E1540]/70 md:text-[#8A8497] md:hover:bg-[#F4F1E8] md:bg-transparent"
+                : "text-[#8A8497] hover:text-[#3E1540]/70 md:text-[#8A8497] md:hover:bg-[#F4F1E8] md:bg-transparent"
               }`}
 
           >
@@ -1686,7 +1686,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
       {/* Search bar — mobile only (desktop has one in the panel header above) */}
       <div className="relative mb-4 md:hidden">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
         <input
           type="text"
           value={search}
@@ -1743,10 +1743,10 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 onClick={() => setShowArchived((s) => !s)}
                 className="w-full flex items-center justify-between py-3 px-1"
               >
-                <span className="text-[11px] font-bold text-muted-foreground/40 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-[#8A8497]/40 uppercase tracking-wider">
                   Archived · {archivedChurchChats.length}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 text-[#8A8497]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
               </button>
               {showArchived && (
                 <div className="flex flex-col gap-2.5">

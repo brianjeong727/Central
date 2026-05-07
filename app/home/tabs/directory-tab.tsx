@@ -5,7 +5,7 @@ import { Search, X, ArrowLeft, MessageCircle, Users, ChevronRight } from "lucide
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState } from "../components/shared"
+import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { DirectoryMember } from "../types"
@@ -35,14 +35,6 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
     m.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "10px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
-
   return (
     <div className="pb-2 md:pb-0">
       {/* Desktop Topbar */}
@@ -63,11 +55,11 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
       <div className="px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5 mb-4">
           {onBack && (
-            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors -ml-1 mr-0.5" aria-label="Back">
+            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
               <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
             </button>
           )}
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
         </div>
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
@@ -84,7 +76,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
       {/* Desktop Editorial Header */}
       <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
         <div>
-          <p style={monoStyle}>{members.length} members · {members.filter(m => ["admin","leader"].includes(m.role.toLowerCase())).length} leaders</p>
+          <p style={MONO_STYLE}>{members.length} members · {members.filter(m => ["admin","leader"].includes(m.role.toLowerCase())).length} leaders</p>
           <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
             Directory
           </h1>
@@ -121,21 +113,21 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground text-[14px] tracking-tight">{member.name}</h3>
+                      <h3 className="font-semibold text-[#13101A] text-[14px] tracking-tight">{member.name}</h3>
                       {member.id === currentUserId && (
                         <span className="text-[10px] bg-[#FBF8F2] text-[#9CA3AF] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide">You</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {member.graduation_year && <span className="text-[11px] text-muted-foreground/60 font-medium">Class of {member.graduation_year}</span>}
+                      {member.graduation_year && <span className="text-[11px] text-[#8A8497] font-medium">Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
+                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white" : "bg-[#F4F1E8] text-[#3E1540]"}`}>
                           {member.role}
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[#E0DDF0] flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
                 </div>
               </button>
             ))}
@@ -146,7 +138,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
             <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
               <div className="grid px-5 py-2.5 border-b border-[#E5E0D2]" style={{ gridTemplateColumns: "1.4fr 100px 1fr 1.4fr 60px", gap: "12px" }}>
                 {["Name", "Class", "Role", "Praying for", ""].map((h, i) => (
-                  <span key={i} style={monoStyle}>{h}</span>
+                  <span key={i} style={MONO_STYLE}>{h}</span>
                 ))}
               </div>
               {filtered.map((member, i) => (
@@ -290,7 +282,7 @@ export function MemberSheet({
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-[#6B7280]" />
+            <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
           </button>
           <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(member.name)}`}>
             {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
@@ -298,7 +290,7 @@ export function MemberSheet({
               {getInitials(member.name)}
             </AvatarFallback>
           </Avatar>
-          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-foreground tracking-tight truncate">
+          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-[#13101A] tracking-tight truncate">
             {member.name}
           </h2>
         </div>
@@ -307,21 +299,21 @@ export function MemberSheet({
         <div className="flex-1 overflow-y-auto px-5 py-6">
           {/* Avatar hero + name + meta */}
           <div className="flex flex-col items-center mb-7">
-            <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4 shadow-lg shadow-[#3E1540]/20`}>
+            <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4`}>
               {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
               <AvatarFallback className="text-white font-bold text-2xl bg-transparent">
                 {getInitials(member.name)}
               </AvatarFallback>
             </Avatar>
-            <h1 className="text-[22px] font-bold text-foreground tracking-tight mb-2">{member.name}</h1>
+            <h1 className="text-[22px] font-bold text-[#13101A] tracking-tight mb-2">{member.name}</h1>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (
-                <span className="text-[12px] text-muted-foreground/60">
+                <span className="text-[12px] text-[#8A8497]">
                   Class of {member.graduation_year}
                 </span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white shadow-sm shadow-[#3E1540]/30" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F4F1E8] text-[#3E1540]"}`}>
                   {member.role}
                 </span>
               )}
@@ -340,7 +332,7 @@ export function MemberSheet({
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
                   Bible verse
                 </p>
-                <p className="text-[13px] text-[#374151] italic leading-relaxed">
+                <p className="text-[13px] text-[#5A5466] italic leading-relaxed">
                   &ldquo;{member.bible_verse}&rdquo;
                 </p>
               </div>
@@ -351,7 +343,7 @@ export function MemberSheet({
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
                   Prayer request
                 </p>
-                <p className="text-[13px] text-[#374151] leading-relaxed">{member.prayer_request}</p>
+                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.prayer_request}</p>
               </div>
             )}
 
@@ -360,7 +352,7 @@ export function MemberSheet({
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
                   How to pray for me
                 </p>
-                <p className="text-[13px] text-[#374151] leading-relaxed">{member.pray_for_me}</p>
+                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.pray_for_me}</p>
               </div>
             )}
 
@@ -369,13 +361,13 @@ export function MemberSheet({
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
                   About
                 </p>
-                <p className="text-[13px] text-[#374151] leading-relaxed">{member.about_me}</p>
+                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.about_me}</p>
               </div>
             )}
 
             {!member.bible_verse && !member.prayer_request && !member.pray_for_me && !member.about_me && (
               <div className="flex items-center justify-center py-10">
-                <p className="text-[13px] text-muted-foreground/40">No details shared yet</p>
+                <p className="text-[13px] text-[#8A8497]/60">No details shared yet</p>
               </div>
             )}
           </div>
@@ -387,7 +379,7 @@ export function MemberSheet({
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-semibold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-lg shadow-[#3E1540]/25 active:scale-[0.98]"
+              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-semibold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)] active:scale-[0.98]"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>

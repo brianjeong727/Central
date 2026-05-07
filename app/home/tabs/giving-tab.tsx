@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { Pencil, Check, X, Copy, ExternalLink, Download, RefreshCw } from "lucide-react"
+import { Pencil, Check, X, Copy, ExternalLink } from "lucide-react"
 import { DesktopTopbar } from "../components/desktop-nav"
+import { Spinner } from "../components/shared"
 
 interface Props {
   ministryId: string
@@ -25,6 +26,44 @@ const PAY_METHODS = [
   { id: "ach", name: "Bank (ACH)", note: "1–2 days" },
   { id: "venmo", name: "Venmo", note: "@central" },
 ]
+
+function FundSelector({ fund, setFund }: { fund: string; setFund: (id: string) => void }) {
+  return (
+    <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
+      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Designate to</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {FUNDS.map(f => (
+          <div
+            key={f.id}
+            onClick={() => setFund(f.id)}
+            style={{
+              padding: "12px 14px",
+              border: `1px solid ${fund === f.id ? "#3E1540" : "#ECE8DE"}`,
+              background: fund === f.id ? "#FBF8F2" : "transparent",
+              borderRadius: 12, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 12,
+            }}
+          >
+            <div style={{
+              width: 16, height: 16, borderRadius: 999,
+              border: `1.5px solid ${fund === f.id ? "#3E1540" : "#C4C4C4"}`,
+              background: fund === f.id ? "#3E1540" : "transparent",
+              position: "relative", flexShrink: 0,
+            }}>
+              {fund === f.id && (
+                <div style={{ position: "absolute", inset: 4, borderRadius: 999, background: "#F6F4EF" }} />
+              )}
+            </div>
+            <div>
+              <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500, lineHeight: 1.2 }}>{f.name}</p>
+              <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{f.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function GivingTab({ ministryId, userId, isAdmin }: Props) {
   const supabase = createClient()
@@ -111,7 +150,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+          <Spinner />
         ) : (
           <>
             <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
@@ -239,13 +278,14 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                           onClick={() => setRecurring(!recurring)}
                           style={{
                             width: 38, height: 22, borderRadius: 999,
-                            background: recurring ? "#C9A34B" : "rgba(246,244,239,0.18)",
+                            background: recurring ? "#F6F4EF" : "rgba(246,244,239,0.18)",
                             position: "relative", cursor: "pointer", flexShrink: 0,
                           }}
                         >
                           <div style={{
                             position: "absolute", top: 2, left: recurring ? 18 : 2,
-                            width: 18, height: 18, borderRadius: 999, background: "white",
+                            width: 18, height: 18, borderRadius: 999,
+                            background: recurring ? "#3E1540" : "white",
                             transition: "left 0.15s",
                           }} />
                         </div>
@@ -302,40 +342,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
               {/* ── Right: fund + pay-with (desktop) ── */}
               {zelleInfo && !editing && (
                 <div className="hidden md:flex flex-col gap-4">
-                  {/* Fund cards */}
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
-                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Designate to</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {FUNDS.map(f => (
-                        <div
-                          key={f.id}
-                          onClick={() => setFund(f.id)}
-                          style={{
-                            padding: "12px 14px",
-                            border: `1px solid ${fund === f.id ? "#3E1540" : "#ECE8DE"}`,
-                            background: fund === f.id ? "#FBF8F2" : "transparent",
-                            borderRadius: 12, cursor: "pointer",
-                            display: "flex", alignItems: "center", gap: 12,
-                          }}
-                        >
-                          <div style={{
-                            width: 16, height: 16, borderRadius: 999,
-                            border: `1.5px solid ${fund === f.id ? "#3E1540" : "#C4C4C4"}`,
-                            background: fund === f.id ? "#3E1540" : "transparent",
-                            position: "relative", flexShrink: 0,
-                          }}>
-                            {fund === f.id && (
-                              <div style={{ position: "absolute", inset: 4, borderRadius: 999, background: "#F6F4EF" }} />
-                            )}
-                          </div>
-                          <div>
-                            <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500, lineHeight: 1.2 }}>{f.name}</p>
-                            <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{f.desc}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <FundSelector fund={fund} setFund={setFund} />
 
                   {/* Pay with */}
                   <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
@@ -362,41 +369,11 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
               )}
             </div>
 
-            {/* Mobile-only: fund + tax note when zelle info set */}
+            {/* Mobile-only: fund selector + tax note */}
             {zelleInfo && !editing && (
               <div className="md:hidden mt-4">
-                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px", marginBottom: 12 }}>
-                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Designate to</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {FUNDS.map(f => (
-                      <div
-                        key={f.id}
-                        onClick={() => setFund(f.id)}
-                        style={{
-                          padding: "12px 14px",
-                          border: `1px solid ${fund === f.id ? "#3E1540" : "#ECE8DE"}`,
-                          background: fund === f.id ? "#FBF8F2" : "transparent",
-                          borderRadius: 12, cursor: "pointer",
-                          display: "flex", alignItems: "center", gap: 12,
-                        }}
-                      >
-                        <div style={{
-                          width: 16, height: 16, borderRadius: 999,
-                          border: `1.5px solid ${fund === f.id ? "#3E1540" : "#C4C4C4"}`,
-                          background: fund === f.id ? "#3E1540" : "transparent",
-                          position: "relative", flexShrink: 0,
-                        }}>
-                          {fund === f.id && (
-                            <div style={{ position: "absolute", inset: 4, borderRadius: 999, background: "#F6F4EF" }} />
-                          )}
-                        </div>
-                        <div>
-                          <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500, lineHeight: 1.2 }}>{f.name}</p>
-                          <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{f.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="mb-3">
+                  <FundSelector fund={fund} setFund={setFund} />
                 </div>
                 <p style={{ fontSize: 12, color: "#8A8497", textAlign: "center", lineHeight: 1.5 }}>
                   Gifts are tax deductible. Contact your ministry leader for a giving statement.
@@ -406,14 +383,8 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
 
             {/* Footer — desktop only */}
             {zelleInfo && !editing && (
-              <div className="hidden md:flex items-center justify-between mt-8 pt-5" style={{ borderTop: "1px solid #ECE8DE", color: "#8A8497", fontSize: 12.5 }}>
+              <div className="hidden md:flex items-center mt-8 pt-5" style={{ borderTop: "1px solid #ECE8DE", color: "#8A8497", fontSize: 12.5 }}>
                 <span>Gifts are tax deductible. Contact your ministry for a giving statement.</span>
-                <button
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "#13101A", fontSize: 12.5, cursor: "pointer", fontWeight: 500 }}
-                >
-                  <Download style={{ width: 13, height: 13 }} />
-                  Download giving statement
-                </button>
               </div>
             )}
           </>

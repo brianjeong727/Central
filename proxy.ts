@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -36,32 +36,44 @@ export async function middleware(request: NextRequest) {
   const isPublicPath =
     pathname === '/' ||
     pathname.startsWith('/landing') ||
+    pathname.startsWith('/ministries') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
     pathname.startsWith('/auth/')
 
-  // No auth — only allow public paths
+  // No auth — gate protected paths to login/signup
   if (!user) {
+    if (pathname.startsWith('/onboarding')) {
+      return NextResponse.redirect(new URL('/signup?intent=register', request.url))
+    }
+    if (pathname.startsWith('/join')) {
+      return NextResponse.redirect(new URL('/login?intent=join', request.url))
+    }
     if (!isPublicPath) {
       return NextResponse.redirect(new URL('/landing', request.url))
     }
     return supabaseResponse
   }
 
-  // Founder account — lives only in /admin, redirect everything else there
-  if (user.email === ADMIN_EMAIL) {
+  // Founder account — always redirect to /admin
+  if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
     if (!pathname.startsWith('/admin') && !pathname.startsWith('/auth/')) {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
     return supabaseResponse
   }
 
-  // Non-admin logged-in user — bounce off auth pages and block /admin
+  // Logged-in non-admin — bounce off auth/admin pages
   if (pathname.startsWith('/login') || pathname.startsWith('/signup')) {
     return NextResponse.redirect(new URL('/home', request.url))
   }
   if (pathname.startsWith('/admin')) {
     return NextResponse.redirect(new URL('/home', request.url))
+  }
+
+  // Any authenticated user can reach /onboarding to register a ministry
+  if (pathname.startsWith('/onboarding')) {
+    return supabaseResponse
   }
 
   // Look up ministry_id
@@ -71,10 +83,10 @@ export async function middleware(request: NextRequest) {
     .eq('id', user.id)
     .maybeSingle()
 
-  // No ministry yet — only allow /onboarding or /join
+  // No ministry yet — allow join/onboarding/public paths, otherwise send to landing
   if (!profile?.ministry_id) {
-    if (!pathname.startsWith('/onboarding') && !pathname.startsWith('/join')) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
+    if (!pathname.startsWith('/join') && !isPublicPath) {
+      return NextResponse.redirect(new URL('/landing', request.url))
     }
     return supabaseResponse
   }
@@ -96,18 +108,21 @@ export async function middleware(request: NextRequest) {
   }
 
   if (status === 'rejected') {
-    if (!pathname.startsWith('/landing') && pathname !== '/') {
+    const allowedForRejected = pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname === '/'
+    if (!allowedForRejected) {
       return NextResponse.redirect(new URL('/landing', request.url))
     }
     return supabaseResponse
   }
 
-  // Status is active — block pending/join pages (onboarding allowed so existing users can register a new ministry)
-  if (
-    pathname.startsWith('/pending') ||
-    pathname.startsWith('/join')
-  ) {
+  // Active ministry — block pending page only; /join and /onboarding stay open for multi-ministry users
+  if (pathname.startsWith('/pending')) {
     return NextResponse.redirect(new URL('/home', request.url))
+  }
+
+  // Allow pick-ministry for users switching between multiple ministries
+  if (pathname.startsWith('/pick-ministry')) {
+    return supabaseResponse
   }
 
   return supabaseResponse

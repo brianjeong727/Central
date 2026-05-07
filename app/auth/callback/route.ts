@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-server"
-
-// Handles the OAuth redirect from Supabase after Google login.
-//
-// MANUAL SETUP REQUIRED in Supabase Dashboard:
-//   1. Go to Authentication → Providers → Google → enable it
-//   2. Paste your Google Client ID and Client Secret from Google Cloud Console
-//   3. In Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client,
-//      add this as an Authorized Redirect URI:
-//      https://wgqpnilaokfipocsugqo.supabase.co/auth/v1/callback
+import { createAdminClient } from "@/lib/supabase-admin"
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -26,13 +18,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", origin))
   }
 
-  // If the user came from the "Create workspace" flow, always send to onboarding
-  // regardless of whether they already belong to a ministry.
   if (intent === "register") {
     return NextResponse.redirect(new URL("/onboarding", origin))
   }
 
-  const { data: profile } = await supabase
+  if (intent === "join") {
+    return NextResponse.redirect(new URL("/join", origin))
+  }
+
+  const admin = createAdminClient()
+
+  // Try user_ministries table (may not exist yet)
+  const { data: memberships, error: umErr } = await admin
+    .from("user_ministries")
+    .select("ministry_id, ministries!inner(status)")
+    .eq("user_id", data.user.id)
+    .eq("ministries.status", "active")
+
+  if (!umErr && memberships) {
+    if (memberships.length > 1) return NextResponse.redirect(new URL("/pick-ministry", origin))
+    if (memberships.length === 1) return NextResponse.redirect(new URL("/home", origin))
+  }
+
+  // Fallback: check profiles.ministry_id directly
+  const { data: profile } = await admin
     .from("profiles")
     .select("ministry_id")
     .eq("id", data.user.id)
@@ -42,5 +51,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/home", origin))
   }
 
-  return NextResponse.redirect(new URL("/join", origin))
+  // No ministry — return to landing
+  return NextResponse.redirect(new URL("/landing", origin))
 }

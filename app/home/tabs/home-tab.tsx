@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Bell, Check } from "lucide-react"
+import { ChevronRight, Bell, Check, MessageCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { Spinner } from "../components/shared"
-import { getInitials, getGreeting } from "../utils"
+import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE } from "../components/shared"
+import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { HomeTabProps, Announcement } from "../types"
 
@@ -44,7 +44,6 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
           setUserHasRsvped(!!rsvpData)
         }
       }
-      // Fetch a featured prayer from the community
       const { data: prayerProfile } = await supabase
         .from("profiles")
         .select("name, pray_for_me")
@@ -75,32 +74,19 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
 
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
-  const firstName = profile.name.split(" ")[0]
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "11px",
-    letterSpacing: "0.04em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
-
   return (
-    <div className="pb-2 md:pb-0">
+    <div className="pb-28 md:pb-0">
       {/* ── Desktop Topbar ── */}
       <DesktopTopbar crumbs={["Central", "Home"]} />
 
       {/* ── Mobile Header ── */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
-        <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-          </svg>
+        <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <RingCrossLogo size={26} color="#3E1540" />
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-        </div>
+        </a>
         <button
           onClick={onGoToProfile}
           className="size-9 rounded-full overflow-hidden bg-[#3E1540] border border-[#ECE8DE] flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
@@ -121,9 +107,9 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
           {/* ── Desktop Editorial Header ── */}
           <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
             <div style={{ maxWidth: "640px" }}>
-              <p style={monoStyle}>{dateLabel}</p>
+              <p style={MONO_STYLE}>{dateLabel}</p>
               <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
-                {getGreeting()}, {firstName}.
+                {ministryName}
               </h1>
               <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px" }}>
                 {totalUnread > 0 ? `${totalUnread} unread message${totalUnread !== 1 ? "s" : ""} waiting for you.` : "You're all caught up."}
@@ -136,7 +122,7 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                 { label: "In ministry", value: "—" },
               ].map(({ label, value }) => (
                 <div key={label}>
-                  <p style={monoStyle}>{label}</p>
+                  <p style={MONO_STYLE}>{label}</p>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", marginTop: "2px", fontVariantNumeric: "tabular-nums", color: "#13101A" }}>{value}</p>
                 </div>
               ))}
@@ -160,7 +146,12 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                   <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
                   <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
                   <div className="relative flex justify-between items-start" style={{ fontSize: "11px" }}>
-                    <span style={{ ...monoStyle, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Up next" : "Latest"}</span>
+                    <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Up next" : "Latest"}</span>
+                    {announcement.is_event && (
+                      <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>
+                        Event
+                      </span>
+                    )}
                   </div>
                   <h2 className="relative" style={{ margin: "28px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 0.98, letterSpacing: "-0.01em" }}>
                     {announcement.title}
@@ -197,10 +188,7 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                 </div>
               ) : (
                 <div className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] flex items-center justify-center" style={{ minHeight: "320px" }}>
-                  <div className="text-center">
-                    <Bell className="w-8 h-8 text-[#C4C4C4] mx-auto mb-3" />
-                    <p className="text-[14px] font-semibold text-[#13101A]/50">No announcements yet</p>
-                  </div>
+                  <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle="Check back soon" />
                 </div>
               )}
 
@@ -213,7 +201,7 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                 </div>
                 {top3.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center py-10">
-                    <p className="text-[13px] text-[#8A8497]">No recent chats</p>
+                    <EmptyState icon={<MessageCircle className="w-6 h-6" />} title="No chats yet" subtitle="Start a conversation" />
                   </div>
                 ) : (
                   top3.map((c, i) => (
@@ -266,7 +254,7 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                     onClick={onSeeAnnouncements}
                     className="text-left rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-4 hover:bg-[#F4F1E8] transition-colors"
                   >
-                    <p style={monoStyle}>{a.is_event ? "Event" : "Announcement"}</p>
+                    <p style={MONO_STYLE}>{a.is_event ? "Event" : "Announcement"}</p>
                     <h4 style={{ margin: "10px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "20px", lineHeight: 1.15, color: "#13101A" }}>{a.title}</h4>
                     <p style={{ marginTop: "8px", fontSize: "12px", color: "#5A5466", lineHeight: 1.5 }} className="line-clamp-2">{a.body}</p>
                     <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px solid #EFEAE0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -285,7 +273,7 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                 style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", alignItems: "center", gap: "24px" }}
               >
                 <div>
-                  <p style={monoStyle}>Pray with us</p>
+                  <p style={MONO_STYLE}>Pray with us</p>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", marginTop: "4px", color: "#13101A" }}>This week&apos;s heart</p>
                 </div>
                 <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.4, color: "#13101A" }}>
@@ -316,11 +304,15 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                     <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.33)_0%,transparent_70%)]" />
                     <div className="relative">
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-[10px] font-bold tracking-[.22em] uppercase text-[#9E85A0]">{announcement.is_event ? "Up Next" : "Latest"}</span>
-                        {announcement.is_event && <span className="px-2 py-0.5 bg-[#C9A34B] text-[#13101A] rounded-full text-[9px] font-bold tracking-[.14em] uppercase">Event</span>}
+                        <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Up Next" : "Latest"}</span>
+                        {announcement.is_event && (
+                          <span style={{ fontSize: "10px", letterSpacing: "0.6px", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>
+                            Event
+                          </span>
+                        )}
                       </div>
                       <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>{announcement.title}</h3>
-                      <p className="text-[13px] text-[#CFB8D1] leading-relaxed mb-5 line-clamp-3">{announcement.body}</p>
+                      <p className="text-[13px] leading-relaxed mb-5 line-clamp-3" style={{ color: "rgba(246,244,239,0.75)" }}>{announcement.body}</p>
                       <div className="flex items-center gap-4">
                         {announcement.is_event && (
                           <button
@@ -331,14 +323,14 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                             {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />You&apos;re going!</span> : "RSVP"}
                           </button>
                         )}
-                        <button onClick={onSeeAnnouncements} className="text-[13px] text-[#9E85A0] font-medium hover:text-[#CFB8D1] transition-colors">
+                        <button onClick={onSeeAnnouncements} className="text-[13px] font-medium transition-colors" style={{ color: "rgba(246,244,239,0.6)" }}>
                           {announcement.is_event ? "Details" : "View details →"}
                         </button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-8 text-center text-[13px] text-[#9E85A0] italic">No announcements yet</div>
+                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-8 text-center text-[13px] italic" style={{ color: "rgba(246,244,239,0.5)" }}>No announcements yet</div>
                 )}
               </section>
 

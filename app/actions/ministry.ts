@@ -50,6 +50,11 @@ export async function joinMinistryByCode(
     return { ministryName: null, error: "Profile not found. Please sign out and sign back in, then try again." }
   }
 
+  await admin.from("user_ministries").upsert(
+    { user_id: user.id, ministry_id: ministry.id, role: "member" },
+    { onConflict: "user_id,ministry_id" }
+  )
+
   return { ministryName: ministry.name, error: null }
 }
 
@@ -95,7 +100,14 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     .update({ ministry_id: ministryId })
     .eq("id", user.id)
 
-  return { error: updateErr?.message ?? null }
+  if (updateErr) return { error: updateErr.message }
+
+  await admin.from("user_ministries").upsert(
+    { user_id: user.id, ministry_id: ministryId, role: "member" },
+    { onConflict: "user_id,ministry_id" }
+  )
+
+  return { error: null }
 }
 
 export async function updateMinistryPublic(isPublic: boolean): Promise<{ error: string | null }> {
@@ -165,6 +177,11 @@ export async function submitMinistryApplication(data: {
   if (!updatedRows || updatedRows.length === 0) {
     return { error: "Profile not found. Please sign out and sign back in, then try again." }
   }
+
+  await admin.from("user_ministries").upsert(
+    { user_id: user.id, ministry_id: ministry.id, role: "admin" },
+    { onConflict: "user_id,ministry_id" }
+  )
 
   // Create teams
   if (data.teams.length > 0) {
@@ -312,6 +329,58 @@ export async function rejectMinistry(ministryId: string): Promise<{ error: strin
     .from("ministries")
     .update({ status: "rejected" })
     .eq("id", ministryId)
+
+  return { error: error?.message ?? null }
+}
+
+// Returns all active ministries the current user belongs to
+export async function getUserMinistries(): Promise<{
+  data: Array<{ id: string; name: string; university: string; role: string }> | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { data: null, error: "Not authenticated." }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("user_ministries")
+    .select("role, ministries!inner(id, name, university, status)")
+    .eq("user_id", user.id)
+    .eq("ministries.status", "active")
+
+  if (error) return { data: null, error: error.message }
+
+  const ministries = (data ?? []).map((row: { role: string; ministries: { id: string; name: string; university: string; status: string } | { id: string; name: string; university: string; status: string }[] }) => {
+    const m = Array.isArray(row.ministries) ? row.ministries[0] : row.ministries
+    return { id: m.id, name: m.name, university: m.university, role: row.role }
+  })
+
+  return { data: ministries, error: null }
+}
+
+// Sets the user's currently active ministry
+export async function setCurrentMinistry(ministryId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const admin = createAdminClient()
+
+  // Verify user actually belongs to this ministry
+  const { data: membership } = await admin
+    .from("user_ministries")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+
+  if (!membership) return { error: "You are not a member of this ministry." }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ ministry_id: ministryId, role: membership.role })
+    .eq("id", user.id)
 
   return { error: error?.message ?? null }
 }

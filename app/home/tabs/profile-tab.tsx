@@ -5,7 +5,7 @@ import { ChevronRight, ChevronDown, X, Check, ArrowLeft, Camera, Edit3, BookOpen
 import { createClient } from "@/lib/supabase"
 import { updateMinistryPublic } from "@/app/actions/ministry"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState } from "../components/shared"
+import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { RoleDescriptionEditor } from "./plan-tab"
@@ -128,7 +128,7 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
       )}
 
       {loading ? (
-        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
@@ -304,7 +304,7 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
       )}
 
       {loading ? (
-        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
@@ -422,7 +422,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
         <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
           <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#3E1540", marginBottom: 12, letterSpacing: "-0.01em" }} />
           <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#13101A", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
-          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "#374151", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
+          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "#5A5466", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
             <button onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.reference.trim() || !draft.verse_text.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</button>
@@ -431,7 +431,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
       )}
 
       {loading ? (
-        <div style={{ textAlign: "center", paddingTop: 48, color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
@@ -478,7 +478,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                     {entry.note && (
                       <div style={{ paddingTop: 14, borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: "#F5F2EC" }}>
                         <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 0 }}>Reflection</p>
-                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{entry.note}</p>
+                        <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{entry.note}</p>
                       </div>
                     )}
                   </div>
@@ -638,18 +638,10 @@ export function ProfileTab({
     { key: "pray_for_me" as const, label: "How to pray for me this week", placeholder: "Specific ways others can intercede…" },
   ]
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "10px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
-
   function FieldCard({ fieldKey, label, placeholder }: { fieldKey: keyof typeof draft; label: string; placeholder: string }) {
     return (
       <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)] md:rounded-xl md:border-[#E5E0D2] md:bg-[#FBF8F2]">
-        <div style={monoStyle}>{fieldKey === "about_me" || fieldKey === "bible_verse" ? "Story" : "Prayer"}</div>
+        <div style={MONO_STYLE}>{fieldKey === "about_me" ? "About" : fieldKey === "bible_verse" ? "Verse" : "Prayer"}</div>
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginTop: "4px", marginBottom: "8px", letterSpacing: "-0.01em" }}>
           {label}
         </p>
@@ -659,10 +651,10 @@ export function ProfileTab({
             onChange={(e) => setDraft((d) => ({ ...d, [fieldKey]: e.target.value }))}
             placeholder={placeholder}
             rows={3}
-            className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]"
+            className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]"
           />
         ) : (
-          <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">
+          <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">
             {profile[fieldKey] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}
           </p>
         )}
@@ -700,12 +692,10 @@ export function ProfileTab({
 
       {/* Mobile header */}
       <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
-        <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-          <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-          <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-          <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-        </svg>
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+        <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+          <RingCrossLogo size={26} />
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+        </a>
       </div>
 
       {/* ── Desktop: hero (always visible) ── */}
@@ -759,12 +749,12 @@ export function ProfileTab({
             </h1>
             <div style={{ marginTop: 12, display: "flex", gap: 24, color: "rgba(246,244,239,0.85)", fontSize: 13.5 }}>
               <div>
-                <span style={{ color: "#C9A34B" }}>Role · </span>
+                <span style={{ color: "rgba(246,244,239,0.55)" }}>Role · </span>
                 {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
               </div>
               {profile.graduation_year && (
                 <div>
-                  <span style={{ color: "#C9A34B" }}>Class · </span>
+                  <span style={{ color: "rgba(246,244,239,0.55)" }}>Class · </span>
                   {profile.graduation_year}
                 </div>
               )}
@@ -820,7 +810,7 @@ export function ProfileTab({
             <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.20)_0%,transparent_65%)]" />
             <div className="relative z-10 flex flex-col items-center gap-4">
               <label
-                className="relative w-24 h-24 rounded-full overflow-hidden bg-[#5A2060] border-[3px] border-white/20 group flex-shrink-0"
+                className="relative w-24 h-24 rounded-full overflow-hidden bg-[#3E1540] border-[3px] border-white/20 group flex-shrink-0"
                 style={{ cursor: uploadingAvatar ? "not-allowed" : "pointer", display: "block" }}
                 aria-label="Change profile photo"
               >
@@ -854,9 +844,9 @@ export function ProfileTab({
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
                 <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
                   <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
-                  {profile.graduation_year && <span className="text-[12px] text-[#BFA8C1] font-medium">Class of {profile.graduation_year}</span>}
+                  {profile.graduation_year && <span className="text-[12px] text-[#8A8497] font-medium">Class of {profile.graduation_year}</span>}
                 </div>
-                <p className="text-[12px] text-[#9E85A0]">{profile.email}</p>
+                <p className="text-[12px] text-[#8A8497]">{profile.email}</p>
               </div>
             </div>
           </div>
@@ -955,9 +945,9 @@ export function ProfileTab({
                 <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
                   {editing ? (
-                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
                   ) : (
-                    <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                    <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
                   )}
                 </div>
               ))}
@@ -970,9 +960,9 @@ export function ProfileTab({
                 <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
                   {editing ? (
-                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#374151] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
+                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
                   ) : (
-                    <p className="text-[14px] text-[#374151] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
+                    <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
                   )}
                 </div>
               ))}

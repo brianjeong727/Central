@@ -1,5 +1,29 @@
 "use client"
 
+// ── Shared design tokens ──────────────────────────────────────────────────────
+
+export const MONO_STYLE: React.CSSProperties = {
+  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+  fontSize: "10px",
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "#8A8497",
+}
+
+// ── Shared brand mark ─────────────────────────────────────────────────────────
+
+export function RingCrossLogo({ size = 32, color = "#3E1540" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden>
+      <circle cx="50" cy="50" r="44" stroke={color} strokeWidth="6" />
+      <rect x="47" y="22" width="6" height="56" fill={color} />
+      <rect x="22" y="47" width="56" height="6" fill={color} />
+    </svg>
+  )
+}
+
+// ── UI atoms ──────────────────────────────────────────────────────────────────
+
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#8A8497]">{children}</span>

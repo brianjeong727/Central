@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Bell, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart, Settings } from "lucide-react"
+import { Home, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -37,13 +37,11 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
-    { id: "announcements", icon: Bell },
     { id: "chats", icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
     { id: "directory", icon: Users },
     { id: "giving", icon: Heart },
     { id: "profile", icon: User },
-    ...(isAdmin ? [{ id: "settings" as Tab, icon: Settings }] : []),
   ]
 
   const monoStyle: React.CSSProperties = {
@@ -172,12 +170,9 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     if (activeTab === "profile") {
-      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void; muted?: boolean }[] = [
+      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
         { label: "Profile", section: "spiritual-profile" },
         { label: "Journal", section: "journal" },
-        { label: "Prayer requests", section: "journal", muted: false },
-        { label: "Notifications", muted: true },
-        { label: "Settings", muted: true },
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
@@ -186,12 +181,8 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
           {items.map((s, i) => (
             <button
               key={i}
-              style={{
-                ...subItemStyle(s.section ? profileSection === s.section : undefined, s.danger),
-                opacity: s.muted ? 0.45 : 1,
-                cursor: s.muted ? "default" : "pointer",
-              }}
-              onClick={!s.muted ? (s.section ? () => onProfileSectionChange(s.section!) : s.onClick) : undefined}
+              style={subItemStyle(s.section ? profileSection === s.section : undefined, s.danger)}
+              onClick={s.section ? () => onProfileSectionChange(s.section!) : s.onClick}
             >
               <span style={{ flex: 1 }}>{s.label}</span>
             </button>
@@ -200,25 +191,24 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    if (activeTab === "settings") {
-      return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Settings</p>
-          <div style={{ ...subItemStyle(true), cursor: "default" }} aria-current="page">
-            <span style={{ flex: 1 }}>General</span>
-          </div>
-        </div>
-      )
-    }
-
-    // Home / announcements — single contextual row per tab
-    const singleLabel = activeTab === "announcements" ? "Announcements" : "Home"
+    // Home panel — Home, Announcements, and Settings (admin-only)
+    const homeItems: { label: string; tab: "home" | "announcements" | "settings" }[] = [
+      { label: "Home", tab: "home" },
+      { label: "Announcements", tab: "announcements" },
+      ...(isAdmin ? [{ label: "Settings", tab: "settings" as const }] : []),
+    ]
     return (
       <div className="flex-1 overflow-y-auto px-2 pb-3">
-        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>{singleLabel}</p>
-        <div style={{ ...subItemStyle(true), cursor: "default" }} aria-current="page">
-          <span style={{ flex: 1 }}>{singleLabel}</span>
-        </div>
+        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
+        {homeItems.map((item) => (
+          <button
+            key={item.tab}
+            style={subItemStyle(activeTab === item.tab)}
+            onClick={() => onTabChange(item.tab)}
+          >
+            <span style={{ flex: 1 }}>{item.label}</span>
+          </button>
+        ))}
       </div>
     )
   }
@@ -227,17 +217,17 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     <>
       {/* Icon Rail */}
       <div className="hidden md:flex flex-col w-16 flex-shrink-0 h-screen bg-[#13101A] items-center py-4 gap-1">
-        {/* Logo */}
-        <div className="w-9 h-9 rounded-[10px] bg-[#3E1540] flex items-center justify-center mb-3.5 flex-shrink-0">
+        {/* Logo — links back to landing */}
+        <a href="/landing" className="w-9 h-9 rounded-[10px] bg-[#3E1540] flex items-center justify-center mb-3.5 flex-shrink-0 hover:bg-[#2D0F2E] transition-colors" style={{ textDecoration: "none" }}>
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
             <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
             <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
           </svg>
-        </div>
+        </a>
 
         {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id
+          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements"))
           return (
             <button
               key={id}

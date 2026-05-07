@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 
+const ADMIN_EMAIL = "brianjeong13@gmail.com"
+
 export default async function HomePage() {
   const supabase = await createClient()
 
@@ -10,6 +12,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (!user) redirect("/login")
+  if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) redirect("/admin")
 
   const { data: profile } = await supabase
     .from("profiles")

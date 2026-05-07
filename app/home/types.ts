@@ -145,6 +145,7 @@ export interface AnnouncementDetailProps {
 export interface AnnouncementCardProps {
   announcement: EnrichedAnnouncement
   isPinned: boolean
+  featured?: boolean
   userId: string
   userRole: string
   onRsvpToggle: (id: string) => void

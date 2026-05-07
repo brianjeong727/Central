@@ -127,7 +127,7 @@ export function SettingsTab({
               </div>
               <div
                 className="w-11 h-6 rounded-full relative flex-shrink-0 transition-colors duration-200"
-                style={{ background: isPublic ? "#3E1540" : "#D1C9D0" }}
+                style={{ background: isPublic ? "#3E1540" : "#E5E0D2" }}
               >
                 <div
                   className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"

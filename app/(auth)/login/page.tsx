@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
+import { RingCrossLogo } from "@/app/home/components/shared"
+import { getUserMinistries } from "@/app/actions/ministry"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -31,8 +33,30 @@ export default function LoginPage() {
       return
     }
 
-    router.push(intent === "register" ? "/onboarding" : "/home")
-    router.refresh()
+    if (intent === "register") {
+      window.location.href = "/onboarding"
+      return
+    }
+
+    if (intent === "join") {
+      window.location.href = "/ministries"
+      return
+    }
+
+    // Try multi-ministry table first (may not exist yet — fall back gracefully)
+    const { data: ministries } = await getUserMinistries()
+    if (ministries && ministries.length > 1) { window.location.href = "/pick-ministry"; return }
+    if (ministries && ministries.length === 1) { window.location.href = "/home"; return }
+
+    // Fallback: check profiles.ministry_id directly
+    const { data: { user: me } } = await supabase.auth.getUser()
+    if (me) {
+      const { data: profile } = await supabase.from("profiles").select("ministry_id").eq("id", me.id).maybeSingle()
+      if (profile?.ministry_id) { window.location.href = "/home"; return }
+    }
+
+    // No ministry affiliation — return to landing so they can choose join or register
+    window.location.href = "/landing"
   }
 
   async function handleGoogleLogin() {
@@ -50,11 +74,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
           <div className="flex items-center gap-2.5 mb-3">
-            <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-              <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-            </svg>
+            <RingCrossLogo size={32} />
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
               Central
             </span>

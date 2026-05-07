@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Check, Plus, X, ChevronLeft } from "lucide-react"
+import { Check, Plus, X } from "lucide-react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
+import { RingCrossLogo } from "@/app/home/components/shared"
 
-const STEPS = 4
+const STEPS = 5
 
 const STRUCTURE_QUESTIONS = [
   { id: "worship", label: "Worship / Music", desc: "Worship leading and music ministry" },
@@ -23,12 +24,28 @@ const TEAM_PRESETS: Record<string, { name: string; icon: string }> = {
 }
 
 const SIZE_OPTIONS = [
-  { value: "small" as const, label: "Under 50" },
-  { value: "medium" as const, label: "50–100" },
-  { value: "large" as const, label: "100+" },
+  { value: "small" as const, label: "Under 50", desc: "Small fellowship" },
+  { value: "medium" as const, label: "50–100", desc: "Mid-size ministry" },
+  { value: "large" as const, label: "100+", desc: "Large campus group" },
 ]
 
-const STEP_TITLES = ["Basic information", "Ministry structure", "Your teams", "Review & submit"]
+const STEP_TITLES = ["Basic info", "Structure", "Teams", "Review", "Pricing"]
+
+const STEP_HEADINGS = [
+  "Basic information",
+  "Ministry structure",
+  "Your teams",
+  "Review & confirm",
+  "Simple pricing.",
+]
+
+const STEP_SUBTITLES = [
+  "Tell us the basics about your ministry.",
+  "Select everything that applies to your ministry.",
+  "We'll create these teams in your workspace.",
+  "Review your details before submitting.",
+  "Central is free while we're in beta.",
+]
 
 function mapLandingSize(s: string): "small" | "medium" | "large" {
   if (s === "100+") return "large"
@@ -43,10 +60,31 @@ interface Team {
 }
 
 const inputClass =
-  "w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+  "w-full px-4 py-3 rounded-[10px] border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        width: 40, height: 24, borderRadius: 999,
+        background: on ? "#3E1540" : "#E5E0D2",
+        position: "relative", cursor: "pointer", flexShrink: 0,
+        transition: "background 0.2s",
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 2, left: on ? 18 : 2,
+        width: 20, height: 20, borderRadius: "50%", background: "white",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+        transition: "left 0.2s",
+      }} />
+    </div>
+  )
+}
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
 
   // Step 1
   const [name, setName] = useState("")
@@ -105,11 +143,13 @@ export default function OnboardingPage() {
       setStep(3)
     } else if (step === 3) {
       setStep(4)
+    } else if (step === 4) {
+      setStep(5)
     }
   }
 
   function back() {
-    setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4)
+    setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4 | 5)
   }
 
   function addTeam() {
@@ -144,82 +184,126 @@ export default function OnboardingPage() {
   const step1Valid = name.trim() && university.trim() && location.trim()
 
   return (
-    <div className="min-h-screen bg-[#FBF8F2] flex items-center justify-center px-5 py-12">
-      <div className="w-full max-w-[480px]">
+    <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column", fontFamily: "var(--font-inter)" }}>
 
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center gap-2.5 mb-2">
-            <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-              <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-            </svg>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+      {/* ── Plum header ── */}
+      <div style={{ background: "#3E1540" }}>
+        <div style={{ maxWidth: 580, margin: "0 auto", padding: "36px 40px 40px" }}>
+
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 32 }}>
+            <RingCrossLogo size={24} color="#F6F4EF" />
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em", lineHeight: 1 }}>
               Central
             </span>
           </div>
-          <p className="text-[13px] text-[#8A8497]">Create your ministry workspace</p>
-        </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-7">
-          {Array.from({ length: STEPS }, (_, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all"
-                style={{
-                  background: i + 1 <= step ? "#3E1540" : "#E5E0D2",
-                  color: i + 1 <= step ? "#F6F4EF" : "#8A8497",
-                }}
-              >
-                {i + 1 < step ? <Check className="w-3 h-3" /> : i + 1}
+          {/* Eyebrow + heading + subtitle */}
+          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.45)", marginBottom: 12, margin: "0 0 12px" }}>
+            Register your ministry
+          </p>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 10px" }}>
+            Set up your ministry workspace.
+          </h1>
+          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.55)", lineHeight: 1.5, margin: "0 0 36px" }}>
+            It only takes a few minutes. We&apos;ll get your team ready to go.
+          </p>
+
+          {/* Step indicator */}
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            {Array.from({ length: STEPS }, (_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS - 1 ? 1 : undefined }}>
+                {/* Circle + label */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                    background: i + 1 <= step ? "#F6F4EF" : "rgba(246,244,239,0.12)",
+                    color: i + 1 <= step ? "#3E1540" : "rgba(246,244,239,0.3)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 700,
+                    transition: "all 0.2s",
+                  }}>
+                    {i + 1 < step
+                      ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} />
+                      : i + 1}
+                  </div>
+                  <span style={{
+                    fontSize: 10, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                    color: i + 1 === step ? "rgba(246,244,239,0.9)" : "rgba(246,244,239,0.3)",
+                    fontWeight: i + 1 === step ? 600 : 400,
+                    transition: "color 0.2s",
+                  }}>
+                    {STEP_TITLES[i]}
+                  </span>
+                </div>
+                {/* Connector line — pushed down to align with circle centers */}
+                {i < STEPS - 1 && (
+                  <div style={{
+                    flex: 1, height: 1, marginTop: 14, marginLeft: 8, marginRight: 8,
+                    background: i + 1 < step ? "rgba(246,244,239,0.55)" : "rgba(246,244,239,0.15)",
+                    transition: "background 0.2s",
+                  }} />
+                )}
               </div>
-              {i < STEPS - 1 && (
-                <div className="w-8 h-px" style={{ background: i + 1 < step ? "#3E1540" : "#E5E0D2" }} />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+      </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl border border-[#ECE8DE] p-6 shadow-[0_2px_8px_rgba(19,16,26,0.06)]">
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", marginBottom: 4, fontWeight: 400 }}>
-            {STEP_TITLES[step - 1]}
+      {/* ── Form area ── */}
+      <div style={{ background: "#FBF8F2", flex: 1 }}>
+        <div style={{ maxWidth: 580, margin: "0 auto", padding: "36px 40px 48px" }}>
+
+          {/* Step heading */}
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", margin: "0 0 6px" }}>
+            {STEP_HEADINGS[step - 1]}
           </h2>
-          <p className="text-[12px] text-[#8A8497] mb-6">Step {step} of {STEPS}</p>
+          <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 28px", lineHeight: 1.5 }}>
+            {STEP_SUBTITLES[step - 1]}
+          </p>
 
           {/* ── Step 1: Basic Info ── */}
           {step === 1 && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">Ministry name</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Ministry name</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Central Student Fellowship" className={inputClass} />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">University</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>University</label>
                 <input type="text" value={university} onChange={(e) => setUniversity(e.target.value)}
                   placeholder="e.g. University of Pittsburgh" className={inputClass} />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">Location</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Location</label>
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Pittsburgh, PA" className={inputClass} />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">Approximate size</label>
-                <div className="flex gap-2">
-                  {SIZE_OPTIONS.map((opt) => (
-                    <button key={opt.value} type="button" onClick={() => setSize(opt.value)}
-                      className={`flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all ${
-                        size === opt.value
-                          ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
-                          : "bg-[#FBF8F2] border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/40"
-                      }`}>
-                      {opt.label}
-                    </button>
-                  ))}
+
+              {/* Size cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Approximate size</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {SIZE_OPTIONS.map((opt) => {
+                    const selected = size === opt.value
+                    return (
+                      <button key={opt.value} type="button" onClick={() => setSize(opt.value)}
+                        style={{
+                          padding: "16px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                          border: selected ? "2px solid #3E1540" : "1.5px solid #ECE8DE",
+                          background: selected ? "#3E1540" : "white",
+                          transition: "all 0.15s",
+                        }}>
+                        <p style={{ fontSize: 15, fontWeight: 700, color: selected ? "#F6F4EF" : "#13101A", margin: "0 0 3px" }}>
+                          {opt.label}
+                        </p>
+                        <p style={{ fontSize: 11, color: selected ? "rgba(246,244,239,0.6)" : "#8A8497", margin: 0 }}>
+                          {opt.desc}
+                        </p>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -227,25 +311,28 @@ export default function OnboardingPage() {
 
           {/* ── Step 2: Structure ── */}
           {step === 2 && (
-            <div className="flex flex-col gap-3">
-              <p className="text-[13px] text-[#5A5466] -mt-2 mb-1">Which of these apply to your ministry?</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {STRUCTURE_QUESTIONS.map((q) => (
                 <button key={q.id} type="button" onClick={() => toggleStructure(q.id)}
-                  className="flex items-center gap-4 p-4 rounded-xl text-left w-full transition-all"
                   style={{
-                    border: structure[q.id] ? "1.5px solid #3E1540" : "1.5px solid #E5E0D2",
+                    display: "flex", alignItems: "center", gap: 14,
+                    padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%", cursor: "pointer",
+                    border: structure[q.id] ? "1.5px solid #3E1540" : "1.5px solid #ECE8DE",
                     background: structure[q.id] ? "rgba(62,21,64,0.04)" : "white",
+                    transition: "all 0.15s",
                   }}>
-                  <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
-                    style={{
-                      background: structure[q.id] ? "#3E1540" : "#F4F1E8",
-                      border: structure[q.id] ? "none" : "1.5px solid #E5E0D2",
-                    }}>
-                    {structure[q.id] && <Check className="w-3 h-3 text-white" />}
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                    background: structure[q.id] ? "#3E1540" : "#F4F1E8",
+                    border: structure[q.id] ? "none" : "1.5px solid #E5E0D2",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s",
+                  }}>
+                    {structure[q.id] && <Check style={{ width: 11, height: 11, color: "white" }} />}
                   </div>
                   <div>
-                    <p className="text-[14px] font-semibold text-[#13101A]">{q.label}</p>
-                    <p className="text-[12px] text-[#8A8497]">{q.desc}</p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>{q.label}</p>
+                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{q.desc}</p>
                   </div>
                 </button>
               ))}
@@ -254,29 +341,37 @@ export default function OnboardingPage() {
 
           {/* ── Step 3: Teams ── */}
           {step === 3 && (
-            <div className="flex flex-col gap-3">
-              <p className="text-[13px] text-[#5A5466] -mt-2 mb-1">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 4px" }}>
                 {teams.length === 0
                   ? "Add your first team below."
                   : `${teams.length} team${teams.length !== 1 ? "s" : ""} will be created in your workspace.`}
               </p>
 
               {teams.map((team) => (
-                <div key={team.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2]">
-                  <span className="text-xl">{team.icon}</span>
-                  <span className="text-[14px] font-medium text-[#13101A] flex-1">{team.name}</span>
+                <div key={team.id} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 14px", borderRadius: 10,
+                  border: "1px solid #ECE8DE", background: "white",
+                }}>
+                  <span style={{ fontSize: 18 }}>{team.icon}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A", flex: 1 }}>{team.name}</span>
                   <button type="button" onClick={() => removeTeam(team.id)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-[#8A8497] hover:text-[#9D2D2D] hover:bg-red-50 transition-colors">
-                    <X className="w-3.5 h-3.5" />
+                    style={{
+                      width: 24, height: 24, borderRadius: "50%", border: "none", background: "#F4F1E8",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", color: "#8A8497", flexShrink: 0,
+                    }}>
+                    <X style={{ width: 12, height: 12 }} />
                   </button>
                 </div>
               ))}
 
               {showAdd ? (
-                <div className="p-4 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] flex flex-col gap-2">
-                  <div className="flex gap-2">
+                <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ECE8DE", background: "white", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
                     <select value={newIcon} onChange={(e) => setNewIcon(e.target.value)}
-                      className="w-14 px-1 py-2 rounded-lg border border-[#E5E0D2] bg-white text-center text-xl focus:outline-none cursor-pointer">
+                      style={{ width: 52, padding: "8px 4px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", textAlign: "center", fontSize: 18, cursor: "pointer", outline: "none" }}>
                       {["🙏","📖","💒","🌍","🎓","❤️","💜","⭐","📋","🎯","🎉","💡","🏠","🍞","🌱","🤲","🫶","🎤","🥁","🎸","🎵","🎬","👥","🤝","✝️"].map((e) => (
                         <option key={e} value={e}>{e}</option>
                       ))}
@@ -285,21 +380,26 @@ export default function OnboardingPage() {
                       placeholder="Team name" className={`${inputClass} flex-1`}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeam() } }} />
                   </div>
-                  <div className="flex gap-2">
+                  <div style={{ display: "flex", gap: 8 }}>
                     <button type="button" onClick={addTeam} disabled={!newName.trim()}
-                      className="flex-1 py-2 rounded-lg bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold disabled:opacity-50 transition-colors">
+                      style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newName.trim() ? 0.5 : 1 }}>
                       Add
                     </button>
-                    <button type="button" onClick={() => { setShowAdd(false); setNewName(""); }}
-                      className="flex-1 py-2 rounded-lg border border-[#E5E0D2] text-[13px] text-[#8A8497] transition-colors">
+                    <button type="button" onClick={() => { setShowAdd(false); setNewName("") }}
+                      style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#8A8497", cursor: "pointer" }}>
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 <button type="button" onClick={() => setShowAdd(true)}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-[#E5E0D2] text-[13px] text-[#8A8497] hover:border-[#3E1540]/40 hover:text-[#3E1540] transition-colors">
-                  <Plus className="w-4 h-4" /> Add team
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "12px 14px", borderRadius: 10,
+                    border: "1.5px dashed #E5E0D2", background: "transparent",
+                    fontSize: 13, color: "#8A8497", cursor: "pointer",
+                  }}>
+                  <Plus style={{ width: 15, height: 15 }} /> Add team
                 </button>
               )}
             </div>
@@ -307,31 +407,36 @@ export default function OnboardingPage() {
 
           {/* ── Step 4: Review & Submit ── */}
           {step === 4 && (
-            <div className="flex flex-col gap-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {error && (
-                <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
+                <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.07)", padding: "12px 16px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
                   {error}
                 </div>
               )}
 
-              <div className="p-4 rounded-xl bg-[#FBF8F2] border border-[#E5E0D2]">
-                <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">Ministry</p>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", color: "#13101A", fontWeight: 400 }}>{name}</p>
-                <p className="text-[13px] text-[#5A5466] mt-0.5">{university}</p>
-                <p className="text-[13px] text-[#8A8497]">{location}</p>
-                <p className="text-[12px] text-[#8A8497] mt-1">
+              <div style={{ padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE" }}>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px" }}>Ministry</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", fontWeight: 400, margin: "0 0 3px" }}>{name}</p>
+                <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>{university}</p>
+                <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 2px" }}>{location}</p>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
                   {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
                 </p>
               </div>
 
               {teams.length > 0 && (
-                <div className="p-4 rounded-xl bg-[#FBF8F2] border border-[#E5E0D2]">
-                  <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">
+                <div style={{ padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px" }}>
                     Teams ({teams.length})
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {teams.map((t) => (
-                      <span key={t.id} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#E5E0D2] text-[13px] text-[#13101A]">
+                      <span key={t.id} style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "4px 12px", borderRadius: 9999,
+                        background: "#F4F1E8", border: "1px solid #ECE8DE",
+                        fontSize: 13, color: "#13101A",
+                      }}>
                         {t.icon} {t.name}
                       </span>
                     ))}
@@ -340,62 +445,105 @@ export default function OnboardingPage() {
               )}
 
               {/* Discoverability toggle */}
-              <button
-                type="button"
-                onClick={() => setIsPublic((v) => !v)}
-                className="flex items-center justify-between w-full p-4 rounded-xl border transition-all"
-                style={{
-                  border: isPublic ? "1.5px solid #3E1540" : "1.5px solid #E5E0D2",
-                  background: isPublic ? "rgba(62,21,64,0.04)" : "white",
-                }}
-              >
-                <div className="text-left">
-                  <p className="text-[14px] font-semibold text-[#13101A]">Make ministry discoverable</p>
-                  <p className="text-[12px] text-[#8A8497] mt-0.5">Anyone can find and join once approved</p>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE",
+              }}>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>Make ministry discoverable</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Anyone can find and join once approved</p>
                 </div>
-                <div
-                  className="w-10 h-6 rounded-full relative transition-colors flex-shrink-0 ml-4"
-                  style={{ background: isPublic ? "#3E1540" : "#E5E0D2" }}
-                >
-                  <div
-                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
-                    style={{ transform: isPublic ? "translateX(18px)" : "translateX(2px)" }}
-                  />
-                </div>
-              </button>
+                <Toggle on={isPublic} onToggle={() => setIsPublic((v) => !v)} />
+              </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-[#FBF8F2] border border-[#E5E0D2]">
-                <div className="w-4 h-4 mt-0.5 rounded-full bg-[#C9A34B]/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-2.5 h-2.5 text-[#C9A34B]" />
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 18px", borderRadius: 10, background: "#F4F1E8", border: "1px solid #ECE8DE" }}>
+                <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                  <Check style={{ width: 10, height: 10, color: "#8A8497" }} />
                 </div>
-                <p className="text-[12px] text-[#8A8497] leading-relaxed">
+                <p style={{ fontSize: 12, color: "#8A8497", lineHeight: 1.6, margin: 0 }}>
                   Your application will be reviewed by the Central team within 24–48 hours. You&apos;ll receive full access once approved.
                 </p>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Navigation buttons */}
-        <div className="flex gap-3 mt-4">
-          {step > 1 && (
-            <button type="button" onClick={back}
-              className="flex items-center gap-1.5 px-5 py-3 rounded-xl border border-[#E5E0D2] text-[13px] font-semibold text-[#5A5466] hover:border-[#3E1540]/40 hover:text-[#3E1540] transition-colors">
-              <ChevronLeft className="w-4 h-4" /> Back
-            </button>
+          {/* ── Step 5: Pricing ── */}
+          {step === 5 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {error && (
+                <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.07)", padding: "12px 16px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                  {error}
+                </div>
+              )}
+              <div style={{
+                padding: "28px 24px", borderRadius: 14, background: "white",
+                border: "1px solid #ECE8DE", textAlign: "center",
+              }}>
+                <div style={{
+                  display: "inline-block", background: "#F4F1E8", borderRadius: 9999,
+                  padding: "4px 14px", fontSize: 11, fontWeight: 700, color: "#3E1540",
+                  letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16,
+                }}>
+                  Beta
+                </div>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, fontWeight: 400, color: "#13101A", margin: "0 0 6px", letterSpacing: "-0.01em" }}>
+                  Free
+                </p>
+                <p style={{ fontSize: 14, color: "#8A8497", margin: "0 0 20px", lineHeight: 1.5 }}>
+                  No credit card required. Free for all ministries while Central is in beta.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
+                  {["Unlimited members", "Real-time messaging", "Announcements & events", "Member directory", "Team planning"].map((item) => (
+                    <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Check style={{ width: 10, height: 10, color: "white" }} />
+                      </div>
+                      <span style={{ fontSize: 13, color: "#5A5466" }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: "#8A8497", textAlign: "center", lineHeight: 1.5 }}>
+                Pricing may change after beta. You&apos;ll be notified before any changes take effect.
+              </p>
+            </div>
           )}
 
-          {step < STEPS ? (
-            <button type="button" onClick={next} disabled={step === 1 && !step1Valid}
-              className="flex-1 py-3 rounded-xl bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold text-[14px] transition-colors">
-              Continue
-            </button>
-          ) : (
-            <button type="button" onClick={handleSubmit} disabled={submitting}
-              className="flex-1 py-3 rounded-xl bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold text-[14px] transition-colors">
-              {submitting ? "Submitting…" : "Submit application"}
-            </button>
-          )}
+          {/* Navigation */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 36 }}>
+            {step > 1 ? (
+              <button type="button" onClick={back}
+                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>
+                ← Back
+              </button>
+            ) : (
+              <div />
+            )}
+
+            {step < STEPS ? (
+              <button type="button" onClick={next} disabled={step === 1 && !step1Valid}
+                style={{
+                  padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
+                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                  cursor: step === 1 && !step1Valid ? "not-allowed" : "pointer",
+                  opacity: step === 1 && !step1Valid ? 0.45 : 1,
+                  transition: "opacity 0.15s",
+                }}>
+                Continue
+              </button>
+            ) : (
+              <button type="button" onClick={handleSubmit} disabled={submitting}
+                style={{
+                  padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
+                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  opacity: submitting ? 0.6 : 1,
+                  transition: "opacity 0.15s",
+                }}>
+                {submitting ? "Submitting…" : "Submit application"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

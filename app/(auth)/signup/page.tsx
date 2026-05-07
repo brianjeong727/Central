@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
+import { RingCrossLogo } from "@/app/home/components/shared"
 
 const CURRENT_YEAR = new Date().getFullYear()
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
@@ -64,11 +65,7 @@ export default function SignupPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
           <div className="flex items-center gap-2.5 mb-3">
-            <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-              <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-            </svg>
+            <RingCrossLogo size={32} />
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
               Central
             </span>
