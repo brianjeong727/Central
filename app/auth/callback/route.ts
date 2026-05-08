@@ -47,11 +47,13 @@ export async function GET(request: NextRequest) {
 
     if (umErr) console.warn("[auth/callback] user_ministries query error:", umErr.message)
 
-    if (memberships && memberships.length > 1) {
+    const uniqueMinistries = [...new Set((memberships ?? []).map((m) => m.ministry_id))]
+
+    if (uniqueMinistries.length > 1) {
       console.log("[auth/callback] multi-ministry → pick-ministry")
       return NextResponse.redirect(new URL("/pick-ministry", base))
     }
-    if (memberships && memberships.length === 1) {
+    if (uniqueMinistries.length === 1) {
       console.log("[auth/callback] single ministry → home")
       return NextResponse.redirect(new URL("/home", base))
     }

@@ -51,8 +51,9 @@ export default function LoginPage() {
         .select("ministry_id")
         .eq("user_id", me.id)
 
-      if (memberships && memberships.length > 1) { window.location.href = "/pick-ministry"; return }
-      if (memberships && memberships.length === 1) { window.location.href = "/home"; return }
+      const uniqueMinistries = [...new Set((memberships ?? []).map((m: { ministry_id: string }) => m.ministry_id))]
+      if (uniqueMinistries.length > 1) { window.location.href = "/pick-ministry"; return }
+      if (uniqueMinistries.length === 1) { window.location.href = "/home"; return }
 
       // user_ministries empty or table missing — fall back to profiles
       const { data: profile } = await supabase.from("profiles").select("ministry_id").eq("id", me.id).maybeSingle()
