@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase"
+import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
-import { getUserMinistries } from "@/app/actions/ministry"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -43,14 +42,19 @@ export default function LoginPage() {
       return
     }
 
-    // Try multi-ministry table first (may not exist yet — fall back gracefully)
-    const { data: ministries } = await getUserMinistries()
-    if (ministries && ministries.length > 1) { window.location.href = "/pick-ministry"; return }
-    if (ministries && ministries.length === 1) { window.location.href = "/home"; return }
-
-    // Fallback: check profiles.ministry_id directly
+    // Browser client always has the session immediately after signInWithPassword.
+    // Query user_ministries directly so multi-ministry detection is reliable.
     const { data: { user: me } } = await supabase.auth.getUser()
     if (me) {
+      const { data: memberships } = await supabase
+        .from("user_ministries")
+        .select("ministry_id")
+        .eq("user_id", me.id)
+
+      if (memberships && memberships.length > 1) { window.location.href = "/pick-ministry"; return }
+      if (memberships && memberships.length === 1) { window.location.href = "/home"; return }
+
+      // user_ministries empty or table missing — fall back to profiles
       const { data: profile } = await supabase.from("profiles").select("ministry_id").eq("id", me.id).maybeSingle()
       if (profile?.ministry_id) { window.location.href = "/home"; return }
     }
@@ -63,7 +67,7 @@ export default function LoginPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
+      options: { redirectTo: siteOrigin() + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
     })
   }
 

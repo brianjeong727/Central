@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase"
+import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -52,7 +52,7 @@ export default function SignupPage() {
     const intent = new URLSearchParams(window.location.search).get("intent")
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
+      options: { redirectTo: siteOrigin() + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
     })
   }
 
