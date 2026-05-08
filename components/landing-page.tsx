@@ -1,32 +1,60 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
-import { MessageCircle, Megaphone, Users, ClipboardList } from "lucide-react"
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  ClipboardList,
+  MessageCircle,
+  UserRound,
+  UsersRound,
+} from "lucide-react"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
-const FEATURES = [
+const COLORS = {
+  primary: "#3E1540",
+  primaryHover: "#2D0F2E",
+  ink: "#13101A",
+  gold: "#C9A34B",
+  surface: "#FBF8F2",
+  border: "#ECE8DE",
+  body: "#5A5466",
+  muted: "#8A8497",
+  ivory: "#F6F4EF",
+}
+
+const FEATURE_ROWS = [
   {
     icon: MessageCircle,
-    title: "Real-time Messaging",
-    body: "Church-wide channels and small-group chats, all in one place. Direct messages too.",
+    title: "Chats that match ministry life",
+    body: "Church-wide rooms, small groups, direct messages, replies, reactions, and read states without scattering people across tools.",
   },
   {
-    icon: Megaphone,
-    title: "Announcements",
-    body: "Pin events, send announcements, track RSVPs — your community stays in the loop.",
+    icon: CalendarDays,
+    title: "Announcements with real follow-through",
+    body: "Pinned updates, event context, RSVP tracking, and audience-aware publishing keep students aligned without another spreadsheet.",
   },
   {
-    icon: Users,
-    title: "Member Directory",
-    body: "Every member's name, role, and prayer request. Know who you're walking with.",
+    icon: UsersRound,
+    title: "A living directory",
+    body: "Names, roles, prayer requests, and spiritual profiles make it easier for leaders and students to care for each other well.",
   },
   {
     icon: ClipboardList,
-    title: "Team Planning",
-    body: "Worship rosters, event tasks, role assignments — everything your teams need to execute.",
+    title: "Planning for the people behind the scenes",
+    body: "Team roles, rosters, worship planning, event tasks, and service details live beside the conversations that move them forward.",
   },
+]
+
+const RHYTHM_ITEMS = [
+  "Welcome new students",
+  "Publish weekly announcements",
+  "Coordinate worship teams",
+  "Keep small groups close",
 ]
 
 export default function LandingPage() {
@@ -37,37 +65,34 @@ export default function LandingPage() {
 
   useEffect(() => {
     function onScroll() {
-      setScrolled(window.scrollY > 80)
+      setScrolled(window.scrollY > 56)
     }
+
+    onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
   useEffect(() => {
     const supabase = createClient()
+
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setAuthUser(true)
+      setAuthUser(Boolean(user))
       setAuthChecked(true)
     })
   }, [])
 
-  function handleRegisterClick() {
-    window.location.href = "/onboarding"
-  }
-
-
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.href = "/landing"
+    window.location.href = "/"
   }
 
-  return (
-    <div style={{ fontFamily: "var(--font-inter)" }}>
+  const navInk = scrolled ? COLORS.ink : COLORS.ivory
+  const navMuted = scrolled ? COLORS.body : "rgba(246,244,239,0.76)"
 
-      {/* ─────────────────────────────────────────────────────────── */}
-      {/* FIXED NAVBAR                                                */}
-      {/* ─────────────────────────────────────────────────────────── */}
+  return (
+    <main style={{ minHeight: "100vh", background: COLORS.surface, color: COLORS.ink, fontFamily: "var(--font-inter)" }}>
       <nav
         style={{
           position: "fixed",
@@ -75,629 +100,649 @@ export default function LandingPage() {
           left: 0,
           right: 0,
           zIndex: 50,
-          height: 68,
-          display: "grid",
-          gridTemplateColumns: "1fr auto 1fr",
-          alignItems: "center",
-          padding: "0 32px",
-          backgroundColor: scrolled ? "#FBF8F2" : "transparent",
-          borderBottom: scrolled ? "1px solid #ECE8DE" : "1px solid transparent",
-          backdropFilter: scrolled ? "blur(12px)" : "none",
-          WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
-          transition: "background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease",
+          borderBottom: scrolled ? `1px solid ${COLORS.border}` : "1px solid transparent",
+          background: scrolled ? "rgba(251,248,242,0.92)" : "transparent",
+          backdropFilter: scrolled ? "blur(16px)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(16px)" : "none",
+          transition: "background 180ms ease, border-color 180ms ease, backdrop-filter 180ms ease",
         }}
       >
-        {/* Column 1: Logo */}
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <a
+        <div
+          className="central-landing-nav"
+          style={{
+            width: "min(1120px, calc(100% - 32px))",
+            height: 72,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "minmax(180px, 1fr) auto minmax(180px, 1fr)",
+            alignItems: "center",
+            gap: 20,
+          }}
+        >
+          <Link
             href="/"
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 9,
+              gap: 10,
+              color: navInk,
+              justifySelf: "start",
               textDecoration: "none",
-              flexShrink: 0,
             }}
           >
-            <RingCrossLogo size={26} color={scrolled ? "#3E1540" : "#F6F4EF"} />
+            <RingCrossLogo size={28} color={scrolled ? COLORS.primary : COLORS.ivory} />
             <span
               style={{
                 fontFamily: "var(--font-instrument-serif)",
-                fontSize: "24px",
-                color: scrolled ? "#13101A" : "#F6F4EF",
-                letterSpacing: "-0.01em",
+                fontSize: 25,
+                color: navInk,
                 lineHeight: 1,
-                transition: "color 0.25s ease",
+                transition: "color 180ms ease",
               }}
             >
               Central
             </span>
-          </a>
-        </div>
+          </Link>
 
-        {/* Column 2: Center nav links — desktop only, collapses to nothing on mobile */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="hidden sm:flex" style={{ alignItems: "center", gap: 32 }}>
+          <div className="hidden md:flex" style={{ alignItems: "center", gap: 30, justifySelf: "center" }}>
             {[
-              { label: "About", href: "#about" },
-              { label: "Why us", href: "#why-us" },
-              { label: "Ministries", href: "/ministries" },
-            ].map(({ label, href }) => (
+              ["Platform", "#platform"],
+              ["Rhythm", "#rhythm"],
+              ["Ministries", "/ministries"],
+            ].map(([label, href]) => (
               <a
                 key={label}
                 href={href}
                 style={{
-                  fontSize: 14, fontWeight: 400,
-                  color: scrolled ? "#8A8497" : "rgba(246,244,239,0.75)",
+                  color: navMuted,
+                  fontSize: 14,
+                  fontWeight: 500,
                   textDecoration: "none",
-                  transition: "color 0.2s ease",
-                  whiteSpace: "nowrap",
+                  transition: "color 160ms ease",
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = scrolled ? "#13101A" : "#F6F4EF")}
-                onMouseLeave={e => (e.currentTarget.style.color = scrolled ? "#8A8497" : "rgba(246,244,239,0.75)")}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.color = navInk
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.color = navMuted
+                }}
               >
                 {label}
               </a>
             ))}
-            <button
-              onClick={handleRegisterClick}
-              style={{
-                fontSize: 14, fontWeight: 400,
-                color: scrolled ? "#8A8497" : "rgba(246,244,239,0.75)",
-                background: "none", border: "none", cursor: "pointer", padding: 0,
-                transition: "color 0.2s ease",
-                whiteSpace: "nowrap",
-                fontFamily: "var(--font-inter)",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = scrolled ? "#13101A" : "#F6F4EF")}
-              onMouseLeave={e => (e.currentTarget.style.color = scrolled ? "#8A8497" : "rgba(246,244,239,0.75)")}
-            >
-              Register your ministry
-            </button>
           </div>
-        </div>
 
-        {/* Column 3: Right auth */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-
-          {/* Desktop */}
-          <div className="hidden sm:flex" style={{ alignItems: "center", gap: 20 }}>
-            {authChecked && !authUser && (
-              <a
-                href="/login"
-                style={{
-                  fontSize: 14, fontWeight: 500,
-                  color: scrolled ? "#5A5466" : "#F6F4EF",
-                  textDecoration: "none",
-                  transition: "color 0.25s ease",
-                }}
-              >
-                Sign in
-              </a>
-            )}
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", justifySelf: "end", gap: 12 }}>
             {authChecked && authUser ? (
               <>
                 <a
                   href="/home"
                   style={{
-                    padding: "7px 18px", borderRadius: 9999, fontSize: 13, fontWeight: 500,
-                    background: "transparent", textDecoration: "none",
-                    whiteSpace: "nowrap", letterSpacing: "-0.01em",
-                    transition: "color 0.2s ease, border-color 0.2s ease",
-                    ...(scrolled
-                      ? { color: "#3E1540", border: "1px solid #3E1540" }
-                      : { color: "#F6F4EF", border: "1px solid #F6F4EF" }),
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = scrolled ? "#2D0F2E" : "#ffffff"
-                    e.currentTarget.style.borderColor = scrolled ? "#2D0F2E" : "#ffffff"
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color = scrolled ? "#3E1540" : "#F6F4EF"
-                    e.currentTarget.style.borderColor = scrolled ? "#3E1540" : "#F6F4EF"
+                    minHeight: 38,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 8,
+                    border: `1px solid ${scrolled ? COLORS.primary : "rgba(246,244,239,0.78)"}`,
+                    color: scrolled ? COLORS.primary : COLORS.ivory,
+                    padding: "0 15px",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  Go to app
+                  Open app
                 </a>
                 <button
                   onClick={handleSignOut}
                   style={{
-                    fontSize: 13, fontWeight: 500, background: "none", border: "none",
-                    cursor: "pointer", padding: 0, whiteSpace: "nowrap",
-                    color: scrolled ? "#8A8497" : "rgba(246,244,239,0.6)",
-                    transition: "color 0.2s ease",
+                    background: "transparent",
+                    border: 0,
+                    color: navMuted,
+                    cursor: "pointer",
                     fontFamily: "var(--font-inter)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "8px 0",
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = scrolled ? "#13101A" : "#F6F4EF")}
-                  onMouseLeave={e => (e.currentTarget.style.color = scrolled ? "#8A8497" : "rgba(246,244,239,0.6)")}
                 >
                   Sign out
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => router.push("/signup")}
-                style={{
-                  padding: "7px 18px", borderRadius: 9999, fontSize: 13, fontWeight: 500,
-                  cursor: "pointer", letterSpacing: "-0.01em", whiteSpace: "nowrap",
-                  transition: "background 0.25s ease, color 0.25s ease, border-color 0.25s ease",
-                  ...(scrolled
-                    ? { background: "#3E1540", color: "#F6F4EF", border: "1.5px solid #3E1540" }
-                    : { background: "transparent", color: "#F6F4EF", border: "1.5px solid rgba(246,244,239,0.65)" }),
-                }}
-              >
-                Sign up
-              </button>
-            )}
-          </div>
-
-          {/* Mobile */}
-          <div className="flex sm:hidden" style={{ alignItems: "center", gap: 16 }}>
-            <a
-              href="/ministries"
-              style={{
-                fontSize: 13, fontWeight: 500,
-                color: scrolled ? "#5A5466" : "#F6F4EF",
-                textDecoration: "none",
-                transition: "color 0.25s ease",
-              }}
-            >
-              Ministries
-            </a>
-            {authChecked && authUser ? (
               <>
                 <a
-                  href="/home"
+                  className="hidden sm:inline-flex"
+                  href="/login"
                   style={{
-                    padding: "6px 14px", borderRadius: 9999, fontSize: 13, fontWeight: 500,
-                    background: "transparent", textDecoration: "none",
-                    whiteSpace: "nowrap", letterSpacing: "-0.01em",
-                    transition: "color 0.2s ease, border-color 0.2s ease",
-                    ...(scrolled
-                      ? { color: "#3E1540", border: "1px solid #3E1540" }
-                      : { color: "#F6F4EF", border: "1px solid #F6F4EF" }),
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = scrolled ? "#2D0F2E" : "#ffffff"
-                    e.currentTarget.style.borderColor = scrolled ? "#2D0F2E" : "#ffffff"
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color = scrolled ? "#3E1540" : "#F6F4EF"
-                    e.currentTarget.style.borderColor = scrolled ? "#3E1540" : "#F6F4EF"
+                    color: navMuted,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  Go to app
+                  Sign in
                 </a>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => router.push("/onboarding")}
                   style={{
-                    fontSize: 12, fontWeight: 500, background: "none", border: "none",
-                    cursor: "pointer", padding: 0, whiteSpace: "nowrap",
-                    color: scrolled ? "#8A8497" : "rgba(246,244,239,0.6)",
-                    transition: "color 0.2s ease",
+                    minHeight: 38,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 8,
+                    border: scrolled ? `1px solid ${COLORS.primary}` : "1px solid rgba(246,244,239,0.76)",
+                    background: scrolled ? COLORS.primary : "rgba(246,244,239,0.12)",
+                    color: COLORS.ivory,
+                    cursor: "pointer",
                     fontFamily: "var(--font-inter)",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    padding: "0 16px",
+                    whiteSpace: "nowrap",
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = scrolled ? "#13101A" : "#F6F4EF")}
-                  onMouseLeave={e => (e.currentTarget.style.color = scrolled ? "#8A8497" : "rgba(246,244,239,0.6)")}
                 >
-                  Sign out
+                  Get started
                 </button>
               </>
-            ) : (
-              <button
-                onClick={() => router.push("/signup")}
-                style={{
-                  padding: "7px 16px", borderRadius: 9999, fontSize: 13, fontWeight: 500,
-                  cursor: "pointer", letterSpacing: "-0.01em", whiteSpace: "nowrap",
-                  transition: "background 0.25s ease, color 0.25s ease, border-color 0.25s ease",
-                  ...(scrolled
-                    ? { background: "#3E1540", color: "#F6F4EF", border: "1.5px solid #3E1540" }
-                    : { background: "transparent", color: "#F6F4EF", border: "1.5px solid rgba(246,244,239,0.65)" }),
-                }}
-              >
-                Get started
-              </button>
             )}
           </div>
-
         </div>
       </nav>
 
-      {/* ─────────────────────────────────────────────────────────── */}
-      {/* SECTION 1 — HERO                                           */}
-      {/* ─────────────────────────────────────────────────────────── */}
       <section
+        className="central-landing-hero"
         style={{
           position: "relative",
-          width: "100%",
-          height: "100svh",
-          minHeight: 600,
-          overflow: "hidden",
+          minHeight: 760,
           display: "flex",
-          flexDirection: "column",
+          alignItems: "end",
+          overflow: "hidden",
+          isolation: "isolate",
+          background: COLORS.surface,
         }}
       >
-        {/* Background photo */}
         <div
+          aria-hidden
           style={{
             position: "absolute",
             inset: 0,
+            zIndex: -3,
             backgroundImage: "url('/chapel.jpg')",
+            backgroundPosition: "center center",
             backgroundSize: "cover",
-            backgroundPosition: "center 30%",
-            zIndex: 0,
           }}
         />
-
-        {/* Gradient overlays */}
         <div
+          aria-hidden
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(to bottom, rgba(62,21,64,0.38) 0%, transparent 28%)",
-            zIndex: 1,
+            zIndex: -2,
+            background:
+              "linear-gradient(180deg, rgba(62,21,64,0.10) 0%, rgba(201,163,75,0.06) 42%, rgba(251,248,242,0.04) 100%)",
           }}
         />
         <div
+          aria-hidden
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(to top, rgba(19,16,26,0.22) 0%, transparent 28%)",
-            zIndex: 1,
+            zIndex: -1,
+            background:
+              "radial-gradient(circle at 25% 70%, rgba(19,16,26,0.28) 0%, rgba(19,16,26,0.13) 26%, rgba(19,16,26,0) 48%), radial-gradient(circle at 70% 72%, rgba(19,16,26,0.18) 0%, rgba(19,16,26,0.08) 24%, rgba(19,16,26,0) 44%)",
           }}
         />
-        {/* Seamless bottom bleed into ivory — extends 2px below section boundary */}
         <div
+          aria-hidden
           style={{
             position: "absolute",
-            bottom: -2,
             left: 0,
             right: 0,
-            height: "200px",
-            background: "linear-gradient(to top, #FBF8F2 0%, #FBF8F2 8%, rgba(251,248,242,0) 100%)",
-            zIndex: 2,
+            bottom: 0,
+            height: 82,
+            zIndex: 0,
+            background: `linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.08) 52%, ${COLORS.surface} 100%)`,
           }}
         />
 
-        {/* Bible verse — top right, offset below navbar */}
         <div
+          className="central-landing-hero-inner"
           style={{
+            width: "min(1120px, calc(100% - 32px))",
+            margin: "0 auto",
+            padding: "132px 0 72px",
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: 28,
+            alignItems: "end",
             position: "relative",
-            zIndex: 10,
-            display: "flex",
-            justifyContent: "flex-end",
-            padding: "76px 36px 0",
+            zIndex: 1,
           }}
-          className="hidden sm:flex"
         >
-          <div style={{ textAlign: "right", maxWidth: 280 }}>
+          <div>
             <p
               style={{
-                fontFamily: "var(--font-instrument-serif)",
-                fontStyle: "italic",
-                fontSize: "13.5px",
-                color: "rgba(246,244,239,0.88)",
-                lineHeight: 1.6,
-                margin: 0,
-                textShadow: "0 1px 12px rgba(19,16,26,0.5), 0 1px 3px rgba(19,16,26,0.4)",
-              }}
-            >
-              &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
-            </p>
-            <p
-              style={{
-                marginTop: 6,
-                fontSize: "10px",
-                letterSpacing: "0.18em",
+                margin: "0 0 18px",
+                color: "rgba(246,244,239,0.76)",
+                fontSize: 13,
+                fontWeight: 700,
                 textTransform: "uppercase",
-                color: "rgba(246,244,239,0.55)",
-                fontFamily: "var(--font-inter)",
-                textShadow: "0 1px 12px rgba(19,16,26,0.5), 0 1px 3px rgba(19,16,26,0.4)",
+                textShadow: "0 1px 8px rgba(19,16,26,0.28)",
               }}
             >
+              College ministry communication
+            </p>
+            <h1
+              className="central-landing-hero-title"
+              style={{
+                margin: "0 0 24px",
+                color: COLORS.ivory,
+                fontFamily: "var(--font-instrument-serif)",
+                fontSize: 52,
+                fontWeight: 400,
+                lineHeight: 0.96,
+                maxWidth: 650,
+                textShadow: "0 2px 14px rgba(19,16,26,0.34)",
+              }}
+            >
+              Central
+            </h1>
+            <p
+              className="central-landing-hero-copy"
+              style={{
+                margin: "0 0 34px",
+                maxWidth: 560,
+                color: "rgba(246,244,239,0.82)",
+                fontSize: 16,
+                lineHeight: 1.7,
+                textShadow: "0 1px 10px rgba(19,16,26,0.34)",
+              }}
+            >
+              A quieter home for the weekly rhythm of ministry: conversations, announcements, people, and planning in one place.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              <button
+                onClick={() => router.push("/onboarding")}
+                style={{
+                  minHeight: 48,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 9,
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.ivory}`,
+                  background: COLORS.ivory,
+                  color: COLORS.primary,
+                  cursor: "pointer",
+                  fontFamily: "var(--font-inter)",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  padding: "0 22px",
+                  boxShadow: "0 2px 8px rgba(19,16,26,0.22)",
+                }}
+              >
+                Register your ministry
+                <ArrowRight size={17} strokeWidth={1.8} />
+              </button>
+              <a
+                href="/ministries"
+                style={{
+                  minHeight: 48,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  border: "1px solid rgba(246,244,239,0.68)",
+                  color: COLORS.ivory,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  padding: "0 22px",
+                  textDecoration: "none",
+                  textShadow: "0 1px 10px rgba(19,16,26,0.40)",
+                }}
+              >
+                Join an existing ministry
+              </a>
+            </div>
+          </div>
+
+          <div
+            className="central-landing-quote"
+            style={{
+              borderTop: "1px solid rgba(246,244,239,0.28)",
+              paddingTop: 24,
+              color: COLORS.ivory,
+            }}
+          >
+            <p
+              style={{
+                margin: "0 0 14px",
+                color: "rgba(246,244,239,0.72)",
+                fontFamily: "var(--font-instrument-serif)",
+                fontSize: 20,
+                fontStyle: "italic",
+                lineHeight: 1.5,
+              }}
+            >
+              “For where two or three gather in my name, there am I with them.”
+            </p>
+            <p style={{ margin: 0, color: "rgba(246,244,239,0.58)", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
               Matthew 18:20
             </p>
           </div>
         </div>
+      </section>
 
-        {/* Spacer — pushes content to bottom */}
-        <div style={{ flex: 1 }} />
-
-        {/* Hero copy — bottom left */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 10,
-            padding: "0 36px 120px",
-          }}
-          className="flex flex-col items-start sm:items-start text-center sm:text-left"
-        >
-          <h1
-            style={{
-              fontFamily: "var(--font-instrument-serif)",
-              fontSize: "clamp(48px, 5.5vw, 72px)",
-              fontWeight: 400,
-              color: "#F6F4EF",
-              lineHeight: 1.05,
-              letterSpacing: "-0.03em",
-              margin: "0 0 28px",
-              maxWidth: 600,
-              textShadow: "0 2px 20px rgba(19,16,26,0.4), 0 1px 4px rgba(19,16,26,0.3)",
-            }}
-          >
-            Where your ministry<br />gathers.
-          </h1>
-          <p
-            style={{
-              fontSize: "clamp(15px, 1.5vw, 18px)",
-              color: "rgba(246,244,239,0.70)",
-              lineHeight: 1.6,
-              maxWidth: 420,
-              margin: "0 0 40px",
-              textShadow: "0 1px 12px rgba(19,16,26,0.5), 0 1px 3px rgba(19,16,26,0.4)",
-            }}
-          >
-            Messaging, announcements, directory, and team tools — built for the way college ministries actually work.
-          </p>
-
+      <section id="platform" className="central-landing-platform" style={{ background: COLORS.surface, padding: "42px 0 44px" }}>
+        <div style={{ width: "min(1120px, calc(100% - 32px))", margin: "0 auto" }}>
           <div
-            style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-            className="justify-center sm:justify-start w-full sm:w-auto"
+            className="central-landing-feature-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: 30,
+              alignItems: "start",
+            }}
           >
-            <button
-              onClick={() => window.location.href = "/onboarding"}
-              style={{
-                padding: "14px 32px",
-                background: "#FBF8F2",
-                color: "#3E1540",
-                border: "none",
-                borderRadius: 9999,
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: "pointer",
-                letterSpacing: "-0.01em",
-                whiteSpace: "nowrap",
-                transition: "background 0.15s",
-                boxShadow: "0 2px 12px rgba(19,16,26,0.25)",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#EDE9DF")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#FBF8F2")}
-            >
-              Register my ministry
-            </button>
-            <button
-              onClick={() => { window.location.href = "/ministries" }}
-              style={{
-                padding: "14px 32px",
-                background: "transparent",
-                color: "rgba(255,255,255,0.95)",
-                border: "2px solid rgba(255,255,255,0.9)",
-                borderRadius: 9999,
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: "pointer",
-                letterSpacing: "-0.01em",
-                whiteSpace: "nowrap",
-                transition: "border-color 0.15s",
-                filter: "drop-shadow(0 1px 6px rgba(19,16,26,0.3))",
-                textShadow: "0 1px 8px rgba(19,16,26,0.6)",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(246,244,239,0.9)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(246,244,239,0.6)")}
-            >
-              Join a ministry
-            </button>
+            <div>
+              <p style={{ margin: "0 0 14px", color: COLORS.muted, fontSize: 12, fontWeight: 800, textTransform: "uppercase" }}>
+                One calm system
+              </p>
+              <h2
+                className="central-landing-section-title"
+                style={{
+                  margin: 0,
+                  color: COLORS.ink,
+                  fontFamily: "var(--font-instrument-serif)",
+                  fontSize: 34,
+                  fontWeight: 400,
+                  lineHeight: 1.08,
+                }}
+              >
+                Less noise between Sunday and the next gathering.
+              </h2>
+            </div>
+            <div style={{ display: "grid", gap: 2 }}>
+              {FEATURE_ROWS.map(({ icon: Icon, title, body }) => (
+                <div
+                  key={title}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "44px 1fr",
+                    gap: 18,
+                    padding: "24px 0",
+                    borderTop: `1px solid ${COLORS.border}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "#F4F1E8",
+                      color: COLORS.primary,
+                    }}
+                  >
+                    <Icon size={19} strokeWidth={1.7} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        margin: "0 0 7px",
+                        color: COLORS.ink,
+                        fontFamily: "var(--font-instrument-serif)",
+                        fontSize: 25,
+                        fontWeight: 400,
+                        lineHeight: 1.18,
+                      }}
+                    >
+                      {title}
+                    </h3>
+                    <p style={{ margin: 0, color: COLORS.body, fontSize: 15, lineHeight: 1.7 }}>{body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────── */}
-      {/* SECTION 2 — FEATURES                                       */}
-      {/* ─────────────────────────────────────────────────────────── */}
-      <section style={{ background: "#FBF8F2", padding: "88px 36px 96px" }}>
-        <div style={{ maxWidth: 960, margin: "0 auto" }}>
-
-          {/* Section heading */}
-          <div style={{ marginBottom: 56 }}>
-            <p
-              style={{
-                fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-                fontSize: 10,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                color: "#8A8497",
-                marginBottom: 14,
-              }}
-            >
-              Everything in one place
-            </p>
+      <section id="rhythm" className="central-landing-rhythm" style={{ background: COLORS.surface, padding: "18px 0 64px" }}>
+        <div
+          className="central-landing-rhythm-grid"
+          style={{
+            width: "min(1120px, calc(100% - 32px))",
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: 30,
+            alignItems: "center",
+            borderTop: `1px solid ${COLORS.border}`,
+            paddingTop: 56,
+          }}
+        >
+          <div>
             <h2
+              className="central-landing-section-title"
               style={{
+                margin: "0 0 18px",
+                color: COLORS.ink,
                 fontFamily: "var(--font-instrument-serif)",
-                fontSize: "clamp(32px, 4vw, 48px)",
+                fontSize: 34,
                 fontWeight: 400,
-                color: "#13101A",
-                letterSpacing: "-0.02em",
                 lineHeight: 1.1,
-                maxWidth: 520,
-                margin: 0,
               }}
             >
-              Everything your ministry needs.
+              Built for the rhythms you repeat every week.
             </h2>
+            <p style={{ margin: 0, maxWidth: 610, color: COLORS.body, fontSize: 16, lineHeight: 1.8 }}>
+              Central keeps the pastoral, practical, and administrative pieces close together so leaders can move with clarity and students know where to look.
+            </p>
           </div>
 
-          {/* 2×2 Feature grid */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: 20,
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: 8,
+              background: "#FFFFFF",
+              boxShadow: "0 2px 8px rgba(19,16,26,0.08)",
+              overflow: "hidden",
             }}
-            className="grid-cols-1 sm:grid-cols-2"
           >
-            {FEATURES.map(({ icon: Icon, title, body }) => (
+            {RHYTHM_ITEMS.map((item, index) => (
               <div
-                key={title}
+                key={item}
                 style={{
-                  background: "white",
-                  border: "1px solid #ECE8DE",
-                  borderRadius: 20,
-                  padding: "32px 30px 28px",
-                  boxShadow: "0 1px 4px rgba(19,16,26,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  minHeight: 58,
+                  padding: "0 18px",
+                  borderTop: index === 0 ? "none" : `1px solid ${COLORS.border}`,
                 }}
               >
-                <div
+                <span
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: "#F4F1E8",
-                    display: "flex",
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: 20,
-                    color: "#3E1540",
+                    background: index === 0 ? COLORS.primary : "#F4F1E8",
+                    color: index === 0 ? COLORS.ivory : COLORS.primary,
+                    flexShrink: 0,
                   }}
                 >
-                  <Icon size={20} strokeWidth={1.5} />
-                </div>
-                <h3
-                  style={{
-                    fontFamily: "var(--font-instrument-serif)",
-                    fontSize: 22,
-                    fontWeight: 400,
-                    color: "#13101A",
-                    letterSpacing: "-0.01em",
-                    margin: "0 0 10px",
-                  }}
-                >
-                  {title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: "#5A5466",
-                    lineHeight: 1.65,
-                    margin: 0,
-                  }}
-                >
-                  {body}
-                </p>
+                  <Check size={15} strokeWidth={2} />
+                </span>
+                <span style={{ color: COLORS.ink, fontSize: 15, fontWeight: 650 }}>{item}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────── */}
-      {/* SECTION 3 — CTA STRIP                                      */}
-      {/* ─────────────────────────────────────────────────────────── */}
-      <section
-        style={{
-          background: "#3E1540",
-          padding: "88px 36px",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <h2
-            style={{
-              fontFamily: "var(--font-instrument-serif)",
-              fontSize: "clamp(28px, 4vw, 44px)",
-              fontWeight: 400,
-              color: "#F6F4EF",
-              letterSpacing: "-0.02em",
-              lineHeight: 1.15,
-              margin: "0 0 36px",
-            }}
-          >
-            Built for the way your ministry actually works.
-          </h2>
+      <section style={{ background: COLORS.primary, padding: "72px 0" }}>
+        <div
+          style={{
+            width: "min(1120px, calc(100% - 32px))",
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: 28,
+            alignItems: "center",
+          }}
+          className="max-md:!grid-cols-1"
+        >
+          <div>
+            <h2
+              className="central-landing-cta-title"
+              style={{
+                margin: "0 0 12px",
+                color: COLORS.ivory,
+                fontFamily: "var(--font-instrument-serif)",
+                fontSize: 32,
+                fontWeight: 400,
+                lineHeight: 1.12,
+              }}
+            >
+              Give your ministry one place to gather.
+            </h2>
+            <p style={{ margin: 0, color: "rgba(246,244,239,0.72)", fontSize: 15, lineHeight: 1.7 }}>
+              Register a ministry, invite your students, and keep the week moving with less friction.
+            </p>
+          </div>
           <button
-            onClick={() => window.location.href = "/onboarding"}
+            onClick={() => router.push("/onboarding")}
             style={{
-              height: 50,
-              padding: "0 36px",
-              background: "#F6F4EF",
-              color: "#3E1540",
-              border: "none",
-              borderRadius: 12,
-              fontSize: 15,
-              fontWeight: 600,
+              minHeight: 48,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 9,
+              borderRadius: 8,
+              border: `1px solid ${COLORS.ivory}`,
+              background: COLORS.ivory,
+              color: COLORS.primary,
               cursor: "pointer",
-              letterSpacing: "-0.01em",
-              transition: "opacity 0.15s",
+              fontFamily: "var(--font-inter)",
+              fontSize: 15,
+              fontWeight: 800,
+              padding: "0 22px",
+              width: "fit-content",
             }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
-            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background = "#ECE8DE"
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background = COLORS.ivory
+            }}
           >
-            Get started
+            Start with Central
+            <ArrowRight size={17} strokeWidth={1.8} />
           </button>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────── */}
-      {/* SECTION 4 — FOOTER                                         */}
-      {/* ─────────────────────────────────────────────────────────── */}
-      <footer
-        style={{
-          background: "#FBF8F2",
-          borderTop: "1px solid #ECE8DE",
-          padding: "48px 36px",
-          textAlign: "center",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
-        }}
-      >
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <RingCrossLogo size={22} color="#3E1540" />
-          <span
-            style={{
-              fontFamily: "var(--font-instrument-serif)",
-              fontSize: "22px",
-              color: "#13101A",
-              letterSpacing: "-0.01em",
-              lineHeight: 1,
-            }}
-          >
-            Central
-          </span>
-        </div>
-
-        <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
-          Built for college ministries
-        </p>
-
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <a
-            href="/login"
-            style={{
-              fontSize: 13,
-              color: "#5A5466",
-              textDecoration: "none",
-              fontWeight: 500,
-            }}
-          >
-            Log in
-          </a>
-          <a
-            href="/signup"
-            style={{
-              fontSize: 13,
-              color: "#3E1540",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
-          >
-            Sign up
-          </a>
+      <footer style={{ background: COLORS.surface, borderTop: `1px solid ${COLORS.border}`, padding: "34px 0" }}>
+        <div
+          style={{
+            width: "min(1120px, calc(100% - 32px))",
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <RingCrossLogo size={24} color={COLORS.primary} />
+            <span style={{ color: COLORS.ink, fontFamily: "var(--font-instrument-serif)", fontSize: 23, lineHeight: 1 }}>
+              Central
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <a href="/login" style={{ color: COLORS.body, fontSize: 14, fontWeight: 650, textDecoration: "none" }}>
+              Log in
+            </a>
+            <a href="/ministries" style={{ color: COLORS.primary, fontSize: 14, fontWeight: 750, textDecoration: "none" }}>
+              Find ministry
+            </a>
+            <span style={{ color: COLORS.muted, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+              <UserRound size={15} strokeWidth={1.7} />
+              Built for college ministries
+            </span>
+          </div>
         </div>
       </footer>
 
-    </div>
+      <style>{`
+        @media (min-width: 901px) {
+          .central-landing-hero {
+            min-height: 84svh !important;
+            align-items: end !important;
+          }
+
+          .central-landing-hero-inner {
+            grid-template-columns: minmax(0, 660px) minmax(260px, 360px) !important;
+            gap: 48px !important;
+            padding: 136px 0 96px !important;
+          }
+
+          .central-landing-hero-title {
+            font-size: 72px !important;
+          }
+
+          .central-landing-hero-copy {
+            max-width: 560px !important;
+            font-size: 18px !important;
+          }
+
+          .central-landing-quote {
+            border-left: 1px solid rgba(246,244,239,0.28) !important;
+            border-top: 0 !important;
+            padding-left: 28px !important;
+            padding-top: 0 !important;
+          }
+
+          .central-landing-platform {
+            padding: 82px 0 56px !important;
+          }
+
+          .central-landing-feature-grid,
+          .central-landing-rhythm-grid {
+            gap: 54px !important;
+          }
+
+          .central-landing-feature-grid {
+            grid-template-columns: minmax(240px, 390px) 1fr !important;
+          }
+
+          .central-landing-rhythm-grid {
+            grid-template-columns: 1fr minmax(280px, 380px) !important;
+          }
+
+          .central-landing-section-title {
+            font-size: 44px !important;
+          }
+
+          .central-landing-rhythm {
+            padding: 32px 0 88px !important;
+          }
+
+          .central-landing-cta-title {
+            font-size: 38px !important;
+          }
+        }
+      `}</style>
+    </main>
   )
 }

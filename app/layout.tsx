@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/pwa-register";
@@ -21,6 +21,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#3E1540",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,7 +35,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="theme-color" content="#3E1540" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body
