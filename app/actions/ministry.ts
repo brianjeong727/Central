@@ -343,20 +343,41 @@ export async function getUserMinistries(): Promise<{
   if (authErr || !user) return { data: null, error: "Not authenticated." }
 
   const admin = createAdminClient()
-  const { data, error } = await admin
+
+  // Step 1: get all (ministry_id, role) rows for this user — deduplicate by ministry_id
+  const { data: rows, error: rowsErr } = await admin
     .from("user_ministries")
-    .select("role, ministries!inner(id, name, university, status)")
+    .select("ministry_id, role")
     .eq("user_id", user.id)
-    .eq("ministries.status", "active")
 
-  if (error) return { data: null, error: error.message }
+  if (rowsErr) return { data: null, error: rowsErr.message }
 
-  const ministries = (data ?? []).map((row: { role: string; ministries: { id: string; name: string; university: string; status: string } | { id: string; name: string; university: string; status: string }[] }) => {
-    const m = Array.isArray(row.ministries) ? row.ministries[0] : row.ministries
-    return { id: m.id, name: m.name, university: m.university, role: row.role }
-  })
+  // Build a map of ministry_id → role (deduplicates multiple rows for the same ministry)
+  const byMinistry = new Map<string, string>()
+  for (const row of (rows ?? [])) {
+    if (!byMinistry.has(row.ministry_id)) byMinistry.set(row.ministry_id, row.role)
+  }
 
-  return { data: ministries, error: null }
+  if (byMinistry.size === 0) return { data: [], error: null }
+
+  // Step 2: fetch ministry details in a single IN query — filter to active only
+  const { data: ministries, error: mErr } = await admin
+    .from("ministries")
+    .select("id, name, university, status")
+    .in("id", [...byMinistry.keys()])
+    .eq("status", "active")
+
+  if (mErr) return { data: null, error: mErr.message }
+
+  return {
+    data: (ministries ?? []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      university: m.university,
+      role: byMinistry.get(m.id) ?? "member",
+    })),
+    error: null,
+  }
 }
 
 // Sets the user's currently active ministry
@@ -367,19 +388,19 @@ export async function setCurrentMinistry(ministryId: string): Promise<{ error: s
 
   const admin = createAdminClient()
 
-  // Verify user actually belongs to this ministry
-  const { data: membership } = await admin
+  // Verify membership — use limit(1) to be safe against duplicate rows
+  const { data: rows, error: memErr } = await admin
     .from("user_ministries")
     .select("role")
     .eq("user_id", user.id)
     .eq("ministry_id", ministryId)
-    .maybeSingle()
+    .limit(1)
 
-  if (!membership) return { error: "You are not a member of this ministry." }
+  if (memErr || !rows || rows.length === 0) return { error: "You are not a member of this ministry." }
 
   const { error } = await admin
     .from("profiles")
-    .update({ ministry_id: ministryId, role: membership.role })
+    .update({ ministry_id: ministryId, role: rows[0].role })
     .eq("id", user.id)
 
   return { error: error?.message ?? null }
