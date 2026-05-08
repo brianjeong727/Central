@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode } from "@/app/actions/ministry"
+import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner } from "@/app/home/components/shared"
 
 const SIZE_LABELS: Record<string, string> = {
@@ -29,6 +29,8 @@ function MinistriesContent() {
   const [myMinistries, setMyMinistries] = useState<MyMinistry[]>([])
   const [myIds, setMyIds] = useState<Set<string>>(new Set())
   const [loadingMine, setLoadingMine] = useState(false)
+
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
 
   // Browse
   const [search, setSearch] = useState("")
@@ -78,6 +80,12 @@ function MinistriesContent() {
   }, [tab, search, fetchPublic])
 
   const browseable = publicMinistries.filter((m) => !myIds.has(m.id))
+
+  async function handleGoToMinistry(id: string) {
+    setSwitchingId(id)
+    await setCurrentMinistry(id)
+    window.location.href = "/home"
+  }
 
   async function handleJoin(ministry: PublicMinistry) {
     if (!isLoggedIn) { window.location.href = "/signup"; return }
@@ -182,13 +190,13 @@ function MinistriesContent() {
                       <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
                       <p className="text-[12px] text-[#8A8497] truncate">{m.university}</p>
                     </div>
-                    <a
-                      href="/home"
-                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] transition-colors"
-                      style={{ textDecoration: "none" }}
+                    <button
+                      onClick={() => handleGoToMinistry(m.id)}
+                      disabled={switchingId === m.id}
+                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-60 transition-colors"
                     >
-                      Go to ministry
-                    </a>
+                      {switchingId === m.id ? "Opening…" : "Go to ministry"}
+                    </button>
                   </div>
                 ))}
               </div>
