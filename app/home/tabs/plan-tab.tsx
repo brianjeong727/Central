@@ -1284,7 +1284,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   // Slides state
   const [slidesWeekId, setSlidesWeekId] = useState<string | null>(null)
   const [rawOcrBySong, setRawOcrBySong] = useState<Record<string, string>>({})
-  type SlidePage = { songTitle: string; songKey: string; section: string; lyrics: string }
+  type SlidePage = { songTitle: string; songKey: string; section: string; lyrics: string; isTitle?: boolean }
   const [slidesDeck, setSlidesDeck] = useState<SlidePage[] | null>(null)
   const [slidesGenerating, setSlidesGenerating] = useState(false)
   const [slidesOverlayOpen, setSlidesOverlayOpen] = useState(false)
@@ -1652,9 +1652,12 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
 
   async function handleGenerateSlides(songs: WorshipSong[]) {
     setSlidesGenerating(true)
-    const allSlides: { songTitle: string; songKey: string; section: string; lyrics: string }[] = []
+    const allSlides: SlidePage[] = []
 
     for (const song of songs) {
+      // Title slide for this song
+      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: "", isTitle: true })
+
       let ocrText = rawOcrBySong[song.id]
 
       // If no cached OCR text but chart is available, re-fetch and OCR the PDF
@@ -1757,7 +1760,6 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
       {/* ── Slides full-screen overlay ── */}
       {slidesOverlayOpen && slidesDeck && (() => {
         const slide = slidesDeck[slidesActiveIndex]
-        const isFallback = slide.section === "" && slide.lyrics === slide.songTitle
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
             {/* Radial glow */}
@@ -1784,21 +1786,28 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
 
             {/* Slide content */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 40px 80px", textAlign: "center", position: "relative", zIndex: 6 }}>
-              {/* Song title */}
-              {!isFallback && (
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6, letterSpacing: "0.01em" }}>{slide.songTitle}</p>
-              )}
-              {/* Section label */}
-              {slide.section && (
-                <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>
-              )}
-              {/* Lyrics */}
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>
-                {isFallback ? slide.songTitle : slide.lyrics}
-              </p>
-              {/* Key on fallback */}
-              {isFallback && slide.songKey && (
-                <p style={{ marginTop: 18, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 16, color: "rgba(246,244,239,0.45)", letterSpacing: "0.18em", textTransform: "uppercase" as const }}>{slide.songKey}</p>
+              {slide.isTitle ? (
+                /* ── Title slide ── */
+                <>
+                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(201,163,75,0.7)", marginBottom: 20 }}>
+                    {slide.songKey ? `Key of ${slide.songKey}` : ""}
+                  </p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "#F6F4EF", lineHeight: 1.15, fontWeight: 400 }}>
+                    {slide.songTitle}
+                  </p>
+                  <div style={{ width: 40, height: 1.5, background: "rgba(201,163,75,0.4)", margin: "28px auto 0" }} />
+                </>
+              ) : (
+                /* ── Lyric slide ── */
+                <>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6, letterSpacing: "0.01em" }}>{slide.songTitle}</p>
+                  {slide.section && (
+                    <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>
+                  )}
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>
+                    {slide.lyrics}
+                  </p>
+                </>
               )}
             </div>
 
@@ -2153,7 +2162,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 6 }}>Week</label>
                 <select
                   value={slidesWeekId ?? ""}
-                  onChange={e => { setSlidesWeekId(e.target.value) }}
+                  onChange={e => { setSlidesWeekId(e.target.value); setSlidesDeck(null) }}
                   style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}
                 >
                   {weeks.map(w => (
@@ -2188,11 +2197,11 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 <div style={{ display: "flex", gap: 10 }}>
                   {canManage && (
                     <button
-                      onClick={() => handleGenerateSlides(slidesSongs)}
+                      onClick={() => slidesDeck ? setSlidesOverlayOpen(true) : handleGenerateSlides(slidesSongs)}
                       disabled={slidesGenerating}
                       style={{ flex: 1, padding: "11px 0", background: slidesGenerating ? "#8A8497" : "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer" }}
                     >
-                      {slidesGenerating ? "Generating…" : "Generate slides"}
+                      {slidesGenerating ? "Generating…" : slidesDeck ? "View slides" : "Generate slides"}
                     </button>
                   )}
                   {canManage && (
