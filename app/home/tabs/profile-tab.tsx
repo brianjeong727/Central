@@ -280,6 +280,7 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
             initialContent={draft.content}
             onChange={html => setDraft(d => ({ ...d, content: html }))}
             placeholder="Write your prayer here…"
+            minHeight={152}
           >
             <div style={{ padding: "18px 26px 0" }}>
               <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid #F0EDE8", paddingBottom: 10 }} />
@@ -698,8 +699,8 @@ export function ProfileTab({
         </a>
       </div>
 
-      {/* ── Desktop: hero (always visible) ── */}
-      <div className="hidden md:block px-7 pt-7 pb-0">
+      {/* ── Desktop: hero (hidden on journal tab) ── */}
+      <div className={`${activeSection === "journal" ? "hidden" : "hidden md:block"} px-7 pt-7 pb-0`}>
         <div
           className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
           style={{

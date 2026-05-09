@@ -198,11 +198,13 @@ export function RoleDescriptionEditor({
   onChange,
   placeholder,
   children,
+  minHeight,
 }: {
   initialContent: string
   onChange: (html: string) => void
   placeholder?: string
   children?: React.ReactNode
+  minHeight?: number
 }) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -222,7 +224,7 @@ export function RoleDescriptionEditor({
     <div className="role-description-editor">
       <TiptapToolbar editor={editor} />
       {children}
-      <div style={{ padding: "14px 16px" }}>
+      <div style={{ padding: "14px 16px", minHeight: minHeight ? minHeight + 28 : undefined }}>
         <EditorContent editor={editor} />
       </div>
     </div>
