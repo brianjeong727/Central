@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Edit2, ChevronDown } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Edit2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import {
   updateMinistryPublic,
@@ -83,14 +83,9 @@ export function SettingsTab({
 
   // Members
   const [members, setMembers] = useState<MemberRow[]>([])
-  const [memberFilter, setMemberFilter] = useState<RoleFilter>("all")
-  const [memberSearch, setMemberSearch] = useState("")
-  const [roleMenuOpen, setRoleMenuOpen] = useState<string | null>(null)
-  const [changingRole, setChangingRole] = useState<string | null>(null)
-  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
-  const [removing, setRemoving] = useState(false)
+  const [showMembersOverlay, setShowMembersOverlay] = useState(false)
+  const [overlayInitialFilter, setOverlayInitialFilter] = useState<RoleFilter>("all")
 
-  // Stats derived from members
   const totalMembers = members.length
   const totalLeaders = members.filter(m => m.role.toLowerCase() === "leader").length
   const totalAdmins = members.filter(m => m.role.toLowerCase() === "admin").length
@@ -112,9 +107,6 @@ export function SettingsTab({
 
   // Loading
   const [loading, setLoading] = useState(true)
-
-  // Ref for closing role menus on outside click
-  const roleMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -157,23 +149,14 @@ export function SettingsTab({
 
   // ── Role change ─────────────────────────────────────────────────────────────
   async function handleRoleChange(memberId: string, newRole: "member" | "leader" | "admin") {
-    setChangingRole(memberId)
-    setRoleMenuOpen(null)
     const { error } = await updateMemberRole(memberId, newRole)
-    if (!error) {
-      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
-    }
-    setChangingRole(null)
+    if (!error) setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
   }
 
   // ── Remove member ───────────────────────────────────────────────────────────
-  async function handleRemoveMember() {
-    if (!removeConfirmId) return
-    setRemoving(true)
-    const { error } = await removeMember(removeConfirmId)
-    if (!error) setMembers(prev => prev.filter(m => m.id !== removeConfirmId))
-    setRemoving(false)
-    setRemoveConfirmId(null)
+  async function handleRemoveMember(memberId: string) {
+    const { error } = await removeMember(memberId)
+    if (!error) setMembers(prev => prev.filter(m => m.id !== memberId))
   }
 
   // ── Invite code ─────────────────────────────────────────────────────────────
@@ -211,13 +194,7 @@ export function SettingsTab({
     window.location.href = "/landing"
   }
 
-  // ── Filtered member list ─────────────────────────────────────────────────────
-  const filteredMembers = members.filter(m => {
-    const roleMatch = memberFilter === "all" || m.role.toLowerCase() === memberFilter
-    const searchLower = memberSearch.toLowerCase().trim()
-    const searchMatch = !searchLower || m.name.toLowerCase().includes(searchLower) || m.email.toLowerCase().includes(searchLower)
-    return roleMatch && searchMatch
-  })
+  const previewMembers = members.slice(0, 5)
 
   return (
     <div className="md:h-full md:overflow-y-auto">
@@ -296,125 +273,43 @@ export function SettingsTab({
                 </div>
               </section>
 
-              {/* Member Management */}
+              {/* Member Preview */}
               <section>
-                <div className="flex items-center justify-between mb-3">
-                  <p style={SECTION_LABEL}>Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({filteredMembers.length})</span></p>
-                  {memberFilter !== "all" && (
-                    <button onClick={() => setMemberFilter("all")} style={{ fontSize: "11px", color: "#8A8497", display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer" }}>
-                      <X className="w-3 h-3" />Clear filter
+                <p style={SECTION_LABEL} className="mb-3">Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({totalMembers})</span></p>
+                <div style={CARD} className="overflow-hidden">
+                  {members.length === 0 ? (
+                    <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
+                  ) : (
+                    previewMembers.map((m, i) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-3 px-4 py-3.5"
+                        style={{ borderTop: i ? "1px solid #F4F1E8" : undefined }}
+                      >
+                        <div style={{ width: 34, height: 34, borderRadius: 8, background: m.role.toLowerCase() === "admin" ? "#3E1540" : m.role.toLowerCase() === "leader" ? "rgba(62,21,64,0.12)" : "#EFEAE0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: m.role.toLowerCase() === "admin" ? "#F6F4EF" : m.role.toLowerCase() === "leader" ? "#3E1540" : "#5A5466" }}>{getInitials(m.name)}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="flex items-center gap-2">
+                            <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</p>
+                            {m.id === userId && <span style={{ fontSize: "10px", color: "#8A8497" }}>you</span>}
+                          </div>
+                          <p style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</p>
+                        </div>
+                        {roleBadge(m.role)}
+                      </div>
+                    ))
+                  )}
+                  {members.length > 0 && (
+                    <button
+                      onClick={() => setShowMembersOverlay(true)}
+                      className="w-full flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold text-[#3E1540] hover:bg-[#FBF8F2] transition-colors"
+                      style={{ borderTop: "1px solid #F4F1E8" }}
+                    >
+                      See all {totalMembers} members
                     </button>
                   )}
                 </div>
-
-                {/* Search */}
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A8497]" />
-                  <input
-                    value={memberSearch}
-                    onChange={e => setMemberSearch(e.target.value)}
-                    placeholder="Search members…"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#E5E0D2] bg-white text-[13px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40"
-                  />
-                </div>
-
-                <div style={CARD} className="overflow-hidden">
-                  {filteredMembers.length === 0 ? (
-                    <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>
-                      {memberSearch ? "No members match your search." : "No members in this group."}
-                    </p>
-                  ) : (
-                    filteredMembers.map((m, i) => {
-                      const isMe = m.id === userId
-                      const menuOpen = roleMenuOpen === m.id
-                      return (
-                        <div
-                          key={m.id}
-                          className="flex items-center gap-3 px-4 py-3.5 hover:bg-[#FAFAF8] transition-colors relative"
-                          style={{ borderTop: i ? "1px solid #F4F1E8" : undefined }}
-                        >
-                          {/* Avatar */}
-                          <div style={{ width: 34, height: 34, borderRadius: 8, background: m.role.toLowerCase() === "admin" ? "#3E1540" : m.role.toLowerCase() === "leader" ? "rgba(62,21,64,0.12)" : "#EFEAE0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: m.role.toLowerCase() === "admin" ? "#F6F4EF" : m.role.toLowerCase() === "leader" ? "#3E1540" : "#5A5466" }}>{getInitials(m.name)}</span>
-                          </div>
-
-                          {/* Name + email */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="flex items-center gap-2">
-                              <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</p>
-                              {isMe && <span style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.05em" }}>you</span>}
-                            </div>
-                            <p style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</p>
-                          </div>
-
-                          {/* Role + action */}
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {changingRole === m.id ? (
-                              <span style={{ fontSize: "11px", color: "#8A8497" }}>Saving…</span>
-                            ) : (
-                              roleBadge(m.role)
-                            )}
-
-                            {/* Role menu — admin only, not self */}
-                            {isAdmin && !isMe && (
-                              <div className="relative" ref={menuOpen ? roleMenuRef : null}>
-                                {menuOpen && <div className="fixed inset-0 z-[5]" onClick={() => setRoleMenuOpen(null)} />}
-                                <button
-                                  onClick={() => setRoleMenuOpen(menuOpen ? null : m.id)}
-                                  className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#EFEAE0] transition-colors"
-                                >
-                                  <MoreHorizontal className="w-4 h-4 text-[#8A8497]" />
-                                </button>
-                                {menuOpen && (
-                                  <div className="absolute top-8 right-0 z-[20] bg-white rounded-xl shadow-[0_4px_20px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1.5 min-w-[160px]">
-                                    <p style={{ fontSize: "10px", color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Set role</p>
-                                    {(["member", "leader", "admin"] as const).map(r => (
-                                      <button
-                                        key={r}
-                                        onClick={() => handleRoleChange(m.id, r)}
-                                        className="w-full flex items-center justify-between px-3 py-2 text-[13px] hover:bg-[#FBF8F2] transition-colors text-left"
-                                        style={{ color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400 }}
-                                      >
-                                        {r.charAt(0).toUpperCase() + r.slice(1)}
-                                        {m.role.toLowerCase() === r && <Check className="w-3.5 h-3.5 text-[#3E1540]" />}
-                                      </button>
-                                    ))}
-                                    <div style={{ margin: "6px 12px", borderTop: "1px solid #F4F1E8" }} />
-                                    <button
-                                      onClick={() => { setRemoveConfirmId(m.id); setRoleMenuOpen(null) }}
-                                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-500 hover:bg-red-50 transition-colors text-left"
-                                    >
-                                      Remove from ministry
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-
-                {/* Remove confirmation inline banner */}
-                {removeConfirmId && (() => {
-                  const target = members.find(m => m.id === removeConfirmId)
-                  return (
-                    <div className="mt-3 rounded-xl border border-red-100 bg-[#FFF5F5] px-4 py-3.5 flex items-center gap-3">
-                      <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                      <p style={{ fontSize: "13px", color: "#5A5466", flex: 1 }}>
-                        Remove <span style={{ fontWeight: 600, color: "#13101A" }}>{target?.name}</span> from this ministry?
-                      </p>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button onClick={() => setRemoveConfirmId(null)} className="px-3 py-1.5 rounded-lg border border-[#E5E0D2] text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">Cancel</button>
-                        <button onClick={handleRemoveMember} disabled={removing} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-[12px] font-semibold hover:bg-red-600 disabled:opacity-60 transition-colors">
-                          {removing ? "Removing…" : "Remove"}
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })()}
               </section>
             </div>
 
@@ -429,25 +324,18 @@ export function SettingsTab({
                     { icon: <Users className="w-4 h-4" />, value: totalMembers, label: "Members", filter: "all" as RoleFilter },
                     { icon: <Shield className="w-4 h-4" />, value: totalLeaders, label: "Leaders", filter: "leader" as RoleFilter },
                     { icon: <Crown className="w-4 h-4" />, value: totalAdmins, label: "Admins", filter: "admin" as RoleFilter },
-                  ].map(({ icon, value, label, filter }) => {
-                    const active = memberFilter === filter || (filter === "all" && memberFilter === "all")
-                    const isFiltering = filter !== "all"
-                    return (
-                      <button
-                        key={label}
-                        onClick={() => setMemberFilter(memberFilter === filter ? "all" : filter)}
-                        className="text-left transition-all"
-                        style={{ ...CARD, padding: "14px 16px", cursor: "pointer", border: `1px solid ${active && isFiltering ? "#3E1540" : "#E5E0D2"}`, background: active && isFiltering ? "rgba(62,21,64,0.04)" : "white" }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div style={{ color: active && isFiltering ? "#3E1540" : "#8A8497" }}>{icon}</div>
-                          {active && isFiltering && <ChevronDown className="w-3 h-3 text-[#3E1540]" />}
-                        </div>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
-                        <p style={{ fontSize: "11px", color: active && isFiltering ? "#3E1540" : "#8A8497", marginTop: "2px", fontWeight: active && isFiltering ? 600 : 400 }}>{label}</p>
-                      </button>
-                    )
-                  })}
+                  ].map(({ icon, value, label, filter }) => (
+                    <button
+                      key={label}
+                      onClick={() => { setOverlayInitialFilter(filter); setShowMembersOverlay(true) }}
+                      className="text-left transition-all"
+                      style={{ ...CARD, padding: "14px 16px", cursor: "pointer" }}
+                    >
+                      <div className="mb-2" style={{ color: "#8A8497" }}>{icon}</div>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
+                      <p style={{ fontSize: "11px", color: "#8A8497", marginTop: "2px" }}>{label}</p>
+                    </button>
+                  ))}
                 </div>
               </section>
 
@@ -579,6 +467,167 @@ export function SettingsTab({
             </div>
           </div>
         )}
+      </div>
+
+      {showMembersOverlay && (
+        <MembersFullOverlay
+          members={members}
+          userId={userId}
+          isAdmin={isAdmin}
+          initialFilter={overlayInitialFilter}
+          onClose={() => setShowMembersOverlay(false)}
+          onRoleChange={handleRoleChange}
+          onRemoveMember={handleRemoveMember}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── MembersFullOverlay ────────────────────────────────────────────────────────
+
+function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, onRoleChange, onRemoveMember }: {
+  members: MemberRow[]
+  userId: string
+  isAdmin: boolean
+  initialFilter: RoleFilter
+  onClose: () => void
+  onRoleChange: (id: string, role: "member" | "leader" | "admin") => Promise<void>
+  onRemoveMember: (id: string) => Promise<void>
+}) {
+  const [search, setSearch] = useState("")
+  const [filter, setFilter] = useState<RoleFilter>(initialFilter)
+  const [roleMenuOpen, setRoleMenuOpen] = useState<string | null>(null)
+  const [changingRole, setChangingRole] = useState<string | null>(null)
+  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
+
+  const filtered = members.filter(m => {
+    const roleMatch = filter === "all" || m.role.toLowerCase() === filter
+    const s = search.toLowerCase().trim()
+    return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
+  })
+
+  async function handleRoleChange(memberId: string, role: "member" | "leader" | "admin") {
+    setChangingRole(memberId)
+    setRoleMenuOpen(null)
+    await onRoleChange(memberId, role)
+    setChangingRole(null)
+  }
+
+  async function handleRemove() {
+    if (!removeConfirmId) return
+    setRemoving(true)
+    await onRemoveMember(removeConfirmId)
+    setRemoving(false)
+    setRemoveConfirmId(null)
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "#FBF8F2", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ padding: "20px 24px 14px", borderBottom: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2", flexShrink: 0 }}>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, margin: 0 }}>
+          Members <span style={{ fontSize: 18, color: "#8A8497", fontFamily: "var(--font-inter)" }}>({members.length})</span>
+        </h2>
+        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #ECE8DE", background: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <X className="w-4 h-4 text-[#5A5466]" />
+        </button>
+      </div>
+
+      {/* Search + filter bar */}
+      <div style={{ padding: "14px 24px 0", background: "#FBF8F2", flexShrink: 0 }}>
+        <div style={{ position: "relative", marginBottom: 10 }}>
+          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#8A8497" }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search members…"
+            style={{ width: "100%", boxSizing: "border-box", paddingLeft: 36, paddingRight: 16, paddingTop: 10, paddingBottom: 10, borderRadius: 12, border: "1px solid #E5E0D2", background: "white", fontSize: 13, color: "#13101A", outline: "none", fontFamily: "var(--font-inter)" }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingBottom: 12 }}>
+          {(["all", "member", "leader", "admin"] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 999, border: `1px solid ${filter === f ? "#3E1540" : "#E5E0D2"}`, background: filter === f ? "#3E1540" : "white", color: filter === f ? "#F6F4EF" : "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+            >
+              {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Scrollable list */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 32px" }}>
+        {removeConfirmId && (() => {
+          const target = members.find(m => m.id === removeConfirmId)
+          return (
+            <div style={{ margin: "12px 0", borderRadius: 12, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+              <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
+              <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>Remove <strong style={{ color: "#13101A" }}>{target?.name}</strong> from this ministry?</p>
+              <button onClick={() => setRemoveConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+              <button onClick={handleRemove} disabled={removing} style={{ fontSize: 12, fontWeight: 600, color: "white", background: "#EF4444", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: removing ? 0.6 : 1 }}>
+                {removing ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          )
+        })()}
+
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #E5E0D2", overflow: "hidden", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+          {filtered.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#8A8497", padding: 24, textAlign: "center" }}>
+              {search ? "No members match your search." : "No members found."}
+            </p>
+          ) : filtered.map((m, i) => {
+            const isMe = m.id === userId
+            const menuOpen = roleMenuOpen === m.id
+            return (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid #F4F1E8" : undefined, position: "relative" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: m.role.toLowerCase() === "admin" ? "#3E1540" : m.role.toLowerCase() === "leader" ? "rgba(62,21,64,0.12)" : "#EFEAE0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: m.role.toLowerCase() === "admin" ? "#F6F4EF" : m.role.toLowerCase() === "leader" ? "#3E1540" : "#5A5466" }}>{getInitials(m.name)}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>{m.name}</p>
+                    {isMe && <span style={{ fontSize: 10, color: "#8A8497" }}>you</span>}
+                  </div>
+                  <p style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>{m.email}</p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  {changingRole === m.id
+                    ? <span style={{ fontSize: 11, color: "#8A8497" }}>Saving…</span>
+                    : roleBadge(m.role)
+                  }
+                  {isAdmin && !isMe && (
+                    <div style={{ position: "relative" }}>
+                      {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setRoleMenuOpen(null)} />}
+                      <button onClick={() => setRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
+                        <MoreHorizontal style={{ width: 16, height: 16, color: "#8A8497" }} />
+                      </button>
+                      {menuOpen && (
+                        <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "white", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #ECE8DE", padding: "6px 0", minWidth: 160 }}>
+                          <p style={{ fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, margin: 0 }}>Set role</p>
+                          {(["member", "leader", "admin"] as const).map(r => (
+                            <button key={r} onClick={() => handleRoleChange(m.id, r)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
+                              {r.charAt(0).toUpperCase() + r.slice(1)}
+                              {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
+                            </button>
+                          ))}
+                          <div style={{ margin: "6px 12px", borderTop: "1px solid #F4F1E8" }} />
+                          <button onClick={() => { setRemoveConfirmId(m.id); setRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#EF4444", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+                            Remove from ministry
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
