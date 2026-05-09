@@ -194,7 +194,6 @@ export function SettingsTab({
     window.location.href = "/landing"
   }
 
-  const previewMembers = members.slice(0, 5)
 
   return (
     <div className="md:h-full md:overflow-y-auto">
@@ -276,36 +275,37 @@ export function SettingsTab({
               {/* Member Preview */}
               <section className="flex flex-col flex-1">
                 <p style={SECTION_LABEL} className="mb-3">Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({totalMembers})</span></p>
-                <div style={{ ...CARD, display: "flex", flexDirection: "column", flex: 1 }} className="overflow-hidden">
-                  {members.length === 0 ? (
-                    <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
-                  ) : (
-                    previewMembers.map((m, i) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center gap-3 px-4 py-3.5"
-                        style={{ borderTop: i ? "1px solid #F4F1E8" : undefined }}
-                      >
-                        <div style={{ width: 34, height: 34, borderRadius: 8, background: m.role.toLowerCase() === "admin" ? "#3E1540" : m.role.toLowerCase() === "leader" ? "rgba(62,21,64,0.12)" : "#EFEAE0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: m.role.toLowerCase() === "admin" ? "#F6F4EF" : m.role.toLowerCase() === "leader" ? "#3E1540" : "#5A5466" }}>{getInitials(m.name)}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="flex items-center gap-2">
-                            <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</p>
-                            {m.id === userId && <span style={{ fontSize: "10px", color: "#8A8497" }}>you</span>}
+                <div style={{ ...CARD, display: "flex", flexDirection: "column", flex: 1 }}>
+                  {/* member rows — fills space, clips any that don't fit */}
+                  <div style={{ flex: 1, overflow: "hidden" }}>
+                    {members.length === 0 ? (
+                      <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
+                    ) : (
+                      members.map((m, i) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center gap-3 px-4 py-3.5"
+                          style={{ borderTop: i ? "1px solid #F4F1E8" : undefined }}
+                        >
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: m.role.toLowerCase() === "admin" ? "#3E1540" : m.role.toLowerCase() === "leader" ? "rgba(62,21,64,0.12)" : "#EFEAE0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: m.role.toLowerCase() === "admin" ? "#F6F4EF" : m.role.toLowerCase() === "leader" ? "#3E1540" : "#5A5466" }}>{getInitials(m.name)}</span>
                           </div>
-                          <p style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</p>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="flex items-center gap-2">
+                              <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</p>
+                              {m.id === userId && <span style={{ fontSize: "10px", color: "#8A8497" }}>you</span>}
+                            </div>
+                            <p style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</p>
+                          </div>
+                          {roleBadge(m.role)}
                         </div>
-                        {roleBadge(m.role)}
-                      </div>
-                    ))
-                  )}
-                  {/* spacer pushes "See all" to the bottom */}
-                  <div style={{ flex: 1 }} />
+                      ))
+                    )}
+                  </div>
                   {members.length > 0 && (
                     <button
                       onClick={() => setShowMembersOverlay(true)}
-                      className="w-full flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold text-[#3E1540] hover:bg-[#FBF8F2] transition-colors"
+                      className="w-full flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold text-[#3E1540] hover:bg-[#FBF8F2] transition-colors flex-shrink-0"
                       style={{ borderTop: "1px solid #F4F1E8" }}
                     >
                       See all {totalMembers} members
