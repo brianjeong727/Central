@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { getUserMinistries } from "@/app/actions/ministry"
 import {
   ArrowRight,
   CalendarDays,
@@ -62,6 +63,7 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [authUser, setAuthUser] = useState<boolean | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [ministryCount, setMinistryCount] = useState<number>(1)
 
   useEffect(() => {
     function onScroll() {
@@ -76,9 +78,13 @@ export default function LandingPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setAuthUser(Boolean(user))
       setAuthChecked(true)
+      if (user) {
+        const { data } = await getUserMinistries()
+        setMinistryCount(data?.length ?? 1)
+      }
     })
   }, [])
 
@@ -176,7 +182,7 @@ export default function LandingPage() {
             {authChecked && authUser ? (
               <>
                 <a
-                  href="/home"
+                  href={ministryCount > 1 ? "/pick-ministry" : "/home"}
                   style={{
                     minHeight: 38,
                     display: "inline-flex",
