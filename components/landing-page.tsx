@@ -1,61 +1,55 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getUserMinistries } from "@/app/actions/ministry"
-import {
-  ArrowRight,
-  CalendarDays,
-  Check,
-  ClipboardList,
-  MessageCircle,
-  UserRound,
-  UsersRound,
-} from "lucide-react"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
-const COLORS = {
-  primary: "#3E1540",
-  primaryHover: "#2D0F2E",
+const C = {
+  plum: "#3E1540",
+  plumDarker: "#240920",
   ink: "#13101A",
   gold: "#C9A34B",
   surface: "#FBF8F2",
+  surface2: "#F6F4EF",
   border: "#ECE8DE",
   body: "#5A5466",
   muted: "#8A8497",
   ivory: "#F6F4EF",
 }
 
-const FEATURE_ROWS = [
+const SERIF = "var(--font-instrument-serif)"
+const SANS = "var(--font-inter)"
+
+const FEATURES = [
   {
-    icon: MessageCircle,
-    title: "Chats that match ministry life",
-    body: "Church-wide rooms, small groups, direct messages, replies, reactions, and read states without scattering people across tools.",
+    num: "i",
+    title: "Chats that match ministry life.",
+    body: "Church-wide rooms, small groups, direct messages, and threaded replies — the way students actually talk during the week.",
   },
   {
-    icon: CalendarDays,
-    title: "Announcements with real follow-through",
-    body: "Pinned updates, event context, RSVP tracking, and audience-aware publishing keep students aligned without another spreadsheet.",
+    num: "ii",
+    title: "Announcements with follow-through.",
+    body: "Pinned updates, event context, and RSVP tracking, so the right people see the right thing without another spreadsheet.",
   },
   {
-    icon: UsersRound,
-    title: "A living directory",
-    body: "Names, roles, prayer requests, and spiritual profiles make it easier for leaders and students to care for each other well.",
+    num: "iii",
+    title: "A living directory of your people.",
+    body: "Names, roles, prayer requests, and spiritual profiles — leaders and students can care for each other well.",
   },
   {
-    icon: ClipboardList,
-    title: "Planning for the people behind the scenes",
-    body: "Team roles, rosters, worship planning, event tasks, and service details live beside the conversations that move them forward.",
+    num: "iv",
+    title: "Planning, beside the conversation.",
+    body: "Team roles, worship rosters, and event tasks live next to the chats that move them forward — not in a second app.",
   },
 ]
 
-const RHYTHM_ITEMS = [
-  "Welcome new students",
-  "Publish weekly announcements",
-  "Coordinate worship teams",
-  "Keep small groups close",
+const RHYTHM = [
+  { day: "Sun · service", what: "Welcome new students.", who: "— the welcome team" },
+  { day: "Mon · planning", what: "Publish the week ahead.", who: "— campus leads" },
+  { day: "Wed · rehearsal", what: "Coordinate worship.", who: "— praise team" },
+  { day: "Fri · cells", what: "Keep small groups close.", who: "— cell leaders" },
 ]
 
 export default function LandingPage() {
@@ -69,7 +63,6 @@ export default function LandingPage() {
     function onScroll() {
       setScrolled(window.scrollY > 56)
     }
-
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
@@ -77,7 +70,6 @@ export default function LandingPage() {
 
   useEffect(() => {
     const supabase = createClient()
-
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setAuthUser(Boolean(user))
       setAuthChecked(true)
@@ -94,124 +86,55 @@ export default function LandingPage() {
     window.location.href = "/"
   }
 
-  const navInk = scrolled ? COLORS.ink : COLORS.ivory
-  const navMuted = scrolled ? COLORS.body : "rgba(246,244,239,0.76)"
+  const navColor = scrolled ? C.ink : C.ivory
+  const navMuted = scrolled ? "rgba(90,84,102,0.9)" : "rgba(246,244,239,0.85)"
 
   return (
-    <main style={{ minHeight: "100vh", background: COLORS.surface, color: COLORS.ink, fontFamily: "var(--font-inter)" }}>
+    <main style={{ minHeight: "100vh", background: C.surface, color: C.ink, fontFamily: SANS }}>
+
+      {/* ── NAV ── */}
       <nav
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          borderBottom: scrolled ? `1px solid ${COLORS.border}` : "1px solid transparent",
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+          borderBottom: scrolled ? `1px solid ${C.border}` : "1px solid transparent",
           background: scrolled ? "rgba(251,248,242,0.92)" : "transparent",
           backdropFilter: scrolled ? "blur(16px)" : "none",
           WebkitBackdropFilter: scrolled ? "blur(16px)" : "none",
-          transition: "background 180ms ease, border-color 180ms ease, backdrop-filter 180ms ease",
+          transition: "background 180ms ease, border-color 180ms ease",
         }}
       >
-        <div
-          className="central-landing-nav"
-          style={{
-            width: "min(1120px, calc(100% - 32px))",
-            height: 72,
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "minmax(180px, 1fr) auto minmax(180px, 1fr)",
-            alignItems: "center",
-            gap: 20,
-          }}
-        >
-          <Link
+        <div style={{ maxWidth: 1192, margin: "0 auto", padding: "0 56px", display: "flex", alignItems: "center", height: 72, gap: 24 }}>
+          {/* Brand */}
+          <a
             href="/"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              color: navInk,
-              justifySelf: "start",
-              textDecoration: "none",
-            }}
+            style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: navColor, fontFamily: SERIF, fontSize: 22, transition: "color 180ms ease", flexShrink: 0 }}
           >
-            <RingCrossLogo size={28} color={scrolled ? COLORS.primary : COLORS.ivory} />
-            <span
-              style={{
-                fontFamily: "var(--font-instrument-serif)",
-                fontSize: 25,
-                color: navInk,
-                lineHeight: 1,
-                transition: "color 180ms ease",
-              }}
-            >
-              Central
-            </span>
-          </Link>
+            <RingCrossLogo size={28} color={scrolled ? C.plum : C.ivory} />
+            Central
+          </a>
 
-          <div className="hidden md:flex" style={{ alignItems: "center", gap: 30, justifySelf: "center" }}>
-            {[
-              ["Platform", "#platform"],
-              ["Rhythm", "#rhythm"],
-              ["Ministries", "/ministries"],
-            ].map(([label, href]) => (
-              <a
-                key={label}
-                href={href}
-                style={{
-                  color: navMuted,
-                  fontSize: 14,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  transition: "color 160ms ease",
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.color = navInk
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.color = navMuted
-                }}
-              >
+          {/* Center links */}
+          <div className="cl-nav-links" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 28 }}>
+            {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
+              <a key={label} href={href} style={{ fontSize: 13, color: navMuted, textDecoration: "none" }}>
                 {label}
               </a>
             ))}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", justifySelf: "end", gap: 12 }}>
+          {/* Right CTAs */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
             {authChecked && authUser ? (
               <>
                 <a
                   href={ministryCount > 1 ? "/pick-ministry" : "/home"}
-                  style={{
-                    minHeight: 38,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 8,
-                    border: `1px solid ${scrolled ? COLORS.primary : "rgba(246,244,239,0.78)"}`,
-                    color: scrolled ? COLORS.primary : COLORS.ivory,
-                    padding: "0 15px",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
+                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, textDecoration: "none", border: scrolled ? `1px solid ${C.border}` : "1px solid rgba(246,244,239,0.5)", color: navColor, background: "transparent", fontFamily: SANS }}
                 >
                   Open app
                 </a>
                 <button
                   onClick={handleSignOut}
-                  style={{
-                    background: "transparent",
-                    border: 0,
-                    color: navMuted,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-inter)",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    padding: "8px 0",
-                  }}
+                  style={{ background: "transparent", border: 0, color: navMuted, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}
                 >
                   Sign out
                 </button>
@@ -219,36 +142,14 @@ export default function LandingPage() {
             ) : (
               <>
                 <a
-                  className="hidden sm:inline-flex"
                   href="/login"
-                  style={{
-                    color: navMuted,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
+                  style={{ height: 36, padding: "0 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, textDecoration: "none", border: "none", background: "transparent", color: navColor, fontFamily: SANS }}
                 >
                   Sign in
                 </a>
                 <button
                   onClick={() => router.push("/onboarding")}
-                  style={{
-                    minHeight: 38,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 8,
-                    border: scrolled ? `1px solid ${COLORS.primary}` : "1px solid rgba(246,244,239,0.76)",
-                    background: scrolled ? COLORS.primary : "rgba(246,244,239,0.12)",
-                    color: COLORS.ivory,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-inter)",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    padding: "0 16px",
-                    whiteSpace: "nowrap",
-                  }}
+                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.plum}` : `1px solid ${C.ivory}`, background: scrolled ? C.plum : C.ivory, color: scrolled ? C.ivory : C.plum, cursor: "pointer", fontFamily: SANS }}
                 >
                   Get started
                 </button>
@@ -258,495 +159,217 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section
-        className="central-landing-hero"
-        style={{
-          position: "relative",
-          minHeight: 760,
-          display: "flex",
-          alignItems: "end",
-          overflow: "hidden",
-          isolation: "isolate",
-          background: COLORS.surface,
-        }}
-      >
-        <div
+      {/* ── HERO ── */}
+      <section className="cl-hero" style={{ position: "relative", minHeight: 760, overflow: "hidden" }}>
+        {/* Chapel — no overlay washes, image speaks for itself */}
+        <img
+          src="/chapel.jpg"
+          alt=""
           aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: -3,
-            backgroundImage: "url('/chapel.jpg')",
-            backgroundPosition: "center center",
-            backgroundSize: "cover",
-          }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
+        {/* Paper fade dissolves image into page at bottom */}
         <div
           aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: -2,
-            background:
-              "linear-gradient(180deg, rgba(62,21,64,0.10) 0%, rgba(201,163,75,0.06) 42%, rgba(251,248,242,0.04) 100%)",
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: -1,
-            background:
-              "radial-gradient(circle at 25% 70%, rgba(19,16,26,0.28) 0%, rgba(19,16,26,0.13) 26%, rgba(19,16,26,0) 48%), radial-gradient(circle at 70% 72%, rgba(19,16,26,0.18) 0%, rgba(19,16,26,0.08) 24%, rgba(19,16,26,0) 44%)",
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 82,
-            zIndex: 0,
-            background: `linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.08) 52%, ${COLORS.surface} 100%)`,
-          }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 180, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.55) 55%, #FBF8F2 100%)", zIndex: 1 }}
         />
 
+        {/* Left-constrained content — keeps chapel untouched */}
         <div
-          className="central-landing-hero-inner"
-          style={{
-            width: "min(1120px, calc(100% - 32px))",
-            margin: "0 auto",
-            padding: "132px 0 72px",
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gap: 28,
-            alignItems: "end",
-            position: "relative",
-            zIndex: 1,
-          }}
+          className="cl-hero-body"
+          style={{ position: "relative", zIndex: 2, padding: "148px 56px 96px", maxWidth: 516 }}
         >
-          <div>
-            <p
-              style={{
-                margin: "0 0 18px",
-                color: "rgba(246,244,239,0.76)",
-                fontSize: 13,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                textShadow: "0 1px 8px rgba(19,16,26,0.28)",
-              }}
-            >
-              College ministry communication
-            </p>
-            <h1
-              className="central-landing-hero-title"
-              style={{
-                margin: "0 0 24px",
-                color: COLORS.ivory,
-                fontFamily: "var(--font-instrument-serif)",
-                fontSize: 52,
-                fontWeight: 400,
-                lineHeight: 0.96,
-                maxWidth: 650,
-                textShadow: "0 2px 14px rgba(19,16,26,0.34)",
-              }}
-            >
-              Central
-            </h1>
-            <p
-              className="central-landing-hero-copy"
-              style={{
-                margin: "0 0 34px",
-                maxWidth: 560,
-                color: "rgba(246,244,239,0.82)",
-                fontSize: 16,
-                lineHeight: 1.7,
-                textShadow: "0 1px 10px rgba(19,16,26,0.34)",
-              }}
-            >
-              A quieter home for the weekly rhythm of ministry: conversations, announcements, people, and planning in one place.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <button
-                onClick={() => router.push("/onboarding")}
-                style={{
-                  minHeight: 48,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 9,
-                  borderRadius: 8,
-                  border: `1px solid ${COLORS.ivory}`,
-                  background: COLORS.ivory,
-                  color: COLORS.primary,
-                  cursor: "pointer",
-                  fontFamily: "var(--font-inter)",
-                  fontSize: 15,
-                  fontWeight: 800,
-                  padding: "0 22px",
-                  boxShadow: "0 2px 8px rgba(19,16,26,0.22)",
-                }}
-              >
-                Register your ministry
-                <ArrowRight size={17} strokeWidth={1.8} />
-              </button>
-              <a
-                href="/ministries"
-                style={{
-                  minHeight: 48,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 8,
-                  border: "1px solid rgba(246,244,239,0.68)",
-                  color: COLORS.ivory,
-                  fontSize: 15,
-                  fontWeight: 700,
-                  padding: "0 22px",
-                  textDecoration: "none",
-                  textShadow: "0 1px 10px rgba(19,16,26,0.40)",
-                }}
-              >
-                Join an existing ministry
-              </a>
-            </div>
-          </div>
-
-          <div
-            className="central-landing-quote"
-            style={{
-              borderTop: "1px solid rgba(246,244,239,0.28)",
-              paddingTop: 24,
-              color: COLORS.ivory,
-            }}
+          <p style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold }}>
+            For college ministries
+          </p>
+          <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400 }}>
+            A quieter home<br />for the weekly{" "}
+            <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>rhythm.</span>
+          </h1>
+          <p
+            className="cl-hero-sub"
+            style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.ivory, marginTop: 24, maxWidth: 380, lineHeight: 1.5 }}
           >
-            <p
-              style={{
-                margin: "0 0 14px",
-                color: "rgba(246,244,239,0.72)",
-                fontFamily: "var(--font-instrument-serif)",
-                fontSize: 20,
-                fontStyle: "italic",
-                lineHeight: 1.5,
-              }}
+            Conversations, announcements, people, and planning — held together so leaders can move with clarity and students know where to look.
+          </p>
+          <div style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap" }}>
+            <button
+              onClick={() => router.push("/onboarding")}
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
             >
-              “For where two or three gather in my name, there am I with them.”
-            </p>
-            <p style={{ margin: 0, color: "rgba(246,244,239,0.58)", fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>
-              Matthew 18:20
-            </p>
+              Register your ministry
+            </button>
+            <a
+              href="/ministries"
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.gold}`, background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+            >
+              Find an existing one
+            </a>
           </div>
+        </div>
+
+        {/* Verse — pinned upper-right, sits in the plum sky of the image */}
+        <div
+          className="cl-verse-anchor"
+          style={{ position: "absolute", right: 56, top: 130, maxWidth: 240, textAlign: "right", zIndex: 2 }}
+        >
+          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14.5, color: C.ivory, lineHeight: 1.5, margin: 0 }}>
+            &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
+          </p>
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, margin: "12px 0 0" }}>
+            Matthew 18 : 20
+          </p>
         </div>
       </section>
 
-      <section id="platform" className="central-landing-platform" style={{ background: COLORS.surface, padding: "42px 0 44px" }}>
-        <div style={{ width: "min(1120px, calc(100% - 32px))", margin: "0 auto" }}>
-          <div
-            className="central-landing-feature-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: 30,
-              alignItems: "start",
-            }}
-          >
-            <div>
-              <p style={{ margin: "0 0 14px", color: COLORS.muted, fontSize: 12, fontWeight: 800, textTransform: "uppercase" }}>
-                One calm system
-              </p>
-              <h2
-                className="central-landing-section-title"
-                style={{
-                  margin: 0,
-                  color: COLORS.ink,
-                  fontFamily: "var(--font-instrument-serif)",
-                  fontSize: 34,
-                  fontWeight: 400,
-                  lineHeight: 1.08,
-                }}
-              >
-                Less noise between Sunday and the next gathering.
-              </h2>
+      {/* ── PLATFORM ── */}
+      <section id="platform" className="cl-platform" style={{ maxWidth: 1192, margin: "0 auto", padding: "96px 56px" }}>
+        <p style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted, margin: 0 }}>
+          One calm system
+        </p>
+        <h2 className="cl-section-h" style={{ fontFamily: SERIF, fontSize: 60, lineHeight: 0.98, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400, color: C.ink }}>
+          Less noise between<br />Sunday and the next gathering.
+        </h2>
+        <p style={{ fontSize: 16, color: C.body, marginTop: 22, maxWidth: 580, lineHeight: 1.6 }}>
+          Central keeps the pastoral, practical, and administrative pieces of college ministry in one quiet place — so leaders can lead, and students can find what they need.
+        </p>
+
+        <div
+          className="cl-feat-grid"
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: C.border, marginTop: 56, border: `1px solid ${C.border}`, borderRadius: 18, overflow: "hidden" }}
+        >
+          {FEATURES.map(({ num, title, body }) => (
+            <div key={num} style={{ background: C.surface, padding: "40px 36px", minHeight: 220 }}>
+              <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.gold }}>{num}</div>
+              <h4 style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1.1, fontWeight: 400, margin: "14px 0 10px", color: C.ink }}>{title}</h4>
+              <p style={{ color: C.body, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{body}</p>
             </div>
-            <div style={{ display: "grid", gap: 2 }}>
-              {FEATURE_ROWS.map(({ icon: Icon, title, body }) => (
-                <div
-                  key={title}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "44px 1fr",
-                    gap: 18,
-                    padding: "24px 0",
-                    borderTop: `1px solid ${COLORS.border}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "#F4F1E8",
-                      color: COLORS.primary,
-                    }}
-                  >
-                    <Icon size={19} strokeWidth={1.7} />
-                  </div>
-                  <div>
-                    <h3
-                      style={{
-                        margin: "0 0 7px",
-                        color: COLORS.ink,
-                        fontFamily: "var(--font-instrument-serif)",
-                        fontSize: 25,
-                        fontWeight: 400,
-                        lineHeight: 1.18,
-                      }}
-                    >
-                      {title}
-                    </h3>
-                    <p style={{ margin: 0, color: COLORS.body, fontSize: 15, lineHeight: 1.7 }}>{body}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      <section id="rhythm" className="central-landing-rhythm" style={{ background: COLORS.surface, padding: "18px 0 64px" }}>
-        <div
-          className="central-landing-rhythm-grid"
-          style={{
-            width: "min(1120px, calc(100% - 32px))",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gap: 30,
-            alignItems: "center",
-            borderTop: `1px solid ${COLORS.border}`,
-            paddingTop: 56,
-          }}
-        >
-          <div>
-            <h2
-              className="central-landing-section-title"
-              style={{
-                margin: "0 0 18px",
-                color: COLORS.ink,
-                fontFamily: "var(--font-instrument-serif)",
-                fontSize: 34,
-                fontWeight: 400,
-                lineHeight: 1.1,
-              }}
-            >
-              Built for the rhythms you repeat every week.
-            </h2>
-            <p style={{ margin: 0, maxWidth: 610, color: COLORS.body, fontSize: 16, lineHeight: 1.8 }}>
-              Central keeps the pastoral, practical, and administrative pieces close together so leaders can move with clarity and students know where to look.
-            </p>
-          </div>
+      {/* ── RHYTHM ── */}
+      <section id="rhythm" style={{ background: C.surface2, padding: "96px 0" }}>
+        <div className="cl-rhythm-inner" style={{ maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted, margin: 0 }}>
+            A week with Central
+          </p>
+          <h2 className="cl-rhythm-h" style={{ fontFamily: SERIF, fontSize: 52, lineHeight: 0.98, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400, color: C.ink }}>
+            Built for the rhythms<br />you repeat every week.
+          </h2>
 
-          <div
-            style={{
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 8,
-              background: "#FFFFFF",
-              boxShadow: "0 2px 8px rgba(19,16,26,0.08)",
-              overflow: "hidden",
-            }}
-          >
-            {RHYTHM_ITEMS.map((item, index) => (
+          <div className="cl-rhythm-strip" style={{ marginTop: 48, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
+            {RHYTHM.map(({ day, what, who }, i) => (
               <div
-                key={item}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  minHeight: 58,
-                  padding: "0 18px",
-                  borderTop: index === 0 ? "none" : `1px solid ${COLORS.border}`,
-                }}
+                key={day}
+                style={{ padding: "32px 24px", borderRight: i < RHYTHM.length - 1 ? `1px solid ${C.border}` : "none" }}
               >
-                <span
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 8,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: index === 0 ? COLORS.primary : "#F4F1E8",
-                    color: index === 0 ? COLORS.ivory : COLORS.primary,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Check size={15} strokeWidth={2} />
-                </span>
-                <span style={{ color: COLORS.ink, fontSize: 15, fontWeight: 650 }}>{item}</span>
+                <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold }}>{day}</div>
+                <div style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.2, marginTop: 10, color: C.ink }}>{what}</div>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{who}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section style={{ background: COLORS.primary, padding: "72px 0" }}>
-        <div
-          style={{
-            width: "min(1120px, calc(100% - 32px))",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 28,
-            alignItems: "center",
-          }}
-          className="max-md:!grid-cols-1"
-        >
-          <div>
-            <h2
-              className="central-landing-cta-title"
-              style={{
-                margin: "0 0 12px",
-                color: COLORS.ivory,
-                fontFamily: "var(--font-instrument-serif)",
-                fontSize: 32,
-                fontWeight: 400,
-                lineHeight: 1.12,
-              }}
+      {/* ── CTA ── */}
+      <section className="cl-cta" style={{ padding: "110px 56px", background: C.plum, color: C.ivory, position: "relative", overflow: "hidden" }}>
+        {/* Gold dot pattern */}
+        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(201,163,75,0.22) 1px, transparent 1.4px)", backgroundSize: "22px 22px", opacity: 0.45, pointerEvents: "none" }} />
+        {/* Radial gold glows */}
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 88% 16%, rgba(201,163,75,0.16) 0%, transparent 40%), radial-gradient(circle at 6% 88%, rgba(201,163,75,0.10) 0%, transparent 35%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, margin: 0 }}>
+            Begin
+          </p>
+          <h3 className="cl-cta-title" style={{ fontFamily: SERIF, fontSize: 72, lineHeight: 1, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400 }}>
+            Give your ministry<br />one place to gather.
+          </h3>
+          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 19, color: "rgba(246,244,239,0.82)", marginTop: 24, maxWidth: 520, lineHeight: 1.5 }}>
+            Register a ministry, invite your students, and keep the week moving with a little less friction.
+          </p>
+          <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => router.push("/onboarding")}
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
             >
-              Give your ministry one place to gather.
-            </h2>
-            <p style={{ margin: 0, color: "rgba(246,244,239,0.72)", fontSize: 15, lineHeight: 1.7 }}>
-              Register a ministry, invite your students, and keep the week moving with less friction.
-            </p>
+              Start with Central
+            </button>
+            <a
+              href="/login"
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.gold}`, background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+            >
+              Sign in
+            </a>
           </div>
-          <button
-            onClick={() => router.push("/onboarding")}
-            style={{
-              minHeight: 48,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 9,
-              borderRadius: 8,
-              border: `1px solid ${COLORS.ivory}`,
-              background: COLORS.ivory,
-              color: COLORS.primary,
-              cursor: "pointer",
-              fontFamily: "var(--font-inter)",
-              fontSize: 15,
-              fontWeight: 800,
-              padding: "0 22px",
-              width: "fit-content",
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.background = "#ECE8DE"
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.background = COLORS.ivory
-            }}
-          >
-            Start with Central
-            <ArrowRight size={17} strokeWidth={1.8} />
-          </button>
         </div>
       </section>
 
-      <footer style={{ background: COLORS.surface, borderTop: `1px solid ${COLORS.border}`, padding: "34px 0" }}>
-        <div
-          style={{
-            width: "min(1120px, calc(100% - 32px))",
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <RingCrossLogo size={24} color={COLORS.primary} />
-            <span style={{ color: COLORS.ink, fontFamily: "var(--font-instrument-serif)", fontSize: 23, lineHeight: 1 }}>
+      {/* ── FOOTER ── */}
+      <footer className="cl-footer" style={{ padding: "56px 56px" }}>
+        <div style={{ maxWidth: 1192, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingBottom: 22, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: SERIF, fontSize: 22, color: C.ink }}>
+              <RingCrossLogo size={24} color={C.plum} />
               Central
-            </span>
+            </div>
+            <div className="cl-footer-links" style={{ display: "flex", gap: 28, fontSize: 13, color: C.body, flexWrap: "wrap" }}>
+              {[["Log in", "/login"], ["Find ministry", "/ministries"], ["Platform", "#platform"], ["Rhythm", "#rhythm"]].map(([label, href]) => (
+                <a key={label} href={href} style={{ textDecoration: "none", color: "inherit" }}>{label}</a>
+              ))}
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <a href="/login" style={{ color: COLORS.body, fontSize: 14, fontWeight: 650, textDecoration: "none" }}>
-              Log in
-            </a>
-            <a href="/ministries" style={{ color: COLORS.primary, fontSize: 14, fontWeight: 750, textDecoration: "none" }}>
-              Find ministry
-            </a>
-            <span style={{ color: COLORS.muted, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <UserRound size={15} strokeWidth={1.7} />
-              Built for college ministries
-            </span>
+          <div style={{ paddingTop: 22, display: "flex", justifyContent: "space-between", fontSize: 12.5, color: C.muted, flexWrap: "wrap", gap: 8 }}>
+            <em style={{ fontFamily: SERIF, fontStyle: "italic", color: C.ink }}>Built for the rhythms you repeat every week.</em>
+            <span>© Central · College ministry communication</span>
           </div>
         </div>
       </footer>
 
       <style>{`
-        @media (min-width: 901px) {
-          .central-landing-hero {
-            min-height: 84svh !important;
-            align-items: end !important;
-          }
+        /* Gold underline on italic "rhythm" in hero */
+        .cl-rhythm-italic {
+          position: relative;
+        }
+        .cl-rhythm-italic::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 6px;
+          bottom: 4px;
+          height: 2px;
+          background: ${C.gold};
+          border-radius: 2px;
+        }
 
-          .central-landing-hero-inner {
-            grid-template-columns: minmax(0, 660px) minmax(260px, 360px) !important;
-            gap: 48px !important;
-            padding: 136px 0 96px !important;
-          }
+        @media (max-width: 900px) {
+          .cl-nav-links { display: none !important; }
+          .cl-hero { min-height: 520px !important; }
+          .cl-hero-body { padding: 112px 24px 72px !important; max-width: 100% !important; }
+          .cl-hero-title { font-size: 46px !important; }
+          .cl-hero-sub { font-size: 16px !important; max-width: 100% !important; }
+          .cl-verse-anchor { display: none !important; }
 
-          .central-landing-hero-title {
-            font-size: 72px !important;
-          }
+          .cl-platform { padding: 64px 24px !important; }
+          .cl-section-h { font-size: 36px !important; }
+          .cl-feat-grid { grid-template-columns: 1fr !important; }
 
-          .central-landing-hero-copy {
-            max-width: 560px !important;
-            font-size: 18px !important;
-          }
+          .cl-rhythm-inner { padding: 0 24px !important; }
+          .cl-rhythm-h { font-size: 34px !important; }
+          .cl-rhythm-strip { grid-template-columns: 1fr 1fr !important; }
 
-          .central-landing-quote {
-            border-left: 1px solid rgba(246,244,239,0.28) !important;
-            border-top: 0 !important;
-            padding-left: 28px !important;
-            padding-top: 0 !important;
-          }
+          .cl-cta { padding: 72px 24px !important; }
+          .cl-cta-title { font-size: 44px !important; }
 
-          .central-landing-platform {
-            padding: 82px 0 56px !important;
-          }
+          .cl-footer { padding: 40px 24px !important; }
+        }
 
-          .central-landing-feature-grid,
-          .central-landing-rhythm-grid {
-            gap: 54px !important;
-          }
-
-          .central-landing-feature-grid {
-            grid-template-columns: minmax(240px, 390px) 1fr !important;
-          }
-
-          .central-landing-rhythm-grid {
-            grid-template-columns: 1fr minmax(280px, 380px) !important;
-          }
-
-          .central-landing-section-title {
-            font-size: 44px !important;
-          }
-
-          .central-landing-rhythm {
-            padding: 32px 0 88px !important;
-          }
-
-          .central-landing-cta-title {
-            font-size: 38px !important;
-          }
+        @media (max-width: 560px) {
+          .cl-hero-title { font-size: 38px !important; }
+          .cl-rhythm-strip { grid-template-columns: 1fr !important; }
+          .cl-rhythm-strip > div { border-right: none !important; border-bottom: 1px solid ${C.border}; }
+          .cl-cta-title { font-size: 34px !important; }
         }
       `}</style>
     </main>
