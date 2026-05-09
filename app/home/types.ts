@@ -167,6 +167,7 @@ export interface ChatSettingsProps {
   groupId: string
   groupName: string
   groupType: string
+  groupArchived?: boolean
   userId: string
   userRole: string
   onBack: () => void

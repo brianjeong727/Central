@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
+import { deleteGroup } from "@/app/actions/chat"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState } from "../components/shared"
 import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
@@ -201,7 +202,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   )
 }
 
-export function ChatSettings({ groupId, groupName, groupType, userId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -225,7 +226,8 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
   const isChurch = groupType === "church"
   const canManage = (isChurch && isAdminOrLeader) || isMy
   const canLeave = isMy || isDM
-  const canArchive = isChurch && isAdminOrLeader
+  const canArchive = isChurch && isAdminOrLeader && !groupArchived
+  const canUnarchive = isChurch && isAdminOrLeader && groupArchived
   const canDelete = isChurch && isAdminOrLeader
 
   useEffect(() => {
@@ -296,9 +298,13 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
     onClose()
   }
 
+  async function handleUnarchive() {
+    await supabase.from("groups").update({ archived: false }).eq("id", groupId)
+    onClose()
+  }
+
   async function handleDelete() {
-    await supabase.from("messages").delete().eq("group_id", groupId)
-    await supabase.from("groups").delete().eq("id", groupId)
+    await deleteGroup(groupId)
     onClose()
   }
 
@@ -634,6 +640,11 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                   Archive chat
                 </button>
               )}
+              {canUnarchive && (
+                <button onClick={handleUnarchive} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                  Unarchive chat
+                </button>
+              )}
               {canLeave && (
                 <button onClick={handleLeave} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "none", cursor: "pointer" }}>
                   Leave conversation
@@ -727,9 +738,10 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
               </div>
             </div>
           )}
-          {(canArchive || canLeave || canDelete) && (
+          {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="px-5 pb-10">
               {canArchive && <button onClick={handleArchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
+              {canUnarchive && <button onClick={handleUnarchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Unarchive chat</button>}
               {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Leave chat</button>}
               {canDelete && (
                 confirmDelete ? (
@@ -762,6 +774,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
   const [sending, setSending] = useState(false)
   const [displayName, setDisplayName] = useState(groupName)
   const [groupType, setGroupType] = useState("")
+  const [groupArchived, setGroupArchived] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
@@ -822,14 +835,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
     await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", userId)
   }
 
-  // Fetch group type for settings
+  // Fetch group type + archived status for settings
   useEffect(() => {
     supabase
       .from("groups")
-      .select("type")
+      .select("type, archived")
       .eq("id", groupId)
       .single()
-      .then(({ data }) => { if (data) setGroupType(data.type) })
+      .then(({ data }) => { if (data) { setGroupType(data.type); setGroupArchived(data.archived ?? false) } })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
 
@@ -1536,6 +1549,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
         groupId={groupId}
         groupName={displayName}
         groupType={groupType}
+        groupArchived={groupArchived}
         userId={userId}
         userRole={userRole}
         onBack={() => setShowSettings(false)}
