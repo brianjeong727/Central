@@ -4579,6 +4579,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [error, setError] = useState<string | null>(null)
   const [activeRole, setActiveRole] = useState(0)
 
+  const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
+  const canDelete = isAdmin || isPresident
+
   useEffect(() => {
     async function load() {
       const [{ data: rolesData }, { data: membersData }] = await Promise.all([
@@ -4749,7 +4752,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           </span>
         </div>
         <div className="w-9 flex justify-end">
-          {!showAddMember && isAdmin && (
+          {!showAddMember && canDelete && (
             <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
               <Trash2 className="w-4 h-4 text-[#8A8497] hover:text-red-500" />
             </button>
@@ -4765,7 +4768,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         }
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {isAdmin && !showAddMember && (
+            {canDelete && !showAddMember && (
               <button
                 onClick={() => setConfirmDelete(true)}
                 style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
