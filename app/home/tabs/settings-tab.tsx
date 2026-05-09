@@ -214,9 +214,9 @@ export function SettingsTab({
         {loading ? (
           <div style={{ color: "#8A8497", fontSize: "14px" }}>Loading…</div>
         ) : (
-          <div className="flex flex-col gap-8 md:grid md:items-start" style={{ gridTemplateColumns: "1fr 300px" }}>
+          <div className="flex flex-col gap-8 md:grid md:items-stretch" style={{ gridTemplateColumns: "1fr 300px" }}>
             {/* ── LEFT COLUMN ── */}
-            <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-8 h-full">
 
               {/* Ministry Profile */}
               <section>
@@ -274,9 +274,9 @@ export function SettingsTab({
               </section>
 
               {/* Member Preview */}
-              <section>
+              <section className="flex flex-col flex-1">
                 <p style={SECTION_LABEL} className="mb-3">Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({totalMembers})</span></p>
-                <div style={CARD} className="overflow-hidden">
+                <div style={{ ...CARD, display: "flex", flexDirection: "column", flex: 1 }} className="overflow-hidden">
                   {members.length === 0 ? (
                     <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
                   ) : (
@@ -300,6 +300,8 @@ export function SettingsTab({
                       </div>
                     ))
                   )}
+                  {/* spacer pushes "See all" to the bottom */}
+                  <div style={{ flex: 1 }} />
                   {members.length > 0 && (
                     <button
                       onClick={() => setShowMembersOverlay(true)}
