@@ -4738,10 +4738,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
           onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : onClose}
-          className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
+          className="size-9 bg-white border border-[#ECE8DE] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          {showAddMember ? "Back" : "Teams"}
+          <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
         <div className="flex items-center gap-2">
           {!showAddMember && <span className="text-[18px]">{team.icon ?? "👥"}</span>}
@@ -4749,10 +4748,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
             {showAddMember ? "Add Member" : team.name}
           </span>
         </div>
-        <div className="w-14 flex justify-end">
+        <div className="w-9 flex justify-end">
           {!showAddMember && isAdmin && (
-            <button onClick={() => setConfirmDelete(true)} className="text-[#8A8497] hover:text-red-500 transition-colors">
-              <Trash2 className="w-4 h-4" />
+            <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
+              <Trash2 className="w-4 h-4 text-[#8A8497] hover:text-red-500" />
             </button>
           )}
         </div>
@@ -4764,21 +4763,33 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           ? ["Central", "Plan", team.name, "Settings", "Add member"]
           : ["Central", "Plan", team.name, "Settings"]
         }
-        right={isAdmin && !showAddMember ? (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
-          >
-            <Trash2 style={{ width: 13, height: 13 }} /> Delete team
-          </button>
-        ) : showAddMember ? (
-          <button
-            onClick={() => { setShowAddMember(false); setError(null) }}
-            style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
-          >
-            <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
-          </button>
-        ) : undefined}
+        right={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {isAdmin && !showAddMember && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
+              >
+                <Trash2 style={{ width: 13, height: 13 }} /> Delete team
+              </button>
+            )}
+            {showAddMember && (
+              <button
+                onClick={() => { setShowAddMember(false); setError(null) }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
+              >
+                <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
+              title="Close settings"
+            >
+              <X style={{ width: 15, height: 15 }} />
+            </button>
+          </div>
+        }
       />
 
       {confirmDelete && (
