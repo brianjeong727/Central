@@ -871,7 +871,7 @@ export function MeetingNotesSection({
   )
 }
 
-export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
+export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
@@ -1185,6 +1185,7 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
       {showCreateTeam && (
         <CreateTeamOverlay
           userId={userId}
+          userName={userName}
           ministryId={ministryId}
           onClose={() => setShowCreateTeam(false)}
           onCreated={(teamId) => { setShowCreateTeam(false); onTeamsChange(); onTeamCreated(teamId) }}
@@ -4114,8 +4115,9 @@ export function EventPlanWorkspace({
 
 // ── CreateTeamOverlay ─────────────────────────────────────────────────────────
 
-export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
+export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCreated }: {
   userId: string
+  userName: string
   ministryId: string
   onClose: () => void
   onCreated: (teamId: string) => void
@@ -4132,6 +4134,16 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
   const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Index of the first "president" role (case-insensitive). -1 if none.
+  const presidentRoleIdx = roles.findIndex((r) => r.name.toLowerCase().includes("president"))
+  // Default role for new members: last non-president role, or 0 if all are president.
+  const defaultMemberRoleIdx = (() => {
+    for (let i = roles.length - 1; i >= 0; i--) {
+      if (!roles[i].name.toLowerCase().includes("president")) return i
+    }
+    return 0
+  })()
 
   useEffect(() => {
     if (step !== "members") return
@@ -4184,7 +4196,7 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
   function toggleMemberSelection(memberId: string) {
     setSelectedMembers((prev) => {
       const exists = prev.find((m) => m.userId === memberId)
-      return exists ? prev.filter((m) => m.userId !== memberId) : [...prev, { userId: memberId, roleIdx: 0 }]
+      return exists ? prev.filter((m) => m.userId !== memberId) : [...prev, { userId: memberId, roleIdx: defaultMemberRoleIdx }]
     })
   }
 
@@ -4213,11 +4225,12 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
 
     if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
 
-    // Build members list — always include creator, then any additionally selected members
+    // Build members list — always include creator as president (or first role), then others
+    const creatorRoleIdx = presidentRoleIdx >= 0 ? presidentRoleIdx : 0
     const creatorAlreadySelected = selectedMembers.some((m) => m.userId === userId)
     const allMembers = creatorAlreadySelected
       ? selectedMembers
-      : [{ userId, roleIdx: 0 }, ...selectedMembers]
+      : [{ userId, roleIdx: creatorRoleIdx }, ...selectedMembers]
 
     const { error: membersErr } = await supabase.from("team_members").insert(
       allMembers.map((m) => ({
@@ -4470,6 +4483,20 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
         {step === "members" && (
           <div className="flex flex-col gap-4">
             <p className="text-[13px] text-[#8A8497]">Add members now, or share the invite code later.</p>
+
+            {/* Creator row — always shown, always president */}
+            <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[#ECE8DE] p-3">
+              <div className="w-5 h-5 rounded-md bg-[#3E1540] border-[#3E1540] border-2 flex items-center justify-center flex-shrink-0">
+                <Check className="w-3 h-3 text-white" />
+              </div>
+              <span className="flex-1 text-[14px] font-medium text-[#13101A]">
+                {userName} <span className="text-[#8A8497] font-normal">(you)</span>
+              </span>
+              <span className="text-[12px] text-[#5A5466] font-medium">
+                {presidentRoleIdx >= 0 ? roles[presidentRoleIdx].name : roles[0]?.name}
+              </span>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
               <input
@@ -4486,6 +4513,10 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
               )}
               {filteredMembers.map((member) => {
                 const sel = selectedMembers.find((m) => m.userId === member.id)
+                // Roles available to non-creator members: exclude president roles
+                const assignableRoles = roles
+                  .map((r, i) => ({ ...r, i }))
+                  .filter(({ name }) => !name.toLowerCase().includes("president"))
                 return (
                   <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
                     <button
@@ -4497,19 +4528,19 @@ export function CreateTeamOverlay({ userId, ministryId, onClose, onCreated }: {
                       {sel && <Check className="w-3 h-3 text-white" />}
                     </button>
                     <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
-                    {sel && roles.length > 1 && (
+                    {sel && assignableRoles.length > 1 && (
                       <select
                         value={sel.roleIdx}
                         onChange={(e) => updateMemberRole(member.id, Number(e.target.value))}
                         className="text-[12px] text-[#5A5466] bg-[#FBF8F2] border border-[#ECE8DE] rounded-lg px-2 py-1 focus:outline-none"
                       >
-                        {roles.map((r, i) => (
-                          <option key={i} value={i}>{r.name || `Role ${i + 1}`}</option>
+                        {assignableRoles.map(({ name, i }) => (
+                          <option key={i} value={i}>{name || `Role ${i + 1}`}</option>
                         ))}
                       </select>
                     )}
-                    {sel && roles.length === 1 && (
-                      <span className="text-[12px] text-[#8A8497]">{roles[0].name}</span>
+                    {sel && assignableRoles.length <= 1 && (
+                      <span className="text-[12px] text-[#8A8497]">{assignableRoles[0]?.name ?? roles[0].name}</span>
                     )}
                   </div>
                 )

@@ -334,6 +334,7 @@ export interface MeetingNote {
 
 export interface PlanTabProps {
   userId: string
+  userName: string
   ministryId: string
   ministryName: string
   userTeams: UserTeam[]

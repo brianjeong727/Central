@@ -430,6 +430,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             <div className="md:h-full md:overflow-y-auto">
               <PlanTab
                 userId={userId}
+                userName={initialProfile.name}
                 ministryId={ministryId}
                 ministryName={ministryName}
                 userTeams={userTeams}
