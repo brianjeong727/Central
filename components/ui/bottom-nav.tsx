@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, Heart } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList, Heart, BookUser } from "lucide-react"
 
 type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings"
 
@@ -11,19 +11,22 @@ interface BottomNavProps {
   showPlan?: boolean
 }
 
-const HOME_TAB = { id: "home" as const, label: "Home", icon: Home }
-const CHATS_TAB = { id: "chats" as const, label: "Chats", icon: MessageCircle }
-const PLAN_TAB = { id: "plan" as const, label: "Plan", icon: ClipboardList }
-const GIVING_TAB = { id: "giving" as const, label: "Give", icon: Heart }
-const PROFILE_TAB = { id: "profile" as const, label: "You", icon: User }
+const TABS_BASE = [
+  { id: "home" as Tab,      label: "Home",      icon: Home },
+  { id: "chats" as Tab,     label: "Chats",     icon: MessageCircle },
+  { id: "directory" as Tab, label: "Directory", icon: BookUser },
+  { id: "profile" as Tab,   label: "You",       icon: User },
+  { id: "giving" as Tab,    label: "Give",      icon: Heart },
+]
+
+const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
-  const tabs = showPlan
-    ? [HOME_TAB, CHATS_TAB, PLAN_TAB, GIVING_TAB, PROFILE_TAB]
-    : [HOME_TAB, CHATS_TAB, GIVING_TAB, PROFILE_TAB]
+  const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
+  const compact = tabs.length > 5
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 px-1 md:hidden">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 md:hidden">
       <div className="flex items-center justify-around h-full">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab
@@ -34,16 +37,16 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 transition-all ${
+              className={`flex flex-col items-center justify-center gap-0.5 transition-all ${compact ? "px-1 py-1" : "px-2 py-1"} ${
                 isActive ? "text-[#3E1540]" : "text-[#C4C4C4] hover:text-[#9CA3AF]"
               }`}
             >
               {isActive && (
-                <span className="w-5 h-0.5 bg-[#3E1540] rounded-full mb-0.5" />
+                <span className="w-4 h-0.5 bg-[#3E1540] rounded-full mb-0.5" />
               )}
               <div className="relative">
                 <Icon
-                  className={`w-5 h-5 transition-all ${
+                  className={`transition-all ${compact ? "w-[18px] h-[18px]" : "w-5 h-5"} ${
                     isActive ? "stroke-[2px]" : "stroke-[1.5px]"
                   }`}
                 />
@@ -53,7 +56,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-semibold tracking-wide">
+              <span className={`font-semibold tracking-wide ${compact ? "text-[9px]" : "text-[10px]"}`}>
                 {tab.label}
               </span>
             </button>
