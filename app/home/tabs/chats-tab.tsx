@@ -766,7 +766,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
 }
 
-export function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead, inline = false }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -1559,7 +1559,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
         userId={userId}
         userRole={userRole}
         onBack={() => setShowSettings(false)}
-        onNameChange={(name) => setDisplayName(name)}
+        onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}
         onClose={() => { setShowSettings(false); onClose() }}
       />
     )}

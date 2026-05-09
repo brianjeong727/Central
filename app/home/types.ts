@@ -184,6 +184,7 @@ export interface ChatScreenProps {
   userRole: string
   onClose: () => void
   onRead?: () => void
+  onNameChange?: (name: string) => void
   inline?: boolean
 }
 

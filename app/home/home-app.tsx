@@ -306,6 +306,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     setChatRefreshKey((k) => k + 1)
   }
 
+  function handleChatNameChange(name: string) {
+    setGlobalOpenChat((prev) => prev ? { ...prev, name } : prev)
+    setChatRefreshKey((k) => k + 1)
+  }
+
   function handleSidebarTabChange(tab: Tab) {
     setGlobalOpenChat(null)
     setActiveTab(tab)
@@ -405,6 +410,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                     userRole={initialProfile.role}
                     onClose={handleChatClose}
                     onRead={recountTotalUnread}
+                    onNameChange={handleChatNameChange}
                     inline
                   />
                 </div>
@@ -510,6 +516,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           userRole={initialProfile.role}
           onClose={handleChatClose}
           onRead={recountTotalUnread}
+          onNameChange={handleChatNameChange}
         />
       )}
 
