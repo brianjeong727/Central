@@ -174,10 +174,12 @@ export default function LandingPage() {
           style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 180, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.55) 55%, #FBF8F2 100%)", zIndex: 1 }}
         />
 
-        {/* Left-constrained content — keeps chapel untouched */}
+        {/* Same centered container as nav and platform sections */}
+        <div className="cl-hero-container" style={{ position: "relative", zIndex: 2, maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
+        {/* Left-constrained content within the container — keeps chapel untouched */}
         <div
           className="cl-hero-body"
-          style={{ position: "relative", zIndex: 2, padding: "148px 56px 96px", maxWidth: 516 }}
+          style={{ padding: "148px 0 96px", maxWidth: 460 }}
         >
           <p style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold }}>
             For college ministries
@@ -219,6 +221,7 @@ export default function LandingPage() {
           <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, margin: "12px 0 0" }}>
             Matthew 18 : 20
           </p>
+        </div>
         </div>
       </section>
 
@@ -346,7 +349,8 @@ export default function LandingPage() {
         @media (max-width: 900px) {
           .cl-nav-links { display: none !important; }
           .cl-hero { min-height: 520px !important; }
-          .cl-hero-body { padding: 112px 24px 72px !important; max-width: 100% !important; }
+          .cl-hero-container { padding: 0 24px !important; }
+          .cl-hero-body { padding: 112px 0 72px !important; max-width: 100% !important; }
           .cl-hero-title { font-size: 46px !important; }
           .cl-hero-sub { font-size: 16px !important; max-width: 100% !important; }
           .cl-verse-anchor { display: none !important; }
