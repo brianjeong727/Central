@@ -1,22 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [intent, setIntent] = useState<string | null>(null)
+function LoginContent() {
+  const searchParams = useSearchParams()
+  const intent = searchParams.get("intent")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    setIntent(new URLSearchParams(window.location.search).get("intent"))
-  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -33,12 +29,12 @@ export default function LoginPage() {
     }
 
     if (intent === "register") {
-      window.location.href = "/onboarding"
+      window.location.assign("/onboarding")
       return
     }
 
     if (intent === "join") {
-      window.location.href = "/ministries"
+      window.location.assign("/ministries")
       return
     }
 
@@ -52,16 +48,16 @@ export default function LoginPage() {
         .eq("user_id", me.id)
 
       const uniqueMinistries = [...new Set((memberships ?? []).map((m: { ministry_id: string }) => m.ministry_id))]
-      if (uniqueMinistries.length > 1) { window.location.href = "/pick-ministry"; return }
-      if (uniqueMinistries.length === 1) { window.location.href = "/home"; return }
+      if (uniqueMinistries.length > 1) { window.location.assign("/pick-ministry"); return }
+      if (uniqueMinistries.length === 1) { window.location.assign("/home"); return }
 
       // user_ministries empty or table missing — fall back to profiles
       const { data: profile } = await supabase.from("profiles").select("ministry_id").eq("id", me.id).maybeSingle()
-      if (profile?.ministry_id) { window.location.href = "/home"; return }
+      if (profile?.ministry_id) { window.location.assign("/home"); return }
     }
 
     // No ministry affiliation — return to landing so they can choose join or register
-    window.location.href = "/landing"
+    window.location.assign("/landing")
   }
 
   async function handleGoogleLogin() {
@@ -166,5 +162,13 @@ export default function LoginPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

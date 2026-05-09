@@ -147,6 +147,7 @@ export interface AnnouncementCardProps {
   isPinned: boolean
   featured?: boolean
   userId: string
+  ministryId: string
   userRole: string
   onRsvpToggle: (id: string) => void
   onEdit: (ann: EnrichedAnnouncement) => void
@@ -171,6 +172,7 @@ export interface ChatSettingsProps {
   onBack: () => void
   onNameChange: (name: string) => void
   onClose: () => void
+  onGroupDeleted?: () => void
 }
 
 export interface ChatScreenProps {

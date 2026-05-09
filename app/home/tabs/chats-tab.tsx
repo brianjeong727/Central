@@ -49,20 +49,17 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
   async function handleCreate() {
     const name = chatName.trim()
-    console.log("[handleCreate] fired — name:", JSON.stringify(name), "groupType:", groupType, "userId:", userId)
     if (!name) { setError("Please enter a chat name."); return }
 
     setCreating(true)
     setError(null)
 
-    console.log("[handleCreate] calling server action createGroup…")
     const { group, error: createErr } = await createGroup({
       name,
       type: groupType,
       memberIds: Array.from(selectedIds),
       createdBy: userId,
     })
-    console.log("[handleCreate] server action returned — group:", group, "error:", createErr)
 
     if (createErr || !group) {
       setError(createErr ?? "Failed to create chat.")
@@ -220,6 +217,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [muted, setMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
@@ -228,6 +226,7 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
   const canManage = (isChurch && isAdminOrLeader) || isMy
   const canLeave = isMy || isDM
   const canArchive = isChurch && isAdminOrLeader
+  const canDelete = isChurch && isAdminOrLeader
 
   useEffect(() => {
     loadMembers()
@@ -294,6 +293,12 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
 
   async function handleArchive() {
     await supabase.from("groups").update({ archived: true }).eq("id", groupId)
+    onClose()
+  }
+
+  async function handleDelete() {
+    await supabase.from("messages").delete().eq("group_id", groupId)
+    await supabase.from("groups").delete().eq("id", groupId)
     onClose()
   }
 
@@ -634,6 +639,21 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
                   Leave conversation
                 </button>
               )}
+              {canDelete && (
+                confirmDelete ? (
+                  <div style={{ background: "#FFF5F5", border: "1px solid #FFD7D7", borderRadius: 12, padding: "12px 14px" }}>
+                    <p style={{ fontSize: 13, color: "#B0413E", marginBottom: 10, fontWeight: 500 }}>Delete this chat and all its messages? This cannot be undone.</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={handleDelete} style={{ flex: 1, padding: "8px 0", background: "#B0413E", color: "white", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete</button>
+                      <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: "8px 0", background: "#F4F1E8", color: "#5A5466", borderRadius: 10, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmDelete(true)} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #FFD7D7", cursor: "pointer" }}>
+                    Delete chat
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -707,10 +727,23 @@ export function ChatSettings({ groupId, groupName, groupType, userId, userRole, 
               </div>
             </div>
           )}
-          {(canArchive || canLeave) && (
+          {(canArchive || canLeave || canDelete) && (
             <div className="px-5 pb-10">
               {canArchive && <button onClick={handleArchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
               {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Leave chat</button>}
+              {canDelete && (
+                confirmDelete ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                    <p className="text-[13px] text-[#B0413E] font-medium mb-3">Delete this chat and all its messages? This cannot be undone.</p>
+                    <div className="flex gap-2">
+                      <button onClick={handleDelete} className="flex-1 py-2.5 rounded-xl bg-[#B0413E] text-white text-[13px] font-semibold">Delete</button>
+                      <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2.5 rounded-xl bg-[#F4F1E8] text-[#5A5466] text-[13px] font-medium">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmDelete(true)} className="mt-3 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>
+                )
+              )}
             </div>
           )}
         </div>
@@ -1160,12 +1193,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-white border-b border-[#ECE8DE]`}>
-        <button
-          onClick={onClose}
-          className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
-        >
-          <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
-        </button>
+        {!inline && (
+          <button
+            onClick={onClose}
+            className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.1 }} className="truncate">
             {displayName}
@@ -1770,6 +1805,21 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           groupType={showCreateChat}
           onClose={() => setShowCreateChat(null)}
           onCreated={(group) => {
+            const newGroup: ChatGroup = {
+              id: group.id,
+              name: group.name,
+              type: showCreateChat!,
+              last_message: null,
+              last_sender: null,
+              last_message_time: null,
+              unread_count: 0,
+              archived: false,
+            }
+            if (showCreateChat === "church") {
+              setChurchChats(prev => [newGroup, ...prev])
+            } else {
+              setMyChats(prev => [newGroup, ...prev])
+            }
             setShowCreateChat(null)
             onOpenChat(group.id, group.name)
           }}

@@ -1,25 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
 const CURRENT_YEAR = new Date().getFullYear()
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
 
-export default function SignupPage() {
-  const [intent, setIntent] = useState<string | null>(null)
+function SignupContent() {
+  const searchParams = useSearchParams()
+  const intent = searchParams.get("intent")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [graduationYear, setGraduationYear] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    setIntent(new URLSearchParams(window.location.search).get("intent"))
-  }, [])
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -28,7 +26,7 @@ export default function SignupPage() {
 
     const supabase = createClient()
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -43,13 +41,11 @@ export default function SignupPage() {
     }
 
     // Replace so /signup is not in the browser history stack — back button won't return here.
-    const intent = new URLSearchParams(window.location.search).get("intent")
     window.location.replace(intent === "register" ? "/onboarding" : "/join")
   }
 
   async function handleGoogleSignup() {
     const supabase = createClient()
-    const intent = new URLSearchParams(window.location.search).get("intent")
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: siteOrigin() + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
@@ -184,5 +180,13 @@ export default function SignupPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Check, Plus, X } from "lucide-react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
@@ -59,6 +59,23 @@ interface Team {
   icon: string
 }
 
+function readPendingMinistry(): { name: string; university: string; size: "small" | "medium" | "large" } {
+  if (typeof window === "undefined") return { name: "", university: "", size: "small" }
+
+  try {
+    const raw = sessionStorage.getItem("pending_ministry")
+    if (!raw) return { name: "", university: "", size: "small" }
+    const saved = JSON.parse(raw) as { name?: string; university?: string; size?: string }
+    return {
+      name: saved.name ?? "",
+      university: saved.university ?? "",
+      size: saved.size ? mapLandingSize(saved.size) : "small",
+    }
+  } catch {
+    return { name: "", university: "", size: "small" }
+  }
+}
+
 const inputClass =
   "w-full px-4 py-3 rounded-[10px] border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
 
@@ -84,13 +101,14 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 }
 
 export default function OnboardingPage() {
+  const pendingMinistry = useState(readPendingMinistry)[0]
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
 
   // Step 1
-  const [name, setName] = useState("")
-  const [university, setUniversity] = useState("")
+  const [name, setName] = useState(pendingMinistry.name)
+  const [university, setUniversity] = useState(pendingMinistry.university)
   const [location, setLocation] = useState("")
-  const [size, setSize] = useState<"small" | "medium" | "large">("small")
+  const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
 
   // Step 2
   const [structure, setStructure] = useState<Record<string, boolean>>({
@@ -109,17 +127,6 @@ export default function OnboardingPage() {
   // Submit
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("pending_ministry")
-      if (!raw) return
-      const saved = JSON.parse(raw)
-      if (saved.name) setName(saved.name)
-      if (saved.university) setUniversity(saved.university)
-      if (saved.size) setSize(mapLandingSize(saved.size))
-    } catch {}
-  }, [])
 
   function toggleStructure(id: string) {
     setStructure((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -178,7 +185,7 @@ export default function OnboardingPage() {
       return
     }
     sessionStorage.removeItem("pending_ministry")
-    window.location.href = "/pending"
+    window.location.assign("/pending")
   }
 
   const step1Valid = name.trim() && university.trim() && location.trim()

@@ -30,7 +30,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "profile", "settings"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "profile", "settings"]
   const initialTab = (searchParams.get("tab") as Tab | null)
   const [activeTab, setActiveTabState] = useState<Tab>(
     initialTab && validTabs.includes(initialTab) ? initialTab : "home"
@@ -313,7 +313,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    window.location.href = "/login"
+    window.location.assign("/login")
   }
 
   const showPlanTab = isAdmin || userTeams.length > 0

@@ -84,28 +84,28 @@ function MinistriesContent() {
   async function handleGoToMinistry(id: string) {
     setSwitchingId(id)
     await setCurrentMinistry(id)
-    window.location.href = "/home"
+    window.location.assign("/home")
   }
 
   async function handleJoin(ministry: PublicMinistry) {
-    if (!isLoggedIn) { window.location.href = "/signup"; return }
+    if (!isLoggedIn) { window.location.assign("/signup"); return }
     setJoiningId(ministry.id)
     setJoinError(null)
     const { error } = await joinMinistryById(ministry.id)
     if (error) { setJoinError(error); setJoiningId(null); return }
-    window.location.href = "/home"
+    window.location.assign("/home")
   }
 
   async function handleCodeJoin(e: React.FormEvent) {
     e.preventDefault()
-    if (!isLoggedIn) { window.location.href = "/login?intent=join"; return }
+    if (!isLoggedIn) { window.location.assign("/login?intent=join"); return }
     if (!inviteCode.trim()) return
     setJoiningCode(true)
     setCodeError(null)
     try {
       const { error } = await joinMinistryByCode(inviteCode)
       if (error) { setCodeError(error); setJoiningCode(false); return }
-      window.location.href = "/home"
+      window.location.assign("/home")
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoiningCode(false)

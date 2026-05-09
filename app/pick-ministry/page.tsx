@@ -30,7 +30,7 @@ export default function PickMinistryPage() {
     setSelecting(id)
     const { error: err } = await setCurrentMinistry(id)
     if (err) { setError(err); setSelecting(null); return }
-    window.location.href = "/home"
+    window.location.assign("/home")
   }
 
   return (

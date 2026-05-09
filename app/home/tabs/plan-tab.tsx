@@ -263,6 +263,8 @@ export function StudentOrgRoleTabContent({
     setLinks((linkRows ?? []) as RoleLink[])
   }, [teamId, roleName])
 
+  // Role content is hydrated from Supabase when the selected role changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadContent() }, [loadContent])
 
   async function saveDescription() {
@@ -655,6 +657,8 @@ export function MeetingNoteCard({
   onSaveBody: (id: string, body: string) => Promise<void>
 }) {
   const [localTitle, setLocalTitle] = useState(note.title)
+  // Keep the editable title in sync when a different note is expanded.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLocalTitle(note.title) }, [note.id, note.title])
   const [noteEditor, setNoteEditor] = useState<Editor | null>(null)
 
@@ -872,6 +876,8 @@ export function PlanTab({ userId, ministryId, ministryName, userTeams, allTeams,
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [studentOrgTab, setStudentOrgTab] = useState("General")
+  // Reset nested Plan UI whenever the active team changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setStudentOrgTab("General"); setOpenTeam(null) }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0

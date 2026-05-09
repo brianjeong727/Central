@@ -82,6 +82,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         .from("announcements")
         .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, image_url: imageUrl })
         .eq("id", existing.id)
+        .eq("ministry_id", ministryId)
         .select()
         .maybeSingle()
 
@@ -352,7 +353,7 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
 
   async function handleDesktopDelete(ann: EnrichedAnnouncement) {
     setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id))
-    await createClient().from("announcements").delete().eq("id", ann.id)
+    await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
   }
 
   function handleEditSuccess(updated: Announcement) {
@@ -457,6 +458,7 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
                 isPinned={ann.is_pinned && idx === 0}
                 featured={idx === 0}
                 userId={userId}
+                ministryId={ministryId}
                 userRole={userRole}
                 onRsvpToggle={handleRsvpToggle}
                 onEdit={(a) => setEditingAnn(a)}
@@ -712,7 +714,7 @@ export function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle
 
 // ── Announcement Card ────────────────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, userRole, onRsvpToggle, onEdit, onDelete }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -735,7 +737,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
 
   async function handleDelete() {
     setDeleting(true)
-    await supabase.from("announcements").delete().eq("id", announcement.id)
+    await supabase.from("announcements").delete().eq("id", announcement.id).eq("ministry_id", ministryId)
     onDelete(announcement.id)
   }
 

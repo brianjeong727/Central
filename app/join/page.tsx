@@ -18,11 +18,30 @@ function getInitials(name: string) {
   return name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
 }
 
+function readPendingJoinState(): { tab: Tab; inviteCode: string; selected: Ministry | null } {
+  if (typeof window === "undefined") return { tab: "browse", inviteCode: "", selected: null }
+
+  const inviteCode = sessionStorage.getItem("pending_invite_code") ?? ""
+  const browseRaw = sessionStorage.getItem("pending_browse_ministry")
+  let selected: Ministry | null = null
+
+  if (browseRaw) {
+    try {
+      selected = JSON.parse(browseRaw) as Ministry
+    } catch {
+      selected = null
+    }
+  }
+
+  return { tab: inviteCode ? "code" : "browse", inviteCode, selected }
+}
+
 function JoinContent() {
-  const [tab, setTab] = useState<Tab>("browse")
+  const pendingJoin = useState(readPendingJoinState)[0]
+  const [tab, setTab] = useState<Tab>(pendingJoin.tab)
 
   // Invite code state
-  const [inviteCode, setInviteCode] = useState("")
+  const [inviteCode, setInviteCode] = useState(pendingJoin.inviteCode)
   const [joining, setJoining] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
 
@@ -31,29 +50,16 @@ function JoinContent() {
   const [ministries, setMinistries] = useState<Ministry[]>([])
   const [browsing, setBrowsing] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Ministry | null>(null)
+  const [selected, setSelected] = useState<Ministry | null>(pendingJoin.selected)
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [myMinistryIds, setMyMinistryIds] = useState<Set<string>>(new Set())
   const [switching, setSwitching] = useState<string | null>(null)
 
-  // Pre-fill from sessionStorage + load user's existing memberships
+  // Clear consumed sessionStorage handoff + load user's existing memberships
   useEffect(() => {
-    const code = sessionStorage.getItem("pending_invite_code")
-    if (code) {
-      setInviteCode(code)
-      setTab("code")
-      sessionStorage.removeItem("pending_invite_code")
-    }
-    const browseRaw = sessionStorage.getItem("pending_browse_ministry")
-    if (browseRaw) {
-      try {
-        const m = JSON.parse(browseRaw) as Ministry
-        sessionStorage.removeItem("pending_browse_ministry")
-        setSelected(m)
-        setTab("browse")
-      } catch {}
-    }
+    sessionStorage.removeItem("pending_invite_code")
+    sessionStorage.removeItem("pending_browse_ministry")
     getUserMinistries().then(({ data }) => {
       if (data) setMyMinistryIds(new Set(data.map((m) => m.id)))
     })
@@ -82,7 +88,7 @@ function JoinContent() {
     try {
       const { error } = await joinMinistryByCode(inviteCode)
       if (error) { setCodeError(error); setJoining(false); return }
-      window.location.href = "/home"
+      window.location.assign("/home")
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoining(false)
@@ -95,14 +101,14 @@ function JoinContent() {
       setSwitching(selected.id)
       const { error } = await setCurrentMinistry(selected.id)
       if (error) { setConfirmError(error); setSwitching(null); return }
-      window.location.href = "/home"
+      window.location.assign("/home")
       return
     }
     setConfirming(true)
     setConfirmError(null)
     const { error } = await joinMinistryById(selected.id)
     if (error) { setConfirmError(error); setConfirming(false); return }
-    window.location.href = "/home"
+    window.location.assign("/home")
   }
 
   return (
