@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
@@ -16,6 +16,8 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
+import * as Y from "yjs"
+import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
@@ -603,41 +605,173 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
   )
 }
 
+// ── Collab presence colors ────────────────────────────────────────────────────
+const COLLAB_COLORS = ["#7C3AED", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#EC4899"]
+function hashUserId(id: string) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return h
+}
+
+interface CollabUser { userId: string; userName: string; color: string }
+
+// ── Live collab hook ──────────────────────────────────────────────────────────
+function useNoteCollab(noteId: string, userId: string, userName: string) {
+  const supabase = createClient()
+  const ydoc = useMemo(() => new Y.Doc(), [noteId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [activeUsers, setActiveUsers] = useState<CollabUser[]>([])
+  const receivedStateRef = useRef(false)
+  const initDoneRef = useRef(false)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const color = COLLAB_COLORS[hashUserId(userId) % COLLAB_COLORS.length]
+
+  useEffect(() => {
+    receivedStateRef.current = false
+    initDoneRef.current = false
+
+    const channel = supabase.channel(`meeting-note-${noteId}`, {
+      config: { presence: { key: userId }, broadcast: { self: false } },
+    })
+    channelRef.current = channel
+
+    // Receive Y.Doc incremental updates from other clients
+    channel.on("broadcast", { event: "ydoc-update" }, ({ payload }: { payload: { update: number[] } }) => {
+      Y.applyUpdate(ydoc, new Uint8Array(payload.update), "remote")
+    })
+
+    // Another client requesting our full state (they just joined)
+    channel.on("broadcast", { event: "request-state" }, ({ payload }: { payload: { forUserId: string } }) => {
+      const state = Y.encodeStateAsUpdate(ydoc)
+      channel.send({ type: "broadcast", event: "state-response", payload: { update: Array.from(state), forUserId: payload.forUserId } })
+    })
+
+    // Full state response arriving for us
+    channel.on("broadcast", { event: "state-response" }, ({ payload }: { payload: { update: number[]; forUserId: string } }) => {
+      if (payload.forUserId !== userId) return
+      Y.applyUpdate(ydoc, new Uint8Array(payload.update), "remote")
+      // If the doc has content, we don't need to init from DB
+      const frag = ydoc.getXmlFragment("default")
+      if (frag.length > 0) receivedStateRef.current = true
+    })
+
+    // Live title broadcast
+    channel.on("broadcast", { event: "title" }, ({ payload }: { payload: { title: string; userId: string } }) => {
+      if (payload.userId === userId) return
+      // Emit a custom DOM event that MeetingNoteCard listens to
+      window.dispatchEvent(new CustomEvent(`note-title-${noteId}`, { detail: { title: payload.title } }))
+    })
+
+    // Presence: who's viewing/editing this note
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState()
+      const users = (Object.values(state).flat() as unknown as CollabUser[]).filter(u => u.userId !== userId)
+      setActiveUsers(users)
+    })
+
+    // Broadcast our own Y.Doc updates to others (skip remote-origin updates to avoid echo)
+    const onYUpdate = (update: Uint8Array, origin: unknown) => {
+      if (origin === "remote") return
+      channel.send({ type: "broadcast", event: "ydoc-update", payload: { update: Array.from(update) } })
+    }
+    ydoc.on("update", onYUpdate)
+
+    channel.subscribe(async (status: string) => {
+      if (status !== "SUBSCRIBED") return
+      await channel.track({ userId, userName, color })
+      // Ask existing clients for their current state
+      channel.send({ type: "broadcast", event: "request-state", payload: { forUserId: userId } })
+    })
+
+    return () => {
+      ydoc.off("update", onYUpdate)
+      channel.untrack()
+      channel.unsubscribe()
+      channelRef.current = null
+      ydoc.destroy()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId, userId, userName])
+
+  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, color }
+}
+
 export function MeetingNoteEditor({
+  noteId,
+  userId,
+  userName,
   initialContent,
   onSave,
   onEditorReady,
 }: {
+  noteId: string
+  userId: string
+  userName: string
   initialContent: string
   onSave: (html: string) => Promise<void>
   onEditorReady?: (editor: Editor | null) => void
 }) {
-  const lastSavedRef = useRef(initialContent)
+  const { ydoc, activeUsers, receivedStateRef, initDoneRef } = useNoteCollab(noteId, userId, userName)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ undoRedo: false }), // Collaboration handles undo/redo
       TiptapUnderline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TextStyle,
       Color,
       Placeholder.configure({ placeholder: "Start writing your meeting notes here…" }),
+      Collaboration.configure({ document: ydoc }),
     ],
-    content: initialContent || "",
-    onBlur: ({ editor: e }) => {
-      const html = e.getHTML()
-      if (html !== lastSavedRef.current) {
-        lastSavedRef.current = html
-        onSave(html)
-      }
+    onUpdate: ({ editor: e }) => {
+      // Debounced DB save (Y.Doc update is broadcast automatically via the hook)
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => onSave(e.getHTML()), 800)
     },
   })
 
-  useEffect(() => { onEditorReady?.(editor) }, [editor])
+  // Init content from DB only if no other clients sent us their state
+  useEffect(() => {
+    if (!editor || initDoneRef.current) return
+    const timer = setTimeout(() => {
+      initDoneRef.current = true
+      const frag = ydoc.getXmlFragment("default")
+      if (!receivedStateRef.current && frag.length === 0 && initialContent) {
+        editor.commands.setContent(initialContent)
+      }
+    }, 700)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor])
+
+  useEffect(() => { onEditorReady?.(editor) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="meeting-note-editor">
+      {/* Presence bar */}
+      {activeUsers.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "#FDFBF7" }}>
+          <div style={{ display: "flex" }}>
+            {activeUsers.slice(0, 4).map((u, i) => (
+              <div
+                key={u.userId}
+                title={u.userName}
+                style={{ width: 22, height: 22, borderRadius: "50%", background: u.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "white", border: "2px solid white", marginLeft: i === 0 ? 0 : -6, flexShrink: 0 }}
+              >
+                {getInitials(u.userName)}
+              </div>
+            ))}
+          </div>
+          <span style={{ fontSize: 12, color: "#8A8497" }}>
+            {activeUsers.length === 1
+              ? `${activeUsers[0].userName.split(" ")[0]} is also editing`
+              : `${activeUsers.length} others are editing`}
+          </span>
+          {/* Live pulse dot */}
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0, boxShadow: "0 0 0 2px rgba(34,197,94,0.25)" }} />
+        </div>
+      )}
       <div style={{ padding: "20px 32px 44px" }}>
         <EditorContent editor={editor} />
       </div>
@@ -648,21 +782,46 @@ export function MeetingNoteEditor({
 export function MeetingNoteCard({
   note,
   isExpanded,
+  userId,
+  userName,
   onToggle,
   onSaveTitle,
   onSaveBody,
 }: {
   note: MeetingNote
   isExpanded: boolean
+  userId: string
+  userName: string
   onToggle: () => void
   onSaveTitle: (id: string, title: string) => Promise<void>
   onSaveBody: (id: string, body: string) => Promise<void>
 }) {
+  const supabase = createClient()
   const [localTitle, setLocalTitle] = useState(note.title)
-  // Keep the editable title in sync when a different note is expanded.
+  const titleChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLocalTitle(note.title) }, [note.id, note.title])
   const [noteEditor, setNoteEditor] = useState<Editor | null>(null)
+
+  // Listen for remote title changes when expanded
+  useEffect(() => {
+    if (!isExpanded) return
+    const handler = (e: Event) => {
+      const { title } = (e as CustomEvent).detail
+      setLocalTitle(title)
+    }
+    window.addEventListener(`note-title-${note.id}`, handler)
+    return () => window.removeEventListener(`note-title-${note.id}`, handler)
+  }, [isExpanded, note.id])
+
+  // Get channel ref from collab hook to broadcast title - we reuse the same channel name
+  function broadcastTitle(title: string) {
+    // We broadcast via a temporary send - the hook's channel handles this
+    // Dispatch as CustomEvent so the useNoteCollab hook can pick it up (we go through the plan-tab channel)
+    const ch = supabase.channel(`meeting-note-${note.id}`)
+    ch.send({ type: "broadcast", event: "title", payload: { title, userId } }).catch(() => {})
+  }
 
   const noteDateLabel = (() => {
     const d = new Date(note.date + "T12:00:00")
@@ -724,8 +883,14 @@ export function MeetingNoteCard({
       <div style={{ padding: "28px 32px 0" }}>
         <input
           value={localTitle}
-          onChange={e => setLocalTitle(e.target.value)}
-          onBlur={() => { if (localTitle !== note.title) onSaveTitle(note.id, localTitle) }}
+          onChange={e => {
+            setLocalTitle(e.target.value)
+            if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current)
+            titleSaveTimer.current = setTimeout(() => {
+              broadcastTitle(e.target.value)
+              onSaveTitle(note.id, e.target.value)
+            }, 400)
+          }}
           placeholder="Untitled"
           style={{
             fontFamily: "var(--font-instrument-serif)",
@@ -746,6 +911,9 @@ export function MeetingNoteCard({
       </div>
       <MeetingNoteEditor
         key={note.id}
+        noteId={note.id}
+        userId={userId}
+        userName={userName}
         initialContent={note.body}
         onSave={(html) => onSaveBody(note.id, html)}
         onEditorReady={setNoteEditor}
@@ -757,10 +925,12 @@ export function MeetingNoteCard({
 export function MeetingNotesSection({
   teamId,
   userId,
+  userName,
   canWrite,
 }: {
   teamId: string | null
   userId: string
+  userName: string
   canWrite: boolean
 }) {
   const supabase = createClient()
@@ -862,6 +1032,8 @@ export function MeetingNotesSection({
               key={note.id}
               note={note}
               isExpanded={expandedIds.has(note.id)}
+              userId={userId}
+              userName={userName}
               onToggle={() => toggleExpand(note.id)}
               onSaveTitle={saveTitle}
               onSaveBody={saveBody}
@@ -1024,6 +1196,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                     <MeetingNotesSection
                       teamId={activeTeamId}
                       userId={userId}
+                      userName={userName}
                       canWrite={isAdmin || !!studentOrgUserTeam}
                     />
                   </>
@@ -1109,6 +1282,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                   <MeetingNotesSection
                     teamId={activeTeamId}
                     userId={userId}
+                    userName={userName}
                     canWrite={isAdmin || !!studentOrgUserTeam}
                   />
                 </>
