@@ -361,6 +361,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             <div className="md:h-full md:overflow-y-auto">
               <HomeTab
                 profile={initialProfile}
+                userRole={initialProfile.role}
                 ministryId={ministryId}
                 ministryName={ministryName}
                 recentChats={recentChats}

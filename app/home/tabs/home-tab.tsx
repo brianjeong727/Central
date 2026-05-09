@@ -11,7 +11,7 @@ import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
 
-export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
+export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
   const supabase = createClient()
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
   const [moreAnnouncements, setMoreAnnouncements] = useState<Announcement[]>([])
@@ -19,6 +19,11 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
   const [loading, setLoading] = useState(true)
   const [userHasRsvped, setUserHasRsvped] = useState(false)
   const [rsvping, setRsvping] = useState(false)
+  const [rsvpCount, setRsvpCount] = useState(0)
+  const [rsvpAttendees, setRsvpAttendees] = useState<{ user_id: string; name: string }[]>([])
+  const [featuredShowAttendees, setFeaturedShowAttendees] = useState(false)
+
+  const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
 
   useEffect(() => {
     async function load() {
@@ -34,14 +39,22 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
         setAnnouncement(list[0])
         setMoreAnnouncements(list.slice(1))
         const first = list[0]
+        setFeaturedShowAttendees(first.show_attendees ?? false)
         if (first.is_event) {
-          const { data: rsvpData } = await supabase
+          const { data: rsvpRows } = await supabase
             .from("rsvps")
-            .select("announcement_id")
+            .select("user_id")
             .eq("announcement_id", first.id)
-            .eq("user_id", profile.id)
-            .maybeSingle()
-          setUserHasRsvped(!!rsvpData)
+          const rows = rsvpRows ?? []
+          setRsvpCount(rows.length)
+          setUserHasRsvped(rows.some((r) => r.user_id === profile.id))
+          // Fetch names for attendees
+          const ids = rows.map((r) => r.user_id)
+          if (ids.length > 0) {
+            const { data: profileRows } = await supabase
+              .from("profiles").select("id, name").in("id", ids).eq("ministry_id", ministryId)
+            setRsvpAttendees((profileRows ?? []).map((p) => ({ user_id: p.id, name: p.name })))
+          }
         }
       }
       const { data: prayerProfile } = await supabase
@@ -62,15 +75,26 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
   }, [profile.id])
 
   async function handleHomeRsvp() {
-    if (!announcement || userHasRsvped || rsvping) return
+    if (!announcement || rsvping) return
     setRsvping(true)
-    setUserHasRsvped(true)
-    await supabase.from("rsvps").upsert(
-      { announcement_id: announcement.id, user_id: profile.id },
-      { onConflict: "announcement_id,user_id" }
-    )
+    if (userHasRsvped) {
+      setUserHasRsvped(false)
+      setRsvpCount((c) => Math.max(0, c - 1))
+      setRsvpAttendees((prev) => prev.filter((a) => a.user_id !== profile.id))
+      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", profile.id)
+    } else {
+      setUserHasRsvped(true)
+      setRsvpCount((c) => c + 1)
+      setRsvpAttendees((prev) => [...prev, { user_id: profile.id, name: profile.name }])
+      await supabase.from("rsvps").upsert(
+        { announcement_id: announcement.id, user_id: profile.id },
+        { onConflict: "announcement_id,user_id" }
+      )
+    }
     setRsvping(false)
   }
+
+  const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
 
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
@@ -159,31 +183,46 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                   <p className="relative mt-2.5 text-[13px] leading-relaxed line-clamp-3" style={{ opacity: 0.78, maxWidth: "420px" }}>
                     {announcement.body}
                   </p>
-                  <div className="relative mt-auto pt-9 flex items-center gap-3">
-                    {announcement.is_event && (
+                  <div className="relative mt-auto pt-9">
+                    <div className="flex items-center gap-3">
+                      {announcement.is_event && (
+                        <button
+                          onClick={handleHomeRsvp}
+                          disabled={rsvping}
+                          style={{
+                            background: userHasRsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF",
+                            color: userHasRsvped ? "#F6F4EF" : "#13101A",
+                            border: 0, padding: "9px 18px", borderRadius: "8px",
+                            fontWeight: 500, fontSize: "13px", cursor: "pointer",
+                          }}
+                        >
+                          {userHasRsvped ? "Going ✓" : "RSVP"}
+                        </button>
+                      )}
                       <button
-                        onClick={handleHomeRsvp}
-                        disabled={userHasRsvped || rsvping}
+                        onClick={onSeeAnnouncements}
                         style={{
-                          background: userHasRsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF",
-                          color: userHasRsvped ? "#F6F4EF" : "#13101A",
-                          border: 0, padding: "9px 18px", borderRadius: "8px",
-                          fontWeight: 500, fontSize: "13px", cursor: userHasRsvped ? "default" : "pointer",
+                          background: "rgba(255,255,255,0.08)", color: "#F6F4EF",
+                          border: "1px solid rgba(255,255,255,0.18)", padding: "9px 18px",
+                          borderRadius: "8px", fontSize: "13px", cursor: "pointer",
                         }}
                       >
-                        {userHasRsvped ? "Going ✓" : "RSVP"}
+                        Details
                       </button>
+                      {announcement.is_event && rsvpCount > 0 && (
+                        <span style={{ fontSize: "12px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}>{rsvpCount} going</span>
+                      )}
+                    </div>
+                    {announcement.is_event && showAttendeeList && (
+                      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {rsvpAttendees.slice(0, 8).map((a) => (
+                          <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                        ))}
+                        {rsvpAttendees.length > 8 && (
+                          <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{rsvpAttendees.length - 8} more</span>
+                        )}
+                      </div>
                     )}
-                    <button
-                      onClick={onSeeAnnouncements}
-                      style={{
-                        background: "rgba(255,255,255,0.08)", color: "#F6F4EF",
-                        border: "1px solid rgba(255,255,255,0.18)", padding: "9px 18px",
-                        borderRadius: "8px", fontSize: "13px", cursor: "pointer",
-                      }}
-                    >
-                      Details
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -317,16 +356,26 @@ export function HomeTab({ profile, ministryId, ministryName, recentChats, onSeeC
                         {announcement.is_event && (
                           <button
                             onClick={handleHomeRsvp}
-                            disabled={userHasRsvped || rsvping}
-                            className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] cursor-default" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white"}`}
+                            disabled={rsvping}
+                            className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}
                           >
-                            {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />You&apos;re going!</span> : "RSVP"}
+                            {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                           </button>
                         )}
                         <button onClick={onSeeAnnouncements} className="text-[13px] font-medium transition-colors" style={{ color: "rgba(246,244,239,0.6)" }}>
                           {announcement.is_event ? "Details" : "View details →"}
                         </button>
                       </div>
+                      {announcement.is_event && showAttendeeList && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {rsvpAttendees.slice(0, 6).map((a) => (
+                            <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                          ))}
+                          {rsvpAttendees.length > 6 && (
+                            <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{rsvpAttendees.length - 6} more</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (

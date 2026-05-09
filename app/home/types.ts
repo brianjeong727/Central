@@ -116,6 +116,7 @@ export interface Reaction {
 
 export interface HomeTabProps {
   profile: Profile
+  userRole: string
   ministryId: string
   ministryName: string
   recentChats: ChatPreview[]
