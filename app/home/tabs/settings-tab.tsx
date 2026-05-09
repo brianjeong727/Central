@@ -221,13 +221,13 @@ export function SettingsTab({
 
   return (
     <div className="md:h-full md:overflow-y-auto">
-      <DesktopTopbar crumbs={[ministryName, "Settings"]} />
+      <DesktopTopbar crumbs={[ministryName, "Church Settings"]} />
 
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
         <div className="mb-8 md:mb-10">
           <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 40px)", color: "#13101A", fontWeight: 400, margin: "0 0 4px" }}>
-            Settings
+            Church Settings
           </h1>
           <p style={{ fontSize: "14px", color: "#8A8497" }}>
             {isAdmin ? "Ministry admin control panel" : "Ministry workspace — you can view member info"}

@@ -195,7 +195,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     const homeItems: { label: string; tab: "home" | "announcements" | "settings" }[] = [
       { label: "Home", tab: "home" },
       { label: "Announcements", tab: "announcements" },
-      ...(isAdmin ? [{ label: "Settings", tab: "settings" as const }] : []),
+      ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
     return (
       <div className="flex-1 overflow-y-auto px-2 pb-3">
