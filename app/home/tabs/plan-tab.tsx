@@ -622,6 +622,7 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
   const [activeUsers, setActiveUsers] = useState<CollabUser[]>([])
   const receivedStateRef = useRef(false)
   const initDoneRef = useRef(false)
+  const isApplyingRemote = useRef(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const color = COLLAB_COLORS[hashUserId(userId) % COLLAB_COLORS.length]
 
@@ -668,9 +669,9 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
       setActiveUsers(users)
     })
 
-    // Broadcast our own Y.Doc updates to others (skip remote-origin updates to avoid echo)
+    // Broadcast our own Y.Doc updates to others (skip remote-origin updates and when applying fallback content)
     const onYUpdate = (update: Uint8Array, origin: unknown) => {
-      if (origin === "remote") return
+      if (origin === "remote" || isApplyingRemote.current) return
       channel.send({ type: "broadcast", event: "ydoc-update", payload: { update: Array.from(update) } })
     }
     ydoc.on("update", onYUpdate)
@@ -692,7 +693,7 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId, userId, userName])
 
-  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, color }
+  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, color, isApplyingRemote }
 }
 
 export function MeetingNoteEditor({
@@ -710,8 +711,10 @@ export function MeetingNoteEditor({
   onSave: (html: string) => Promise<void>
   onEditorReady?: (editor: Editor | null) => void
 }) {
-  const { ydoc, activeUsers, receivedStateRef, initDoneRef } = useNoteCollab(noteId, userId, userName)
+  const { ydoc, activeUsers, receivedStateRef, initDoneRef, isApplyingRemote } = useNoteCollab(noteId, userId, userName)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastLocalEditRef = useRef(0)
+  const editorRef = useRef<Editor | null>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -725,11 +728,15 @@ export function MeetingNoteEditor({
       Collaboration.configure({ document: ydoc }),
     ],
     onUpdate: ({ editor: e }) => {
-      // Debounced DB save (Y.Doc update is broadcast automatically via the hook)
+      if (isApplyingRemote.current) return
+      lastLocalEditRef.current = Date.now()
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => onSave(e.getHTML()), 800)
     },
   })
+
+  // Keep editorRef current so the postgres_changes handler can access the editor
+  useEffect(() => { editorRef.current = editor }, [editor])
 
   // Init content from DB only if no other clients sent us their state
   useEffect(() => {
@@ -738,12 +745,35 @@ export function MeetingNoteEditor({
       initDoneRef.current = true
       const frag = ydoc.getXmlFragment("default")
       if (!receivedStateRef.current && frag.length === 0 && initialContent) {
+        isApplyingRemote.current = true
         editor.commands.setContent(initialContent)
+        isApplyingRemote.current = false
       }
     }, 700)
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
+
+  // Fallback: postgres_changes catches updates that broadcast missed
+  useEffect(() => {
+    const supabase = createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ch = supabase.channel(`db-note-${noteId}`) as any
+    ch.on("postgres_changes", { event: "UPDATE", schema: "public", table: "meeting_notes", filter: `id=eq.${noteId}` },
+      (payload: { new: { body?: string } }) => {
+        const newBody = payload.new?.body
+        const ed = editorRef.current
+        if (!newBody || !ed) return
+        if (Date.now() - lastLocalEditRef.current < 2000) return // user actively typing
+        if (newBody === ed.getHTML()) return // already up to date
+        isApplyingRemote.current = true
+        ed.commands.setContent(newBody)
+        isApplyingRemote.current = false
+      },
+    ).subscribe()
+    return () => { supabase.removeChannel(ch) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId])
 
   useEffect(() => { onEditorReady?.(editor) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
 
