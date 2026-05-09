@@ -380,6 +380,85 @@ export async function getUserMinistries(): Promise<{
   }
 }
 
+// ─── Admin: update ministry name / university ────────────────────────────────
+export async function updateMinistryInfo(data: { name: string; university: string }): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can update ministry info." }
+
+  const admin = createAdminClient()
+  const { error } = await admin.from("ministries").update({ name: data.name.trim(), university: data.university.trim() }).eq("id", profile.ministry_id)
+  return { error: error?.message ?? null }
+}
+
+// ─── Admin: regenerate invite code ──────────────────────────────────────────
+export async function regenerateInviteCode(): Promise<{ code: string | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { code: null, error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { code: null, error: "No ministry found." }
+  if (profile.role.toLowerCase() !== "admin") return { code: null, error: "Only admins can regenerate invite codes." }
+
+  const admin = createAdminClient()
+  const newCode = await uniqueInviteCode(admin)
+  const { error } = await admin.from("ministries").update({ invite_code: newCode }).eq("id", profile.ministry_id)
+  if (error) return { code: null, error: error.message }
+  return { code: newCode, error: null }
+}
+
+// ─── Admin: change a member's role ──────────────────────────────────────────
+export async function updateMemberRole(targetUserId: string, newRole: "member" | "leader" | "admin"): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can change member roles." }
+
+  const admin = createAdminClient()
+  const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
+  return { error: error?.message ?? null }
+}
+
+// ─── Admin: remove a member from the ministry ────────────────────────────────
+export async function removeMember(targetUserId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  if (targetUserId === user.id) return { error: "You cannot remove yourself." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can remove members." }
+
+  const admin = createAdminClient()
+  const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
+  return { error: error?.message ?? null }
+}
+
+// ─── Admin: archive ministry ─────────────────────────────────────────────────
+export async function archiveMinistry(): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can archive the ministry." }
+
+  const admin = createAdminClient()
+  const { error } = await admin.from("ministries").update({ status: "archived" }).eq("id", profile.ministry_id)
+  return { error: error?.message ?? null }
+}
+
 // Sets the user's currently active ministry
 export async function setCurrentMinistry(ministryId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
