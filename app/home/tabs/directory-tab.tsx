@@ -10,12 +10,17 @@ import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { DirectoryMember } from "../types"
 
-export function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, onOpenChat, onBack }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; onOpenChat: (id: string, name: string) => void; onBack?: () => void }) {
+export function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, initialMemberId, onMemberSelect, onOpenChat, onBack }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; initialMemberId?: string; onMemberSelect?: (id: string | null) => void; onOpenChat: (id: string, name: string) => void; onBack?: () => void }) {
   const supabase = createClient()
   const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<DirectoryMember | null>(null)
+
+  function selectMember(member: DirectoryMember | null) {
+    setSelected(member)
+    onMemberSelect?.(member?.id ?? null)
+  }
 
   useEffect(() => {
     async function load() {
@@ -26,7 +31,8 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
         .order("name")
       const list = data ?? []
       setMembers(list)
-      if (list.length > 0) setSelected(list[0])
+      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
+      setSelected(restored ?? list[0] ?? null)
       setLoading(false)
     }
     load()
@@ -76,7 +82,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
               return (
                 <button
                   key={member.id}
-                  onClick={() => setSelected(member)}
+                  onClick={() => selectMember(member)}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[#ECE8DE]/60"
                   style={{
                     borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
@@ -213,9 +219,9 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
             member={selected}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
-            onClose={() => setSelected(null)}
+            onClose={() => selectMember(null)}
             onOpenChat={(id, name) => {
-              setSelected(null)
+              selectMember(null)
               onOpenChat(id, name)
             }}
           />

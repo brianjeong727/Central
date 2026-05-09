@@ -36,9 +36,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     initialTab && validTabs.includes(initialTab) ? initialTab : "home"
   )
 
+  // Persist a single URL param without clobbering others
+  function replaceParam(key: string, value: string | null) {
+    const params = new URLSearchParams(window.location.search)
+    if (value === null) params.delete(key)
+    else params.set(key, value)
+    router.replace(`/home?${params.toString()}`, { scroll: false })
+  }
+
   function setActiveTab(tab: Tab) {
     setActiveTabState(tab)
-    router.replace(`/home?tab=${tab}`, { scroll: false })
+    replaceParam("tab", tab)
   }
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
   const [totalChatsUnread, setTotalChatsUnread] = useState(0)
@@ -49,8 +57,28 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
-  const [profileSection, setProfileSection] = useState<"spiritual-profile" | "journal">("spiritual-profile")
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(searchParams.get("team"))
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
+  const validSections = ["spiritual-profile", "journal"] as const
+  const initialSection = searchParams.get("section") as "spiritual-profile" | "journal" | null
+  const [profileSection, setProfileSection] = useState<"spiritual-profile" | "journal">(
+    initialSection && (validSections as readonly string[]).includes(initialSection) ? initialSection : "spiritual-profile"
+  )
+
+  function handleTeamChange(teamId: string) {
+    setActiveTeamId(teamId)
+    replaceParam("team", teamId)
+  }
+
+  function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
+    setProfileSection(section)
+    replaceParam("section", section === "spiritual-profile" ? null : section)
+  }
+
+  function handleMemberSelect(memberId: string | null) {
+    setActiveMemberId(memberId)
+    replaceParam("member", memberId)
+  }
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [ministryIsPublic, setMinistryIsPublic] = useState(false)
 
@@ -178,7 +206,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
     })
     setUserTeams(teams)
-    setActiveTeamId((prev) => prev ?? teams[0]?.teamId ?? null)
+    setActiveTeamId((prev) => {
+      // Keep URL-initialized or user-selected team if still valid; otherwise fall back to first
+      if (prev && teams.some((t) => t.teamId === prev)) return prev
+      return teams[0]?.teamId ?? null
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
@@ -346,9 +378,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         isAdmin={isAdmin}
         onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
         activeTeamId={activeTeamId}
-        onActiveTeamChange={setActiveTeamId}
+        onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
-        onProfileSectionChange={setProfileSection}
+        onProfileSectionChange={handleProfileSectionChange}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -441,7 +473,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
-                onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); setActiveTeamId(teamId) }}
+                onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
               />
             </div>
           )}
@@ -453,6 +485,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 currentUserName={initialProfile.name}
                 ministryId={ministryId}
                 ministryName={ministryName}
+                initialMemberId={activeMemberId ?? undefined}
+                onMemberSelect={handleMemberSelect}
                 onBack={() => setActiveTab("chats")}
                 onOpenChat={(id, name) => {
                   setActiveTab("chats")
@@ -483,7 +517,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 onLogout={handleLogout}
                 onAvatarChange={(url) => setAvatarUrl(url)}
                 activeSection={profileSection}
-                onSectionChange={setProfileSection}
+                onSectionChange={handleProfileSectionChange}
               />
             </div>
           )}
