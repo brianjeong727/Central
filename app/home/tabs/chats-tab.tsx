@@ -1088,7 +1088,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
 
   async function handleSend() {
     const content = inputText.trim()
-    if (!content || sending) return
+    if (!content || sending || groupArchived) return
 
     setSending(true)
     setInputText("")
@@ -1516,24 +1516,30 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
       )}
 
       {/* ── Input bar ── */}
-      <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-end gap-2">
-        <textarea
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Message…"
-          rows={1}
-          className="flex-1 resize-none bg-[#FBF8F2] rounded-full px-4 py-2.5 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
-          style={{ lineHeight: "1.5" }}
-        />
-        <button
-          onClick={handleSend}
-          disabled={!inputText.trim() || sending}
-          className="size-9 rounded-full bg-[#3E1540] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#2D0F2E] transition-all active:scale-95 ml-1"
-        >
-          <Send className="w-4 h-4 text-white" />
-        </button>
-      </div>
+      {groupArchived ? (
+        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-center justify-center">
+          <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
+        </div>
+      ) : (
+        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-end gap-2">
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message…"
+            rows={1}
+            className="flex-1 resize-none bg-[#FBF8F2] rounded-full px-4 py-2.5 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
+            style={{ lineHeight: "1.5" }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!inputText.trim() || sending}
+            className="size-9 rounded-full bg-[#3E1540] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#2D0F2E] transition-all active:scale-95 ml-1"
+          >
+            <Send className="w-4 h-4 text-white" />
+          </button>
+        </div>
+      )}
       {/* Overlay to dismiss emoji picker / context menu — inside z-[100] stacking context so picker at z-[160] sits above it */}
       {(emojiPickerFor || contextMenuFor) && (
         <div
