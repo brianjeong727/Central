@@ -24,7 +24,9 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
         .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
         .eq("ministry_id", ministryId)
         .order("name")
-      setMembers(data ?? [])
+      const list = data ?? []
+      setMembers(list)
+      if (list.length > 0) setSelected(list[0])
       setLoading(false)
     }
     load()
