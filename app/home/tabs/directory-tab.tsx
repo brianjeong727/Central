@@ -36,15 +36,18 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
   )
 
   return (
-    <div className="pb-2 md:pb-0 md:flex md:h-full md:overflow-hidden">
+    <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
 
-      {/* Desktop Topbar */}
+      {/* Desktop Topbar — full-width row */}
       <DesktopTopbar
         crumbs={selected ? ["Central", "Directory", selected.name] : ["Central", "Directory"]}
       />
 
+      {/* ── Desktop: split-pane row ── */}
+      <div className="hidden md:flex md:flex-1 md:overflow-hidden">
+
       {/* ── Desktop: left member list panel ── */}
-      <div className="hidden md:flex md:flex-col md:w-[260px] md:flex-shrink-0 md:border-r md:border-[#ECE8DE] md:h-full md:overflow-hidden" style={{ background: "#F4F1E8" }}>
+      <div className="flex flex-col w-[260px] flex-shrink-0 border-r border-[#ECE8DE] h-full overflow-hidden" style={{ background: "#F4F1E8" }}>
         {/* Search */}
         <div className="px-3 py-3 border-b border-[#ECE8DE]">
           <div className="relative">
@@ -110,7 +113,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
       </div>
 
       {/* ── Desktop: right detail panel ── */}
-      <div className="hidden md:flex md:flex-1 md:overflow-y-auto md:flex-col" style={{ background: "#FDFBF7" }}>
+      <div className="flex flex-1 overflow-y-auto flex-col" style={{ background: "#FDFBF7" }}>
         {selected ? (
           <MemberDetailPanel
             member={selected}
@@ -128,6 +131,8 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
           </div>
         )}
       </div>
+
+      </div>{/* end split-pane row */}
 
       {/* ── Mobile: header + card list ── */}
       <div className="md:hidden">
