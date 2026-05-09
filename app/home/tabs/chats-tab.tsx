@@ -72,20 +72,28 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-white md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
-        {/* Top nav */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-white">
-          <button
-            onClick={onClose}
-            className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
-          >
-            <X className="w-4 h-4 text-[#13101A]" />
-          </button>
-          <h1 className="text-[17px] font-bold text-[#13101A] tracking-tight">
-            {groupType === "church" ? "New Church Chat" : "New Chat"}
-          </h1>
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-[#ECE8DE]">
+          <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
+            <button
+              onClick={onClose}
+              className="size-9 bg-white border border-[#ECE8DE] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+            >
+              <X className="w-4 h-4 text-[#13101A]" />
+            </button>
+            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "#8A8497" }}>
+              {groupType === "church" ? "Church Chat" : "Group Chat"}
+            </span>
+          </div>
+          <div className="px-5 pb-5">
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>
+              {groupType === "church" ? "New Church Chat" : "New Chat"}
+            </h1>
+            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>Name your space and invite members to join.</p>
+          </div>
         </div>
 
         {/* Scrollable body */}
@@ -97,14 +105,17 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           )}
 
           {/* Chat name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[12px] font-medium text-[#8A8497]">Chat name</label>
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="px-4 pt-4 pb-1">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Chat Name</label>
+            </div>
             <input
               type="text"
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-              className="w-full px-4 py-3 rounded-xl border border-[#EFEFEF] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+              className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }}
             />
           </div>
 
@@ -127,12 +138,12 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
           {/* Member search */}
           <div className="flex flex-col gap-3">
-            <label className="text-[12px] font-medium text-[#8A8497]">
-              Add members
+            <div className="flex items-center justify-between">
+              <label style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", color: "#8A8497" }}>Add Members</label>
               {selectedMembers.length > 0 && (
-                <span className="ml-2 text-[#3E1540] font-semibold">{selectedMembers.length} selected</span>
+                <span className="text-[12px] text-[#3E1540] font-semibold">{selectedMembers.length} selected</span>
               )}
-            </label>
+            </div>
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
               <input
@@ -140,41 +151,39 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#ECE8DE] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col rounded-2xl border border-[#ECE8DE] bg-white overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
               {filtered.length === 0 ? (
-                <p className="text-center text-[13px] text-[#8A8497]/50 py-6">No members found</p>
+                <p className="text-center text-[13px] text-[#8A8497]/50 py-8">No members found</p>
               ) : (
-                filtered.map((member) => {
+                filtered.map((member, idx) => {
                   const isSelected = selectedIds.has(member.id)
                   return (
                     <button
                       key={member.id}
                       type="button"
                       onClick={() => toggleMember(member.id)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                        isSelected
-                          ? "border-[#3E1540]/30 bg-[#3E1540]/4"
-                          : "border-[#EFEFEF] bg-white hover:border-[#3E1540]/30"
-                      }`}
+                      className={`flex items-center gap-3 px-4 py-3 transition-all text-left ${
+                        idx > 0 ? "border-t border-[#F2EDE8]" : ""
+                      } ${isSelected ? "bg-[#3E1540]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
                     >
-                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm overflow-hidden`}>
-                        {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                        <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">
+                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm overflow-hidden`} style={{ borderRadius: "12px" }}>
+                        {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover" style={{ borderRadius: "12px" }} />}
+                        <AvatarFallback className="text-white font-bold text-[11px] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)" }}>
                           {getInitials(member.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold text-[#13101A]">{member.name}</p>
                         {member.graduation_year && (
-                          <p className="text-[11px] text-[#8A8497]/60">Class of {member.graduation_year}</p>
+                          <p className="text-[11px] text-[#8A8497]">Class of {member.graduation_year}</p>
                         )}
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        isSelected ? "bg-[#3E1540] border-[#3E1540]" : "border-muted-foreground/25"
+                        isSelected ? "bg-[#3E1540] border-[#3E1540]" : "border-[#D4CFCF]"
                       }`}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -187,7 +196,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         </div>
 
         {/* Create button */}
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
           <button
             onClick={handleCreate}
             disabled={creating || !chatName.trim()}

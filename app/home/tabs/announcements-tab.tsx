@@ -91,7 +91,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
   if (success) {
     return (
-      <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center gap-4 md:left-[296px]">
+      <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[296px]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
           <CheckCircle2 className="w-8 h-8 text-[#3E1540]" />
         </div>
@@ -104,53 +104,77 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-white md:h-auto md:max-h-[88vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
-        <div className="flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-white flex-shrink-0">
-          <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
-            <X className="w-4 h-4 text-[#13101A]" />
-          </button>
-          <h1 className="text-[17px] font-bold text-[#13101A] tracking-tight">New Announcement</h1>
+    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[88vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+        <div className="flex-shrink-0 border-b border-[#ECE8DE]">
+          <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
+            <button onClick={onClose} className="w-9 h-9 rounded-full bg-white border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]">
+              <X className="w-4 h-4 text-[#13101A]" />
+            </button>
+            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "#8A8497" }}>
+              {isEditing ? "Editing" : "New"}
+            </span>
+          </div>
+          <div className="px-5 pb-5">
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>
+              {isEditing ? "Edit Announcement" : "New Announcement"}
+            </h1>
+            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>
+              {isEditing ? "Update your announcement below." : "Share what’s happening with your ministry."}
+            </p>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
-          <form id="ann-form" onSubmit={handleSubmit} className="px-5 py-6 flex flex-col gap-5">
+          <form id="ann-form" onSubmit={handleSubmit} className="px-5 py-5 flex flex-col gap-4">
             {error && <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-medium text-[#8A8497]">Title</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all" />
+            {/* Title + Body */}
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+              <div className="px-4 pt-4 pb-1">
+                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Title</label>
+              </div>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }} className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent border-b border-[#F2EDE8]" />
+              <div className="px-4 pt-3 pb-1">
+                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Body</label>
+              </div>
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={5} className="w-full px-4 pt-1 pb-4 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent resize-none" style={{ lineHeight: "1.6" }} />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-medium text-[#8A8497]">Body</label>
-              <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={5} className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all resize-none" />
-            </div>
-            <div className="flex flex-col gap-2.5">
-              <label className="text-[12px] font-medium text-[#8A8497]">Audience</label>
+            {/* Audience */}
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-3">Audience</label>
               <div className="flex flex-wrap gap-2">
                 {AUDIENCE_OPTIONS.map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#3E1540] text-[#F6F4EF] border-[#3E1540]" : "bg-white text-[#5A5466] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
+                  <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#3E1540] text-[#F6F4EF] border-[#3E1540]" : "bg-[#FBF8F2] text-[#5A5466] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
                 ))}
               </div>
             </div>
-            <div className="flex items-center justify-between bg-[#FBF8F2] border border-[#ECE8DE] rounded-xl px-4 py-3.5">
-              <div>
-                <p className="text-[13px] font-semibold text-[#13101A]">This is an event</p>
-                <p className="text-[11px] text-[#8A8497] mt-0.5">Shows an RSVP button on the card</p>
+            {/* Event toggle */}
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[13px] font-semibold text-[#13101A]">This is an event</p>
+                  <p className="text-[11px] text-[#8A8497] mt-0.5">Shows an RSVP button on the card</p>
+                </div>
+                <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "#3E1540" : "#E5E0D2" }}>
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
+                </button>
               </div>
-              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "#3E1540" : "#E5E0D2" }}>
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
-              </button>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-medium text-[#8A8497]">Image <span className="text-[#C4C4C4]">(optional)</span></label>
+            {/* Image */}
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+              <div className="px-4 pt-4 pb-3">
+                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Image <span className="text-[#C4C4C4] normal-case font-medium">— optional</span></label>
+              </div>
               {imagePreview ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
-                  <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3.5 h-3.5 text-white" /></button>
+                <div className="px-4 pb-4">
+                  <div className="relative rounded-xl overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
+                    <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3.5 h-3.5 text-white" /></button>
+                  </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:text-[#3E1540]/60 transition-all">
-                  <ImageIcon className="w-6 h-6" />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-4 mb-4 h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#FBF8F2] hover:text-[#3E1540]/70 transition-all" style={{ width: "calc(100% - 32px)" }}>
+                  <ImageIcon className="w-5 h-5" />
                   <span className="text-[12px] font-medium">Tap to add image</span>
                 </button>
               )}
@@ -158,9 +182,9 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             </div>
           </form>
         </div>
-        <div className="bg-white border-t border-[#ECE8DE] px-5 py-4">
+        <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
           <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-[#F6F4EF] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide">
-            {submitting ? "Posting…" : "Post Announcement"}
+            {submitting ? "Posting…" : isEditing ? "Save Changes" : "Post Announcement"}
           </button>
         </div>
       </div>
