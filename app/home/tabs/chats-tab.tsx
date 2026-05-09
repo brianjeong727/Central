@@ -105,36 +105,17 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           )}
 
           {/* Chat name */}
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-            <div className="px-4 pt-4 pb-1">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Chat Name</label>
-            </div>
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-2">Chat Name</label>
             <input
               type="text"
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-              className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
-              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }}
+              className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
             />
           </div>
-
-          {/* Selected chips */}
-          {selectedMembers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedMembers.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => toggleMember(m.id)}
-                  className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
-                >
-                  {m.name.split(" ")[0]}
-                  <X className="w-3 h-3 opacity-70" />
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Member search */}
           <div className="flex flex-col gap-3">
@@ -154,6 +135,23 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#ECE8DE] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
               />
             </div>
+
+            {/* Selected chips — lives here so the member list stays in place */}
+            {selectedMembers.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedMembers.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleMember(m.id)}
+                    className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
+                  >
+                    {m.name.split(" ")[0]}
+                    <X className="w-3 h-3 opacity-70" />
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-col rounded-2xl border border-[#ECE8DE] bg-white overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
               {filtered.length === 0 ? (
