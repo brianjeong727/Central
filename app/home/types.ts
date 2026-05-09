@@ -59,12 +59,19 @@ export interface Announcement {
   image_url: string | null
   audience: string | null
   created_by: string | null
+  show_attendees: boolean
+}
+
+export interface RsvpAttendee {
+  user_id: string
+  name: string
 }
 
 export interface EnrichedAnnouncement extends Announcement {
   view_count: number
   rsvp_count: number
   user_has_rsvped: boolean
+  rsvp_attendees: RsvpAttendee[]
 }
 
 export interface ChatGroup {
@@ -129,6 +136,7 @@ export interface CreateAnnouncementModalProps {
 
 export interface AnnouncementsTabProps {
   userId: string
+  userName: string
   userRole: string
   userGradYear: number | null
   ministryId: string
@@ -138,6 +146,7 @@ export interface AnnouncementsTabProps {
 export interface AnnouncementDetailProps {
   announcement: EnrichedAnnouncement
   userId: string
+  userRole: string
   onClose: () => void
   onRsvpToggle: (id: string) => void
 }

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
-import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement } from "../types"
+import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
 
 const AUDIENCE_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -30,6 +30,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [body, setBody] = useState(existing?.body ?? "")
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
+  const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
   const [submitting, setSubmitting] = useState(false)
@@ -73,15 +74,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, image_url: imageUrl })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       setSuccess(true)
-      setTimeout(() => { onSuccess((data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, image_url: imageUrl }) as Announcement); onClose() }, 1000)
+      setTimeout(() => { onSuccess((data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl }) as Announcement); onClose() }, 1000)
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       setSuccess(true)
@@ -158,6 +159,17 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
                 </button>
               </div>
+              {isEvent && (
+                <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-[#F2EDE8]">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#13101A]">Show attendees publicly</p>
+                    <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
+                  </div>
+                  <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: showAttendees ? "#3E1540" : "#E5E0D2" }}>
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${showAttendees ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
+                </div>
+              )}
             </div>
             {/* Image */}
             <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
@@ -195,13 +207,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 // ── Inline Edit Form (shared across card types) ──────────────────────────────
 
 function InlineEditFields({
-  title, body, audience, isEvent,
-  onTitle, onBody, onAudience, onIsEvent,
+  title, body, audience, isEvent, showAttendees,
+  onTitle, onBody, onAudience, onIsEvent, onShowAttendees,
   onSave, onCancel, saving, dark,
 }: {
-  title: string; body: string; audience: string; isEvent: boolean
+  title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean
   onTitle: (v: string) => void; onBody: (v: string) => void
-  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void
+  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void; onShowAttendees: (v: boolean) => void
   onSave: () => void; onCancel: () => void
   saving: boolean; dark?: boolean
 }) {
@@ -272,6 +284,25 @@ function InlineEditFields({
           }} />
         </button>
       </div>
+      {/* Show attendees toggle — only relevant for events */}
+      {isEvent && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
+          <span style={{ fontSize: 12, color: fgMuted }}>Show attendees publicly</span>
+          <button
+            type="button"
+            onClick={() => onShowAttendees(!showAttendees)}
+            style={{
+              width: 36, height: 20, borderRadius: 999, position: "relative", border: "none", cursor: "pointer",
+              background: showAttendees ? (dark ? "rgba(246,244,239,0.4)" : "#3E1540") : (dark ? "rgba(246,244,239,0.15)" : "#E5E0D2"),
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2, width: 16, height: 16, borderRadius: "50%", background: "white",
+              left: showAttendees ? 18 : 2, transition: "left 0.15s",
+            }} />
+          </button>
+        </div>
+      )}
       {/* Save / Cancel */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 4 }}>
         <button
@@ -297,7 +328,7 @@ function InlineEditFields({
 
 // ── Announcements Tab ────────────────────────────────────────────────────────
 
-export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
+export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
   const supabase = createClient()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
@@ -307,7 +338,7 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
 
   // Desktop inline edit state
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<{ title: string; body: string; audience: string; isEvent: boolean } | null>(null)
+  const [editDraft, setEditDraft] = useState<{ title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean } | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
@@ -342,18 +373,37 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
       .upsert(ids.map((id) => ({ announcement_id: id, user_id: userId })), { onConflict: "announcement_id,user_id" })
       .then()
 
+    // Fetch names for all RSVP attendees
+    const allRsvpUserIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
+    const profileNameMap: Record<string, string> = {}
+    if (allRsvpUserIds.length > 0) {
+      const { data: profileRows } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .in("id", allRsvpUserIds)
+        .eq("ministry_id", ministryId)
+      for (const p of profileRows ?? []) profileNameMap[p.id] = p.name
+    }
+
     const viewMap: Record<string, number> = {}
     const rsvpCountMap: Record<string, number> = {}
+    const rsvpAttendeesMap: Record<string, RsvpAttendee[]> = {}
     const userRsvpSet = new Set<string>()
     for (const v of viewRows ?? []) viewMap[v.announcement_id] = (viewMap[v.announcement_id] ?? 0) + 1
     for (const r of rsvpRows ?? []) {
       rsvpCountMap[r.announcement_id] = (rsvpCountMap[r.announcement_id] ?? 0) + 1
+      if (!rsvpAttendeesMap[r.announcement_id]) rsvpAttendeesMap[r.announcement_id] = []
+      rsvpAttendeesMap[r.announcement_id].push({ user_id: r.user_id, name: profileNameMap[r.user_id] ?? "Unknown" })
       if (r.user_id === userId) userRsvpSet.add(r.announcement_id)
     }
 
     setAnnouncements(anns.map((ann) => ({
-      ...ann, view_count: viewMap[ann.id] ?? 0,
-      rsvp_count: rsvpCountMap[ann.id] ?? 0, user_has_rsvped: userRsvpSet.has(ann.id),
+      ...ann,
+      show_attendees: ann.show_attendees ?? false,
+      view_count: viewMap[ann.id] ?? 0,
+      rsvp_count: rsvpCountMap[ann.id] ?? 0,
+      user_has_rsvped: userRsvpSet.has(ann.id),
+      rsvp_attendees: rsvpAttendeesMap[ann.id] ?? [],
     })))
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,14 +411,27 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
 
   useEffect(() => { loadAnnouncements() }, [loadAnnouncements])
 
+  // True toggle: flips going state and count, and optimistically updates attendee list
   function handleRsvpToggle(announcementId: string) {
     setAnnouncements((prev) =>
-      prev.map((ann) => ann.id === announcementId ? { ...ann, user_has_rsvped: true, rsvp_count: ann.rsvp_count + 1 } : ann)
+      prev.map((ann) => {
+        if (ann.id !== announcementId) return ann
+        const wasRsvped = ann.user_has_rsvped
+        const newAttendees = wasRsvped
+          ? ann.rsvp_attendees.filter((a) => a.user_id !== userId)
+          : [...ann.rsvp_attendees, { user_id: userId, name: userName }]
+        return {
+          ...ann,
+          user_has_rsvped: !wasRsvped,
+          rsvp_count: wasRsvped ? Math.max(0, ann.rsvp_count - 1) : ann.rsvp_count + 1,
+          rsvp_attendees: newAttendees,
+        }
+      })
     )
   }
 
   function handleNewAnnouncement(newAnn: Announcement) {
-    setAnnouncements((prev) => [{ ...newAnn, view_count: 0, rsvp_count: 0, user_has_rsvped: false }, ...prev])
+    setAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [] }, ...prev])
   }
 
   function handleDeleteAnnouncement(id: string) {
@@ -386,7 +449,7 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
 
   function startDesktopEdit(ann: EnrichedAnnouncement) {
     setEditingId(ann.id)
-    setEditDraft({ title: ann.title, body: ann.body, audience: ann.audience ?? "all", isEvent: ann.is_event ?? false })
+    setEditDraft({ title: ann.title, body: ann.body, audience: ann.audience ?? "all", isEvent: ann.is_event ?? false, showAttendees: ann.show_attendees ?? false })
   }
 
   function cancelDesktopEdit() {
@@ -399,12 +462,12 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
     setEditSaving(true)
     const { data, error } = await supabase
       .from("announcements")
-      .update({ title: editDraft.title.trim(), body: editDraft.body.trim(), audience: editDraft.audience, is_event: editDraft.isEvent })
+      .update({ title: editDraft.title.trim(), body: editDraft.body.trim(), audience: editDraft.audience, is_event: editDraft.isEvent, show_attendees: editDraft.showAttendees })
       .eq("id", editingId).eq("ministry_id", ministryId)
       .select().maybeSingle()
     setEditSaving(false)
     if (!error) {
-      handleEditSuccess((data ?? { id: editingId, title: editDraft.title, body: editDraft.body, audience: editDraft.audience, is_event: editDraft.isEvent }) as Announcement)
+      handleEditSuccess((data ?? { id: editingId, title: editDraft.title, body: editDraft.body, audience: editDraft.audience, is_event: editDraft.isEvent, show_attendees: editDraft.showAttendees }) as Announcement)
       cancelDesktopEdit()
     }
   }
@@ -514,11 +577,12 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
                       <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.5, marginBottom: "12px" }}>📌 Editing pinned</p>
                       <InlineEditFields
                         title={editDraft.title} body={editDraft.body}
-                        audience={editDraft.audience} isEvent={editDraft.isEvent}
+                        audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
                         onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
                         onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
                         onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
                         onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
+                        onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
                         onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
                         saving={editSaving} dark
                       />
@@ -567,11 +631,12 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
                       <div style={{ padding: "16px 20px" }}>
                         <InlineEditFields
                           title={editDraft.title} body={editDraft.body}
-                          audience={editDraft.audience} isEvent={editDraft.isEvent}
+                          audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
                           onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
                           onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
                           onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
                           onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
+                          onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
                           onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
                           saving={editSaving}
                         />
@@ -611,11 +676,12 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
                       {editingId === ann.id && editDraft ? (
                         <InlineEditFields
                           title={editDraft.title} body={editDraft.body}
-                          audience={editDraft.audience} isEvent={editDraft.isEvent}
+                          audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
                           onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
                           onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
                           onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
                           onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
+                          onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
                           onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
                           saving={editSaving}
                         />
@@ -627,21 +693,35 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
                           </div>
                           <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
                           <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
-                          <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                            <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              {ann.is_event && (
-                                <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
-                                  {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
-                                </button>
-                              )}
-                              {isLeaderOrAdmin && (
-                                <>
-                                  <button onClick={() => startDesktopEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
-                                  <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
-                                </>
-                              )}
+                          <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                              <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                {ann.is_event && (
+                                  <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
+                                    {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
+                                  </button>
+                                )}
+                                {isLeaderOrAdmin && (
+                                  <>
+                                    <button onClick={() => startDesktopEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
+                                    <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                                  </>
+                                )}
+                              </div>
                             </div>
+                            {ann.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees) && (
+                              <div style={{ marginTop: 12 }}>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {ann.rsvp_attendees.slice(0, 10).map(a => (
+                                    <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                                  ))}
+                                  {ann.rsvp_attendees.length > 10 && (
+                                    <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -674,17 +754,25 @@ export function AnnouncementsTab({ userId, userRole, userGradYear, ministryId, m
 
 // ── Announcement Detail ──────────────────────────────────────────────────────
 
-export function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle }: AnnouncementDetailProps) {
+export function AnnouncementDetail({ announcement, userId, userRole, onClose, onRsvpToggle }: AnnouncementDetailProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
 
+  const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
+
   async function handleRsvp() {
-    if (announcement.user_has_rsvped || rsvping) return
+    if (rsvping) return
     setRsvping(true)
     onRsvpToggle(announcement.id)
-    await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+    if (announcement.user_has_rsvped) {
+      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", userId)
+    } else {
+      await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+    }
     setRsvping(false)
   }
+
+  const showAttendeeList = announcement.is_event && announcement.rsvp_attendees.length > 0 && (isLeaderOrAdmin || announcement.show_attendees)
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
@@ -700,11 +788,21 @@ export function AnnouncementDetail({ announcement, userId, onClose, onRsvpToggle
           </div>
           <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, marginBottom: "16px" }}>{announcement.title}</h1>
           <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{announcement.body}</p>
+          {showAttendeeList && (
+            <div className="mt-6 pt-5 border-t border-[#EFEAE0]">
+              <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">{announcement.rsvp_count} going</p>
+              <div className="flex flex-wrap gap-2">
+                {announcement.rsvp_attendees.map(a => (
+                  <span key={a.user_id} style={{ fontSize: "12px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         {announcement.is_event && (
           <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4 pb-20">
-            <button onClick={handleRsvp} disabled={announcement.user_has_rsvped || rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] cursor-default" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF]"}`}>
-              {announcement.user_has_rsvped ? <span className="flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />You&apos;re going!</span> : "RSVP"}
+            <button onClick={handleRsvp} disabled={rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] hover:bg-[#3E1540]/15 active:scale-[0.99]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF] active:scale-[0.99]"}`}>
+              {announcement.user_has_rsvped ? <span className="flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />You&apos;re going — tap to undo</span> : "RSVP"}
             </button>
           </div>
         )}
@@ -729,6 +827,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
   const [editBody, setEditBody] = useState(announcement.body)
   const [editAudience, setEditAudience] = useState(announcement.audience ?? "all")
   const [editIsEvent, setEditIsEvent] = useState(announcement.is_event ?? false)
+  const [editShowAttendees, setEditShowAttendees] = useState(announcement.show_attendees ?? false)
   const [editSaving, setEditSaving] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
@@ -738,6 +837,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
     setEditBody(announcement.body)
     setEditAudience(announcement.audience ?? "all")
     setEditIsEvent(announcement.is_event ?? false)
+    setEditShowAttendees(announcement.show_attendees ?? false)
     setIsEditing(true)
     setShowMenu(false)
   }
@@ -751,21 +851,25 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
     setEditSaving(true)
     const { data, error } = await supabase
       .from("announcements")
-      .update({ title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent })
+      .update({ title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent, show_attendees: editShowAttendees })
       .eq("id", announcement.id).eq("ministry_id", ministryId)
       .select().maybeSingle()
     setEditSaving(false)
     if (!error) {
-      onEdit({ ...announcement, title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent, ...(data ?? {}) } as EnrichedAnnouncement)
+      onEdit({ ...announcement, title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent, show_attendees: editShowAttendees, ...(data ?? {}) } as EnrichedAnnouncement)
       setIsEditing(false)
     }
   }
 
   async function handleRsvp() {
-    if (announcement.user_has_rsvped || rsvping) return
+    if (rsvping) return
     setRsvping(true)
     onRsvpToggle(announcement.id)
-    await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+    if (announcement.user_has_rsvped) {
+      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", userId)
+    } else {
+      await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+    }
     setRsvping(false)
   }
 
@@ -792,8 +896,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
               <>
                 <p style={{ fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", marginBottom: 12 }}>Editing</p>
                 <InlineEditFields
-                  title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent}
-                  onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent}
+                  title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent} showAttendees={editShowAttendees}
+                  onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent} onShowAttendees={setEditShowAttendees}
                   onSave={handleSaveEdit} onCancel={cancelEdit} saving={editSaving} dark
                 />
               </>
@@ -833,12 +937,24 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                 <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
 
                 {announcement.is_event && (
-                  <div className="flex items-center gap-4">
-                    <button onClick={handleRsvp} disabled={announcement.user_has_rsvped || rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] cursor-default" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}>
-                      {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />You&apos;re going!</span> : "RSVP"}
-                    </button>
-                    {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
-                  </div>
+                  <>
+                    <div className="flex items-center gap-4">
+                      <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}>
+                        {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
+                      </button>
+                      {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
+                    </div>
+                    {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
+                      <div className="mt-4 flex flex-wrap gap-1.5">
+                        {announcement.rsvp_attendees.slice(0, 8).map(a => (
+                          <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                        ))}
+                        {announcement.rsvp_attendees.length > 8 && (
+                          <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -857,7 +973,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           )}
         </div>
 
-        {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
+        {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
       </>
     )
   }
@@ -876,8 +992,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             <>
               <p style={{ fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Editing</p>
               <InlineEditFields
-                title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent}
-                onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent}
+                title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent} showAttendees={editShowAttendees}
+                onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent} onShowAttendees={setEditShowAttendees}
                 onSave={handleSaveEdit} onCancel={cancelEdit} saving={editSaving}
               />
             </>
@@ -911,11 +1027,23 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
               <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
 
               {announcement.is_event && (
-                <div className="flex items-center gap-3 pt-3 border-t border-[#EFEAE0]">
-                  <button onClick={handleRsvp} disabled={announcement.user_has_rsvped || rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] cursor-default" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.98]"}`}>
-                    {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
-                  </button>
-                  {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
+                <div className="pt-3 border-t border-[#EFEAE0]">
+                  <div className="flex items-center gap-3">
+                    <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.98]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.98]"}`}>
+                      {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
+                    </button>
+                    {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
+                  </div>
+                  {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {announcement.rsvp_attendees.slice(0, 8).map(a => (
+                        <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                      ))}
+                      {announcement.rsvp_attendees.length > 8 && (
+                        <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -935,7 +1063,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
         )}
       </div>
 
-      {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
+      {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
     </>
   )
 }
