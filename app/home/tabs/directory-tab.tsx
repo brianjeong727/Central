@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, X, ArrowLeft, MessageCircle, Users, ChevronRight } from "lucide-react"
+import { Search, ArrowLeft, MessageCircle, Heart, ChevronRight, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
+import { Spinner, EmptyState } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { DirectoryMember } from "../types"
@@ -36,70 +36,134 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
   )
 
   return (
-    <div className="pb-2 md:pb-0">
+    <div className="pb-2 md:pb-0 md:flex md:h-full md:overflow-hidden">
+
       {/* Desktop Topbar */}
-      <DesktopTopbar crumbs={["Central", "Directory"]} right={
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-full bg-[#F4F1E8] text-[#8A8497]" style={{ width: "280px" }}>
-          <Search className="w-3.5 h-3.5 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search by name, year, prayer…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
-          />
-        </div>
-      } />
+      <DesktopTopbar
+        crumbs={selected ? ["Central", "Directory", selected.name] : ["Central", "Directory"]}
+      />
 
-      {/* Mobile Header */}
-      <div className="px-5 pt-14 pb-5 md:hidden">
-        <div className="flex items-center gap-2.5 mb-4">
-          {onBack && (
-            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
-              <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
-            </button>
+      {/* ── Desktop: left member list panel ── */}
+      <div className="hidden md:flex md:flex-col md:w-[260px] md:flex-shrink-0 md:border-r md:border-[#ECE8DE] md:h-full md:overflow-hidden" style={{ background: "#F4F1E8" }}>
+        {/* Search */}
+        <div className="px-3 py-3 border-b border-[#ECE8DE]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A8497]" />
+            <input
+              type="text"
+              placeholder="Search members"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-white rounded-lg border border-[#E5E0D2] text-[12.5px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+            />
+          </div>
+        </div>
+
+        {/* Member list */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="p-4"><Spinner /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-[12px] text-[#8A8497] text-center py-8">No members found</p>
+          ) : (
+            filtered.map((member) => {
+              const isActive = selected?.id === member.id
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => setSelected(member)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[#ECE8DE]/60"
+                  style={{
+                    borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
+                    background: isActive ? "rgba(62,21,64,0.06)" : undefined,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                      background: "#13101A",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {member.avatar_url
+                      ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 13, color: "#F6F4EF", fontWeight: 400 }}>{getInitials(member.name)}</span>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-[#13101A] truncate leading-tight">
+                      {member.name}
+                      {member.id === currentUserId && <span className="ml-1.5 text-[10px] text-[#8A8497] font-normal">you</span>}
+                    </p>
+                    <p className="text-[11px] text-[#8A8497] truncate leading-tight mt-0.5">
+                      {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : ""}
+                      {member.graduation_year && member.role ? " · " : ""}
+                      {member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : ""}
+                    </p>
+                  </div>
+                </button>
+              )
+            })
           )}
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
-          <input
-            type="text"
-            placeholder="Search members…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
-          />
         </div>
       </div>
 
-      {/* Desktop Editorial Header */}
-      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
-        <div>
-          <p style={MONO_STYLE}>{members.length} members · {members.filter(m => ["admin","leader"].includes(m.role.toLowerCase())).length} leaders</p>
-          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-            Directory
-          </h1>
-          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
-            Names, faces, what they&apos;re carrying. A chance to know and pray.
-          </p>
-        </div>
+      {/* ── Desktop: right detail panel ── */}
+      <div className="hidden md:flex md:flex-1 md:overflow-y-auto md:flex-col" style={{ background: "#FDFBF7" }}>
+        {selected ? (
+          <MemberDetailPanel
+            member={selected}
+            currentUserId={currentUserId}
+            currentUserName={currentUserName}
+            onOpenChat={onOpenChat}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Users className="w-9 h-9 text-[#C4C4C4] mx-auto mb-3" />
+              <p className="text-[14px] font-semibold text-[#8A8497]">Select a member</p>
+              <p className="text-[12px] text-[#C4C4C4] mt-1">Choose someone from the list</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className="px-5 md:px-14"><Spinner /></div>
-      ) : filtered.length === 0 ? (
-        <div className="px-5 md:px-14">
-          <EmptyState
-            icon={<Users className="w-7 h-7" />}
-            title="No members found"
-            subtitle={search ? "Try a different name" : "No members in the directory yet"}
-          />
+      {/* ── Mobile: header + card list ── */}
+      <div className="md:hidden">
+        <div className="px-5 pt-14 pb-5">
+          <div className="flex items-center gap-2.5 mb-4">
+            {onBack && (
+              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
+                <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
+              </button>
+            )}
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+            <input
+              type="text"
+              placeholder="Search members…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
+            />
+          </div>
         </div>
-      ) : (
-        <>
-          {/* Mobile card list */}
-          <div className="md:hidden px-5 pb-4 flex flex-col gap-3">
+
+        {loading ? (
+          <div className="px-5"><Spinner /></div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5">
+            <EmptyState
+              icon={<Users className="w-7 h-7" />}
+              title="No members found"
+              subtitle={search ? "Try a different name" : "No members in the directory yet"}
+            />
+          </div>
+        ) : (
+          <div className="px-5 pb-4 flex flex-col gap-3">
             {filtered.map((member) => (
               <button
                 key={member.id}
@@ -132,106 +196,43 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
               </button>
             ))}
           </div>
+        )}
+      </div>
 
-          {/* Desktop table */}
-          <div className="hidden md:block px-14 py-7">
-            <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
-              <div className="grid px-5 py-2.5 border-b border-[#E5E0D2]" style={{ gridTemplateColumns: "1.4fr 100px 1fr 1.4fr 60px", gap: "12px" }}>
-                {["Name", "Class", "Role", "Praying for", ""].map((h, i) => (
-                  <span key={i} style={MONO_STYLE}>{h}</span>
-                ))}
-              </div>
-              {filtered.map((member, i) => (
-                <button
-                  key={member.id}
-                  onClick={() => setSelected(member)}
-                  className="w-full grid px-5 py-3 text-left items-center hover:bg-[#F4F1E8] transition-colors"
-                  style={{ gridTemplateColumns: "1.4fr 100px 1fr 1.4fr 60px", gap: "12px", borderTop: i ? "1px solid #EFEAE0" : undefined }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                      background: i % 2 === 0 ? "#3E1540" : "#13101A",
-                      color: "#F6F4EF", display: "grid", placeItems: "center",
-                      fontSize: "11px", fontWeight: 600, overflow: "hidden",
-                    }}>
-                      {member.avatar_url
-                        ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : getInitials(member.name)}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "13px", fontWeight: 500 }}>
-                        {member.name}
-                        {member.id === currentUserId && (
-                          <span style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.6px", textTransform: "uppercase", marginLeft: "6px" }}>You</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#8A8497" }}>{member.email}</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#5A5466", fontVariantNumeric: "tabular-nums" }}>
-                    {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : "—"}
-                  </div>
-                  <div>
-                    <span style={{
-                      fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px",
-                      background: ["admin","leader"].includes(member.role.toLowerCase()) ? "#3E1540" : "#F4F1E8",
-                      color: ["admin","leader"].includes(member.role.toLowerCase()) ? "#F6F4EF" : "#13101A",
-                      border: ["admin","leader"].includes(member.role.toLowerCase()) ? "none" : "1px solid #E5E0D2",
-                      textTransform: "uppercase", fontWeight: 600,
-                    }}>{member.role}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#5A5466", fontStyle: "italic", fontFamily: "var(--font-instrument-serif)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {member.pray_for_me || "—"}
-                  </div>
-                  <div className="flex justify-end">
-                    <ChevronRight className="w-4 h-4 text-[#C4C4C4]" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Member Detail Sheet */}
+      {/* Mobile: full-screen member sheet */}
       {selected && (
-        <MemberSheet
-          member={selected}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
-          onClose={() => setSelected(null)}
-          onOpenChat={(id, name) => {
-            setSelected(null)
-            onOpenChat(id, name)
-          }}
-        />
+        <div className="md:hidden">
+          <MemberSheet
+            member={selected}
+            currentUserId={currentUserId}
+            currentUserName={currentUserName}
+            onClose={() => setSelected(null)}
+            onOpenChat={(id, name) => {
+              setSelected(null)
+              onOpenChat(id, name)
+            }}
+          />
+        </div>
       )}
     </div>
   )
 }
 
-export function MemberSheet({
-  member,
-  currentUserId,
-  currentUserName,
-  onClose,
-  onOpenChat,
-}: {
+// ── Desktop inline detail panel ─────────────────────────────────────────────
+
+function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat }: {
   member: DirectoryMember
   currentUserId: string
   currentUserName: string
-  onClose: () => void
   onOpenChat: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const [dmLoading, setDmLoading] = useState(false)
+  const [prayingFor, setPrayingFor] = useState(false)
   const isOwnProfile = member.id === currentUserId
 
-  async function handleSendMessage() {
+  async function handleMessage() {
     setDmLoading(true)
-
-    // Check for an existing DM between these two users
     const { data: myGroups } = await supabase
       .from("group_members")
       .select("group_id, groups!inner(type)")
@@ -259,7 +260,170 @@ export function MemberSheet({
       }
     }
 
-    // No existing DM — create one named after the other person
+    const { group: newGroup, error: dmErr } = await createGroup({
+      name: member.name,
+      type: "dm",
+      memberIds: [member.id],
+      createdBy: currentUserId,
+    })
+    setDmLoading(false)
+    if (dmErr || !newGroup) return
+    onOpenChat(newGroup.id, newGroup.name)
+  }
+
+  const infoRows = [
+    { label: "EMAIL", value: member.email },
+    { label: "ROLE", value: member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null },
+    { label: "CLASS", value: member.graduation_year ? `Class of ${member.graduation_year}` : null },
+  ].filter(r => r.value)
+
+  return (
+    <div className="flex flex-col items-center px-16 py-16">
+      {/* Avatar */}
+      <div
+        style={{
+          width: 120, height: 120, borderRadius: "50%",
+          background: "#3E1540",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginBottom: 28, overflow: "hidden", flexShrink: 0,
+        }}
+      >
+        {member.avatar_url
+          ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", fontWeight: 400 }}>{getInitials(member.name)}</span>
+        }
+      </div>
+
+      {/* Name */}
+      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 42, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1, textAlign: "center" }}>
+        {member.name}
+      </h1>
+
+      {/* Subtitle */}
+      <p style={{ fontSize: 13.5, color: "#8A8497", margin: "0 0 28px", textAlign: "center" }}>
+        {[
+          member.graduation_year ? `Class of ${member.graduation_year}` : null,
+          member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null,
+        ].filter(Boolean).join(" · ")}
+      </p>
+
+      {/* Action buttons */}
+      {!isOwnProfile && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
+          <button
+            onClick={handleMessage}
+            disabled={dmLoading}
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "10px 22px", borderRadius: 9999,
+              background: "#3E1540", color: "#F6F4EF",
+              border: "none", fontSize: 13.5, fontWeight: 500,
+              cursor: dmLoading ? "not-allowed" : "pointer",
+              opacity: dmLoading ? 0.6 : 1,
+            }}
+          >
+            <MessageCircle style={{ width: 15, height: 15 }} />
+            {dmLoading ? "Opening…" : "Message"}
+          </button>
+          <button
+            onClick={() => setPrayingFor((v) => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "10px 22px", borderRadius: 9999,
+              background: prayingFor ? "#F4F1E8" : "white",
+              color: prayingFor ? "#3E1540" : "#5A5466",
+              border: "1.5px solid #ECE8DE",
+              fontSize: 13.5, fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            <Heart style={{ width: 15, height: 15, fill: prayingFor ? "#3E1540" : "none" }} />
+            {prayingFor ? "Praying" : "Pray for"}
+          </button>
+        </div>
+      )}
+
+      {/* Info rows */}
+      <div style={{ width: "100%", maxWidth: 480, borderTop: "1px solid #ECE8DE" }}>
+        {infoRows.map((row) => (
+          <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+            <span style={{ fontSize: 14, color: "#13101A" }}>{row.value}</span>
+          </div>
+        ))}
+
+        {/* Spiritual fields */}
+        {member.bible_verse && (
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>VERSE</span>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 14, color: "#3E1540", fontStyle: "italic" }}>&ldquo;{member.bible_verse}&rdquo;</span>
+          </div>
+        )}
+        {member.pray_for_me && (
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>PRAY FOR</span>
+            <span style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6 }}>{member.pray_for_me}</span>
+          </div>
+        )}
+        {member.about_me && (
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>ABOUT</span>
+            <span style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6 }}>{member.about_me}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Mobile full-screen sheet (unchanged) ────────────────────────────────────
+
+export function MemberSheet({
+  member,
+  currentUserId,
+  currentUserName,
+  onClose,
+  onOpenChat,
+}: {
+  member: DirectoryMember
+  currentUserId: string
+  currentUserName: string
+  onClose: () => void
+  onOpenChat: (id: string, name: string) => void
+}) {
+  const supabase = createClient()
+  const [dmLoading, setDmLoading] = useState(false)
+  const isOwnProfile = member.id === currentUserId
+
+  async function handleSendMessage() {
+    setDmLoading(true)
+
+    const { data: myGroups } = await supabase
+      .from("group_members")
+      .select("group_id, groups!inner(type)")
+      .eq("user_id", currentUserId)
+
+    const myDmGroupIds = (myGroups ?? [])
+      .filter((m: { groups: { type: string } | { type: string }[] | null }) => {
+        const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+        return g?.type === "dm"
+      })
+      .map((m: { group_id: string }) => m.group_id)
+
+    if (myDmGroupIds.length > 0) {
+      const { data: shared } = await supabase
+        .from("group_members")
+        .select("group_id")
+        .eq("user_id", member.id)
+        .in("group_id", myDmGroupIds)
+        .limit(1)
+
+      if (shared && shared.length > 0) {
+        setDmLoading(false)
+        onOpenChat(shared[0].group_id, member.name)
+        return
+      }
+    }
+
     const { group: newGroup, error: dmErr } = await createGroup({
       name: member.name,
       type: "dm",
@@ -273,11 +437,11 @@ export function MemberSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white md:max-w-[580px] md:h-auto md:max-h-[88vh] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
 
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
           <button
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -297,7 +461,6 @@ export function MemberSheet({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-6">
-          {/* Avatar hero + name + meta */}
           <div className="flex flex-col items-center mb-7">
             <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4`}>
               {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
@@ -308,9 +471,7 @@ export function MemberSheet({
             <h1 className="text-[22px] font-bold text-[#13101A] tracking-tight mb-2">{member.name}</h1>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (
-                <span className="text-[12px] text-[#8A8497]">
-                  Class of {member.graduation_year}
-                </span>
+                <span className="text-[12px] text-[#8A8497]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
                 <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F4F1E8] text-[#3E1540]"}`}>
@@ -318,53 +479,36 @@ export function MemberSheet({
                 </span>
               )}
               {isOwnProfile && (
-                <span className="text-[10px] bg-[#3E1540]/10 text-[#3E1540] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">
-                  You
-                </span>
+                <span className="text-[10px] bg-[#3E1540]/10 text-[#3E1540] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
               )}
             </div>
           </div>
 
-          {/* Fields */}
           <div className="flex flex-col gap-3">
             {member.bible_verse && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
-                  Bible verse
-                </p>
-                <p className="text-[13px] text-[#5A5466] italic leading-relaxed">
-                  &ldquo;{member.bible_verse}&rdquo;
-                </p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>Bible verse</p>
+                <p className="text-[13px] text-[#5A5466] italic leading-relaxed">&ldquo;{member.bible_verse}&rdquo;</p>
               </div>
             )}
-
             {member.prayer_request && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
-                  Prayer request
-                </p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>Prayer request</p>
                 <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.prayer_request}</p>
               </div>
             )}
-
             {member.pray_for_me && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
-                  How to pray for me
-                </p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>How to pray for me</p>
                 <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.pray_for_me}</p>
               </div>
             )}
-
             {member.about_me && (
               <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>
-                  About
-                </p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>About</p>
                 <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.about_me}</p>
               </div>
             )}
-
             {!member.bible_verse && !member.prayer_request && !member.pray_for_me && !member.about_me && (
               <div className="flex items-center justify-center py-10">
                 <p className="text-[13px] text-[#8A8497]/60">No details shared yet</p>
@@ -373,7 +517,6 @@ export function MemberSheet({
           </div>
         </div>
 
-        {/* Pinned Send Message button */}
         {!isOwnProfile && (
           <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4">
             <button
@@ -385,7 +528,6 @@ export function MemberSheet({
             </button>
           </div>
         )}
-
       </div>
     </div>
   )
