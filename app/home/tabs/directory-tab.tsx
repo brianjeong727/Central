@@ -75,7 +75,13 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
           {loading ? (
             <div className="p-4"><Spinner /></div>
           ) : filtered.length === 0 ? (
-            <p className="text-[12px] text-[#8A8497] text-center py-8">No members found</p>
+            <div className="p-4">
+              <EmptyState
+                icon={<Users size={20} strokeWidth={1.5} />}
+                title="No members found"
+                subtitle={search ? "Try a different name" : "No members in the directory yet"}
+              />
+            </div>
           ) : (
             filtered.map((member) => {
               const isActive = selected?.id === member.id

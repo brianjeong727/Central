@@ -41,13 +41,6 @@ export function formatDate(dateStr: string): string {
   })
 }
 
-export function getGreeting(): string {
-  const h = new Date().getHours()
-  if (h < 12) return "Good morning"
-  if (h < 18) return "Good afternoon"
-  return "Good evening"
-}
-
 export function formatMessageTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString("en-US", {
     hour: "numeric",

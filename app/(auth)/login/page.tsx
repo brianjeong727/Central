@@ -85,7 +85,7 @@ function LoginContent() {
 
         {/* Form card */}
         <div className="bg-white rounded-2xl border border-[#ECE8DE] p-6 shadow-[0_2px_8px_rgba(19,16,26,0.06)]">
-          <h2 className="text-[20px] font-bold text-[#13101A] tracking-tight mb-1">Welcome back</h2>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "#13101A", lineHeight: 1.1, marginBottom: 4 }}>Welcome back</h2>
           <p className="text-[13px] text-[#8A8497] mb-6">Sign in to your account</p>
 
           {/* Google OAuth */}
