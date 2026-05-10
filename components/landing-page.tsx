@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getUserMinistries } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
@@ -10,7 +11,6 @@ const C = {
   plum: "#3E1540",
   plumDarker: "#240920",
   ink: "#13101A",
-  gold: "#C9A34B",
   surface: "#FBF8F2",
   surface2: "#F6F4EF",
   border: "#ECE8DE",
@@ -83,7 +83,7 @@ export default function LandingPage() {
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.href = "/"
+    window.location.assign("/")
   }
 
   const navColor = scrolled ? C.ink : C.ivory
@@ -105,13 +105,13 @@ export default function LandingPage() {
       >
         <div style={{ maxWidth: 1192, margin: "0 auto", padding: "0 56px", display: "flex", alignItems: "center", height: 72, gap: 24 }}>
           {/* Brand */}
-          <a
+          <Link
             href="/"
             style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: navColor, fontFamily: SERIF, fontSize: 22, transition: "color 180ms ease", flexShrink: 0 }}
           >
             <RingCrossLogo size={28} color={scrolled ? C.plum : C.ivory} />
             Central
-          </a>
+          </Link>
 
           {/* Center links */}
           <div className="cl-nav-links" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 28 }}>
@@ -181,18 +181,18 @@ export default function LandingPage() {
           className="cl-hero-body"
           style={{ padding: "148px 0 96px", maxWidth: 460 }}
         >
-          <p style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold }}>
-            For college ministries
+          <p style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.72)" }}>
+            For college ministry leaders
           </p>
           <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400 }}>
-            A quieter home<br />for the weekly{" "}
-            <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>rhythm.</span>
+            Know who&apos;s connected<br />and what needs{" "}
+            <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>follow-up.</span>
           </h1>
           <p
             className="cl-hero-sub"
             style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.ivory, marginTop: 24, maxWidth: 380, lineHeight: 1.5 }}
           >
-            Conversations, announcements, people, and planning — held together so leaders can move with clarity and students know where to look.
+            Replace scattered chats, announcement threads, RSVP lists, and planning docs with one calm weekly workspace.
           </p>
           <div style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap" }}>
             <button
@@ -203,7 +203,7 @@ export default function LandingPage() {
             </button>
             <a
               href="/ministries"
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.gold}`, background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
               Find an existing one
             </a>
@@ -218,7 +218,7 @@ export default function LandingPage() {
           <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14.5, color: C.ivory, lineHeight: 1.5, margin: 0 }}>
             &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
           </p>
-          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, margin: "12px 0 0" }}>
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.68)", margin: "12px 0 0" }}>
             Matthew 18 : 20
           </p>
         </div>
@@ -231,10 +231,10 @@ export default function LandingPage() {
           One calm system
         </p>
         <h2 className="cl-section-h" style={{ fontFamily: SERIF, fontSize: 60, lineHeight: 0.98, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400, color: C.ink }}>
-          Less noise between<br />Sunday and the next gathering.
+          Less drift between<br />Sunday and the next gathering.
         </h2>
         <p style={{ fontSize: 16, color: C.body, marginTop: 22, maxWidth: 580, lineHeight: 1.6 }}>
-          Central keeps the pastoral, practical, and administrative pieces of college ministry in one quiet place — so leaders can lead, and students can find what they need.
+          Central gives leaders one place to post updates, track responses, care for people, and coordinate the teams that carry the week.
         </p>
 
         <div
@@ -243,7 +243,7 @@ export default function LandingPage() {
         >
           {FEATURES.map(({ num, title, body }) => (
             <div key={num} style={{ background: C.surface, padding: "40px 36px", minHeight: 220 }}>
-              <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.gold }}>{num}</div>
+              <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.muted }}>{num}</div>
               <h4 style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1.1, fontWeight: 400, margin: "14px 0 10px", color: C.ink }}>{title}</h4>
               <p style={{ color: C.body, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{body}</p>
             </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
                 key={day}
                 style={{ padding: "32px 24px", borderRight: i < RHYTHM.length - 1 ? `1px solid ${C.border}` : "none" }}
               >
-                <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold }}>{day}</div>
+                <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.muted }}>{day}</div>
                 <div style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.2, marginTop: 10, color: C.ink }}>{what}</div>
                 <div style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{who}</div>
               </div>
@@ -278,12 +278,10 @@ export default function LandingPage() {
 
       {/* ── CTA ── */}
       <section className="cl-cta" style={{ padding: "110px 56px", background: C.plum, color: C.ivory, position: "relative", overflow: "hidden" }}>
-        {/* Gold dot pattern */}
-        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(201,163,75,0.22) 1px, transparent 1.4px)", backgroundSize: "22px 22px", opacity: 0.45, pointerEvents: "none" }} />
-        {/* Radial gold glows */}
-        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 88% 16%, rgba(201,163,75,0.16) 0%, transparent 40%), radial-gradient(circle at 6% 88%, rgba(201,163,75,0.10) 0%, transparent 35%)", pointerEvents: "none" }} />
+        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.16) 1px, transparent 1.4px)", backgroundSize: "22px 22px", opacity: 0.28, pointerEvents: "none" }} />
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 88% 16%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 6% 88%, rgba(246,244,239,0.08) 0%, transparent 35%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: C.gold, margin: 0 }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.7)", margin: 0 }}>
             Begin
           </p>
           <h3 className="cl-cta-title" style={{ fontFamily: SERIF, fontSize: 72, lineHeight: 1, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400 }}>
@@ -301,7 +299,7 @@ export default function LandingPage() {
             </button>
             <a
               href="/login"
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.gold}`, background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.35)", background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
               Sign in
             </a>
@@ -342,7 +340,7 @@ export default function LandingPage() {
           right: 6px;
           bottom: 4px;
           height: 2px;
-          background: ${C.gold};
+          background: rgba(246,244,239,0.72);
           border-radius: 2px;
         }
 

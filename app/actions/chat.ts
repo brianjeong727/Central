@@ -11,14 +11,22 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
   // Verify the caller is admin or leader
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("ministry_id, role")
     .eq("id", user.id)
     .single()
-  if (!profile || !["admin", "leader"].includes(profile.role.toLowerCase())) {
+  if (!profile?.ministry_id || !["admin", "leader"].includes(profile.role.toLowerCase())) {
     return { error: "Insufficient permissions." }
   }
 
   const admin = createAdminClient()
+
+  const { data: group } = await admin
+    .from("groups")
+    .select("id")
+    .eq("id", groupId)
+    .eq("ministry_id", profile.ministry_id)
+    .maybeSingle()
+  if (!group) return { error: "Chat not found in your ministry." }
 
   // Delete in FK-safe order
   const { data: msgs } = await admin.from("messages").select("id").eq("group_id", groupId)

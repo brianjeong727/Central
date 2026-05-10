@@ -319,6 +319,9 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
           member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null,
         ].filter(Boolean).join(" · ")}
       </p>
+      <p style={{ fontSize: 12, color: "#8A8497", margin: "-16px 0 28px", textAlign: "center", maxWidth: 360, lineHeight: 1.45 }}>
+        Shared profile details are visible to members in this ministry.
+      </p>
 
       {/* Action buttons */}
       {!isOwnProfile && (
@@ -495,6 +498,9 @@ export function MemberSheet({
                 <span className="text-[10px] bg-[#3E1540]/10 text-[#3E1540] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
               )}
             </div>
+            <p className="mt-3 text-[12px] text-[#8A8497] text-center leading-relaxed max-w-[270px]">
+              Shared profile details are visible to members in this ministry.
+            </p>
           </div>
 
           <div className="flex flex-col gap-3">

@@ -61,8 +61,8 @@ export default function PendingPage() {
         </div>
 
         {/* Status icon */}
-        <div className="w-16 h-16 rounded-full bg-[#C9A34B]/15 flex items-center justify-center mb-6">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C9A34B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center mb-6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3E1540" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />

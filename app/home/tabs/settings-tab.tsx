@@ -382,7 +382,7 @@ export function SettingsTab({
                       disabled={!inviteCode}
                       className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#E5E0D2] text-[12px] font-semibold text-[#5A5466] hover:bg-[#F4F1E8] disabled:opacity-40 transition-colors flex-shrink-0"
                     >
-                      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
                       {copied ? "Copied" : "Copy"}
                     </button>
                   </div>
@@ -390,13 +390,13 @@ export function SettingsTab({
                   {/* Regenerate */}
                   {isAdmin && (
                     showRegenerateConfirm ? (
-                      <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-                        <p style={{ fontSize: "12px", color: "#92400E", marginBottom: "8px" }}>
+                      <div className="rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] p-3">
+                        <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "8px" }}>
                           The old code will stop working immediately. Anyone with it won&apos;t be able to join.
                         </p>
                         <div className="flex gap-2">
-                          <button onClick={() => setShowRegenerateConfirm(false)} className="px-3 py-1.5 rounded-lg border border-amber-200 text-[11px] text-[#92400E] hover:bg-amber-100 transition-colors">Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:bg-amber-700 disabled:opacity-60 transition-colors">
+                          <button onClick={() => setShowRegenerateConfirm(false)} className="px-3 py-1.5 rounded-lg border border-[#E5E0D2] text-[11px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">Cancel</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-1.5 rounded-lg bg-[#3E1540] text-[#F6F4EF] text-[11px] font-semibold hover:bg-[#2D0F2E] disabled:opacity-60 transition-colors">
                             {regenerating ? "Regenerating…" : "Yes, regenerate"}
                           </button>
                         </div>

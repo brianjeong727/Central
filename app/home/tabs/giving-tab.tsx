@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { Pencil, Check, X, Copy, ExternalLink } from "lucide-react"
+import { Pencil, Check, Copy, ExternalLink } from "lucide-react"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { Spinner } from "../components/shared"
 
@@ -12,55 +12,26 @@ interface Props {
   isAdmin: boolean
 }
 
-const FUNDS = [
-  { id: "general", name: "General fund", desc: "Where it's needed most" },
-  { id: "missions", name: "Missions", desc: "Spring break trip & outreach" },
-  { id: "scholarship", name: "Retreat scholarships", desc: "Help a member attend" },
-]
-
 const PRESET_AMOUNTS = ["10", "25", "50", "100", "250"]
 
-const PAY_METHODS = [
-  { id: "zelle", name: "Zelle", note: "Instant" },
-  { id: "card", name: "Card", note: "2.9% fee" },
-  { id: "ach", name: "Bank (ACH)", note: "1–2 days" },
-  { id: "venmo", name: "Venmo", note: "@central" },
-]
-
-function FundSelector({ fund, setFund }: { fund: string; setFund: (id: string) => void }) {
+function GivingTrustPanel({ zelleInfo, onCopy, copied }: { zelleInfo: string; onCopy: () => void; copied: boolean }) {
   return (
     <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
-      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Designate to</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {FUNDS.map(f => (
-          <div
-            key={f.id}
-            onClick={() => setFund(f.id)}
-            style={{
-              padding: "12px 14px",
-              border: `1px solid ${fund === f.id ? "#3E1540" : "#ECE8DE"}`,
-              background: fund === f.id ? "#FBF8F2" : "transparent",
-              borderRadius: 12, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 12,
-            }}
-          >
-            <div style={{
-              width: 16, height: 16, borderRadius: 999,
-              border: `1.5px solid ${fund === f.id ? "#3E1540" : "#C4C4C4"}`,
-              background: fund === f.id ? "#3E1540" : "transparent",
-              position: "relative", flexShrink: 0,
-            }}>
-              {fund === f.id && (
-                <div style={{ position: "absolute", inset: 4, borderRadius: 999, background: "#F6F4EF" }} />
-              )}
-            </div>
-            <div>
-              <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500, lineHeight: 1.2 }}>{f.name}</p>
-              <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{f.desc}</p>
-            </div>
-          </div>
-        ))}
+      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Giving destination</p>
+      <div style={{ padding: "12px 14px", border: "1px solid #ECE8DE", background: "#FBF8F2", borderRadius: 12, marginBottom: 12 }}>
+        <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 600, lineHeight: 1.2 }}>{zelleInfo}</p>
+        <p style={{ fontSize: 12, color: "#8A8497", marginTop: 4 }}>Zelle email or phone</p>
       </div>
+      <button
+        onClick={onCopy}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, border: "1px solid #E5E0D2", background: "white", color: copied ? "#3E1540" : "#5A5466", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}
+      >
+        {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
+        {copied ? "Copied" : "Copy Zelle info"}
+      </button>
+      <p style={{ fontSize: 12.5, color: "#5A5466", lineHeight: 1.55 }}>
+        Central only stores your ministry&apos;s Zelle destination. Gifts, receipts, statements, and tax records stay with your ministry.
+      </p>
     </div>
   )
 }
@@ -74,10 +45,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [zelleFallback, setZelleFallback] = useState(false)
-  const [fund, setFund] = useState("general")
   const [amount, setAmount] = useState("50")
-  const [payMethod, setPayMethod] = useState("zelle")
-  const [recurring, setRecurring] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -90,9 +58,11 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId])
 
   async function handleSave() {
+    if (!isAdmin) return
     const val = editValue.trim()
     if (!val) return
     setSaving(true)
@@ -144,8 +114,8 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
             Give cheerfully.
           </h1>
           <p className="mt-3 text-[14px] text-[#5A5466] leading-relaxed md:max-w-[520px]">
-            Every gift goes directly to the ministry — fueling retreats, meals, and the people doing the work.{" "}
-            <span className="text-[#8A8497]">Your giving is private.</span>
+            Give directly through your ministry&apos;s Zelle information.{" "}
+            <span className="text-[#8A8497]">Central does not process payments or track gifts.</span>
           </p>
         </div>
 
@@ -158,7 +128,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
               {/* ── Left: plum card ── */}
               <div
                 style={{
-                  background: "radial-gradient(circle at 90% 20%, rgba(201,163,75,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(201,163,75,0.08) 0%, transparent 35%), #3E1540",
+                  background: "radial-gradient(circle at 90% 20%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(246,244,239,0.08) 0%, transparent 35%), #3E1540",
                   borderRadius: 20,
                   padding: "28px 28px 24px",
                   position: "relative",
@@ -170,7 +140,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                 {/* dot grid overlay */}
                 <div style={{
                   position: "absolute", inset: 0,
-                  backgroundImage: "radial-gradient(circle, rgba(201,163,75,0.20) 1px, transparent 1.4px)",
+                  backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.18) 1px, transparent 1.4px)",
                   backgroundSize: "18px 18px",
                   opacity: 0.35,
                   pointerEvents: "none",
@@ -268,29 +238,6 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                         ))}
                       </div>
 
-                      {/* Recurring toggle */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderTop: "1px solid rgba(246,244,239,0.15)", borderBottom: "1px solid rgba(246,244,239,0.15)", marginBottom: 16 }}>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ color: "#F6F4EF", fontSize: 13.5, fontWeight: 500 }}>Make this monthly</p>
-                          <p style={{ color: "rgba(246,244,239,0.6)", fontSize: 12 }}>Withdrawn on the 1st of each month</p>
-                        </div>
-                        <div
-                          onClick={() => setRecurring(!recurring)}
-                          style={{
-                            width: 38, height: 22, borderRadius: 999,
-                            background: recurring ? "#F6F4EF" : "rgba(246,244,239,0.18)",
-                            position: "relative", cursor: "pointer", flexShrink: 0,
-                          }}
-                        >
-                          <div style={{
-                            position: "absolute", top: 2, left: recurring ? 18 : 2,
-                            width: 18, height: 18, borderRadius: 999,
-                            background: recurring ? "#3E1540" : "white",
-                            transition: "left 0.15s",
-                          }} />
-                        </div>
-                      </div>
-
                       {/* Open Zelle */}
                       <button
                         onClick={handleOpenZelle}
@@ -301,7 +248,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                         }}
                       >
                         <ExternalLink style={{ width: 16, height: 16 }} />
-                        Give with Zelle · ${displayAmount}
+                        Open Zelle · ${displayAmount}
                       </button>
 
                       {zelleFallback && (
@@ -315,9 +262,9 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                         onClick={handleCopy}
                         style={{
                           width: "100%", height: 38, background: "transparent",
-                          color: copied ? "rgba(110,231,183,0.9)" : "rgba(246,244,239,0.6)",
+                          color: copied ? "#F6F4EF" : "rgba(246,244,239,0.6)",
                           borderRadius: 10, fontSize: 13,
-                          border: `1px solid ${copied ? "rgba(110,231,183,0.4)" : "rgba(246,244,239,0.15)"}`,
+                          border: `1px solid ${copied ? "rgba(246,244,239,0.45)" : "rgba(246,244,239,0.15)"}`,
                           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                         }}
                       >
@@ -339,52 +286,25 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
                 </div>
               </div>
 
-              {/* ── Right: fund + pay-with (desktop) ── */}
+              {/* ── Right: trust context (desktop) ── */}
               {zelleInfo && !editing && (
                 <div className="hidden md:flex flex-col gap-4">
-                  <FundSelector fund={fund} setFund={setFund} />
-
-                  {/* Pay with */}
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
-                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Pay with</p>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      {PAY_METHODS.map(m => (
-                        <div
-                          key={m.id}
-                          onClick={() => setPayMethod(m.id)}
-                          style={{
-                            padding: "12px 14px",
-                            border: `1px solid ${payMethod === m.id ? "#3E1540" : "#ECE8DE"}`,
-                            background: payMethod === m.id ? "#FBF8F2" : "transparent",
-                            borderRadius: 12, cursor: "pointer",
-                          }}
-                        >
-                          <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</p>
-                          <p style={{ fontSize: 11.5, color: "#8A8497", marginTop: 2 }}>{m.note}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <GivingTrustPanel zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
                 </div>
               )}
             </div>
 
-            {/* Mobile-only: fund selector + tax note */}
+            {/* Mobile-only: trust context */}
             {zelleInfo && !editing && (
               <div className="md:hidden mt-4">
-                <div className="mb-3">
-                  <FundSelector fund={fund} setFund={setFund} />
-                </div>
-                <p style={{ fontSize: 12, color: "#8A8497", textAlign: "center", lineHeight: 1.5 }}>
-                  Gifts are tax deductible. Contact your ministry leader for a giving statement.
-                </p>
+                <GivingTrustPanel zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
               </div>
             )}
 
             {/* Footer — desktop only */}
             {zelleInfo && !editing && (
               <div className="hidden md:flex items-center mt-8 pt-5" style={{ borderTop: "1px solid #ECE8DE", color: "#8A8497", fontSize: 12.5 }}>
-                <span>Gifts are tax deductible. Contact your ministry for a giving statement.</span>
+                <span>For receipts or giving statements, contact your ministry treasurer.</span>
               </div>
             )}
           </>

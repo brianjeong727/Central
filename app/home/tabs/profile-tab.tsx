@@ -13,8 +13,8 @@ import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   praying:  { label: "Praying",  bg: "#EDE5F0", text: "#3E1540" },
-  answered: { label: "Answered", bg: "#D1FAE5", text: "#065F46" },
-  ongoing:  { label: "Ongoing",  bg: "#FEF3C7", text: "#92400E" },
+  answered: { label: "Answered", bg: "#F4F1E8", text: "#3E1540" },
+  ongoing:  { label: "Ongoing",  bg: "#FBF8F2", text: "#5A5466" },
 }
 
 function fmtJournalDate(iso: string) {
@@ -38,13 +38,13 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
       if (data) setEntries(data)
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId])
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -59,7 +59,7 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).select().single()
+      const { data, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Devotional) : e))
     } else {
       const { data, error } = await supabase.from("devotionals").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).select().single()
@@ -68,7 +68,11 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
-  async function handleDelete(id: string) { await supabase.from("devotionals").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from("devotionals").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
+    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    setOpenMenuId(null)
+  }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -197,13 +201,13 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
       if (data) setEntries(data)
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId])
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -218,7 +222,7 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).select().single()
+      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e))
     } else {
       const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
@@ -227,10 +231,14 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
-  async function handleDelete(id: string) { await supabase.from("prayers").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from("prayers").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
+    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    setOpenMenuId(null)
+  }
 
   async function updateStatus(id: string, status: PrayerStatus) {
-    const { data, error } = await supabase.from("prayers").update({ status }).eq("id", id).select().single()
+    const { data, error } = await supabase.from("prayers").update({ status }).eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
     if (!error && data) setEntries(prev => prev.map(e => e.id === id ? (data as Prayer) : e))
     setStatusMenuId(null)
   }
@@ -373,13 +381,13 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.from("verses").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      const { data } = await supabase.from("verses").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
       if (data) setEntries(data)
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId])
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -394,7 +402,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     if (!draft.reference.trim() || !draft.verse_text.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("verses").update({ reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).eq("id", editingEntry.id).select().single()
+      const { data, error } = await supabase.from("verses").update({ reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Verse) : e))
     } else {
       const { data, error } = await supabase.from("verses").insert({ user_id: userId, ministry_id: ministryId, reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).select().single()
@@ -403,7 +411,11 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
-  async function handleDelete(id: string) { await supabase.from("verses").delete().eq("id", id); setEntries(prev => prev.filter(e => e.id !== id)); setOpenMenuId(null) }
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from("verses").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
+    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    setOpenMenuId(null)
+  }
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
@@ -593,6 +605,7 @@ export function ProfileTab({
         pray_for_me: draft.pray_for_me || null,
       })
       .eq("id", userId)
+      .eq("ministry_id", initialProfile.ministry_id ?? "")
       .select()
       .single()
 
@@ -600,7 +613,7 @@ export function ProfileTab({
     setSaving(false)
     setEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, userId])
+  }, [draft, initialProfile.ministry_id, userId])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -624,7 +637,7 @@ export function ProfileTab({
       const { data: { publicUrl } } = supabase.storage
         .from("profile-images")
         .getPublicUrl(uploadData.path)
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId)
+      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
       setProfile((p) => ({ ...p, avatar_url: publicUrl }))
       onAvatarChange?.(publicUrl)
     }
@@ -709,7 +722,7 @@ export function ProfileTab({
             display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center",
           }}
         >
-          <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+          <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
           <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
 
           {/* Avatar — label wraps input for reliable iOS file picker */}
@@ -808,7 +821,7 @@ export function ProfileTab({
       <div className="md:hidden px-5">
         <div className="rounded-2xl overflow-hidden border border-[#ECE8DE] shadow-[0_2px_8px_rgba(19,16,26,0.06)] mb-5">
           <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
-            <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.20)_0%,transparent_65%)]" />
+            <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.16)_0%,transparent_65%)]" />
             <div className="relative z-10 flex flex-col items-center gap-4">
               <label
                 className="relative w-24 h-24 rounded-full overflow-hidden bg-[#3E1540] border-[3px] border-white/20 group flex-shrink-0"

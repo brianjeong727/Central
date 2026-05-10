@@ -179,6 +179,7 @@ export interface ChatSettingsProps {
   groupType: string
   groupArchived?: boolean
   userId: string
+  ministryId: string
   userRole: string
   onBack: () => void
   onNameChange: (name: string) => void
@@ -191,6 +192,7 @@ export interface ChatScreenProps {
   groupName: string
   userId: string
   userName: string
+  ministryId: string
   userRole: string
   onClose: () => void
   onRead?: () => void

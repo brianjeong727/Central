@@ -570,7 +570,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             {/* Pinned hero strip */}
             {pinnedAnn && filter === "all" && (
               <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "22px 28px", }}>
-                <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+                <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
                 <div className="relative">
                   {editingId === pinnedAnn.id && editDraft ? (
                     <>
@@ -884,7 +884,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
     return (
       <>
         <div className="relative rounded-[22px] bg-[#3E1540] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
-          <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.28)_0%,transparent_70%)] pointer-events-none" />
+          <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
 
           {!isEditing && announcement.image_url && (
             // eslint-disable-next-line @next/next/no-img-element

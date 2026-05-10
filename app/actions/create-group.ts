@@ -22,12 +22,15 @@ export async function createGroup(input: CreateGroupInput): Promise<CreateGroupR
 
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("ministry_id")
+    .select("ministry_id, role")
     .eq("id", user.id)
     .single()
 
   if (profileErr || !profile?.ministry_id) {
     return { group: null, error: "You must be part of a ministry to create a chat." }
+  }
+  if (input.type === "church" && !["admin", "leader"].includes(profile.role.toLowerCase())) {
+    return { group: null, error: "Only admins and leaders can create church chats." }
   }
 
   const { data: group, error: groupErr } = await supabase

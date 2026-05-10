@@ -354,9 +354,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   }
 
   const showPlanTab = isAdmin || userTeams.length > 0
-  // Church chat creation: admins/leaders + DGL members + Student Org Board members
+  // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
-    userTeams.some(t => t.teamName === "Small Group Leaders" || t.teamName === "Student Org Board")
+    userTeams.some(t => {
+      const label = t.teamName.toLowerCase()
+      return /\b(small group|discipleship|student org|board|leadership)\b/.test(label) ||
+        t.permissions.some(p => ["can_create_dgs", "can_view_dgs", "can_manage_members", "can_plan_events"].includes(p))
+    })
 
   return (
     <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[#F4F1E8]">
@@ -440,6 +444,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                     groupName={globalOpenChat.name}
                     userId={userId}
                     userName={initialProfile.name}
+                    ministryId={ministryId}
                     userRole={initialProfile.role}
                     onClose={handleChatClose}
                     onRead={recountTotalUnread}
@@ -551,6 +556,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           groupName={globalOpenChat.name}
           userId={userId}
           userName={initialProfile.name}
+          ministryId={ministryId}
           userRole={initialProfile.role}
           onClose={handleChatClose}
           onRead={recountTotalUnread}

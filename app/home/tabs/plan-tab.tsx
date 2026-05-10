@@ -1096,12 +1096,15 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
   const teamsToShow = isAdmin ? allTeams : userTeams.map(t => ({ id: t.teamId, name: t.teamName, icon: t.teamIcon, description: t.teamDescription, created_by: "", member_count: 0 }))
 
-  const isStudentOrgBoard = activeTeamName === "Student Org Board"
-  const studentOrgUserTeam = isStudentOrgBoard ? userTeams.find(t => t.teamId === activeTeamId) : null
+  const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
+  const activeTeamLabel = activeTeamName.toLowerCase()
+  const activeTeamPerms = activeUserTeam?.permissions ?? []
+  const isStudentOrgBoard = /\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
+  const studentOrgUserTeam = isStudentOrgBoard ? activeUserTeam : null
   const studentOrgRole = studentOrgUserTeam?.roleName ?? ""
 
-  const isPraiseTeam = activeTeamName === "Praise Team"
-  const praiseTeamPerms = isPraiseTeam ? (userTeams.find(t => t.teamId === activeTeamId)?.permissions ?? []) : []
+  const isPraiseTeam = /\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p))
+  const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
   const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
   const studentOrgTabs: string[] = (() => {
@@ -1425,8 +1428,8 @@ export function worshipWeekDateLabel(dateStr: string) {
 export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "filled" | "confirmed"; onChange?: (s: string) => void }) {
   const cfg = {
     draft:     { label: "Draft",     bg: "#F3F0F7", color: "#5A5466" },
-    filled:    { label: "Filled",    bg: "#FFF7E6", color: "#C9A34B" },
-    confirmed: { label: "Confirmed", bg: "#EDFAF3", color: "#2D7A4F" },
+    filled:    { label: "Filled",    bg: "#F4F1E8", color: "#3E1540" },
+    confirmed: { label: "Confirmed", bg: "#EDE5F0", color: "#3E1540" },
   }[status]
   if (onChange) {
     return (
@@ -1967,7 +1970,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
             {/* Radial glow */}
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(201,163,75,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
 
             {/* Close button */}
             <button
@@ -1993,13 +1996,13 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               {slide.isTitle ? (
                 /* ── Title slide ── */
                 <>
-                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(201,163,75,0.7)", marginBottom: 20 }}>
+                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.62)", marginBottom: 20 }}>
                     {slide.songKey ? `Key of ${slide.songKey}` : ""}
                   </p>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "#F6F4EF", lineHeight: 1.15, fontWeight: 400 }}>
                     {slide.songTitle}
                   </p>
-                  <div style={{ width: 40, height: 1.5, background: "rgba(201,163,75,0.4)", margin: "28px auto 0" }} />
+                  <div style={{ width: 40, height: 1.5, background: "rgba(246,244,239,0.32)", margin: "28px auto 0" }} />
                 </>
               ) : (
                 /* ── Lyric slide ── */
@@ -2678,11 +2681,11 @@ function SetListPdfViewer({
               onChange={e => setEditValue(e.target.value)}
               onBlur={handleSaveFieldEdit}
               onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
-              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "#C9A34B", padding: "2px 0", width: 60 }}
+              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "#F6F4EF", padding: "2px 0", width: 60 }}
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("key"); setEditValue(song.key) } : undefined}
-              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", ...monoStyle, color: song.key ? "#C9A34B" : "#5A5466", padding: 0 }}>
+              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", ...monoStyle, color: song.key ? "#3E1540" : "#5A5466", padding: 0 }}>
               {song.key || "NO KEY"}
             </button>
           )}
@@ -2779,11 +2782,11 @@ function SetListPdfViewer({
 // ── MinistryCalendar ──────────────────────────────────────────────────────────
 
 const CATEGORY_CONFIG = {
-  welcoming: { label: "Welcoming", dot: "#16A34A", bg: "#DCFCE7", text: "#14532D" },
-  retreat:   { label: "Retreat",   dot: "#2563EB", bg: "#DBEAFE", text: "#1E3A8A" },
-  social:    { label: "Social",    dot: "#C9A34B", bg: "#FEF3C7", text: "#92400E" },
-  service:   { label: "Service",   dot: "#7C3AED", bg: "#EDE9FE", text: "#4C1D95" },
-  regular:   { label: "Regular",   dot: "#6B7280", bg: "#F3F4F6", text: "#374151" },
+  welcoming: { label: "Welcoming", dot: "#3E1540", bg: "#EDE5F0", text: "#3E1540" },
+  retreat:   { label: "Retreat",   dot: "#5A5466", bg: "#F4F1E8", text: "#3E1540" },
+  social:    { label: "Social",    dot: "#8A8497", bg: "#FBF8F2", text: "#5A5466" },
+  service:   { label: "Service",   dot: "#3E1540", bg: "#F0EDE8", text: "#3E1540" },
+  regular:   { label: "Regular",   dot: "#8A8497", bg: "#F3F0F7", text: "#5A5466" },
 } as const
 export function MonthGrid({
   events,

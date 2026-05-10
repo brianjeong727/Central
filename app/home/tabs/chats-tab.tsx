@@ -209,7 +209,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   )
 }
 
-export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -273,6 +273,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const { data } = await supabase
       .from("profiles")
       .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
+      .eq("ministry_id", ministryId)
       .order("name")
     setAllProfiles((data ?? []).filter((p: Profile) => !memberIds.has(p.id)))
   }
@@ -281,9 +282,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const trimmed = newName.trim()
     if (!trimmed || trimmed === displayGroupName) { setRenaming(false); return }
     setSaving(true)
-    await supabase.from("groups").update({ name: trimmed }).eq("id", groupId)
-    setDisplayGroupName(trimmed)
-    onNameChange(trimmed)
+    const { error } = await supabase.from("groups").update({ name: trimmed }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!error) {
+      setDisplayGroupName(trimmed)
+      onNameChange(trimmed)
+    }
     setSaving(false)
     setRenaming(false)
   }
@@ -301,18 +304,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleArchive() {
-    await supabase.from("groups").update({ archived: true }).eq("id", groupId)
-    onClose()
+    const { error } = await supabase.from("groups").update({ archived: true }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!error) onClose()
   }
 
   async function handleUnarchive() {
-    await supabase.from("groups").update({ archived: false }).eq("id", groupId)
-    onClose()
+    const { error } = await supabase.from("groups").update({ archived: false }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!error) onClose()
   }
 
   async function handleDelete() {
-    await deleteGroup(groupId)
-    onClose()
+    const { error } = await deleteGroup(groupId)
+    if (!error) onClose()
   }
 
   async function handleAddMembers() {
@@ -463,11 +466,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         {/* ── Desktop: plum hero ── */}
         <div className="hidden md:block px-10 pt-8 pb-6">
           <div style={{
-            background: "radial-gradient(circle at 90% 20%, rgba(201,163,75,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(201,163,75,0.08) 0%, transparent 35%), #3E1540",
+            background: "radial-gradient(circle at 90% 20%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(246,244,239,0.08) 0%, transparent 35%), #3E1540",
             borderRadius: 20, padding: "28px 32px", position: "relative", overflow: "hidden",
             display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 24, alignItems: "center",
           }}>
-            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(201,163,75,0.20) 1px, transparent 1.4px)", backgroundSize: "18px 18px", opacity: 0.35, pointerEvents: "none" }} />
+            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.18) 1px, transparent 1.4px)", backgroundSize: "18px 18px", opacity: 0.35, pointerEvents: "none" }} />
             {/* Avatar */}
             <div style={{ position: "relative", zIndex: 1 }}>
               <div style={{ width: 72, height: 72, borderRadius: 999, background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-instrument-serif)", fontSize: 24, color: "#F6F4EF" }}>
@@ -773,7 +776,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
 }
 
-export function ChatScreen({ groupId, groupName, userId, userName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, ministryId, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -1375,6 +1378,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
                       </div>
                     )}
                   <div
+                    title="Long-press for reply and reactions"
                     onPointerDown={() => handlePointerDown(msg)}
                     onPointerUp={() => handlePointerUp(msg)}
                     onPointerLeave={handlePointerCancel}
@@ -1564,6 +1568,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, userRole, onC
         groupType={groupType}
         groupArchived={groupArchived}
         userId={userId}
+        ministryId={ministryId}
         userRole={userRole}
         onBack={() => setShowSettings(false)}
         onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}

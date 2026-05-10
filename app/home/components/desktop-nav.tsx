@@ -242,7 +242,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
             >
               <Icon className="w-[18px] h-[18px]" />
               {isActive && (
-                <span className="absolute left-[-9px] top-2 bottom-2 w-0.5 bg-[#C9A34B] rounded-full" />
+                <span className="absolute left-[-9px] top-2 bottom-2 w-0.5 bg-[#F6F4EF] rounded-full" />
               )}
               {id === "chats" && chatsUnread > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#C9A34B] rounded-full" />

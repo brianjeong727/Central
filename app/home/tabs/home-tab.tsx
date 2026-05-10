@@ -11,13 +11,6 @@ import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
 
-function getGreeting() {
-  const h = new Date().getHours()
-  if (h < 12) return "Good morning"
-  if (h < 17) return "Good afternoon"
-  return "Good evening"
-}
-
 export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
   const supabase = createClient()
 
@@ -41,8 +34,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
   const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
-  const firstName = profile.name.split(" ")[0]
-  const greeting = getGreeting()
   const roleBadge = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
 
@@ -207,7 +198,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
             <div style={{ maxWidth: "640px" }}>
               <p style={MONO_STYLE}>{dateLabel}</p>
               <h1 style={{ margin: "14px 0 8px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
-                {greeting}, {firstName}
+                Today in {ministryName}
               </h1>
               <span style={{ display: "inline-block", fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
                 {roleBadge}
@@ -240,7 +231,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                   className="relative overflow-hidden rounded-2xl text-[#F6F4EF] flex flex-col"
                   style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "32px 32px 28px", minHeight: "320px" }}
                 >
-                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(201,163,75,0.18), transparent 60%)" }} />
+                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
                   <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
                   <div className="relative flex justify-between items-start">
                     <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Up next</span>
@@ -403,10 +394,9 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
 
           {/* ── Mobile content ── */}
           <div className="md:hidden px-5 pb-4">
-            {/* Greeting */}
             <div className="mb-6">
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
-                {greeting},<br />{firstName}
+                Today in<br />{ministryName}
               </p>
               <div className="flex items-center gap-2 mt-2.5">
                 <span style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
@@ -435,7 +425,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
 
                 {heroAnn ? (
                   <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
-                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(201,163,75,0.33)_0%,transparent_70%)]" />
+                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)]" />
                     <div className="relative">
                       <div className="flex items-center gap-2 mb-3">
                         <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Event</span>
