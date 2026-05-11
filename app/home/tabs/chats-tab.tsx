@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, User, Smile } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -482,7 +482,25 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Name + meta */}
             <div style={{ position: "relative", zIndex: 1 }}>
               <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)", marginBottom: 6 }}>{typeLabel}</p>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05 }}>{displayGroupName}</h2>
+              {renaming ? (
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+                  onBlur={handleRename}
+                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid rgba(246,244,239,0.4)", outline: "none", padding: 0 }}
+                />
+              ) : (
+                <div
+                  className="group flex items-center gap-2"
+                  style={{ cursor: canManage ? "text" : "default" }}
+                  onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
+                >
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05 }}>{displayGroupName}</h2>
+                  {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "rgba(246,244,239,0.6)", flexShrink: 0, marginTop: 4 }} />}
+                </div>
+              )}
               <p style={{ color: "rgba(246,244,239,0.65)", fontSize: 13, marginTop: 8 }}>
                 {members.length} member{members.length !== 1 ? "s" : ""}
               </p>
@@ -490,9 +508,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Action buttons */}
             {canManage && (
               <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 10, color: "#F6F4EF", fontSize: 13, cursor: "pointer" }}>
-                  <Edit3 style={{ width: 13, height: 13 }} /> Rename
-                </button>
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 10, color: "#F6F4EF", fontSize: 13, cursor: "pointer" }}>
                   <Plus style={{ width: 13, height: 13 }} /> Add members
                 </button>
@@ -594,33 +609,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
             <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
             <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
-              {/* Rename row */}
-              {renaming ? (
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid #ECE8DE", display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
-                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ECE8DE", borderRadius: 8, fontSize: 13, color: "#13101A", background: "#FBF8F2", outline: "none" }}
-                  />
-                  <button onClick={handleRename} disabled={saving} style={{ width: 32, height: 32, borderRadius: 999, background: "#3E1540", border: "none", color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Check style={{ width: 13, height: 13 }} />
-                  </button>
-                  <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} style={{ width: 32, height: 32, borderRadius: 999, background: "#F4F1E8", border: "none", color: "#8A8497", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <X style={{ width: 13, height: 13 }} />
-                  </button>
-                </div>
-              ) : canManage ? (
-                <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", cursor: "pointer" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
-                    <Edit3 style={{ width: 13, height: 13 }} />
-                  </div>
-                  <div style={{ flex: 1, textAlign: "left" }}>
-                    <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Rename chat</p>
-                    <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Change how it appears in everyone&apos;s list</p>
-                  </div>
-                  <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
-                </button>
-              ) : null}
               {canManage && (
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", cursor: "pointer" }}>
                   <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
@@ -692,8 +680,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)}`}>
                 <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">{getInitials(displayGroupName)}</AvatarFallback>
               </Avatar>
-              <div>
-                <h3 className="text-[16px] font-bold text-[#13101A] tracking-tight">{displayGroupName}</h3>
+              <div className="flex-1 min-w-0">
+                {renaming ? (
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+                    onBlur={handleRename}
+                    className="text-[16px] font-bold text-[#13101A] tracking-tight bg-transparent outline-none border-none w-full"
+                    style={{ borderBottom: "1px solid #E2DDCF", padding: 0 }}
+                  />
+                ) : (
+                  <div
+                    className="group flex items-center gap-1.5"
+                    style={{ cursor: canManage ? "text" : "default" }}
+                    onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
+                  >
+                    <h3 className="text-[16px] font-bold text-[#13101A] tracking-tight">{displayGroupName}</h3>
+                    {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "#8A8497", flexShrink: 0 }} />}
+                  </div>
+                )}
                 <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
               </div>
             </div>
@@ -729,19 +736,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div className="px-5 pb-4">
               <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
               <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-                {renaming ? (
-                  <div className="p-4 flex items-center gap-3 border-b border-[#ECE8DE]">
-                    <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }} className="flex-1 text-[13px] text-[#13101A] bg-[#FBF8F2] border border-[#EFEFEF] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3E1540]/30" />
-                    <button onClick={handleRename} disabled={saving} className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center disabled:opacity-50 hover:bg-[#2D0F2E] transition-colors"><Check className="w-3.5 h-3.5 text-white" /></button>
-                    <button onClick={() => { setRenaming(false); setNewName(displayGroupName) }} className="w-8 h-8 rounded-full bg-[#F4F1E8] flex items-center justify-center hover:bg-[#F4F1E8] transition-colors"><X className="w-3.5 h-3.5 text-[#8A8497]" /></button>
-                  </div>
-                ) : (
-                  <button onClick={() => { setRenaming(true); setNewName(displayGroupName) }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors border-b border-[#ECE8DE]">
-                    <div className="w-8 h-8 rounded-xl bg-[#3E1540]/8 flex items-center justify-center flex-shrink-0"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" /></div>
-                    <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Rename Chat</span>
-                    <ChevronRight className="w-4 h-4 text-[#8A8497]/30" />
-                  </button>
-                )}
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
                   <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[#3E1540]" /></div>
                   <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Add Members</span>

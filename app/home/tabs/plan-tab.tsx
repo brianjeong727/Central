@@ -5583,32 +5583,29 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                       <div style={{ padding: "20px 24px" }}>
                         {roles[activeRole] && (
                           <>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                              <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                                {renamingRoleId === roles[activeRole].id ? (
-                                  <input
-                                    autoFocus
-                                    value={renamingRoleValue}
-                                    onChange={e => setRenamingRoleValue(e.target.value)}
-                                    onKeyDown={e => { if (e.key === "Enter") handleRenameRole(roles[activeRole].id); if (e.key === "Escape") setRenamingRoleId(null) }}
-                                    onBlur={() => handleRenameRole(roles[activeRole].id)}
-                                    style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, width: "100%" }}
-                                  />
-                                ) : (
-                                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
-                                )}
-                                <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
-                                  {roles[activeRole].permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
-                                </p>
-                              </div>
-                              {canManageTeam && renamingRoleId !== roles[activeRole].id && (
-                                <button
-                                  onClick={() => { setRenamingRoleId(roles[activeRole].id); setRenamingRoleValue(roles[activeRole].name) }}
-                                  style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 7, color: "#8A8497", fontSize: 12, cursor: "pointer", flexShrink: 0 }}
+                            <div style={{ marginBottom: 16 }}>
+                              {renamingRoleId === roles[activeRole].id ? (
+                                <input
+                                  autoFocus
+                                  value={renamingRoleValue}
+                                  onChange={e => setRenamingRoleValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter") handleRenameRole(roles[activeRole].id); if (e.key === "Escape") setRenamingRoleId(null) }}
+                                  onBlur={() => handleRenameRole(roles[activeRole].id)}
+                                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0 }}
+                                />
+                              ) : (
+                                <div
+                                  className="group flex items-center gap-1.5"
+                                  style={{ cursor: canManageTeam ? "text" : "default" }}
+                                  onClick={canManageTeam ? () => { setRenamingRoleId(roles[activeRole].id); setRenamingRoleValue(roles[activeRole].name) } : undefined}
                                 >
-                                  <Pencil style={{ width: 11, height: 11 }} /> Rename
-                                </button>
+                                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
+                                  {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0 }} />}
+                                </div>
                               )}
+                              <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
+                                {roles[activeRole].permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
+                              </p>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column" }}>
                               {ALL_PERMISSIONS.map((perm, pi) => {

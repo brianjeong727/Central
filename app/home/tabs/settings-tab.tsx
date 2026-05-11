@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Edit2 } from "lucide-react"
+import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import {
   updateMinistryPublic,
@@ -75,9 +75,10 @@ export function SettingsTab({
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
-  const [editingInfo, setEditingInfo] = useState(false)
-  const [editName, setEditName] = useState("")
-  const [editUniversity, setEditUniversity] = useState("")
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState("")
+  const [editingUniversity, setEditingUniversity] = useState(false)
+  const [universityDraft, setUniversityDraft] = useState("")
   const [savingInfo, setSavingInfo] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
 
@@ -128,23 +129,23 @@ export function SettingsTab({
   }, [ministryId])
 
   // ── Ministry info edit ──────────────────────────────────────────────────────
-  function startEdit() {
-    if (!ministryInfo) return
-    setEditName(ministryInfo.name)
-    setEditUniversity(ministryInfo.university)
-    setInfoError(null)
-    setEditingInfo(true)
-  }
-
-  async function saveInfo() {
-    if (!editName.trim() || !editUniversity.trim()) return
+  async function saveMinistryField(field: "name" | "university", val: string) {
+    const trimmed = val.trim()
+    const current = field === "name" ? (ministryInfo?.name ?? "") : (ministryInfo?.university ?? "")
+    if (!trimmed || trimmed === current) {
+      field === "name" ? setEditingName(false) : setEditingUniversity(false)
+      return
+    }
     setSavingInfo(true)
     setInfoError(null)
-    const { error } = await updateMinistryInfo({ name: editName.trim(), university: editUniversity.trim() })
+    const { error } = await updateMinistryInfo({
+      name: field === "name" ? trimmed : (ministryInfo?.name ?? ""),
+      university: field === "university" ? trimmed : (ministryInfo?.university ?? ""),
+    })
     setSavingInfo(false)
     if (error) { setInfoError(error); return }
-    setMinistryInfo(prev => prev ? { ...prev, name: editName.trim(), university: editUniversity.trim() } : prev)
-    setEditingInfo(false)
+    setMinistryInfo(prev => prev ? { ...prev, [field]: trimmed } : prev)
+    field === "name" ? setEditingName(false) : setEditingUniversity(false)
   }
 
   // ── Role change ─────────────────────────────────────────────────────────────
@@ -221,54 +222,52 @@ export function SettingsTab({
               <section>
                 <p style={SECTION_LABEL} className="mb-3">Ministry profile</p>
                 <div style={CARD} className="p-6">
-                  {editingInfo ? (
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <label style={{ fontSize: "11px", fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", display: "block", marginBottom: "6px" }}>Ministry Name</label>
-                        <input
-                          value={editName}
-                          onChange={e => setEditName(e.target.value)}
-                          className="w-full px-3 py-2 rounded-[10px] border border-[#E2DDCF] text-[14px] text-[#13101A] focus:outline-none focus:border-[#3E1540]/40 bg-[#FBF8F2]"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: "11px", fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", display: "block", marginBottom: "6px" }}>University</label>
-                        <input
-                          value={editUniversity}
-                          onChange={e => setEditUniversity(e.target.value)}
-                          className="w-full px-3 py-2 rounded-[10px] border border-[#E2DDCF] text-[14px] text-[#13101A] focus:outline-none focus:border-[#3E1540]/40 bg-[#FBF8F2]"
-                        />
-                      </div>
-                      {infoError && <p style={{ fontSize: "12px", color: "#DC2626" }}>{infoError}</p>}
-                      <div className="flex gap-2 justify-end">
-                        <button onClick={() => setEditingInfo(false)} className="px-4 py-2 rounded-[10px] border border-[#E2DDCF] text-[13px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">
-                          Cancel
-                        </button>
-                        <button onClick={saveInfo} disabled={savingInfo || !editName.trim() || !editUniversity.trim()} className="px-4 py-2 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[13px] font-semibold hover:bg-[#13101A] disabled:opacity-50 transition-colors">
-                          {savingInfo ? "Saving…" : "Save changes"}
-                        </button>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#FBF8F2" }}>{(ministryInfo?.name ?? ministryName)[0]}</span>
                     </div>
-                  ) : (
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#FBF8F2" }}>{(ministryInfo?.name ?? ministryName)[0]}</span>
-                          </div>
-                          <div>
-                            <p style={{ fontSize: "16px", fontWeight: 600, color: "#13101A", lineHeight: 1.2 }}>{ministryInfo?.name ?? ministryName}</p>
-                            <p style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px" }}>{ministryInfo?.university ?? "—"}</p>
-                          </div>
+                    <div className="flex-1 min-w-0">
+                      {editingName ? (
+                        <input
+                          autoFocus
+                          value={nameDraft}
+                          onChange={e => setNameDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }}
+                          onBlur={() => saveMinistryField("name", nameDraft)}
+                          style={{ fontSize: "16px", fontWeight: 600, color: "#13101A", lineHeight: 1.2, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
+                        />
+                      ) : (
+                        <div
+                          className="group flex items-center gap-1.5"
+                          style={{ cursor: isAdmin ? "text" : "default" }}
+                          onClick={isAdmin ? () => { setNameDraft(ministryInfo?.name ?? ministryName); setEditingName(true) } : undefined}
+                        >
+                          <p style={{ fontSize: "16px", fontWeight: 600, color: "#13101A", lineHeight: 1.2 }}>{ministryInfo?.name ?? ministryName}</p>
+                          {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "#8A8497", flexShrink: 0 }} />}
                         </div>
-                      </div>
-                      {isAdmin && (
-                        <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[12px] text-[#5A5466] hover:bg-[#F1ECDE] hover:text-[#13101A] transition-colors flex-shrink-0">
-                          <Edit2 className="w-3.5 h-3.5" />Edit
-                        </button>
                       )}
+                      {editingUniversity ? (
+                        <input
+                          autoFocus
+                          value={universityDraft}
+                          onChange={e => setUniversityDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }}
+                          onBlur={() => saveMinistryField("university", universityDraft)}
+                          style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
+                        />
+                      ) : (
+                        <div
+                          className="group flex items-center gap-1"
+                          style={{ cursor: isAdmin ? "text" : "default", marginTop: "2px" }}
+                          onClick={isAdmin ? () => { setUniversityDraft(ministryInfo?.university ?? ""); setEditingUniversity(true) } : undefined}
+                        >
+                          <p style={{ fontSize: "12px", color: "#8A8497" }}>{ministryInfo?.university ?? "—"}</p>
+                          {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />}
+                        </div>
+                      )}
+                      {infoError && <p style={{ fontSize: "12px", color: "#DC2626", marginTop: 4 }}>{infoError}</p>}
                     </div>
-                  )}
+                  </div>
                 </div>
               </section>
 
