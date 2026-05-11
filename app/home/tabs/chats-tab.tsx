@@ -791,6 +791,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null)
   const [contextMenuFor, setContextMenuFor] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; avatarUrl: string | null }>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
   const avatarCache = useRef<Record<string, string | null>>({})
@@ -799,6 +800,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
   const [memberReadMap, setMemberReadMap] = useState<Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }>>({})
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const myTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -898,6 +902,32 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
+
+  // Typing indicator — broadcast channel
+  useEffect(() => {
+    const channel = supabase.channel(`typing-${groupId}`)
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const { senderId, name, avatarUrl, isTyping } = payload as { senderId: string; name: string; avatarUrl: string | null; isTyping: boolean }
+        if (senderId === userId) return
+        if (isTyping) {
+          setTypingUsers(prev => ({ ...prev, [senderId]: { name, avatarUrl } }))
+          if (typingTimeoutsRef.current[senderId]) clearTimeout(typingTimeoutsRef.current[senderId])
+          typingTimeoutsRef.current[senderId] = setTimeout(() => {
+            setTypingUsers(prev => { const next = { ...prev }; delete next[senderId]; return next })
+          }, 3000)
+        } else {
+          if (typingTimeoutsRef.current[senderId]) clearTimeout(typingTimeoutsRef.current[senderId])
+          setTypingUsers(prev => { const next = { ...prev }; delete next[senderId]; return next })
+        }
+      })
+      .subscribe()
+    typingChannelRef.current = channel
+    return () => {
+      supabase.removeChannel(channel)
+      typingChannelRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
 
@@ -1096,9 +1126,24 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInputText(e.target.value)
+    if (typingChannelRef.current && e.target.value.trim()) {
+      typingChannelRef.current.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: true } })
+      if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
+      myTypingTimeoutRef.current = setTimeout(() => {
+        typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
+      }, 2500)
+    }
+  }
+
   async function handleSend() {
     const content = inputText.trim()
     if (!content || sending || groupArchived) return
+
+    // Clear own typing status
+    if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
+    typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
 
     setSending(true)
     setInputText("")
@@ -1139,6 +1184,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       e.preventDefault()
       handleSend()
     }
+  }
+
+  function formatDateLabel(dateStr: string): string {
+    const date = new Date(dateStr)
+    const today = new Date()
+    const isToday = date.toDateString() === today.toDateString()
+    const month = date.toLocaleString("en-US", { month: "long" }).toUpperCase()
+    const day = date.getDate()
+    return isToday ? `TODAY · ${month} ${day}` : `${date.toLocaleString("en-US", { weekday: "short" }).toUpperCase()} · ${month} ${day}`
   }
 
   function groupedReactions(msgId: string) {
@@ -1210,38 +1264,46 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     }
   }
 
+  const memberCount = Object.keys(memberReadMap).length + 1
+
   return (
     <>
-    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
+    <div className={inline ? "flex flex-col h-full bg-[#F1EDE6] w-full" : "fixed inset-0 z-[100] bg-[#F1EDE6] flex flex-col md:left-[296px]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
+
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-white border-b border-[#ECE8DE]`}>
         {!inline && (
           <button
             onClick={onClose}
-            className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
+            className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
+            <ArrowLeft className="w-5 h-5 text-[#13101A]" />
           </button>
         )}
+        {/* Group avatar */}
+        <div
+          className={`flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-[#F6F4EF] ${getAvatarColor(displayName)}`}
+          style={{ width: 40, height: 40, borderRadius: 12 }}
+        >
+          {getInitials(displayName)}
+        </div>
         <div className="flex-1 min-w-0">
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.1 }} className="truncate">
-            {displayName}
-          </h2>
-          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>
-            {Object.keys(memberReadMap).length + 1} members · active
+          <h2 className="text-[16px] font-semibold text-[#13101A] truncate leading-tight">{displayName}</h2>
+          <p className="text-[12px] text-[#8A8497] leading-tight mt-0.5">
+            {memberCount} member{memberCount !== 1 ? "s" : ""}
           </p>
         </div>
         <button
           onClick={() => setShowSettings(true)}
-          className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
+          className="flex-shrink-0 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors"
         >
-          <Settings className="w-4 h-4 text-[#5A5466]" />
+          <Settings className="w-5 h-5 text-[#8A8497]" />
         </button>
       </div>
 
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
@@ -1258,7 +1320,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               const prevMsg = i > 0 ? messages[i - 1] : null
               const nextMsg = i < messages.length - 1 ? messages[i + 1] : null
 
-              // Group = consecutive same-sender within same minute window
               const sameMinute = (a: Message, b: Message) =>
                 a.sender_id === b.sender_id &&
                 Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
@@ -1266,7 +1327,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               const isFirstInGroup = !prevMsg || !sameMinute(msg, prevMsg)
               const isLastInGroup = !nextMsg || !sameMinute(msg, nextMsg)
 
-              // Corner treatment per bubble position in group
+              // Date separator
+              const prevDate = prevMsg ? new Date(prevMsg.created_at).toDateString() : null
+              const thisDate = new Date(msg.created_at).toDateString()
+              const showDateSep = !prevMsg || prevDate !== thisDate
+
               const incomingRadius = isFirstInGroup && isLastInGroup
                 ? "rounded-2xl rounded-tl-sm"
                 : isFirstInGroup
@@ -1283,223 +1348,225 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     : "rounded-2xl rounded-r-md"
 
               const rxGroups = groupedReactions(msg.id)
-              const groupGap = isFirstInGroup && i > 0 ? "mt-3" : ""
+              const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
               return (
-                <div
-                  key={msg.id}
-                  ref={(el) => { messageRefs.current[msg.id] = el }}
-                  className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"} ${groupGap}`}
-                >
-                  {/* Emoji picker — floats above the bubble */}
-                  {emojiPickerFor === msg.id && (
-                    <div
-                      className={`absolute bottom-[calc(100%-4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3">
-                        {REACTION_EMOJIS.map((emoji) => (
+                <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
+                  {/* Date separator */}
+                  {showDateSep && (
+                    <div className="flex items-center gap-3 my-4">
+                      <div className="flex-1 h-px bg-[#DDD8CE]" />
+                      <span className="text-[11px] font-medium text-[#8A8497] tracking-wide whitespace-nowrap">
+                        {formatDateLabel(msg.created_at)}
+                      </span>
+                      <div className="flex-1 h-px bg-[#DDD8CE]" />
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"} ${groupGap}`}>
+                    {/* Emoji picker */}
+                    {emojiPickerFor === msg.id && (
+                      <div
+                        className={`absolute bottom-[calc(100%-4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3">
+                          {REACTION_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={(e) => { e.stopPropagation(); handleReact(msg.id, emoji) }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onPointerUp={(e) => e.stopPropagation()}
+                              className="text-[22px] hover:scale-125 active:scale-95 transition-transform"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Context menu */}
+                    {contextMenuFor === msg.id && (
+                      <div
+                        className={`absolute bottom-[calc(100%+4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[140px]">
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
+                            className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                          >
+                            <CornerUpLeft className="w-4 h-4 text-[#5A5466]" />
+                            Reply
+                          </button>
+                          {isOwn && (
+                            <button
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setDeletingId(msg.id) }}
+                              className="w-full text-left px-4 py-3 text-[14px] text-red-500 flex items-center gap-2.5 hover:bg-red-50 active:bg-red-100 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sender name + time — above first bubble only, incoming only */}
+                    {!isOwn && isFirstInGroup && (
+                      <div className="flex items-baseline gap-1.5 mb-1 ml-9">
+                        <span className="text-[13px] font-semibold text-[#13101A]">{msg.sender_name}</span>
+                        <span className="text-[12px] text-[#8A8497]">{formatMessageTime(msg.created_at)}</span>
+                      </div>
+                    )}
+
+                    {/* Avatar + bubble row */}
+                    <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                      {/* Avatar — shown for every incoming message */}
+                      {!isOwn && (
+                        <div
+                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name)}`}
+                          style={{ borderRadius: "10px", alignSelf: "flex-end" }}
+                        >
+                          {msg.sender_avatar_url
+                            ? <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-full h-full object-cover" />
+                            : msg.sender_name.charAt(0).toUpperCase()
+                          }
+                        </div>
+                      )}
+
+                      <div
+                        title="Long-press for reply and reactions"
+                        onPointerDown={() => handlePointerDown(msg)}
+                        onPointerUp={() => handlePointerUp(msg)}
+                        onPointerLeave={handlePointerCancel}
+                        onPointerCancel={handlePointerCancel}
+                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none ${
+                          msg.deleted
+                            ? isOwn
+                              ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2`
+                              : `bg-white border border-[#EFEFEF] text-[#8A8497] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                            : isOwn
+                              ? `bg-[#3E1540] text-white ${outgoingRadius}`
+                              : `bg-white text-[#13101A] ${incomingRadius} shadow-[0_1px_3px_rgba(19,16,26,0.07)]`
+                        } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
+                      >
+                        {msg.deleted ? (
+                          <span className="italic text-[13px]">Message deleted</span>
+                        ) : (
+                          <>
+                            {msg.reply_to_id && msg.reply_to_content && (
+                              <div className="px-3 pt-2.5 pb-0">
+                                <button
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={() => scrollToMessage(msg.reply_to_id!)}
+                                  className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
+                                    isOwn
+                                      ? "bg-white/20 border-l-[3px] border-white/50"
+                                      : "bg-[#F4F1E8] border-l-[3px] border-[#3E1540]"
+                                  }`}
+                                >
+                                  <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[#3E1540]"}`}>
+                                    <CornerUpLeft className="w-3 h-3" />
+                                    {msg.reply_to_sender}
+                                  </span>
+                                  <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[#8A8497]"}`}>
+                                    {msg.reply_to_content.slice(0, 80)}
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                            <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
+                              {msg.content}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Reactions */}
+                    {!msg.deleted && rxGroups.length > 0 && (
+                      <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
+                        {rxGroups.map(({ emoji, count, userReacted }) => (
                           <button
                             key={emoji}
-                            onClick={(e) => { e.stopPropagation(); handleReact(msg.id, emoji) }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            onPointerUp={(e) => e.stopPropagation()}
-                            className="text-[22px] hover:scale-125 active:scale-95 transition-transform"
+                            onClick={() => handleReact(msg.id, emoji)}
+                            className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
+                              userReacted
+                                ? "bg-[#3E1540] border-[#3E1540]"
+                                : "bg-white border-[#ECE8DE]"
+                            }`}
                           >
-                            {emoji}
+                            <span>{emoji}</span>
+                            <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[#8A8497]"}`}>{count}</span>
                           </button>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Context menu — floats above the bubble on long press */}
-                  {contextMenuFor === msg.id && (
-                    <div
-                      className={`absolute bottom-[calc(100%+4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[140px]">
-                        <button
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setContextMenuFor(null)
-                            setReplyingTo(msg)
-                          }}
-                          className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
-                        >
-                          <CornerUpLeft className="w-4 h-4 text-[#5A5466]" />
-                          Reply
-                        </button>
-                        {isOwn && (
-                          <button
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setContextMenuFor(null)
-                              setDeletingId(msg.id)
-                            }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-red-500 flex items-center gap-2.5 hover:bg-red-50 active:bg-red-100 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Group kicker: sender + time, shown once at top of each incoming group */}
-                  {!isOwn && isFirstInGroup && (
-                    <div className="flex items-center gap-2 mb-1 pl-9">
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#8A8497", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                        {msg.sender_name} · {formatMessageTime(msg.created_at)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Incoming group: avatar at bottom-left of last bubble only */}
-                  <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-                    {!isOwn && (
-                      <div className="flex-shrink-0 w-7">
-                        {isLastInGroup ? (
-                          <div
-                            className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name)}`}
-                            style={{ borderRadius: "10px" }}
-                          >
-                            {msg.sender_avatar_url
-                              ? <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-full h-full object-cover" />
-                              : msg.sender_name.charAt(0).toUpperCase()
-                            }
-                          </div>
-                        ) : (
-                          <div className="w-7 h-7" />
-                        )}
+                    {/* Delete confirmation */}
+                    {deletingId === msg.id && (
+                      <div
+                        className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-[12px] text-[#5A5466]">Delete this message?</span>
+                        <button onClick={() => handleDeleteMessage(msg.id)} className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors">Delete</button>
+                        <button onClick={() => setDeletingId(null)} className="text-[12px] text-[#8A8497] hover:text-[#5A5466] transition-colors">Cancel</button>
                       </div>
                     )}
-                  <div
-                    title="Long-press for reply and reactions"
-                    onPointerDown={() => handlePointerDown(msg)}
-                    onPointerUp={() => handlePointerUp(msg)}
-                    onPointerLeave={handlePointerCancel}
-                    onPointerCancel={handlePointerCancel}
-                    className={`max-w-[75%] text-[14px] leading-[1.4] select-none ${
-                      msg.deleted
-                        ? isOwn
-                          ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                          : `bg-white border border-[#EFEFEF] text-[#8A8497] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
-                        : isOwn
-                          ? `bg-[#3E1540] text-white ${outgoingRadius}`
-                          : `bg-white border border-[#EFEFEF] text-[#13101A] ${incomingRadius} shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
-                    } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2" : ""}`}
-                  >
-                    {msg.deleted ? (
-                      <span className="italic text-[13px]">Message deleted</span>
-                    ) : (
-                      <>
-                        {msg.reply_to_id && msg.reply_to_content && (
-                          <div className="px-3 pt-2.5 pb-0">
-                            <button
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={() => scrollToMessage(msg.reply_to_id!)}
-                              className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
-                                isOwn
-                                  ? "bg-white/20 border-l-[3px] border-white/50"
-                                  : "bg-[#F4F1E8] border-l-[3px] border-[#3E1540]"
-                              }`}
-                            >
-                              <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[#3E1540]"}`}>
-                                <CornerUpLeft className="w-3 h-3" />
-                                {msg.reply_to_sender}
-                              </span>
-                              <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[#8A8497]"}`}>
-                                {msg.reply_to_content.slice(0, 80)}
-                              </span>
-                            </button>
+
+                    {/* Timestamp + read receipts (own messages: every message; incoming: skip since time is in header) */}
+                    {isOwn && (
+                      <div className="flex items-center gap-1.5 mt-1 pr-1">
+                        {(readReceiptMap[msg.id]?.length ?? 0) > 0 && (
+                          <div className="flex items-center">
+                            {readReceiptMap[msg.id].map(({ name, avatarUrl }, idx) => (
+                              <Avatar
+                                key={`${name}-${idx}`}
+                                title={`Read by ${name}`}
+                                className={`w-4 h-4 flex-shrink-0 border border-[#F1EDE6] overflow-hidden ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
+                              >
+                                {avatarUrl && <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />}
+                                <AvatarFallback className="text-white bg-transparent" style={{ fontSize: "6px", fontWeight: 700 }}>
+                                  {name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
                           </div>
                         )}
-                        <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
-                          {msg.content}
-                        </div>
-                      </>
+                        <span className="text-[11px] text-[#B0A9A0]">{formatMessageTime(msg.created_at)}</span>
+                      </div>
                     )}
                   </div>
-                  </div>{/* end avatar+bubble row */}
-
-                  {/* Reaction pills — hidden on deleted messages */}
-                  {!msg.deleted && rxGroups.length > 0 && (
-                    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
-                      {rxGroups.map(({ emoji, count, userReacted }) => (
-                        <button
-                          key={emoji}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={() => handleReact(msg.id, emoji)}
-                          className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
-                            userReacted
-                              ? "bg-[#3E1540] border-[#3E1540]"
-                              : "bg-white border-[#ECE8DE]"
-                          }`}
-                        >
-                          <span>{emoji}</span>
-                          <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[#8A8497]"}`}>
-                            {count}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Inline delete confirmation */}
-                  {deletingId === msg.id && (
-                    <div
-                      className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <span className="text-[12px] text-[#5A5466]">Delete this message?</span>
-                      <button
-                        onClick={() => handleDeleteMessage(msg.id)}
-                        className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setDeletingId(null)}
-                        className="text-[12px] text-[#8A8497] hover:text-[#5A5466] transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-
-                  {isLastInGroup && (
-                    <div className={`flex items-center gap-1.5 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
-                      {isOwn && (readReceiptMap[msg.id]?.length ?? 0) > 0 && (
-                        <div className="flex items-center">
-                          {readReceiptMap[msg.id].map(({ name, avatarUrl }, idx) => (
-                            <Avatar
-                              key={`${name}-${idx}`}
-                              title={`Read by ${name}`}
-                              className={`w-4 h-4 flex-shrink-0 border border-[#FBF8F2] overflow-hidden ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
-                            >
-                              {avatarUrl && <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />}
-                              <AvatarFallback
-                                className="text-white bg-transparent"
-                                style={{ fontSize: "6px", fontWeight: 700 }}
-                              >
-                                {name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                        </div>
-                      )}
-                      <span className="text-[10px] text-[#C4C4C4]">
-                        {formatMessageTime(msg.created_at)}
-                      </span>
-                    </div>
-                  )}
                 </div>
               )
             })}
+
+            {/* Typing indicators */}
+            {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
+              <div key={uid} className="flex items-center gap-2 mt-3">
+                <div
+                  className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(name)}`}
+                  style={{ borderRadius: "10px" }}
+                >
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt={name} className="w-full h-full object-cover rounded-[10px]" />
+                    : name.charAt(0).toUpperCase()
+                  }
+                </div>
+                <div className="bg-white rounded-2xl rounded-tl-sm shadow-[0_1px_3px_rgba(19,16,26,0.07)] px-3.5 py-2.5 flex items-center gap-1">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </div>
+                <span className="text-[12px] text-[#8A8497]">{name} is typing</span>
+              </div>
+            ))}
+
             <div ref={bottomRef} />
           </div>
         )}
@@ -1513,14 +1580,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
               {replyingTo.sender_name}
             </p>
-            <p className="text-[12px] text-[#8A8497] truncate">
-              {replyingTo.content.slice(0, 60)}
-            </p>
+            <p className="text-[12px] text-[#8A8497] truncate">{replyingTo.content.slice(0, 60)}</p>
           </div>
-          <button
-            onClick={() => setReplyingTo(null)}
-            className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[#5A5466] transition-colors"
-          >
+          <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1532,26 +1594,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-end gap-2">
+        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-center gap-3">
+          <button className="flex-shrink-0 text-[#8A8497] hover:text-[#5A5466] transition-colors">
+            <Plus className="w-5 h-5" />
+          </button>
           <textarea
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Message…"
+            placeholder={`Message ${displayName}`}
             rows={1}
-            className="flex-1 resize-none bg-[#FBF8F2] rounded-full px-4 py-2.5 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
+            className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
             style={{ lineHeight: "1.5" }}
           />
           <button
             onClick={handleSend}
             disabled={!inputText.trim() || sending}
-            className="size-9 rounded-full bg-[#3E1540] flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#2D0F2E] transition-all active:scale-95 ml-1"
+            className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#2D0F2E] transition-all active:scale-95 bg-[#3E1540]"
+            style={{ width: 36, height: 36, borderRadius: 10 }}
           >
-            <Send className="w-4 h-4 text-white" />
+            <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
           </button>
         </div>
       )}
-      {/* Overlay to dismiss emoji picker / context menu — inside z-[100] stacking context so picker at z-[160] sits above it */}
+
+      {/* Overlay to dismiss emoji / context menu */}
       {(emojiPickerFor || contextMenuFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[296px]"
