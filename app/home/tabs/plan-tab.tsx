@@ -1447,6 +1447,9 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
     ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0 } : undefined)
 
+  const isActiveTeamPresident = (activeUserTeam?.roleName ?? "").toLowerCase().includes("president")
+  const canOpenTeamSettings = isAdmin || isActiveTeamPresident
+
   return (
     <div className="pb-2 md:pb-0">
       {/* Desktop Topbar */}
@@ -1518,7 +1521,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                 The week as it stands. Groups to prepare, people to thank.
               </p>
             </div>
-            {activeTeamFull && (
+            {activeTeamFull && canOpenTeamSettings && (
               <button
                 onClick={() => setOpenTeam(activeTeamFull)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
@@ -1554,7 +1557,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             userRole={studentOrgRole}
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
-            onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => setOpenTeam(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
           />
@@ -1598,7 +1601,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             userRole={studentOrgRole}
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
-            onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => setOpenTeam(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
           />
