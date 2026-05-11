@@ -681,7 +681,7 @@ export function ProfileTab({
 
       {/* Desktop Topbar */}
       <DesktopTopbar
-        crumbs={["Central", "Profile", activeSection === "journal" ? "Journal" : "Profile"]}
+        crumbs={["Central", "Profile"]}
         right={
           activeSection === "spiritual-profile" ? (
             <div className="hidden md:flex items-center gap-2">
@@ -712,8 +712,8 @@ export function ProfileTab({
         </a>
       </div>
 
-      {/* ── Desktop: hero (hidden on journal tab) ── */}
-      <div className={`${activeSection === "journal" ? "hidden" : "hidden md:block"} px-7 pt-7 pb-0`}>
+      {/* ── Desktop: hero ── */}
+      <div className="hidden md:block px-7 pt-7 pb-0">
         <div
           className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
           style={{
@@ -787,35 +787,6 @@ export function ProfileTab({
         </div>
       </div>
 
-      {/* ── Desktop: tab strip ── */}
-      <div className="hidden md:flex px-7 pt-5 gap-0" style={{ borderBottom: "1px solid #ECE8DE" }}>
-        {(["spiritual-profile", "journal"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => onSectionChange(s)}
-            style={{
-              padding: "10px 20px",
-              background: "transparent",
-              border: "none",
-              borderBottom: activeSection === s ? "2px solid #3E1540" : "2px solid transparent",
-              color: activeSection === s ? "#13101A" : "#8A8497",
-              fontWeight: activeSection === s ? 500 : 400,
-              fontSize: 13.5,
-              cursor: "pointer",
-              marginBottom: -1,
-            }}
-          >
-            {s === "spiritual-profile" ? "Profile" : "Journal"}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Desktop: journal content ── */}
-      {activeSection === "journal" && (
-        <div className="hidden md:block">
-          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
-        </div>
-      )}
 
       {/* Mobile identity card */}
       <div className="md:hidden px-5">
@@ -867,16 +838,9 @@ export function ProfileTab({
           <div className="px-4 py-2.5 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between gap-2">
             <div className="flex gap-1">
               <button
-                onClick={() => onSectionChange("spiritual-profile")}
-                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: activeSection === "spiritual-profile" ? "#3E1540" : "transparent", color: activeSection === "spiritual-profile" ? "#F6F4EF" : "#8A8497", border: "none", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
+                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "#3E1540", color: "#F6F4EF", border: "none", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
               >
                 Profile
-              </button>
-              <button
-                onClick={() => onSectionChange("journal")}
-                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: activeSection === "journal" ? "#3E1540" : "transparent", color: activeSection === "journal" ? "#F6F4EF" : "#8A8497", border: "none", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
-              >
-                Journal
               </button>
             </div>
             {activeSection === "spiritual-profile" && (
@@ -902,20 +866,15 @@ export function ProfileTab({
       </div>
 
       {/* ── Field cards ── */}
-      {/* Desktop: 2x2 grid — hidden when journal active */}
-      <div className={`px-7 py-6 gap-4 ${activeSection === "journal" ? "hidden" : "hidden md:grid"}`} style={{ gridTemplateColumns: "1fr 1fr" }}>
+      {/* Desktop: 2x2 grid */}
+      <div className="hidden md:grid px-7 py-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
         {fields.map(({ key, label, placeholder }) => (
           <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
         ))}
       </div>
 
       {/* Mobile: stacked sections */}
-      {activeSection === "journal" ? (
-        <div className="md:hidden">
-          <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
-        </div>
-      ) : (
-        <div className="md:hidden px-5 pb-6">
+      <div className="md:hidden px-5 pb-6">
           <div className="mb-5">
             <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
             <div className="flex flex-col gap-3">
@@ -947,7 +906,6 @@ export function ProfileTab({
             </div>
           </div>
         </div>
-      )}
     </div>
   )
 }
