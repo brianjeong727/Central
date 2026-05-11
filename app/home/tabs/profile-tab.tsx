@@ -907,42 +907,6 @@ export function ProfileTab({
         {fields.map(({ key, label, placeholder }) => (
           <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
         ))}
-        {/* Sign out card */}
-        <button
-          onClick={onLogout}
-          className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 text-left flex items-center gap-2 text-[#EF4444] text-[14px] font-medium hover:bg-red-50/40 transition-colors col-span-2"
-        >
-          <LogOut className="w-4 h-4" />Sign out
-        </button>
-
-        {/* Ministry settings — admin only */}
-        {isAdmin && (
-          <div className="col-span-2 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5">
-            <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">Ministry settings</p>
-            <button
-              type="button"
-              onClick={handleTogglePublic}
-              disabled={togglingPublic}
-              className="flex items-center justify-between w-full"
-            >
-              <div className="text-left">
-                <p className="text-[14px] font-medium text-[#13101A]">Public discovery</p>
-                <p className="text-[12px] text-[#8A8497] mt-0.5">
-                  {ministryIsPublic ? "Anyone can find and join this ministry" : "Only joinable via invite code"}
-                </p>
-              </div>
-              <div
-                className="w-10 h-6 rounded-full relative transition-colors flex-shrink-0 ml-4"
-                style={{ background: ministryIsPublic ? "#3E1540" : "#E5E0D2" }}
-              >
-                <div
-                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
-                  style={{ transform: ministryIsPublic ? "translateX(18px)" : "translateX(2px)" }}
-                />
-              </div>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Mobile: stacked sections */}
@@ -982,38 +946,6 @@ export function ProfileTab({
               ))}
             </div>
           </div>
-          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#ECE8DE] text-[#EF4444] text-[14px] font-medium hover:bg-red-50/60 transition-colors shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-            <LogOut className="w-4 h-4" />Sign out
-          </button>
-
-          {/* Ministry settings — admin only */}
-          {isAdmin && (
-            <div className="mt-3 rounded-2xl bg-white border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-              <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">Ministry settings</p>
-              <button
-                type="button"
-                onClick={handleTogglePublic}
-                disabled={togglingPublic}
-                className="flex items-center justify-between w-full"
-              >
-                <div className="text-left">
-                  <p className="text-[14px] font-medium text-[#13101A]">Public discovery</p>
-                  <p className="text-[12px] text-[#8A8497] mt-0.5">
-                    {ministryIsPublic ? "Anyone can find and join" : "Invite code only"}
-                  </p>
-                </div>
-                <div
-                  className="w-10 h-6 rounded-full relative transition-colors flex-shrink-0 ml-4"
-                  style={{ background: ministryIsPublic ? "#3E1540" : "#E5E0D2" }}
-                >
-                  <div
-                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform"
-                    style={{ transform: ministryIsPublic ? "translateX(18px)" : "translateX(2px)" }}
-                  />
-                </div>
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
