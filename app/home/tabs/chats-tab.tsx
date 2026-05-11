@@ -1268,11 +1268,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   return (
     <>
-    <div className={inline ? "flex flex-col h-full bg-[#F1EDE6] w-full" : "fixed inset-0 z-[100] bg-[#F1EDE6] flex flex-col md:left-[296px]"}>
+    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-white border-b border-[#ECE8DE]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
         {!inline && (
           <button
             onClick={onClose}
@@ -1354,11 +1354,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   {/* Date separator */}
                   {showDateSep && (
                     <div className="flex items-center gap-3 my-4">
-                      <div className="flex-1 h-px bg-[#DDD8CE]" />
-                      <span className="text-[11px] font-medium text-[#8A8497] tracking-wide whitespace-nowrap">
+                      <div className="flex-1 h-px bg-[#E8E2D2]" />
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
                         {formatDateLabel(msg.created_at)}
                       </span>
-                      <div className="flex-1 h-px bg-[#DDD8CE]" />
+                      <div className="flex-1 h-px bg-[#E8E2D2]" />
                     </div>
                   )}
 
@@ -1446,11 +1446,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         className={`max-w-[75%] text-[14px] leading-[1.4] select-none ${
                           msg.deleted
                             ? isOwn
-                              ? `bg-[#3E1540]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                              : `bg-white border border-[#EFEFEF] text-[#8A8497] ${incomingRadius} px-4 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]`
+                              ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
+                              : `bg-[#FBF8F2] border border-[#E8E2D2] text-[#8A8497] ${incomingRadius} px-4 py-2`
                             : isOwn
-                              ? `bg-[#3E1540] text-white ${outgoingRadius}`
-                              : `bg-white text-[#13101A] ${incomingRadius} shadow-[0_1px_3px_rgba(19,16,26,0.07)]`
+                              ? `bg-[#2D0F2E] text-[#F6F4EF] ${outgoingRadius}`
+                              : `bg-[#FBF8F2] border border-[#E8E2D2] text-[#13101A] ${incomingRadius}`
                         } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
                       >
                         {msg.deleted ? (
@@ -1464,8 +1464,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   onClick={() => scrollToMessage(msg.reply_to_id!)}
                                   className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                                     isOwn
-                                      ? "bg-white/20 border-l-[3px] border-white/50"
-                                      : "bg-[#F4F1E8] border-l-[3px] border-[#3E1540]"
+                                      ? "bg-white/10 border-l-[2px] border-[#F6F4EF]/50"
+                                      : "bg-[#F1ECDE] border-l-[2px] border-[#3E1540]"
                                   }`}
                                 >
                                   <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[#3E1540]"}`}>
@@ -1558,12 +1558,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     : name.charAt(0).toUpperCase()
                   }
                 </div>
-                <div className="bg-white rounded-2xl rounded-tl-sm shadow-[0_1px_3px_rgba(19,16,26,0.07)] px-3.5 py-2.5 flex items-center gap-1">
+                <div className="bg-[#FBF8F2] border border-[#E8E2D2] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </div>
-                <span className="text-[12px] text-[#8A8497]">{name} is typing</span>
+                <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "12px", color: "#8A8497" }}>{name} is typing…</span>
               </div>
             ))}
 
@@ -1574,7 +1574,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Reply preview bar ── */}
       {replyingTo && (
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-2 flex items-start gap-3">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-2 flex items-start gap-3">
           <div className="flex-1 border-l-2 border-[#3E1540] pl-2.5 min-w-0">
             <p className="text-[11px] font-semibold text-[#3E1540] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
@@ -1590,11 +1590,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Input bar ── */}
       {groupArchived ? (
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-center justify-center">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-4 py-3 flex items-center gap-3">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
           <button className="flex-shrink-0 text-[#8A8497] hover:text-[#5A5466] transition-colors">
             <Plus className="w-5 h-5" />
           </button>
@@ -1610,7 +1610,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <button
             onClick={handleSend}
             disabled={!inputText.trim() || sending}
-            className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#2D0F2E] transition-all active:scale-95 bg-[#3E1540]"
+            className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E]"
             style={{ width: 36, height: 36, borderRadius: 10 }}
           >
             <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />

@@ -453,7 +453,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                   />
                 </div>
               ) : (
-                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[#FDFBF7]">
+                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[#FBF8F2]">
                   <div className="text-center">
                     <MessageCircle className="w-10 h-10 text-[#C4C4C4] mx-auto mb-3" />
                     <p className="text-[14px] font-semibold text-[#8A8497]">Select a chat</p>

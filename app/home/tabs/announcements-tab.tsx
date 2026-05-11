@@ -104,102 +104,208 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     )
   }
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, ‘SF Mono’, Menlo, monospace",
+    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
   return (
-    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[88vh] md:max-w-[560px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
-        <div className="flex-shrink-0 border-b border-[#ECE8DE]">
-          <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
-            <button onClick={onClose} className="w-9 h-9 rounded-full bg-white border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]">
+    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
+          <div className="flex items-center gap-4">
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#FBF8F2] border border-[#E8E2D2] flex items-center justify-center hover:bg-[#F1ECDE] transition-colors flex-shrink-0">
               <X className="w-4 h-4 text-[#13101A]" />
             </button>
-            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "#8A8497" }}>
-              {isEditing ? "Editing" : "New"}
-            </span>
+            <div>
+              <p style={monoStyle}>{isEditing ? "Editing announcement" : "New announcement · Draft"}</p>
+              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: "2px 0 0" }}>
+                {isEditing ? "Edit" : "Write"}
+              </h1>
+            </div>
           </div>
-          <div className="px-5 pb-5">
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>
-              {isEditing ? "Edit Announcement" : "New Announcement"}
-            </h1>
-            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>
-              {isEditing ? "Update your announcement below." : "Share what’s happening with your ministry."}
-            </p>
-          </div>
+          <button type="submit" form="ann-form" disabled={submitting} className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-60 text-[#F6F4EF] font-semibold transition-colors text-[13px]">
+            {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <form id="ann-form" onSubmit={handleSubmit} className="px-5 py-5 flex flex-col gap-4">
-            {error && <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
-            {/* Title + Body */}
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-              <div className="px-4 pt-4 pb-1">
-                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Title</label>
-              </div>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }} className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent border-b border-[#F2EDE8]" />
-              <div className="px-4 pt-3 pb-1">
-                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Body</label>
-              </div>
-              <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={5} className="w-full px-4 pt-1 pb-4 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent resize-none" style={{ lineHeight: "1.6" }} />
+      </div>
+
+      {/* Mobile: scrollable single column */}
+      <div className="md:hidden flex-1 overflow-y-auto min-h-0">
+        <form id="ann-form" onSubmit={handleSubmit} className="px-5 py-5 flex flex-col gap-4">
+          {error && <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="px-4 pt-4 pb-1">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Title</label>
             </div>
-            {/* Audience */}
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-3">Audience</label>
-              <div className="flex flex-wrap gap-2">
-                {AUDIENCE_OPTIONS.map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#3E1540] text-[#F6F4EF] border-[#3E1540]" : "bg-[#FBF8F2] text-[#5A5466] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
-                ))}
-              </div>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }} className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent border-b border-[#F2EDE8]" />
+            <div className="px-4 pt-3 pb-1">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Body</label>
             </div>
-            {/* Event toggle */}
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
-              <div className="flex items-center justify-between">
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={6} className="w-full px-4 pt-1 pb-4 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent resize-none" style={{ lineHeight: "1.6" }} />
+          </div>
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+            <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-3">Audience</label>
+            <div className="flex flex-wrap gap-2">
+              {AUDIENCE_OPTIONS.map((opt) => (
+                <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#3E1540] text-[#F6F4EF] border-[#3E1540]" : "bg-[#FBF8F2] text-[#5A5466] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-semibold text-[#13101A]">This is an event</p>
+                <p className="text-[11px] text-[#8A8497] mt-0.5">Shows an RSVP button on the card</p>
+              </div>
+              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "#3E1540" : "#E5E0D2" }}>
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+            </div>
+            {isEvent && (
+              <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-[#F2EDE8]">
                 <div>
-                  <p className="text-[13px] font-semibold text-[#13101A]">This is an event</p>
-                  <p className="text-[11px] text-[#8A8497] mt-0.5">Shows an RSVP button on the card</p>
+                  <p className="text-[13px] font-semibold text-[#13101A]">Show attendees publicly</p>
+                  <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
                 </div>
-                <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "#3E1540" : "#E5E0D2" }}>
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
+                <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: showAttendees ? "#3E1540" : "#E5E0D2" }}>
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${showAttendees ? "left-[22px]" : "left-0.5"}`} />
                 </button>
               </div>
-              {isEvent && (
-                <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-[#F2EDE8]">
-                  <div>
-                    <p className="text-[13px] font-semibold text-[#13101A]">Show attendees publicly</p>
-                    <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
-                  </div>
-                  <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: showAttendees ? "#3E1540" : "#E5E0D2" }}>
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${showAttendees ? "left-[22px]" : "left-0.5"}`} />
-                  </button>
-                </div>
-              )}
+            )}
+          </div>
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="px-4 pt-4 pb-3">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Image <span className="text-[#C4C4C4] normal-case font-medium">— optional</span></label>
             </div>
-            {/* Image */}
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-              <div className="px-4 pt-4 pb-3">
-                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Image <span className="text-[#C4C4C4] normal-case font-medium">— optional</span></label>
+            {imagePreview ? (
+              <div className="px-4 pb-4">
+                <div className="relative rounded-xl overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
+                  <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3.5 h-3.5 text-white" /></button>
+                </div>
               </div>
-              {imagePreview ? (
-                <div className="px-4 pb-4">
-                  <div className="relative rounded-xl overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
-                    <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3.5 h-3.5 text-white" /></button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-4 mb-4 h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#FBF8F2] hover:text-[#3E1540]/70 transition-all" style={{ width: "calc(100% - 32px)" }}>
-                  <ImageIcon className="w-5 h-5" />
-                  <span className="text-[12px] font-medium">Tap to add image</span>
-                </button>
-              )}
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-            </div>
-          </form>
-        </div>
+            ) : (
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-4 mb-4 h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#FBF8F2] hover:text-[#3E1540]/70 transition-all" style={{ width: "calc(100% - 32px)" }}>
+                <ImageIcon className="w-5 h-5" />
+                <span className="text-[12px] font-medium">Tap to add image</span>
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </div>
+        </form>
         <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
           <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-[#F6F4EF] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide">
             {submitting ? "Posting…" : isEditing ? "Save Changes" : "Post Announcement"}
           </button>
         </div>
       </div>
+
+      {/* Desktop: two-column editorial layout */}
+      <form id="ann-form" onSubmit={handleSubmit} className="hidden md:flex flex-1 overflow-hidden">
+        {/* Main writing area */}
+        <div className="flex-1 flex flex-col overflow-hidden border-r border-[#E8E2D2]">
+          <div className="flex-1 overflow-y-auto px-10 pt-8 pb-6">
+            {error && <div className="mb-6 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
+            {/* Serif title input */}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="A clear, scannable headline"
+              required
+              style={{
+                fontFamily: "var(--font-instrument-serif)", fontSize: "36px",
+                letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1,
+                background: "transparent", border: "none", borderBottom: "1px solid #E8E2D2",
+                outline: "none", width: "100%", paddingBottom: "14px",
+              }}
+            />
+            {/* Body textarea */}
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Write the full announcement here. Take all the space you need — share scripture, walk through logistics, link to sign-ups. The body is where the work lives."
+              required
+              style={{
+                fontFamily: "var(--font-instrument-serif)", fontSize: "18px", lineHeight: "1.65",
+                color: "#13101A", background: "transparent", border: "none", outline: "none",
+                resize: "none", width: "100%", marginTop: "20px", minHeight: "320px",
+              }}
+            />
+          </div>
+          {/* Footer */}
+          <div className="flex-shrink-0 border-t border-[#E8E2D2] px-10 py-4 flex items-center gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[10px] border border-[#E8E2D2] text-[13px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">
+              Cancel
+            </button>
+            <div className="flex-1" />
+            <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-60 text-[#F6F4EF] font-semibold transition-colors text-[13px]">
+              {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
+            </button>
+          </div>
+        </div>
+
+        {/* Right rail */}
+        <aside className="w-[300px] flex-shrink-0 overflow-y-auto px-7 pt-8 pb-6 flex flex-col gap-7">
+          {/* Audience */}
+          <div>
+            <p style={monoStyle} className="mb-3">Audience</p>
+            <div className="flex flex-wrap gap-2">
+              {AUDIENCE_OPTIONS.map((opt) => (
+                <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#2D0F2E] text-[#F6F4EF] border-[#2D0F2E]" : "bg-transparent text-[#5A5466] border-[#E8E2D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Options */}
+          <div className="border border-[#E8E2D2] rounded-[14px] bg-[#FBF8F2] p-5 flex flex-col gap-5">
+            <p style={monoStyle}>Options</p>
+            <div className="flex items-start gap-3">
+              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 mt-0.5" style={{ background: isEvent ? "#3E1540" : "#D6D0C0" }}>
+                <span className="absolute top-0.5 w-4 h-4 rounded-full bg-[#FBF8F2] shadow-sm transition-all duration-200" style={{ left: isEvent ? "17px" : "2px" }} />
+              </button>
+              <div>
+                <p className="text-[13px] font-medium text-[#13101A]">This is an event</p>
+                <p className="text-[11px] text-[#8A8497] mt-0.5">Adds RSVP button + calendar marker</p>
+              </div>
+            </div>
+            {isEvent && (
+              <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 mt-0.5" style={{ background: showAttendees ? "#3E1540" : "#D6D0C0" }}>
+                  <span className="absolute top-0.5 w-4 h-4 rounded-full bg-[#FBF8F2] shadow-sm transition-all duration-200" style={{ left: showAttendees ? "17px" : "2px" }} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-medium text-[#13101A]">Show attendees publicly</p>
+                  <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Image attachment */}
+          <div>
+            <p style={monoStyle} className="mb-3">Attachment</p>
+            {imagePreview ? (
+              <div className="relative rounded-[10px] overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagePreview} alt="Preview" className="w-full h-36 object-cover" />
+                <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors">
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full h-24 rounded-[10px] border border-dashed border-[#C4C0B0] flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#F1ECDE] hover:text-[#3E1540]/70 transition-all">
+                <ImageIcon className="w-4 h-4" />
+                <span className="text-[12px]">Add image or file</span>
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </div>
+        </aside>
+      </form>
     </div>
   )
 }
