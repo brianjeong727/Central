@@ -5175,6 +5175,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setEditingTeamName(false)
   }
 
+  async function handleDeleteRole(roleId: string) {
+    await supabase.from("team_roles").delete().eq("id", roleId)
+    setRoles(prev => {
+      const next = prev.filter(r => r.id !== roleId)
+      setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
+      return next
+    })
+  }
+
   async function handleAddRole() {
     const val = newRoleName.trim()
     if (!val) { setAddingRole(false); return }
@@ -5455,21 +5464,28 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
-                    {editingTeamName ? (
-                      <input
-                        autoFocus
-                        value={teamNameDraft}
-                        onChange={e => setTeamNameDraft(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
-                        onBlur={handleRenameTeam}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, width: "100%" }}
-                      />
-                    ) : (
-                      <p
-                        onClick={canManageTeam ? () => { setTeamNameDraft(localTeamName); setEditingTeamName(true) } : undefined}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, cursor: canManageTeam ? "text" : "default" }}
-                      >{localTeamName}</p>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      {editingTeamName ? (
+                        <input
+                          autoFocus
+                          value={teamNameDraft}
+                          onChange={e => setTeamNameDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
+                          onBlur={handleRenameTeam}
+                          style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, flex: 1 }}
+                        />
+                      ) : (
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1 }}>{localTeamName}</p>
+                      )}
+                      {canManageTeam && !editingTeamName && (
+                        <button
+                          onClick={() => { setTeamNameDraft(localTeamName); setEditingTeamName(true) }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}
+                        >
+                          <Pencil style={{ width: 13, height: 13 }} /> Rename
+                        </button>
+                      )}
+                    </div>
                     <p style={{ color: "#5A5466", fontSize: 14, marginTop: 6 }}>
                       {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
                     </p>
@@ -5499,9 +5515,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                 cursor: "pointer",
                               }}
                             >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A" }}>{role.name}</span>
-                                <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                  {canManageTeam && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); handleDeleteRole(role.id) }}
+                                      style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", borderRadius: 4, cursor: "pointer", color: "#C4C4C4", flexShrink: 0 }}
+                                      title="Delete role"
+                                    >
+                                      <Trash2 style={{ width: 12, height: 12 }} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )
