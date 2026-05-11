@@ -5455,9 +5455,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             </div>
                             {isAdmin && m.user_id !== userId && (
                               isConfirming ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                                  <button onClick={() => setConfirmRemoveId(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                                  <button onClick={() => handleRemoveMember(m.user_id)} style={{ fontSize: 13, color: "#9F3030", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
+                                <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                                  <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                                  <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
                                 </div>
                               ) : (
                                 <button onClick={() => setConfirmRemoveId(m.user_id)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
@@ -5673,10 +5673,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                           {isAdmin && m.user_id !== userId && (
                             isConfirming ? (
-                              <>
-                                <button onClick={() => setConfirmRemoveId(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                                <button onClick={() => handleRemoveMember(m.user_id)} style={{ fontSize: 13, color: "#9F3030", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
-                              </>
+                              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                                <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => setConfirmRemoveId(m.user_id)}
