@@ -5071,6 +5071,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
   const canDelete = isAdmin || isPresident
+  const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
+  const canManageTeam = isAdmin || myRolePerms.includes("can_manage_team")
+
+  // inline team rename
+  const [localTeamName, setLocalTeamName] = useState(team.name)
+  const [editingTeamName, setEditingTeamName] = useState(false)
+  const [teamNameDraft, setTeamNameDraft] = useState("")
+
+  // add role
+  const [addingRole, setAddingRole] = useState(false)
+  const [newRoleName, setNewRoleName] = useState("")
+
+  // rename role
+  const [renamingRoleId, setRenamingRoleId] = useState<string | null>(null)
+  const [renamingRoleValue, setRenamingRoleValue] = useState("")
 
   useEffect(() => {
     async function load() {
@@ -5141,6 +5156,36 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+  }
+
+  async function handleRenameTeam() {
+    const val = teamNameDraft.trim()
+    if (!val || val === localTeamName) { setEditingTeamName(false); return }
+    await supabase.from("teams").update({ name: val }).eq("id", team.id)
+    setLocalTeamName(val)
+    setEditingTeamName(false)
+  }
+
+  async function handleAddRole() {
+    const val = newRoleName.trim()
+    if (!val) { setAddingRole(false); return }
+    const { data } = await supabase.from("team_roles")
+      .insert({ team_id: team.id, name: val, permissions: [] })
+      .select("id, team_id, name, permissions").single()
+    if (data) {
+      const newRole = { ...data, permissions: [] as string[] }
+      setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
+    }
+    setAddingRole(false)
+    setNewRoleName("")
+  }
+
+  async function handleRenameRole(roleId: string) {
+    const val = renamingRoleValue.trim()
+    if (!val) { setRenamingRoleId(null); return }
+    await supabase.from("team_roles").update({ name: val }).eq("id", roleId)
+    setRoles(prev => prev.map(r => r.id === roleId ? { ...r, name: val } : r))
+    setRenamingRoleId(null)
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
@@ -5381,16 +5426,25 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1 }}>{team.name}</p>
+                    {editingTeamName ? (
+                      <input
+                        autoFocus
+                        value={teamNameDraft}
+                        onChange={e => setTeamNameDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
+                        onBlur={handleRenameTeam}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, width: "100%" }}
+                      />
+                    ) : (
+                      <p
+                        onClick={canManageTeam ? () => { setTeamNameDraft(localTeamName); setEditingTeamName(true) } : undefined}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, cursor: canManageTeam ? "text" : "default" }}
+                      >{localTeamName}</p>
+                    )}
                     <p style={{ color: "#5A5466", fontSize: 14, marginTop: 6 }}>
                       {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
                     </p>
                   </div>
-                  {isAdmin && (
-                    <button style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>
-                      <Pencil style={{ width: 13, height: 13 }} /> Edit details
-                    </button>
-                  )}
                 </div>
 
                 {/* Roles & permissions */}
@@ -5423,10 +5477,27 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             </div>
                           )
                         })}
-                        {isAdmin && (
-                          <div style={{ padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}>
-                            <Plus style={{ width: 14, height: 14 }} /> Add role
-                          </div>
+                        {canManageTeam && (
+                          addingRole ? (
+                            <div style={{ padding: "10px 20px", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}>
+                              <input
+                                autoFocus
+                                value={newRoleName}
+                                onChange={e => setNewRoleName(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") handleAddRole(); if (e.key === "Escape") { setAddingRole(false); setNewRoleName("") } }}
+                                onBlur={() => { if (!newRoleName.trim()) { setAddingRole(false); setNewRoleName("") } }}
+                                placeholder="Role name"
+                                style={{ width: "100%", fontSize: 14, background: "transparent", border: "none", borderBottom: "1px solid #3E1540", outline: "none", padding: "2px 0", color: "#13101A" }}
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => { setAddingRole(true); setNewRoleName("") }}
+                              style={{ padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}
+                            >
+                              <Plus style={{ width: 14, height: 14 }} /> Add role
+                            </div>
+                          )
                         )}
                       </div>
 
@@ -5435,14 +5506,28 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         {roles[activeRole] && (
                           <>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                              <div>
-                                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
+                              <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                                {renamingRoleId === roles[activeRole].id ? (
+                                  <input
+                                    autoFocus
+                                    value={renamingRoleValue}
+                                    onChange={e => setRenamingRoleValue(e.target.value)}
+                                    onKeyDown={e => { if (e.key === "Enter") handleRenameRole(roles[activeRole].id); if (e.key === "Escape") setRenamingRoleId(null) }}
+                                    onBlur={() => handleRenameRole(roles[activeRole].id)}
+                                    style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, width: "100%" }}
+                                  />
+                                ) : (
+                                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
+                                )}
                                 <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
                                   {roles[activeRole].permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
                                 </p>
                               </div>
-                              {isAdmin && (
-                                <button style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 7, color: "#8A8497", fontSize: 12, cursor: "pointer" }}>
+                              {canManageTeam && renamingRoleId !== roles[activeRole].id && (
+                                <button
+                                  onClick={() => { setRenamingRoleId(roles[activeRole].id); setRenamingRoleValue(roles[activeRole].name) }}
+                                  style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 7, color: "#8A8497", fontSize: 12, cursor: "pointer", flexShrink: 0 }}
+                                >
                                   <Pencil style={{ width: 11, height: 11 }} /> Rename
                                 </button>
                               )}
