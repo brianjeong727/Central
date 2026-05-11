@@ -5078,6 +5078,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeRole, setActiveRole] = useState(0)
+  const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
 
   const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
   const canDelete = isAdmin || isPresident
@@ -5175,6 +5177,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+    setConfirmRemoveId(null)
   }
 
   async function handleRenameTeam() {
@@ -5437,22 +5440,34 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {members.length === 0 && <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>}
-                      {members.map((m) => (
-                        <div key={m.user_id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(m.name)}`}>
-                            {getInitials(m.name)}
+                      {members.map((m, i) => {
+                        const isConfirming = confirmRemoveId === m.user_id
+                        return (
+                          <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[#ECE8DE] p-3"
+                            style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
+                          >
+                            <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
+                              {getInitials(m.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
+                              <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                            </div>
+                            {isAdmin && m.user_id !== userId && (
+                              isConfirming ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                                  <button onClick={() => setConfirmRemoveId(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                                  <button onClick={() => handleRemoveMember(m.user_id)} style={{ fontSize: 13, color: "#9F3030", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setConfirmRemoveId(m.user_id)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+                                  Remove
+                                </button>
+                              )
+                            )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
-                            <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
-                          </div>
-                          {isAdmin && m.user_id !== userId && (
-                            <button onClick={() => handleRemoveMember(m.user_id)} className="text-[#C4C4C4] hover:text-[#3E1540] transition-colors">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
@@ -5474,28 +5489,25 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   </div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      {editingTeamName ? (
-                        <input
-                          autoFocus
-                          value={teamNameDraft}
-                          onChange={e => setTeamNameDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
-                          onBlur={handleRenameTeam}
-                          style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "2px solid #3E1540", outline: "none", padding: 0, flex: 1 }}
-                        />
-                      ) : (
+                    {editingTeamName ? (
+                      <input
+                        autoFocus
+                        value={teamNameDraft}
+                        onChange={e => setTeamNameDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
+                        onBlur={handleRenameTeam}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0 }}
+                      />
+                    ) : (
+                      <div
+                        className="group flex items-center gap-2"
+                        style={{ cursor: canManageTeam ? "text" : "default" }}
+                        onClick={canManageTeam ? () => { setTeamNameDraft(localTeamName); setEditingTeamName(true) } : undefined}
+                      >
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1 }}>{localTeamName}</p>
-                      )}
-                      {canManageTeam && !editingTeamName && (
-                        <button
-                          onClick={() => { setTeamNameDraft(localTeamName); setEditingTeamName(true) }}
-                          style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}
-                        >
-                          <Pencil style={{ width: 13, height: 13 }} /> Rename
-                        </button>
-                      )}
-                    </div>
+                        {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0, marginTop: 6 }} />}
+                      </div>
+                    )}
                     <p style={{ color: "#5A5466", fontSize: 14, marginTop: 6 }}>
                       {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
                     </p>
@@ -5631,7 +5643,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   )}
                 </div>
                 <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 60px", padding: "10px 22px", borderBottom: "1px solid #ECE8DE", color: "#8A8497", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px", padding: "10px 22px", borderBottom: "1px solid #ECE8DE", color: "#8A8497", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
                     <span />
                     <span>Name</span>
                     <span>Role</span>
@@ -5640,25 +5652,47 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   {members.length === 0 && (
                     <p style={{ padding: "24px", textAlign: "center", color: "#8A8497", fontSize: 13 }}>No one&apos;s here yet.</p>
                   )}
-                  {members.map((m, i) => (
-                    <div key={m.user_id} style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 60px", alignItems: "center", padding: "13px 22px", borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none" }}>
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] ${getAvatarColor(m.name)}`}>
-                        {getInitials(m.name)}
+                  {members.map((m, i) => {
+                    const isConfirming = confirmRemoveId === m.user_id
+                    const isHovered = hoveredMemberId === m.user_id
+                    return (
+                      <div
+                        key={m.user_id}
+                        onMouseEnter={() => setHoveredMemberId(m.user_id)}
+                        onMouseLeave={() => setHoveredMemberId(null)}
+                        style={{
+                          display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px",
+                          alignItems: "center", padding: "13px 22px",
+                          borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
+                          background: isConfirming ? "#FDF0F0" : "transparent",
+                          transition: "background 0.1s",
+                        }}
+                      >
+                        <div style={{ width: 32, height: 32, borderRadius: 9, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
+                          {getInitials(m.name)}
+                        </div>
+                        <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
+                        <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
+                        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+                          {isAdmin && m.user_id !== userId && (
+                            isConfirming ? (
+                              <>
+                                <button onClick={() => setConfirmRemoveId(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                                <button onClick={() => handleRemoveMember(m.user_id)} style={{ fontSize: 13, color: "#9F3030", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}>Remove</button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmRemoveId(m.user_id)}
+                                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
+                              >
+                                Remove
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
-                      <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
-                      <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        {isAdmin && m.user_id !== userId && (
-                          <button
-                            onClick={() => handleRemoveMember(m.user_id)}
-                            style={{ height: 28, width: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 6, cursor: "pointer", color: "#8A8497" }}
-                          >
-                            <X style={{ width: 13, height: 13 }} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}
