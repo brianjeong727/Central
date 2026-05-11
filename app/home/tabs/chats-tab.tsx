@@ -1644,10 +1644,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0 }}
             />
             <div className="flex items-center gap-0.5 flex-shrink-0">
-              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] font-bold hover:bg-[#E8E2D2] transition-colors">B</button>
-              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] italic hover:bg-[#E8E2D2] transition-colors">I</button>
-              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[14px] hover:bg-[#E8E2D2] transition-colors">🙂</button>
-              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] hover:bg-[#E8E2D2] transition-colors">@</button>
               <button
                 onClick={handleSend}
                 disabled={!inputText.trim() || sending}
