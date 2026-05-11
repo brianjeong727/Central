@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, User } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, User, Smile } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState } from "../components/shared"
 import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
+import Picker from "@emoji-mart/react"
+import data from "@emoji-mart/data"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
 
@@ -791,6 +793,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null)
   const [contextMenuFor, setContextMenuFor] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showComposerEmojiPicker, setShowComposerEmojiPicker] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; avatarUrl: string | null }>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
@@ -1197,6 +1201,22 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
+  }
+
+  function insertEmojiAtCursor(native: string) {
+    const el = textareaRef.current
+    const start = el?.selectionStart ?? inputText.length
+    const end = el?.selectionEnd ?? inputText.length
+    const newText = inputText.slice(0, start) + native + inputText.slice(end)
+    setInputText(newText)
+    requestAnimationFrame(() => {
+      if (el) {
+        const pos = start + native.length
+        el.selectionStart = pos
+        el.selectionEnd = pos
+        el.focus()
+      }
+    })
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1746,6 +1766,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               <Plus className="w-4 h-4" />
             </button>
             <textarea
+              ref={textareaRef}
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -1755,6 +1776,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0 }}
             />
             <div className="flex items-center gap-0.5 flex-shrink-0">
+              {/* Emoji picker trigger */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowComposerEmojiPicker(p => !p)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5A5466] hover:bg-[#E8E2D2] transition-colors"
+                >
+                  <Smile className="w-4 h-4" />
+                </button>
+                {showComposerEmojiPicker && (
+                  <div className="absolute bottom-full right-0 mb-2 z-[160]">
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(emoji: { native: string }) => {
+                        insertEmojiAtCursor(emoji.native)
+                        setShowComposerEmojiPicker(false)
+                      }}
+                      theme="light"
+                      previewPosition="none"
+                      skinTonePosition="none"
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleSend}
                 disabled={!inputText.trim() || sending}
@@ -1773,10 +1817,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       )}
 
       {/* Overlay to dismiss emoji / context menu */}
-      {(emojiPickerFor || contextMenuFor) && (
+      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker) && (
         <div
           className="fixed inset-0 z-[155] md:left-[296px]"
-          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null) }}
+          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false) }}
         />
       )}
     </div>
