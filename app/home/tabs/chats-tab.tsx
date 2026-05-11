@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, Bell, User } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -1265,6 +1265,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }
 
   const memberCount = Object.keys(memberReadMap).length + 1
+  const memberFirstNames = useMemo(() => {
+    const others = Object.values(memberReadMap).map(m => m.name.split(" ")[0])
+    return [userName.split(" ")[0], ...others]
+  }, [memberReadMap, userName])
+  const MEMBER_AVATAR_COLORS = ["#3E1540", "#7FA67F", "#D4A45C", "#8A6FB5"]
 
   return (
     <>
@@ -1272,31 +1277,58 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-[#FBF8F2] border-b border-[#E8E2D2]`} style={{ paddingLeft: inline ? undefined : undefined }}>
         {!inline && (
           <button
             onClick={onClose}
-            className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors"
+            className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
           >
             <ArrowLeft className="w-5 h-5 text-[#13101A]" />
           </button>
         )}
         {/* Group avatar */}
         <div
-          className={`flex-shrink-0 flex items-center justify-center text-[13px] font-bold text-[#F6F4EF] ${getAvatarColor(displayName)}`}
-          style={{ width: 40, height: 40, borderRadius: 12 }}
+          className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
+          style={{ width: 44, height: 44, borderRadius: 11, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 17, display: "grid", placeItems: "center" }}
         >
           {getInitials(displayName)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-[16px] font-semibold text-[#13101A] truncate leading-tight">{displayName}</h2>
-          <p className="text-[12px] text-[#8A8497] leading-tight mt-0.5">
-            {memberCount} member{memberCount !== 1 ? "s" : ""}
-          </p>
+          <h2 className="truncate leading-tight" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "24px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center flex-shrink-0">
+              {memberFirstNames.slice(0, 4).map((name, i) => (
+                <span
+                  key={i}
+                  style={{
+                    width: 16, height: 16, borderRadius: 99,
+                    background: MEMBER_AVATAR_COLORS[i % MEMBER_AVATAR_COLORS.length],
+                    color: "#FBF8F2", fontSize: 9, fontWeight: 600,
+                    display: "inline-grid", placeItems: "center",
+                    marginLeft: i ? -4 : 0,
+                    border: "1.5px solid #FBF8F2",
+                    flexShrink: 0,
+                  }}
+                >{name.charAt(0).toUpperCase()}</span>
+              ))}
+            </div>
+            <p className="text-[12px] text-[#8A8497] truncate">
+              {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
+            </p>
+          </div>
         </div>
+        {/* Desktop action buttons */}
+        <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+          {[Search, Bell, User].map((Icon, i) => (
+            <button key={i} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+              <Icon size={15} />
+            </button>
+          ))}
+        </div>
+        {/* Mobile settings */}
         <button
           onClick={() => setShowSettings(true)}
-          className="flex-shrink-0 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors"
+          className="flex-shrink-0 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
         >
           <Settings className="w-5 h-5 text-[#8A8497]" />
         </button>
@@ -1594,27 +1626,39 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
-          <button className="flex-shrink-0 text-[#8A8497] hover:text-[#5A5466] transition-colors">
-            <Plus className="w-5 h-5" />
-          </button>
-          <textarea
-            value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${displayName}`}
-            rows={1}
-            className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none border-none max-h-28 overflow-y-auto"
-            style={{ lineHeight: "1.5" }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!inputText.trim() || sending}
-            className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E]"
-            style={{ width: 36, height: 36, borderRadius: 10 }}
-          >
-            <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
-          </button>
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-4">
+          <div className="flex items-end gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-2.5">
+            <button className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors pb-0.5">
+              <Plus className="w-4 h-4" />
+            </button>
+            <textarea
+              value={inputText}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${displayName}`}
+              rows={1}
+              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-28 overflow-y-auto"
+              style={{ lineHeight: "1.5" }}
+            />
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] font-bold hover:bg-[#E8E2D2] transition-colors">B</button>
+              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] italic hover:bg-[#E8E2D2] transition-colors">I</button>
+              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[14px] hover:bg-[#E8E2D2] transition-colors">🙂</button>
+              <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] hover:bg-[#E8E2D2] transition-colors">@</button>
+              <button
+                onClick={handleSend}
+                disabled={!inputText.trim() || sending}
+                className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
+                style={{ width: 38, height: 38, borderRadius: 10 }}
+              >
+                <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
+              </button>
+            </div>
+          </div>
+          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[#A09A8C]">
+            <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
+            <span>End-to-end visible to {displayName} members</span>
+          </div>
         </div>
       )}
 

@@ -4183,53 +4183,63 @@ export function EventPlanWorkspace({
       className="md:left-[296px]"
     >
       {/* Plum hero header */}
-      <div style={{
-        position: "relative",
-        background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-        color: "#FBF8F2",
-        padding: "0 24px",
-      }}>
-        {/* Dot texture overlay */}
-        <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
-        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
-          {/* Back button */}
-          <button
-            onClick={onClose}
-            style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 48, paddingBottom: 16, background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.65)", fontSize: 13, fontFamily: "var(--font-inter)" }}
-          >
-            ← Back to calendar
-          </button>
-          {/* Event identity */}
-          <div style={{ paddingBottom: 20 }}>
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.6)", marginBottom: 8 }}>
-              {cfg.label.toUpperCase()} · {dateStr}
-            </p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 400, color: "#FBF8F2", margin: 0, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
-              {calendarEvent.title}
-            </h1>
-            {calendarEvent.location && (
-              <p style={{ fontSize: 13, color: "rgba(251,248,242,0.65)", marginTop: 8 }}>
-                {calendarEvent.location}
-              </p>
-            )}
+      <div style={{ padding: "0 24px", paddingTop: 18 }}>
+        <div style={{
+          position: "relative",
+          borderRadius: 18,
+          overflow: "hidden",
+          background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+          color: "#FBF8F2",
+          padding: "30px 36px 32px",
+        }}>
+          {/* Dot texture */}
+          <div style={{ position: "absolute", inset: 0, opacity: 0.18, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
+            {/* Initial chip */}
+            <span style={{ width: 92, height: 92, borderRadius: 18, background: "rgba(251,248,242,0.08)", border: "1px solid rgba(251,248,242,0.18)", display: "grid", placeItems: "center", fontFamily: "var(--font-instrument-serif)", fontSize: 46, color: "#FBF8F2", flexShrink: 0 }}>
+              {calendarEvent.title.charAt(0).toUpperCase()}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.65)", marginBottom: 0 }}>
+                {cfg.label.toUpperCase()} · {dateStr}
+              </div>
+              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,4vw,56px)", lineHeight: 1, margin: "8px 0 0", letterSpacing: -0.6, color: "#FBF8F2", fontWeight: 400 }}>
+                {calendarEvent.title}
+              </h1>
+              {(calendarEvent.description || calendarEvent.location) && (
+                <div style={{ fontSize: 15, color: "rgba(251,248,242,0.78)", marginTop: 10 }}>
+                  {[calendarEvent.description, calendarEvent.location].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
+              <button style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                ✎ Edit event
+              </button>
+              <button
+                onClick={onClose}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.55)", fontSize: 13, fontFamily: "var(--font-inter)", padding: 0 }}
+              >
+                ← Back to calendar
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Underline section tabs */}
-      <div style={{ position: "sticky", top: 0, background: "#FBF8F2", borderBottom: "1px solid #E8E2D2", zIndex: 10, padding: "0 24px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", gap: 0 }}>
+      <div style={{ borderBottom: "1px solid #E8E2D2", zIndex: 10, padding: "0 24px", marginTop: 22 }}>
+        <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", gap: 32 }}>
           {sections.map((s) => (
             <button
               key={s.key}
               onClick={() => setActiveSection(s.key)}
               style={{
-                padding: "14px 20px 14px 0",
-                marginRight: 8,
+                padding: "12px 0 14px",
                 border: "none",
                 borderBottom: activeSection === s.key ? "2px solid #3E1540" : "2px solid transparent",
                 cursor: "pointer",
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: activeSection === s.key ? 600 : 400,
                 color: activeSection === s.key ? "#2D0F2E" : "#8A8497",
                 background: "transparent",
@@ -4251,118 +4261,129 @@ export function EventPlanWorkspace({
           <>
             {/* ── Overview ── */}
             {activeSection === 'overview' && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 24, alignItems: "start" }} className="max-md:!block">
-                {/* Left: event brief + notes */}
-                <div>
-                  {/* Event brief */}
-                  <div style={{ marginBottom: 20 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
-                      Event brief
+              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start" }} className="max-md:!block">
+                {/* Left: planning details */}
+                <section>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 0 }}>
+                    Event Brief
+                  </p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>
+                    Planning Details
+                  </h2>
+                  {calendarEvent.description && (
+                    <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.7, marginTop: 16, maxWidth: 540 }}>
+                      {calendarEvent.description}
                     </p>
-                    <div style={{ borderLeft: "2px solid #3E1540", paddingLeft: 16 }}>
-                      <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 6px", lineHeight: 1.6 }}>
-                        <strong style={{ color: "#13101A" }}>Date</strong> · {dateStr}
-                      </p>
-                      {calendarEvent.location && (
-                        <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 6px", lineHeight: 1.6 }}>
-                          <strong style={{ color: "#13101A" }}>Location</strong> · {calendarEvent.location}
-                        </p>
-                      )}
-                      {calendarEvent.description && (
-                        <p style={{ fontSize: 14, color: "#5A5466", margin: "6px 0 0", lineHeight: 1.6 }}>{calendarEvent.description}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Overview notes */}
-                  <div>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>
-                      Planning notes
-                    </p>
-                    <textarea
-                      value={overviewNotes}
-                      onChange={(e) => setOverviewNotes(e.target.value)}
-                      placeholder="High-level notes about this event…"
-                      rows={5}
-                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6, fontSize: 14, fontFamily: "var(--font-instrument-serif)" }}
-                      readOnly={!canEdit}
-                    />
-                    {canEdit && (
-                      <button
-                        onClick={handleSaveOverview}
-                        disabled={savingOverview}
-                        style={{ marginTop: 10, padding: "8px 20px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: savingOverview ? "not-allowed" : "pointer", opacity: savingOverview ? 0.7 : 1 }}
-                      >
-                        {savingOverview ? "Saving…" : "Save notes"}
-                      </button>
+                  )}
+                  <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "120px 1fr", rowGap: 14, columnGap: 24, fontSize: 14 }}>
+                    <span style={{ color: "#8A8497" }}>When</span>
+                    <span style={{ color: "#13101A" }}>{dateStr}</span>
+                    {calendarEvent.location && (
+                      <>
+                        <span style={{ color: "#8A8497" }}>Where</span>
+                        <span style={{ color: "#13101A" }}>{calendarEvent.location}</span>
+                      </>
                     )}
                   </div>
-                </div>
+                </section>
 
                 {/* Right: stat cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }} className="max-md:mt-6">
-                  {[
-                    { label: "Expected turnout", value: turnout, placeholder: "e.g. 80", type: "number", field: "turnout" },
-                    { label: "Budget allocated ($)", value: budget, placeholder: "e.g. 500", type: "number", field: "budget" },
-                  ].map(({ label, value, placeholder, type, field }) => (
-                    <div key={field} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "16px 18px" }}>
-                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>{label}</p>
-                      {canEdit ? (
-                        <input
-                          type={type}
-                          value={value}
-                          onChange={(e) => field === "turnout" ? setTurnout(e.target.value) : setBudget(e.target.value)}
-                          placeholder={placeholder}
-                          style={{ ...inputStyle, fontSize: 22, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, border: "none", background: "transparent", padding: 0 }}
-                        />
-                      ) : (
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", margin: 0, lineHeight: 1 }}>
-                          {value || "—"}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {/* Readiness */}
-                  <div style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "16px 18px" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>Readiness</p>
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", margin: "0 0 10px", lineHeight: 1 }}>
-                      {tasks.length === 0 ? "—" : `${Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%`}
-                    </p>
-                    {tasks.length > 0 && (
-                      <div style={{ height: 4, borderRadius: 999, background: "#E8E2D2", overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 999, background: "#3E1540", width: `${Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%`, transition: "width 0.3s" }} />
-                      </div>
+                <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
+                  {/* Expected Turnout */}
+                  <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Expected Turnout</p>
+                    {canEdit ? (
+                      <input
+                        type="number"
+                        value={turnout}
+                        onChange={(e) => setTurnout(e.target.value)}
+                        onBlur={handleSaveOverview}
+                        placeholder="—"
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                      />
+                    ) : (
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
                     )}
+                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>guests</p>
                   </div>
-                </div>
+                  {/* Budget */}
+                  <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Budget</p>
+                    {canEdit ? (
+                      <input
+                        type="number"
+                        value={budget}
+                        onChange={(e) => setBudget(e.target.value)}
+                        onBlur={handleSaveOverview}
+                        placeholder="—"
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                      />
+                    ) : (
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
+                    )}
+                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated</p>
+                  </div>
+                  {/* Readiness */}
+                  {(() => {
+                    const total = tasks.length
+                    const done = tasks.filter(t => t.completed).length
+                    const pct = total > 0 ? Math.round((done / total) * 100) : 0
+                    const onTrack = total === 0 || pct >= 50
+                    return (
+                      <div style={{ padding: 22, background: "#F1ECDE", borderColor: "#E2DDCF", border: "1px solid #E2DDCF", borderRadius: 14 }}>
+                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Readiness</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 99, background: onTrack ? "#7FA67F" : "#D4855C", flexShrink: 0 }} />
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
+                        </div>
+                        {total > 0 && (
+                          <>
+                            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                              {Array.from({ length: Math.min(total, 4) }).map((_, i) => (
+                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "#3E1540" : "#E2DDCF" }} />
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "#5A5466" }}>
+                              <span>{done} of {total} done</span>
+                              <span>{pct}%</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </aside>
               </div>
             )}
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
-              <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>
-                    Tasks · {incompleteTasks.length} remaining
-                  </p>
+              <div style={{ maxWidth: 820 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                  <div>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>To Prepare</p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Checklist</h2>
+                  </div>
+                  <span style={{ fontSize: 13, color: "#8A8497" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
                 </div>
 
                 {/* Inline add row — dashed border style */}
                 {canEdit && (
-                  <div style={{ border: "1.5px dashed #C8C2B8", borderRadius: 12, padding: "12px 14px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center", background: "#FBF8F2" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28, padding: "14px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
+                    <span style={{ color: "#8A8497", display: "flex" }}>+</span>
                     <input
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
                       placeholder="Add a task…"
-                      style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)" }}
+                      style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "#13101A" }}
                       onKeyDown={(e) => { if (e.key === "Enter") handleAddTask() }}
                     />
                     <select
                       value={newTaskAssignee}
                       onChange={(e) => setNewTaskAssignee(e.target.value)}
-                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                      style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                     >
-                      <option value="">Assign…</option>
+                      <option value="">Unassigned</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
@@ -4371,37 +4392,37 @@ export function EventPlanWorkspace({
                       type="date"
                       value={newTaskDue}
                       onChange={(e) => setNewTaskDue(e.target.value)}
-                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                      style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                     />
                     <button
                       onClick={handleAddTask}
                       disabled={addingTask || !newTaskTitle.trim()}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", opacity: addingTask || !newTaskTitle.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}
+                      style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask || !newTaskTitle.trim() ? 0.5 : 1 }}
                     >
                       Add
                     </button>
                   </div>
                 )}
 
-                {incompleteTasks.length === 0 && completedTasks.length === 0 && (
-                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "24px 0" }}>No tasks yet.</p>
-                )}
-
-                {/* Incomplete tasks */}
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {incompleteTasks.map((task, i) => (
-                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: i < incompleteTasks.length - 1 ? "1px solid #F0EDE8" : undefined }}>
-                      {/* Plum checkbox */}
+                {/* Task rows */}
+                <div style={{ marginTop: 22, display: "flex", flexDirection: "column" }}>
+                  {tasks.length === 0 && (
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "24px 0" }}>No tasks yet.</p>
+                  )}
+                  {tasks.map((task, i) => (
+                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 4px", borderBottom: i === tasks.length - 1 ? "none" : "1px solid #E8E2D2" }}>
                       <button
                         onClick={() => handleToggleTask(task)}
-                        style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #3E1540", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-                      />
-                      <span style={{ flex: 1, fontSize: 14, color: "#13101A", lineHeight: 1.4 }}>{task.title}</span>
+                        style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "#3E1540" : "#C4C0B0"), background: task.completed ? "#3E1540" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                      >
+                        {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                      </button>
+                      <span style={{ flex: 1, fontSize: 15, color: task.completed ? "#A09A8C" : "#13101A", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
                       {task.assigned_name && (
-                        <span style={{ padding: "2px 9px", borderRadius: 999, background: "rgba(62,21,64,0.07)", color: "#5A5466", fontSize: 12, whiteSpace: "nowrap" }}>{task.assigned_name}</span>
+                        <span style={{ padding: "5px 12px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
                       )}
                       {task.due_date && (
-                        <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 13, color: "#8A8497", width: 64, textAlign: "right", whiteSpace: "nowrap" }}>
                           {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
                       )}
@@ -4413,56 +4434,36 @@ export function EventPlanWorkspace({
                     </div>
                   ))}
                 </div>
-
-                {/* Completed tasks */}
-                {completedTasks.length > 0 && (
-                  <div style={{ marginTop: 24 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
-                      Completed · {completedTasks.length}
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", opacity: 0.55 }}>
-                      {completedTasks.map((task, i) => (
-                        <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < completedTasks.length - 1 ? "1px solid #F0EDE8" : undefined }}>
-                          <button
-                            onClick={() => handleToggleTask(task)}
-                            style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #3E1540", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-                          >
-                            <Check className="w-3 h-3 text-white" />
-                          </button>
-                          <span style={{ flex: 1, fontSize: 14, color: "#13101A", textDecoration: "line-through", lineHeight: 1.4 }}>{task.title}</span>
-                          {task.assigned_name && (
-                            <span style={{ padding: "2px 9px", borderRadius: 999, background: "rgba(62,21,64,0.07)", color: "#5A5466", fontSize: 12, whiteSpace: "nowrap" }}>{task.assigned_name}</span>
-                          )}
-                          {canEdit && (
-                            <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
             {/* ── Roles & Leads ── */}
             {activeSection === 'roles' && (
-              <div>
-                <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 16 }}>
-                  Roles & Leads · {roles.length}
-                </p>
+              <div style={{ maxWidth: 820 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                  <div>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>{"Who's Responsible"}</p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Roles &amp; Leads</h2>
+                  </div>
+                  {canEdit && (
+                    <button
+                      onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
+                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
+                    >
+                      + Add role
+                    </button>
+                  )}
+                </div>
 
-                {roles.length === 0 && !canEdit && (
-                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "24px 0" }}>No roles defined yet.</p>
-                )}
-
-                {/* Roles grid */}
-                <div style={{ display: "flex", flexDirection: "column" }}>
+                {/* Roles rows */}
+                <div style={{ marginTop: 28 }}>
+                  {roles.length === 0 && !canEdit && (
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "8px 0" }}>No roles defined yet.</p>
+                  )}
                   {roles.map((role, i) => (
-                    <div key={role.id} style={{ borderBottom: i < roles.length - 1 ? "1px solid #F0EDE8" : undefined }}>
+                    <div key={role.id} style={{ borderBottom: i === roles.length - 1 ? "none" : "1px solid #E8E2D2" }}>
                       {editingRoleId === role.id ? (
-                        <div style={{ padding: "14px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ padding: "18px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                             <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" style={inputStyle} />
                             <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
@@ -4477,123 +4478,129 @@ export function EventPlanWorkspace({
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr auto", gap: 16, alignItems: "center", padding: "14px 0" }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#13101A" }}>{role.role_name}</span>
-                          <span style={{ fontSize: 13, color: "#8A8497" }}>{role.notes || "—"}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 220px", alignItems: "center", gap: 18, padding: "18px 4px" }}>
+                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>{role.role_name}</div>
+                          <div style={{ fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>
+                            {role.notes || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>Add a note for whoever takes this on</span>}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                             {role.assigned_name ? (
-                              <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap" }}>
-                                {role.assigned_name}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E2DDCF" }}>
+                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "#3E1540", color: "#FBF8F2", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
+                                  {role.assigned_name.split(" ").map((s: string) => s[0]).join("")}
+                                </span>
+                                <span style={{ fontSize: 13 }}>{role.assigned_name}</span>
+                              </div>
                             ) : (
-                              <span style={{ padding: "3px 10px", borderRadius: 999, border: "1.5px dashed #C8C2B8", color: "#A09A8C", fontSize: 12, whiteSpace: "nowrap" }}>
-                                + Assign
-                              </span>
+                              <button
+                                onClick={() => canEdit ? (setEditingRoleId(role.id), setEditRoleName(role.role_name), setEditRoleAssignee(""), setEditRoleNotes(role.notes ?? "")) : undefined}
+                                style={{ padding: "8px 14px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "transparent", color: "#8A8497", fontSize: 13, fontFamily: "var(--font-inter)", cursor: canEdit ? "pointer" : "default" }}
+                              >+ Assign someone</button>
+                            )}
+                            {canEdit && role.assigned_name && (
+                              <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#8A8497" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                              </button>
                             )}
                             {canEdit && (
-                              <>
-                                <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#8A8497" }}>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                </button>
-                                <button onClick={() => handleDeleteRole(role.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </>
+                              <button onClick={() => handleDeleteRole(role.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#C4C4C4" }}>
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             )}
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
-                </div>
 
-                {/* Inline add role row */}
-                {canEdit && (
-                  <div style={{ border: "1.5px dashed #C8C2B8", borderRadius: 12, padding: "12px 14px", marginTop: 16, display: "flex", gap: 10, alignItems: "center", background: "#FBF8F2" }}>
-                    <input
-                      value={newRoleName}
-                      onChange={(e) => setNewRoleName(e.target.value)}
-                      placeholder="Role name…"
-                      style={{ flex: "0 0 160px", background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)", fontWeight: 500 }}
-                    />
-                    <input
-                      value={newRoleNotes}
-                      onChange={(e) => setNewRoleNotes(e.target.value)}
-                      placeholder="Notes…"
-                      style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#5A5466", fontFamily: "var(--font-inter)" }}
-                    />
-                    <select
-                      value={newRoleAssignee}
-                      onChange={(e) => setNewRoleAssignee(e.target.value)}
-                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                    >
-                      <option value="">Assign…</option>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    <button
-                      onClick={handleAddRole}
-                      disabled={addingRole || !newRoleName.trim()}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}
-                    >
-                      Add role
-                    </button>
-                  </div>
-                )}
+                  {/* Inline add role row */}
+                  {canEdit && (
+                    <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "14px 16px", marginTop: 16, display: "flex", gap: 12, alignItems: "center", background: "#F8F4EA" }}>
+                      <input
+                        value={newRoleName}
+                        onChange={(e) => setNewRoleName(e.target.value)}
+                        placeholder="Role name…"
+                        style={{ flex: "0 0 160px", background: "none", border: "none", outline: "none", fontSize: 15, color: "#13101A", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+                      />
+                      <input
+                        value={newRoleNotes}
+                        onChange={(e) => setNewRoleNotes(e.target.value)}
+                        placeholder="Add a note…"
+                        style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "#5A5466", fontFamily: "var(--font-inter)" }}
+                      />
+                      <select
+                        value={newRoleAssignee}
+                        onChange={(e) => setNewRoleAssignee(e.target.value)}
+                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                      <button
+                        onClick={handleAddRole}
+                        disabled={addingRole || !newRoleName.trim()}
+                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* ── Transition Notes ── */}
             {activeSection === 'notes' && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 32, alignItems: "start" }} className="max-md:!block">
-                {/* Left: editorial note articles */}
-                <div>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 20 }}>
-                    Transition notes · institutional memory
+              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 36, alignItems: "start" }} className="max-md:!block">
+                {/* Left: institutional memory notes */}
+                <section>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>
+                    Institutional Memory — Never Deleted
+                  </p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Transition Notes</h2>
+                  <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 480, lineHeight: 1.6 }}>
+                    Wisdom from past leaders. Add what you learned so the next class doesn&apos;t have to find it the hard way.
                   </p>
 
-                  {notes.length === 0 && (
-                    <p style={{ fontSize: 13, color: "#8A8497", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", padding: "8px 0" }}>No notes yet.</p>
-                  )}
-
-                  <div style={{ position: "relative", paddingLeft: 28 }}>
-                    {notes.length > 0 && <span style={{ position: "absolute", left: 9, top: 8, bottom: 8, width: 1, background: "#E8E2D2" }} />}
+                  <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 18 }}>
+                    {notes.length === 0 && (
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No notes yet. Be the first to leave wisdom for future leaders.</p>
+                    )}
                     {notes.map((note) => (
-                      <article key={note.id} style={{ position: "relative", paddingBottom: 24 }}>
-                        <span style={{ position: "absolute", left: -19, top: 5, width: 12, height: 12, borderRadius: 99, background: "#FBF8F2", border: "2px solid #3E1540" }} />
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                          <span style={{ fontWeight: 600, fontSize: 13, color: "#13101A" }}>{note.created_by_name ?? "Someone"}</span>
-                          <span style={{ fontSize: 12, color: "#8A8497" }}>{new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
-                        </div>
-                        <div style={{ borderLeft: "2px solid #3E1540", paddingLeft: 14 }}>
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#2D0F2E", lineHeight: 1.7, margin: 0, whiteSpace: "pre-wrap" }}>{note.content}</p>
-                        </div>
+                      <article key={note.id} style={{ position: "relative", paddingLeft: 22, borderLeft: "2px solid #3E1540" }}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 19, lineHeight: 1.45, color: "#13101A" }}>&ldquo;{note.content}&rdquo;</p>
+                        <p style={{ marginTop: 10, fontSize: 13, color: "#8A8497" }}>
+                          <span style={{ color: "#2D0F2E", fontWeight: 500 }}>{note.created_by_name ?? "Someone"}</span>
+                          {" · "}{new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                        </p>
                       </article>
                     ))}
                   </div>
-                </div>
+                </section>
 
-                {/* Right: leave a note callout */}
-                {canEdit && (
-                  <div style={{ background: "#F1ECDE", border: "1px solid #E8E2D2", borderRadius: 16, padding: "20px" }} className="max-md:mt-6">
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
-                      Leave a note
-                    </p>
+                {/* Right: leave a note */}
+                <aside className="max-md:mt-6">
+                  <div style={{ padding: 22, background: "#F1ECDE", border: "1px solid #E2DDCF", borderRadius: 14 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Leave a Note</p>
                     <textarea
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="What should future leaders know about this event?…"
-                      rows={4}
-                      style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", lineHeight: 1.7, resize: "none", boxSizing: "border-box" }}
+                      placeholder="What should the next leader know before this event?"
+                      rows={5}
+                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#13101A", outline: "none", resize: "vertical", boxSizing: "border-box" }}
                     />
-                    <button
-                      onClick={handleAddNote}
-                      disabled={addingNote || !newNote.trim()}
-                      style={{ marginTop: 12, width: "100%", padding: "9px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
-                    >
-                      {addingNote ? "Adding…" : "Add note"}
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                      <span style={{ fontSize: 12, color: "#8A8497" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
+                      <button
+                        onClick={handleAddNote}
+                        disabled={addingNote || !newNote.trim()}
+                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
+                      >
+                        {addingNote ? "Adding…" : "Add to record"}
+                      </button>
+                    </div>
                   </div>
-                )}
+                </aside>
               </div>
             )}
           </>
