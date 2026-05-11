@@ -277,11 +277,11 @@ export function SettingsTab({
                 <p style={SECTION_LABEL} className="mb-3">Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({totalMembers})</span></p>
                 <div style={{ ...CARD, display: "flex", flexDirection: "column", flex: 1 }}>
                   {/* member rows — fills space, clips any that don't fit */}
-                  <div style={{ flex: 1, overflow: "hidden" }}>
+                  <div>
                     {members.length === 0 ? (
                       <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
                     ) : (
-                      members.map((m, i) => (
+                      members.slice(0, 6).map((m, i) => (
                         <div
                           key={m.id}
                           className="flex items-center gap-3 px-4 py-3.5"
@@ -302,13 +302,13 @@ export function SettingsTab({
                       ))
                     )}
                   </div>
-                  {members.length > 0 && (
+                  {members.length > 6 && (
                     <button
                       onClick={() => setShowMembersOverlay(true)}
-                      className="w-full flex items-center justify-center gap-1.5 py-3 text-[13px] font-semibold text-[#3E1540] hover:bg-[#FBF8F2] transition-colors flex-shrink-0"
+                      className="w-full text-left px-4 py-3 text-[13px] text-[#A09A8C] hover:text-[#3E1540] transition-colors"
                       style={{ borderTop: "1px solid #F4F1E8" }}
                     >
-                      See all {totalMembers} members
+                      View all {totalMembers} members →
                     </button>
                   )}
                 </div>
