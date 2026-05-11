@@ -1269,7 +1269,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     const others = Object.values(memberReadMap).map(m => m.name.split(" ")[0])
     return [userName.split(" ")[0], ...others]
   }, [memberReadMap, userName])
-  const MEMBER_AVATAR_COLORS = ["#3E1540", "#7FA67F", "#D4A45C", "#8A6FB5"]
+  const MEMBER_AVATAR_COLORS = ["#13101A", "#3E1540"]
 
   return (
     <>
@@ -1323,7 +1323,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         {/* Desktop action buttons */}
         <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
           {[Search, Bell, User].map((Icon, i) => (
-            <button key={i} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+            <button key={i} onClick={i === 2 ? () => setShowSettings(true) : undefined} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
               <Icon size={14} />
             </button>
           ))}
