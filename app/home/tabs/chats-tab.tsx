@@ -1973,16 +1973,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       )}
       </div>{/* end inner scroll div */}
 
-      {/* Desktop: New chat button at bottom */}
-      <div className="hidden md:block mx-3 mt-auto pt-2 pb-3 flex-shrink-0">
-        <button
-          onClick={() => setShowCreateChat("my")}
-          className="w-full flex items-center justify-center gap-1.5 py-2 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New chat
-        </button>
-      </div>
     </div>
   )
 }
