@@ -1029,19 +1029,24 @@ export function MeetingNotesSection({
   }
 
   return (
-    <div className="mt-10">
-      <div className="flex items-center justify-between mb-3">
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
-          Meeting Notes
-        </span>
+    <div className="mt-14">
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
+            Meeting Notes · Weekly
+          </p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>
+            What we&apos;ve discussed
+          </h2>
+        </div>
         {canWrite && (
           <button
             onClick={createNote}
             disabled={creating}
-            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: creating ? "default" : "pointer", fontFamily: "var(--font-inter)", fontWeight: 500, opacity: creating ? 0.5 : 1 }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: creating ? "default" : "pointer", fontFamily: "var(--font-inter)", opacity: creating ? 0.5 : 1 }}
           >
             <Plus className="w-3.5 h-3.5" />
-            {creating ? "Creating…" : "Create"}
+            {creating ? "Creating…" : "Start new"}
           </button>
         )}
       </div>
@@ -1049,10 +1054,9 @@ export function MeetingNotesSection({
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
       ) : notes.length === 0 ? (
-        <div style={{ background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 14, padding: "32px 20px", textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, fontWeight: 400, color: "#13101A", margin: "0 0 6px" }}>No meeting notes yet.</p>
-          <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
-            {canWrite ? "Create your first note to get started." : "No notes have been created yet."}
+        <div style={{ borderLeft: "1px solid #E8E2D2", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", margin: 0 }}>
+            {canWrite ? "No notes yet — start a new one above." : "No notes have been created yet."}
           </p>
         </div>
       ) : (
@@ -3380,12 +3384,17 @@ export function MinistryCalendar({
   }
 
   return (
-    <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
+    <div style={{ marginBottom: 32 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A" }}>
-          Ministry Calendar
-        </span>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
+            Upcoming
+          </p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>
+            {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </h2>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "#F0EDE8", borderRadius: 8, padding: 2, gap: 2 }}>
@@ -3903,53 +3912,64 @@ export function EventPlanWorkspace({
       style={{ position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }}
       className="md:left-[296px]"
     >
-      {/* Header */}
-      <div style={{ position: "sticky", top: 0, background: "#FBF8F2", borderBottom: "1px solid #E5E0D2", zIndex: 10, padding: "0 24px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 48, paddingBottom: 16 }}>
-            <button
-              onClick={onClose}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex", alignItems: "center", gap: 6, color: "#5A5466", fontSize: 13 }}
-            >
-              ← Back
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", margin: 0 }}>
-                  {calendarEvent.title}
-                </h1>
-                <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999, flexShrink: 0 }}>
-                  {cfg.label}
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
-                {dateStr}{calendarEvent.location ? ` · ${calendarEvent.location}` : ""}
+      {/* Plum hero header */}
+      <div style={{
+        position: "relative",
+        background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+        color: "#FBF8F2",
+        padding: "0 24px",
+      }}>
+        {/* Dot texture overlay */}
+        <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
+        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
+          {/* Back button */}
+          <button
+            onClick={onClose}
+            style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 48, paddingBottom: 16, background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.65)", fontSize: 13, fontFamily: "var(--font-inter)" }}
+          >
+            ← Back to calendar
+          </button>
+          {/* Event identity */}
+          <div style={{ paddingBottom: 20 }}>
+            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.6)", marginBottom: 8 }}>
+              {cfg.label.toUpperCase()} · {dateStr}
+            </p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 400, color: "#FBF8F2", margin: 0, letterSpacing: "-0.01em", lineHeight: 1.1 }}>
+              {calendarEvent.title}
+            </h1>
+            {calendarEvent.location && (
+              <p style={{ fontSize: 13, color: "rgba(251,248,242,0.65)", marginTop: 8 }}>
+                {calendarEvent.location}
               </p>
-            </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          {/* Section tabs */}
-          <div style={{ display: "flex", gap: 4, paddingBottom: 12 }}>
-            {sections.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setActiveSection(s.key)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 999,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: activeSection === s.key ? 500 : 400,
-                  background: activeSection === s.key ? "#3E1540" : "transparent",
-                  color: activeSection === s.key ? "#F6F4EF" : "#8A8497",
-                  transition: "background 0.15s, color 0.15s",
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+      {/* Underline section tabs */}
+      <div style={{ position: "sticky", top: 0, background: "#FBF8F2", borderBottom: "1px solid #E8E2D2", zIndex: 10, padding: "0 24px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", gap: 0 }}>
+          {sections.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setActiveSection(s.key)}
+              style={{
+                padding: "14px 20px 14px 0",
+                marginRight: 8,
+                border: "none",
+                borderBottom: activeSection === s.key ? "2px solid #3E1540" : "2px solid transparent",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: activeSection === s.key ? 600 : 400,
+                color: activeSection === s.key ? "#2D0F2E" : "#8A8497",
+                background: "transparent",
+                marginBottom: -1,
+                fontFamily: "var(--font-inter)",
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -3961,128 +3981,154 @@ export function EventPlanWorkspace({
           <>
             {/* ── Overview ── */}
             {activeSection === 'overview' && (
-              <div>
-                {/* Event info block */}
-                <div style={{ ...cardStyle, background: "#F4F0F8", border: "1px solid #DDD5E8" }}>
-                  <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 4px" }}><strong style={{ color: "#13101A" }}>Date</strong> · {dateStr}</p>
-                  {calendarEvent.location && (
-                    <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 4px" }}><strong style={{ color: "#13101A" }}>Location</strong> · {calendarEvent.location}</p>
-                  )}
-                  {calendarEvent.description && (
-                    <p style={{ fontSize: 14, color: "#5A5466", margin: "4px 0 0", lineHeight: 1.6 }}>{calendarEvent.description}</p>
-                  )}
-                </div>
-
-                {/* Editable fields */}
-                <div style={cardStyle}>
-                  <p style={sectionHeadingStyle}>Planning Details</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Expected turnout</label>
-                      <input
-                        type="number"
-                        value={turnout}
-                        onChange={(e) => setTurnout(e.target.value)}
-                        placeholder="e.g. 80"
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Budget allocated ($)</label>
-                      <input
-                        type="number"
-                        value={budget}
-                        onChange={(e) => setBudget(e.target.value)}
-                        placeholder="e.g. 500"
-                        style={inputStyle}
-                      />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 24, alignItems: "start" }} className="max-md:!block">
+                {/* Left: event brief + notes */}
+                <div>
+                  {/* Event brief */}
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
+                      Event brief
+                    </p>
+                    <div style={{ borderLeft: "2px solid #3E1540", paddingLeft: 16 }}>
+                      <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 6px", lineHeight: 1.6 }}>
+                        <strong style={{ color: "#13101A" }}>Date</strong> · {dateStr}
+                      </p>
+                      {calendarEvent.location && (
+                        <p style={{ fontSize: 14, color: "#5A5466", margin: "0 0 6px", lineHeight: 1.6 }}>
+                          <strong style={{ color: "#13101A" }}>Location</strong> · {calendarEvent.location}
+                        </p>
+                      )}
+                      {calendarEvent.description && (
+                        <p style={{ fontSize: 14, color: "#5A5466", margin: "6px 0 0", lineHeight: 1.6 }}>{calendarEvent.description}</p>
+                      )}
                     </div>
                   </div>
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: "#8A8497", display: "block", marginBottom: 4 }}>Overview notes</label>
+
+                  {/* Overview notes */}
+                  <div>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>
+                      Planning notes
+                    </p>
                     <textarea
                       value={overviewNotes}
                       onChange={(e) => setOverviewNotes(e.target.value)}
-                      placeholder="High-level notes about this event..."
-                      rows={4}
-                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+                      placeholder="High-level notes about this event…"
+                      rows={5}
+                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6, fontSize: 14, fontFamily: "var(--font-instrument-serif)" }}
+                      readOnly={!canEdit}
                     />
+                    {canEdit && (
+                      <button
+                        onClick={handleSaveOverview}
+                        disabled={savingOverview}
+                        style={{ marginTop: 10, padding: "8px 20px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: savingOverview ? "not-allowed" : "pointer", opacity: savingOverview ? 0.7 : 1 }}
+                      >
+                        {savingOverview ? "Saving…" : "Save notes"}
+                      </button>
+                    )}
                   </div>
-                  {canEdit && (
-                    <button
-                      onClick={handleSaveOverview}
-                      disabled={savingOverview}
-                      style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: savingOverview ? "not-allowed" : "pointer", opacity: savingOverview ? 0.7 : 1 }}
-                    >
-                      {savingOverview ? "Saving…" : "Save"}
-                    </button>
-                  )}
+                </div>
+
+                {/* Right: stat cards */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }} className="max-md:mt-6">
+                  {[
+                    { label: "Expected turnout", value: turnout, placeholder: "e.g. 80", type: "number", field: "turnout" },
+                    { label: "Budget allocated ($)", value: budget, placeholder: "e.g. 500", type: "number", field: "budget" },
+                  ].map(({ label, value, placeholder, type, field }) => (
+                    <div key={field} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "16px 18px" }}>
+                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>{label}</p>
+                      {canEdit ? (
+                        <input
+                          type={type}
+                          value={value}
+                          onChange={(e) => field === "turnout" ? setTurnout(e.target.value) : setBudget(e.target.value)}
+                          placeholder={placeholder}
+                          style={{ ...inputStyle, fontSize: 22, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, border: "none", background: "transparent", padding: 0 }}
+                        />
+                      ) : (
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", margin: 0, lineHeight: 1 }}>
+                          {value || "—"}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {/* Readiness */}
+                  <div style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "16px 18px" }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>Readiness</p>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", margin: "0 0 10px", lineHeight: 1 }}>
+                      {tasks.length === 0 ? "—" : `${Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%`}
+                    </p>
+                    {tasks.length > 0 && (
+                      <div style={{ height: 4, borderRadius: 999, background: "#E8E2D2", overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 999, background: "#3E1540", width: `${Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%`, transition: "width 0.3s" }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
-              <div style={cardStyle}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <p style={sectionHeadingStyle}>Checklist</p>
-                  <span style={{ fontSize: 12, color: "#8A8497" }}>{incompleteTasks.length} remaining</span>
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>
+                    Tasks · {incompleteTasks.length} remaining
+                  </p>
                 </div>
 
-                {/* Add task form */}
+                {/* Inline add row — dashed border style */}
                 {canEdit && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20, padding: "16px", background: "#F4F0F8", borderRadius: 10 }}>
+                  <div style={{ border: "1.5px dashed #C8C2B8", borderRadius: 12, padding: "12px 14px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center", background: "#FBF8F2" }}>
                     <input
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="New task..."
-                      style={inputStyle}
+                      placeholder="Add a task…"
+                      style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)" }}
                       onKeyDown={(e) => { if (e.key === "Enter") handleAddTask() }}
                     />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <select
-                        value={newTaskAssignee}
-                        onChange={(e) => setNewTaskAssignee(e.target.value)}
-                        style={{ ...selectStyle, flex: 1 }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="date"
-                        value={newTaskDue}
-                        onChange={(e) => setNewTaskDue(e.target.value)}
-                        style={{ ...inputStyle, width: "auto" }}
-                      />
-                      <button
-                        onClick={handleAddTask}
-                        disabled={addingTask || !newTaskTitle.trim()}
-                        style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", opacity: addingTask || !newTaskTitle.trim() ? 0.6 : 1, whiteSpace: "nowrap" }}
-                      >
-                        Add
-                      </button>
-                    </div>
+                    <select
+                      value={newTaskAssignee}
+                      onChange={(e) => setNewTaskAssignee(e.target.value)}
+                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                    >
+                      <option value="">Assign…</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={newTaskDue}
+                      onChange={(e) => setNewTaskDue(e.target.value)}
+                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                    />
+                    <button
+                      onClick={handleAddTask}
+                      disabled={addingTask || !newTaskTitle.trim()}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", opacity: addingTask || !newTaskTitle.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}
+                    >
+                      Add
+                    </button>
                   </div>
                 )}
 
-                {/* Incomplete tasks */}
                 {incompleteTasks.length === 0 && completedTasks.length === 0 && (
-                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No tasks yet.</p>
+                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "24px 0" }}>No tasks yet.</p>
                 )}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {incompleteTasks.map((task) => (
-                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={task.completed}
-                        onChange={() => handleToggleTask(task)}
-                        style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#3E1540", flexShrink: 0 }}
+
+                {/* Incomplete tasks */}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {incompleteTasks.map((task, i) => (
+                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: i < incompleteTasks.length - 1 ? "1px solid #F0EDE8" : undefined }}>
+                      {/* Plum checkbox */}
+                      <button
+                        onClick={() => handleToggleTask(task)}
+                        style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #3E1540", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
                       />
-                      <span style={{ flex: 1, fontSize: 14, color: "#13101A" }}>{task.title}</span>
+                      <span style={{ flex: 1, fontSize: 14, color: "#13101A", lineHeight: 1.4 }}>{task.title}</span>
                       {task.assigned_name && (
-                        <span style={chipStyle}>{task.assigned_name}</span>
+                        <span style={{ padding: "2px 9px", borderRadius: 999, background: "rgba(62,21,64,0.07)", color: "#5A5466", fontSize: 12, whiteSpace: "nowrap" }}>{task.assigned_name}</span>
                       )}
                       {task.due_date && (
                         <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
@@ -4090,10 +4136,7 @@ export function EventPlanWorkspace({
                         </span>
                       )}
                       {canEdit && (
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, color: "#C4C4C4" }}
-                        >
+                        <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
                           <X className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -4103,33 +4146,25 @@ export function EventPlanWorkspace({
 
                 {/* Completed tasks */}
                 {completedTasks.length > 0 && (
-                  <div style={{ marginTop: 20 }}>
-                    <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 16, marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 500 }}>Completed</span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {completedTasks.map((task) => (
-                        <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8, opacity: 0.5 }}>
-                          <input
-                            type="checkbox"
-                            checked={task.completed}
-                            onChange={() => handleToggleTask(task)}
-                            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#3E1540", flexShrink: 0 }}
-                          />
-                          <span style={{ flex: 1, fontSize: 14, color: "#13101A", textDecoration: "line-through" }}>{task.title}</span>
+                  <div style={{ marginTop: 24 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
+                      Completed · {completedTasks.length}
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", opacity: 0.55 }}>
+                      {completedTasks.map((task, i) => (
+                        <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < completedTasks.length - 1 ? "1px solid #F0EDE8" : undefined }}>
+                          <button
+                            onClick={() => handleToggleTask(task)}
+                            style={{ width: 18, height: 18, borderRadius: 4, border: "1.5px solid #3E1540", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                          >
+                            <Check className="w-3 h-3 text-white" />
+                          </button>
+                          <span style={{ flex: 1, fontSize: 14, color: "#13101A", textDecoration: "line-through", lineHeight: 1.4 }}>{task.title}</span>
                           {task.assigned_name && (
-                            <span style={chipStyle}>{task.assigned_name}</span>
-                          )}
-                          {task.due_date && (
-                            <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
-                              {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </span>
+                            <span style={{ padding: "2px 9px", borderRadius: 999, background: "rgba(62,21,64,0.07)", color: "#5A5466", fontSize: 12, whiteSpace: "nowrap" }}>{task.assigned_name}</span>
                           )}
                           {canEdit && (
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, color: "#C4C4C4" }}
-                            >
+                            <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
                               <X className="w-3.5 h-3.5" />
                             </button>
                           )}
@@ -4143,138 +4178,95 @@ export function EventPlanWorkspace({
 
             {/* ── Roles & Leads ── */}
             {activeSection === 'roles' && (
-              <div style={cardStyle}>
-                <p style={sectionHeadingStyle}>Roles & Leads</p>
+              <div>
+                <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 16 }}>
+                  Roles & Leads · {roles.length}
+                </p>
 
-                {roles.length === 0 && (
-                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No roles defined yet.</p>
+                {roles.length === 0 && !canEdit && (
+                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "24px 0" }}>No roles defined yet.</p>
                 )}
 
-                {/* Roles table */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                  {roles.map((role) => (
-                    <div key={role.id}>
+                {/* Roles grid */}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {roles.map((role, i) => (
+                    <div key={role.id} style={{ borderBottom: i < roles.length - 1 ? "1px solid #F0EDE8" : undefined }}>
                       {editingRoleId === role.id ? (
-                        <div style={{ border: "1px solid #3E1540", borderRadius: 8, padding: "12px" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                            <input
-                              value={editRoleName}
-                              onChange={(e) => setEditRoleName(e.target.value)}
-                              placeholder="Role name"
-                              style={inputStyle}
-                            />
-                            <select
-                              value={editRoleAssignee}
-                              onChange={(e) => setEditRoleAssignee(e.target.value)}
-                              style={{ ...selectStyle, width: "100%" }}
-                            >
+                        <div style={{ padding: "14px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                            <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" style={inputStyle} />
+                            <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
                               <option value="">Unassigned</option>
-                              {members.map((m) => (
-                                <option key={m.id} value={m.id}>{m.name}</option>
-                              ))}
+                              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                             </select>
                           </div>
-                          <input
-                            value={editRoleNotes}
-                            onChange={(e) => setEditRoleNotes(e.target.value)}
-                            placeholder="Notes (optional)"
-                            style={{ ...inputStyle, marginBottom: 8 }}
-                          />
+                          <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                              onClick={() => handleSaveRoleEdit(role.id)}
-                              style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingRoleId(null)}
-                              style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "#5A5466", cursor: "pointer" }}
-                            >
-                              Cancel
-                            </button>
+                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
+                            <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #E5E0D2", borderRadius: 8 }}>
-                          <div style={{ flex: 1 }}>
-                            <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{role.role_name}</span>
-                            {role.notes && (
-                              <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0" }}>{role.notes}</p>
+                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr auto", gap: 16, alignItems: "center", padding: "14px 0" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#13101A" }}>{role.role_name}</span>
+                          <span style={{ fontSize: 13, color: "#8A8497" }}>{role.notes || "—"}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                            {role.assigned_name ? (
+                              <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap" }}>
+                                {role.assigned_name}
+                              </span>
+                            ) : (
+                              <span style={{ padding: "3px 10px", borderRadius: 999, border: "1.5px dashed #C8C2B8", color: "#A09A8C", fontSize: 12, whiteSpace: "nowrap" }}>
+                                + Assign
+                              </span>
+                            )}
+                            {canEdit && (
+                              <>
+                                <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#8A8497" }}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                </button>
+                                <button onClick={() => handleDeleteRole(role.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </>
                             )}
                           </div>
-                          {role.assigned_name ? (
-                            <span style={chipStyle}>{role.assigned_name}</span>
-                          ) : (
-                            <span style={{ ...chipStyle, color: "#C4C4C4" }}>Unassigned</span>
-                          )}
-                          {canEdit && (
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <button
-                                onClick={() => {
-                                  setEditingRoleId(role.id)
-                                  setEditRoleName(role.role_name)
-                                  setEditRoleAssignee(role.assigned_to ?? "")
-                                  setEditRoleNotes(role.notes ?? "")
-                                }}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#8A8497" }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRole(role.id)}
-                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
 
-                {/* Add role form */}
+                {/* Inline add role row */}
                 {canEdit && (
-                  <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 16 }}>
-                    <p style={{ fontSize: 12, color: "#8A8497", margin: "0 0 8px" }}>Add a role</p>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                      <input
-                        value={newRoleName}
-                        onChange={(e) => setNewRoleName(e.target.value)}
-                        placeholder="Role name"
-                        style={inputStyle}
-                      />
-                      <select
-                        value={newRoleAssignee}
-                        onChange={(e) => setNewRoleAssignee(e.target.value)}
-                        style={{ ...selectStyle, width: "100%" }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        value={newRoleNotes}
-                        onChange={(e) => setNewRoleNotes(e.target.value)}
-                        placeholder="Notes (optional)"
-                        style={{ ...inputStyle, flex: 1 }}
-                      />
-                      <button
-                        onClick={handleAddRole}
-                        disabled={addingRole || !newRoleName.trim()}
-                        style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.6 : 1, whiteSpace: "nowrap" }}
-                      >
-                        Add
-                      </button>
-                    </div>
+                  <div style={{ border: "1.5px dashed #C8C2B8", borderRadius: 12, padding: "12px 14px", marginTop: 16, display: "flex", gap: 10, alignItems: "center", background: "#FBF8F2" }}>
+                    <input
+                      value={newRoleName}
+                      onChange={(e) => setNewRoleName(e.target.value)}
+                      placeholder="Role name…"
+                      style={{ flex: "0 0 160px", background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+                    />
+                    <input
+                      value={newRoleNotes}
+                      onChange={(e) => setNewRoleNotes(e.target.value)}
+                      placeholder="Notes…"
+                      style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#5A5466", fontFamily: "var(--font-inter)" }}
+                    />
+                    <select
+                      value={newRoleAssignee}
+                      onChange={(e) => setNewRoleAssignee(e.target.value)}
+                      style={{ background: "transparent", border: "none", outline: "none", fontSize: 12, color: "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                    >
+                      <option value="">Assign…</option>
+                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <button
+                      onClick={handleAddRole}
+                      disabled={addingRole || !newRoleName.trim()}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1, whiteSpace: "nowrap" }}
+                    >
+                      Add role
+                    </button>
                   </div>
                 )}
               </div>
@@ -4282,46 +4274,56 @@ export function EventPlanWorkspace({
 
             {/* ── Transition Notes ── */}
             {activeSection === 'notes' && (
-              <div style={cardStyle}>
-                <div style={{ marginBottom: 16 }}>
-                  <p style={sectionHeadingStyle}>Transition Notes</p>
-                  <p style={{ fontSize: 13, color: "#8A8497", margin: "-8px 0 0" }}>Institutional memory — never deleted</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 32, alignItems: "start" }} className="max-md:!block">
+                {/* Left: editorial note articles */}
+                <div>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 20 }}>
+                    Transition notes · institutional memory
+                  </p>
+
+                  {notes.length === 0 && (
+                    <p style={{ fontSize: 13, color: "#8A8497", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", padding: "8px 0" }}>No notes yet.</p>
+                  )}
+
+                  <div style={{ position: "relative", paddingLeft: 28 }}>
+                    {notes.length > 0 && <span style={{ position: "absolute", left: 9, top: 8, bottom: 8, width: 1, background: "#E8E2D2" }} />}
+                    {notes.map((note) => (
+                      <article key={note.id} style={{ position: "relative", paddingBottom: 24 }}>
+                        <span style={{ position: "absolute", left: -19, top: 5, width: 12, height: 12, borderRadius: 99, background: "#FBF8F2", border: "2px solid #3E1540" }} />
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: "#13101A" }}>{note.created_by_name ?? "Someone"}</span>
+                          <span style={{ fontSize: 12, color: "#8A8497" }}>{new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+                        </div>
+                        <div style={{ borderLeft: "2px solid #3E1540", paddingLeft: 14 }}>
+                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#2D0F2E", lineHeight: 1.7, margin: 0, whiteSpace: "pre-wrap" }}>{note.content}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Add note form */}
+                {/* Right: leave a note callout */}
                 {canEdit && (
-                  <div style={{ marginBottom: 20, padding: "16px", background: "#F4F0F8", borderRadius: 10 }}>
+                  <div style={{ background: "#F1ECDE", border: "1px solid #E8E2D2", borderRadius: 16, padding: "20px" }} className="max-md:mt-6">
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>
+                      Leave a note
+                    </p>
                     <textarea
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="Write a note for future leaders..."
-                      rows={3}
-                      style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 8 }}
+                      placeholder="What should future leaders know about this event?…"
+                      rows={4}
+                      style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", lineHeight: 1.7, resize: "none", boxSizing: "border-box" }}
                     />
                     <button
                       onClick={handleAddNote}
                       disabled={addingNote || !newNote.trim()}
-                      style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.6 : 1 }}
+                      style={{ marginTop: 12, width: "100%", padding: "9px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
                     >
                       {addingNote ? "Adding…" : "Add note"}
                     </button>
                   </div>
                 )}
-
-                {notes.length === 0 && (
-                  <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", padding: "16px 0" }}>No notes yet. Add institutional knowledge for future leaders.</p>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {notes.map((note) => (
-                    <div key={note.id} style={{ borderBottom: "1px solid #E5E0D2", paddingBottom: 16 }}>
-                      <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>{note.content}</p>
-                      <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
-                        {note.created_by_name ?? "Someone"} · {new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </>

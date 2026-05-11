@@ -202,12 +202,12 @@ export function SettingsTab({
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
         <div className="mb-8 md:mb-10">
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 40px)", color: "#13101A", fontWeight: 400, margin: "0 0 4px" }}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>
+            {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
+          </p>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 44px)", color: "#13101A", fontWeight: 400, margin: 0, letterSpacing: "-0.01em" }}>
             Church Settings
           </h1>
-          <p style={{ fontSize: "14px", color: "#8A8497" }}>
-            {isAdmin ? "Ministry admin control panel" : "Ministry workspace — you can view member info"}
-          </p>
         </div>
 
         {loading ? (
@@ -318,24 +318,25 @@ export function SettingsTab({
             {/* ── RIGHT COLUMN ── */}
             <div className="flex flex-col gap-5">
 
-              {/* Ministry Overview — clickable stat cards */}
+              {/* Ministry Overview — clickable stat cards, 2×2 grid */}
               <section>
                 <p style={SECTION_LABEL} className="mb-3">Overview</p>
-                <div className="grid grid-cols-3 gap-2 md:grid-cols-1 md:gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {[
                     { icon: <Users className="w-4 h-4" />, value: totalMembers, label: "Members", filter: "all" as RoleFilter },
                     { icon: <Shield className="w-4 h-4" />, value: totalLeaders, label: "Leaders", filter: "leader" as RoleFilter },
                     { icon: <Crown className="w-4 h-4" />, value: totalAdmins, label: "Admins", filter: "admin" as RoleFilter },
+                    { icon: <Users className="w-4 h-4" />, value: totalMembers - totalLeaders - totalAdmins, label: "Regular members", filter: "member" as RoleFilter },
                   ].map(({ icon, value, label, filter }) => (
                     <button
                       key={label}
                       onClick={() => { setOverlayInitialFilter(filter); setShowMembersOverlay(true) }}
                       className="text-left transition-all"
-                      style={{ ...CARD, padding: "14px 16px", cursor: "pointer" }}
+                      style={{ ...CARD, padding: "16px 18px", cursor: "pointer" }}
                     >
                       <div className="mb-2" style={{ color: "#8A8497" }}>{icon}</div>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
-                      <p style={{ fontSize: "11px", color: "#8A8497", marginTop: "2px" }}>{label}</p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
+                      <p style={{ fontSize: "11px", color: "#8A8497", marginTop: "3px" }}>{label}</p>
                     </button>
                   ))}
                 </div>
@@ -416,56 +417,65 @@ export function SettingsTab({
           </div>
         )}
 
-        {/* ── Danger Zone ── */}
+        {/* ── Danger Zone — editorial inline rule ── */}
         {isAdmin && !loading && (
-          <div className="mt-12">
-            <div className="flex items-center gap-2 mb-4">
-              <div style={{ flex: 1, height: 1, background: "#ECE8DE" }} />
-              <p style={{ fontSize: "11px", color: "#C4B8B8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Danger Zone</p>
-              <div style={{ flex: 1, height: 1, background: "#ECE8DE" }} />
+          <div className="mt-16">
+            {/* Editorial rule divider */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+              <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#C4A8A8", whiteSpace: "nowrap" }}>
+                Destructive actions
+              </p>
+              <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
             </div>
 
-            <div className="rounded-2xl border border-red-100" style={{ background: "#FFF8F8" }}>
-              <div className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p style={{ fontSize: "14px", fontWeight: 600, color: "#13101A" }}>Archive ministry</p>
-                    <p style={{ fontSize: "12px", color: "#5A5466", marginTop: "4px", lineHeight: 1.5, maxWidth: "420px" }}>
-                      Deactivates the ministry. Members lose access immediately. The ministry data is preserved and can be restored by contacting support.
-                    </p>
-                  </div>
-                  {!showArchiveConfirm ? (
-                    <button
-                      onClick={() => setShowArchiveConfirm(true)}
-                      className="flex-shrink-0 px-4 py-2 rounded-lg border border-red-200 text-[13px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Archive
-                    </button>
-                  ) : (
-                    <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                      <p style={{ fontSize: "12px", color: "#5A5466", textAlign: "right" }}>
-                        Type <strong>{ministryInfo?.name ?? ministryName}</strong> to confirm
-                      </p>
-                      <input
-                        value={archiveConfirmText}
-                        onChange={e => setArchiveConfirmText(e.target.value)}
-                        placeholder="Ministry name…"
-                        className="px-3 py-2 rounded-lg border border-red-200 text-[13px] text-[#13101A] focus:outline-none focus:border-red-400 bg-white w-48"
-                      />
-                      <div className="flex gap-2">
-                        <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} className="px-3 py-1.5 rounded-lg border border-[#E5E0D2] text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">Cancel</button>
-                        <button
-                          onClick={handleArchive}
-                          disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}
-                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-[12px] font-semibold hover:bg-red-700 disabled:opacity-40 transition-colors"
-                        >
-                          {archiving ? "Archiving…" : "Archive ministry"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", fontWeight: 400, color: "#13101A", marginBottom: 4 }}>Archive ministry</p>
+                <p style={{ fontSize: "13px", color: "#8A8497", lineHeight: 1.6, maxWidth: "480px" }}>
+                  Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.
+                </p>
               </div>
+              {!showArchiveConfirm ? (
+                <button
+                  onClick={() => setShowArchiveConfirm(true)}
+                  className="flex-shrink-0 px-4 py-2 rounded-xl text-[13px] font-semibold transition-colors"
+                  style={{ border: "1px solid #E8C8C8", color: "#8B3535", background: "transparent" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#FDF5F5" }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent" }}
+                >
+                  Archive
+                </button>
+              ) : (
+                <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                  <p style={{ fontSize: "12px", color: "#8A8497", textAlign: "right" }}>
+                    Type <strong style={{ color: "#13101A" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm
+                  </p>
+                  <input
+                    value={archiveConfirmText}
+                    onChange={e => setArchiveConfirmText(e.target.value)}
+                    placeholder="Ministry name…"
+                    className="px-3 py-2 rounded-xl border text-[13px] text-[#13101A] focus:outline-none bg-[#FBF8F2] w-48"
+                    style={{ borderColor: "#E8C8C8" }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }}
+                      className="px-3 py-1.5 rounded-lg border border-[#E5E0D2] text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleArchive}
+                      disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold disabled:opacity-40 transition-colors"
+                      style={{ background: "#8B3535", color: "white" }}
+                    >
+                      {archiving ? "Archiving…" : "Archive ministry"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

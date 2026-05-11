@@ -114,59 +114,55 @@ function JoinContent() {
   return (
     <div className="flex flex-col bg-[#FBF8F2]" style={{ height: "100svh" }}>
 
-      {/* ── Plum header ── */}
-      <div className="bg-[#3E1540] px-6 pt-12 pb-8 flex-shrink-0">
-        <div className="max-w-[480px] mx-auto">
-          {/* Logo + wordmark */}
-          <div className="flex items-center gap-2.5 mb-6">
-            <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
-              <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
-            </svg>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.01em", lineHeight: 1 }}>
-              Central
-            </span>
-          </div>
-          <p style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em", color: "rgba(246,244,239,0.5)", textTransform: "uppercase", marginBottom: 8 }}>
-            Join a ministry
-          </p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", color: "#F6F4EF", fontWeight: 400, lineHeight: 1.15, marginBottom: 8 }}>
-            Find your community.
-          </h1>
-          <p style={{ fontSize: "13px", color: "rgba(246,244,239,0.6)", lineHeight: 1.5 }}>
-            Browse public ministries or enter a private invite code from your leader.
-          </p>
+      {/* ── Editorial header ── */}
+      <div className="flex-shrink-0 px-6 pt-12 pb-0 max-w-[520px] mx-auto w-full">
+        {/* Logo + wordmark */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
+            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
+            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+          </svg>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+            Central
+          </span>
         </div>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase", marginBottom: 10 }}>
+          Find your ministry
+        </p>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "40px", color: "#13101A", fontWeight: 400, lineHeight: 1.1, marginBottom: 0 }}>
+          Choose a ministry.
+        </h1>
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="bg-white border-b border-[#ECE8DE] flex-shrink-0">
-        <div className="max-w-[480px] mx-auto flex">
+      <div className="border-b border-[#E8E2D2] flex-shrink-0 mt-6">
+        <div className="max-w-[520px] mx-auto flex px-6">
           {(["browse", "code"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="flex-1 py-3.5 text-[13px] font-semibold transition-colors"
+              className="py-3.5 mr-8 text-[14px] transition-colors"
               style={{
-                color: tab === t ? "#3E1540" : "#8A8497",
+                color: tab === t ? "#2D0F2E" : "#8A8497",
+                fontWeight: tab === t ? 600 : 400,
                 borderBottom: tab === t ? "2px solid #3E1540" : "2px solid transparent",
                 background: "none",
                 marginBottom: -1,
               }}
             >
-              {t === "browse" ? "Browse ministries" : "Private invite code"}
+              {t === "browse" ? "Browse" : "Invite code"}
             </button>
           ))}
         </div>
       </div>
 
       {/* ── Tab content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden max-w-[480px] mx-auto w-full">
+      <div className="flex-1 flex flex-col overflow-hidden max-w-[520px] mx-auto w-full">
 
         {/* Browse tab */}
         {tab === "browse" && (
-          <div className="flex flex-col flex-1 overflow-hidden px-4 pt-4 gap-3">
+          <div className="flex flex-col flex-1 overflow-hidden px-6 pt-5 gap-3">
 
             {/* Search */}
             <div className="relative flex-shrink-0">
@@ -176,7 +172,7 @@ function JoinContent() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or university…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-all"
                 autoComplete="off"
               />
             </div>
@@ -211,7 +207,7 @@ function JoinContent() {
               )}
 
               {!browsing && ministries.length > 0 && (
-                <div className="flex flex-col gap-2 pb-2">
+                <div className="flex flex-col gap-3 pb-2">
                   {ministries.map((m) => {
                     const isSelected = selected?.id === m.id
                     const isMember = myMinistryIds.has(m.id)
@@ -219,54 +215,40 @@ function JoinContent() {
                       <button
                         key={m.id}
                         onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }}
-                        className="flex items-center gap-3.5 rounded-xl border transition-all text-left w-full"
+                        className="flex items-center gap-4 rounded-2xl border transition-all text-left w-full"
                         style={{
-                          padding: "16px 18px",
-                          borderColor: isMember ? "#3E1540" : isSelected ? "#3E1540" : "#ECE8DE",
-                          borderWidth: isMember || isSelected ? "1.5px" : "1px",
-                          background: isMember ? "#F4F0FF" : isSelected ? "#FBF8F2" : "#FFFFFF",
+                          padding: "18px 20px",
+                          borderColor: isSelected ? "#3E1540" : "#E8E2D2",
+                          borderWidth: isSelected ? "1.5px" : "1px",
+                          background: isSelected ? "#F9F5FF" : "#FBF8F2",
                         }}
                       >
-                        {/* Initials icon */}
-                        <div className="w-10 h-10 rounded-[10px] bg-[#F4F1E8] flex items-center justify-center flex-shrink-0">
-                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#3E1540", fontWeight: 400 }}>
+                        {/* Plum icon chip */}
+                        <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 12, background: "#3E1540" }}>
+                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", color: "#F6F4EF", fontWeight: 400 }}>
                             {getInitials(m.name)}
                           </span>
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
-                          <p className="text-[12px] text-[#8A8497] truncate">
+                          <p style={{ fontWeight: 600, fontSize: "15px", color: "#13101A" }} className="truncate">{m.name}</p>
+                          <p style={{ fontSize: "12px", color: "#8A8497", marginTop: 2 }} className="truncate">
                             {m.university} · {SIZE_LABELS[m.size] ?? m.size}
                           </p>
-                          {isMember && (
-                            <p className="text-[11px] font-semibold text-[#3E1540] mt-0.5">Already a member</p>
-                          )}
                         </div>
 
-                        {/* Right indicator */}
-                        {isMember ? (
-                          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-[#3E1540]">
-                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        ) : (
-                          <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
-                            style={{
-                              border: isSelected ? "none" : "1.5px solid #ECE8DE",
-                              background: isSelected ? "#3E1540" : "transparent",
-                            }}
-                          >
-                            {isSelected && (
-                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                          </div>
+                        {/* Role pill or member badge */}
+                        {isMember && (
+                          <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: "12px", fontWeight: 500, flexShrink: 0 }}>
+                            Member
+                          </span>
                         )}
+
+                        {/* Chevron */}
+                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" className="flex-shrink-0" style={{ color: "#C4C4C4" }}>
+                          <path d="M1 1l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                       </button>
                     )
                   })}
@@ -275,13 +257,13 @@ function JoinContent() {
             </div>
 
             {/* Join button pinned at bottom of content area */}
-            <div className="flex-shrink-0 pt-3 pb-5 border-t border-[#ECE8DE]">
+            <div className="flex-shrink-0 pt-4 pb-5 border-t border-[#E8E2D2]">
               <button
                 onClick={handleBrowseJoin}
                 disabled={!selected || confirming || !!switching}
-                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-40 text-[#F6F4EF] font-bold py-3.5 rounded-[10px] transition-colors text-[14px]"
+                className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-40 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] transition-colors text-[14px]"
               >
-                {switching ? "Switching…" : confirming ? "Joining…" : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →` : selected ? `Join ${selected.name} →` : "Select a ministry to join"}
+                {switching ? "Switching…" : confirming ? "Joining…" : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →` : selected ? `Join ${selected.name} →` : "Select a ministry"}
               </button>
               <p className="text-center text-[13px] text-[#8A8497] mt-4">
                 Starting a new ministry?{" "}
@@ -289,14 +271,17 @@ function JoinContent() {
                   Register here
                 </a>
               </p>
+              <p className="text-center mt-5" style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#A09A8C" }}>
+                &ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10
+              </p>
             </div>
           </div>
         )}
 
         {/* Invite code tab */}
         {tab === "code" && (
-          <form onSubmit={handleCodeJoin} className="flex flex-col items-center overflow-y-auto px-4 pt-10 pb-8 gap-5">
-            <p className="text-[13px] text-[#8A8497] text-center max-w-[260px] leading-relaxed">
+          <form onSubmit={handleCodeJoin} className="flex flex-col items-center overflow-y-auto px-6 pt-10 pb-8 gap-5">
+            <p className="text-[13px] text-[#8A8497] text-center max-w-[280px] leading-relaxed">
               Enter the invite code shared by your ministry leader.
             </p>
 
@@ -311,11 +296,11 @@ function JoinContent() {
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                placeholder="Enter invite code"
+                placeholder="ENTER CODE"
                 autoComplete="off"
                 autoCapitalize="characters"
-                className="w-full px-4 py-4 rounded-xl border border-[#ECE8DE] bg-white text-[18px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all text-center font-mono"
-                style={{ letterSpacing: "0.15em", textTransform: "uppercase" }}
+                className="w-full px-4 py-4 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[18px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/50 transition-all text-center"
+                style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}
               />
               <p className="text-[11px] text-[#8A8497] text-center mt-2">Codes are usually 6–8 characters</p>
             </div>
@@ -323,7 +308,7 @@ function JoinContent() {
             <button
               type="submit"
               disabled={joining || inviteCode.trim().length < 4}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-40 text-[#F6F4EF] font-bold py-3.5 rounded-[10px] transition-colors text-[14px]"
+              className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-40 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] transition-colors text-[14px]"
             >
               {joining ? "Joining…" : "Join ministry"}
             </button>
@@ -334,7 +319,7 @@ function JoinContent() {
               className="text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
             >
               Don&apos;t have a code?{" "}
-              <span className="font-semibold text-[#3E1540]">Browse public ministries</span>
+              <span className="font-semibold text-[#3E1540]">Browse ministries</span>
             </button>
 
             <p className="text-[13px] text-[#8A8497]">
@@ -342,6 +327,9 @@ function JoinContent() {
               <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
                 Register here
               </a>
+            </p>
+            <p className="text-center mt-2" style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#A09A8C" }}>
+              &ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10
             </p>
           </form>
         )}
