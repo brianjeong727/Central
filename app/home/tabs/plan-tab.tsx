@@ -1079,14 +1079,394 @@ export function MeetingNotesSection({
   )
 }
 
+// ── StudentOrgTeamHome ─────────────────────────────────────────────────────────
+// Full redesign per design spec: plum hero → General/Plan/Roster/Resources tabs →
+// General = month calendar (click → EventPlanWorkspace directly) + UP NEXT + QUICK ADD + notes timeline
+
+export function StudentOrgTeamHome({
+  teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, onTeamSettings,
+}: {
+  teamId: string | null
+  teamName: string
+  teamIcon: string
+  ministryId: string
+  userId: string
+  userName: string
+  userRole: string
+  isAdmin: boolean
+  canEdit: boolean
+  onTeamSettings?: () => void
+}) {
+  const supabase = createClient()
+  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources">("General")
+  const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
+
+  // Calendar
+  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
+  const [plannedIds, setPlannedIds] = useState<Set<string>>(new Set())
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [calLoading, setCalLoading] = useState(true)
+
+  // Quick add
+  const [quickTitle, setQuickTitle] = useState("")
+  const [quickDate, setQuickDate] = useState("")
+  const [quickCategory, setQuickCategory] = useState<Category>("regular")
+  const [creatingEvent, setCreatingEvent] = useState(false)
+
+  // Roster
+  const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
+
+  useEffect(() => {
+    if (!ministryId) return
+    setCalLoading(true)
+    const q = supabase.from("calendar_events")
+      .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
+      .eq("ministry_id", ministryId).order("start_date")
+    const run = teamId ? q.or(`team_id.eq.${teamId},team_id.is.null`) : q
+    run.then(({ data }) => { setCalEvents((data ?? []) as CalendarEvent[]); setCalLoading(false) })
+    supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
+      .then(({ data }) => setPlannedIds(new Set((data ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId, ministryId])
+
+  useEffect(() => {
+    if (!teamId) return
+    supabase.from("team_members")
+      .select("id, user_id, team_roles(name), profiles(name)")
+      .eq("team_id", teamId)
+      .then(({ data }) => setRoster((data ?? []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        user_id: m.user_id as string,
+        name: (m.profiles as { name?: string } | null)?.name ?? "Unknown",
+        role: (m.team_roles as { name?: string } | null)?.name ?? "Member",
+      }))))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId])
+
+  const now = new Date()
+  const upNext = calEvents.find(ev => new Date(ev.start_date) >= now)
+
+  async function handleQuickCreate() {
+    if (!quickTitle.trim() || !quickDate) return
+    setCreatingEvent(true)
+    const { data: newEv } = await supabase.from("calendar_events").insert({
+      ministry_id: ministryId,
+      ...(teamId ? { team_id: teamId } : {}),
+      title: quickTitle.trim(),
+      start_date: new Date(quickDate + "T12:00:00").toISOString(),
+      end_date: new Date(quickDate + "T12:00:00").toISOString(),
+      all_day: true,
+      category: quickCategory,
+      created_by: userId,
+    }).select("id, title, description, location, start_date, end_date, all_day, category, created_by").single()
+    setCreatingEvent(false)
+    if (newEv) {
+      const sorted = [...calEvents, newEv as CalendarEvent].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+      setCalEvents(sorted)
+      setQuickTitle(""); setQuickDate("")
+      setPlanningEvent(newEv as CalendarEvent)
+    }
+  }
+
+  // Open EventPlanWorkspace directly when user clicks an event
+  if (planningEvent) {
+    return (
+      <EventPlanWorkspace
+        calendarEvent={planningEvent}
+        ministryId={ministryId}
+        userId={userId}
+        canEdit={canEdit}
+        onClose={() => setPlanningEvent(null)}
+      />
+    )
+  }
+
+  const mono: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  return (
+    <div>
+      {/* ── Plum hero banner ── */}
+      <div style={{
+        position: "relative",
+        background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+        color: "#FBF8F2",
+        padding: "30px 56px 32px",
+      }}>
+        <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
+        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
+          {/* Icon chip */}
+          <span style={{ width: 84, height: 84, borderRadius: 16, background: "rgba(251,248,242,0.08)", border: "1px solid rgba(251,248,242,0.18)", display: "grid", placeItems: "center", fontSize: 34, flexShrink: 0 }}>
+            {teamIcon || "🏛️"}
+          </span>
+          {/* Identity */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ ...mono, color: "rgba(251,248,242,0.65)", marginBottom: 0 }}>
+              {teamName.toUpperCase()}{userRole ? ` · ${userRole.toUpperCase()}` : ""}
+            </p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 48, lineHeight: 1, margin: "8px 0 0", letterSpacing: "-0.01em", color: "#FBF8F2" }}>
+              {teamName}
+            </h1>
+            <p style={{ fontSize: 14, color: "rgba(251,248,242,0.72)", marginTop: 10 }}>
+              {roster.length > 0 ? `${roster.length} members` : "Team"} · {calEvents.filter(ev => {
+                const d = new Date(ev.start_date)
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+              }).length} events this month
+            </p>
+          </div>
+          {/* Action buttons */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+            {canEdit && (
+              <button
+                onClick={() => { setTeamTab("General") }}
+                style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Plus className="w-3.5 h-3.5" /> New event
+              </button>
+            )}
+            {onTeamSettings && (
+              <button
+                onClick={onTeamSettings}
+                style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, cursor: "pointer" }}
+              >
+                Settings
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
+      <div style={{ paddingLeft: 56, borderBottom: "1px solid #E8E2D2", display: "flex", gap: 32 }}>
+        {(["General", "Plan", "Roster", "Resources"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTeamTab(t)}
+            style={{
+              padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--font-inter)",
+              color: teamTab === t ? "#2D0F2E" : "#8A8497",
+              fontWeight: teamTab === t ? 600 : 400,
+              borderBottom: teamTab === t ? "2px solid #3E1540" : "2px solid transparent",
+              marginBottom: -1, background: "none", border: "none",
+              cursor: "pointer",
+            }}
+          >{t}</button>
+        ))}
+      </div>
+
+      {/* ── Tab content ── */}
+      <div style={{ padding: "30px 56px 60px" }}>
+
+        {/* GENERAL — calendar + sidebar + meeting notes */}
+        {teamTab === "General" && (
+          <div>
+            <section style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 32 }}>
+              {/* Left: month calendar */}
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div>
+                    <p style={mono}>Upcoming</p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>
+                      {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </h2>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#8A8497" }}>
+                    {[{ label: "Ministry", color: "#3E1540" }, { label: "Social", color: "#9D7B4F" }, { label: "Outreach", color: "#5B7A6C" }].map(({ label, color }) => (
+                      <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 99, background: color }} />{label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {calLoading ? (
+                  <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+                ) : (
+                  <MonthGrid
+                    events={calEvents}
+                    currentMonth={currentMonth}
+                    onMonthChange={setCurrentMonth}
+                    onSelectEvent={(ev) => setPlanningEvent(ev)}
+                  />
+                )}
+
+                <p style={{ marginTop: 10, fontSize: 12, color: "#8A8497", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "#3E1540" }} />
+                  Click any event to open its plan — no modal in between.
+                </p>
+              </div>
+
+              {/* Right: UP NEXT + QUICK ADD */}
+              <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <p style={mono}>Up next</p>
+
+                {upNext ? (
+                  <button
+                    onClick={() => setPlanningEvent(upNext)}
+                    style={{ position: "relative", textAlign: "left", border: "none", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)", color: "#FBF8F2" }}
+                  >
+                    <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }} />
+                    <div style={{ position: "relative", padding: "22px 22px 20px" }}>
+                      <p style={{ ...mono, color: "rgba(251,248,242,0.65)" }}>
+                        {new Date(upNext.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()} · {upNext.category.toUpperCase()}
+                      </p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, marginTop: 6, letterSpacing: "-0.01em", color: "#FBF8F2" }}>{upNext.title}</p>
+                      {upNext.location && <p style={{ fontSize: 13, color: "rgba(251,248,242,0.72)", marginTop: 6 }}>{upNext.location}</p>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(251,248,242,0.12)", fontSize: 11 }}>
+                          {plannedIds.has(upNext.id) ? "Plan exists" : "Needs planning"}
+                        </span>
+                        <span style={{ fontSize: 11, color: "rgba(251,248,242,0.55)" }}>
+                          {Math.max(0, Math.ceil((new Date(upNext.start_date).getTime() - now.getTime()) / 86400000))} days out
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 18, padding: "10px 14px", borderRadius: 10, background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        Open plan <ChevronRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <div style={{ padding: 20, border: "1px dashed #E8E2D2", borderRadius: 16, textAlign: "center" }}>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", margin: 0 }}>No upcoming events</p>
+                  </div>
+                )}
+
+                {canEdit && (
+                  <div style={{ padding: 18, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+                    <p style={mono}>Quick add</p>
+                    <input
+                      value={quickTitle}
+                      onChange={e => setQuickTitle(e.target.value)}
+                      placeholder="Event name"
+                      style={{ marginTop: 12, width: "100%", padding: "10px 12px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, fontFamily: "var(--font-inter)", outline: "none", boxSizing: "border-box" }}
+                    />
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      <input
+                        type="date"
+                        value={quickDate}
+                        onChange={e => setQuickDate(e.target.value)}
+                        style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 12, color: quickDate ? "#5A5466" : "#A09A8C", fontFamily: "var(--font-inter)", outline: "none" }}
+                      />
+                      <select
+                        value={quickCategory}
+                        onChange={e => setQuickCategory(e.target.value as Category)}
+                        style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 12, color: "#5A5466", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }}
+                      >
+                        <option value="ministry">Ministry</option>
+                        <option value="social">Social</option>
+                        <option value="outreach">Outreach</option>
+                        <option value="welcoming">Welcoming</option>
+                        <option value="workshop">Workshop</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={handleQuickCreate}
+                      disabled={creatingEvent || !quickTitle.trim() || !quickDate}
+                      style={{ marginTop: 12, width: "100%", padding: "10px 14px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: creatingEvent || !quickTitle.trim() || !quickDate ? "not-allowed" : "pointer", opacity: creatingEvent || !quickTitle.trim() || !quickDate ? 0.5 : 1 }}
+                    >
+                      {creatingEvent ? "Creating…" : "Create & open plan"}
+                    </button>
+                    <p style={{ fontSize: 11, color: "#8A8497", marginTop: 8, textAlign: "center" }}>Drops you straight into Overview — no modal.</p>
+                  </div>
+                )}
+              </aside>
+            </section>
+
+            {/* Meeting notes timeline */}
+            <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} />
+          </div>
+        )}
+
+        {/* PLAN — events list with Plan → links */}
+        {teamTab === "Plan" && (
+          <div>
+            <div style={{ marginBottom: 28 }}>
+              <p style={mono}>Events & planning</p>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+            </div>
+            {calEvents.length === 0 ? (
+              <div style={{ borderLeft: "2px solid #E8E2D2", paddingLeft: 20 }}>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Use Quick Add on the General tab to create one.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {calEvents.map(ev => {
+                  const isPlanned = plannedIds.has(ev.id)
+                  const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
+                  return (
+                    <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: CATEGORY_CONFIG[ev.category]?.dot ?? "#3E1540", flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                        <p style={{ fontSize: 13, color: "#8A8497", margin: "3px 0 0" }}>{dateStr}{ev.location ? ` · ${ev.location}` : ""}</p>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: isPlanned ? "#14532D" : "#92400E", background: isPlanned ? "#DCFCE7" : "#FEF3C7", borderRadius: 9999, padding: "3px 10px", whiteSpace: "nowrap" }}>
+                        {isPlanned ? "Planned ✓" : "Needs planning"}
+                      </span>
+                      <button
+                        onClick={() => setPlanningEvent(ev)}
+                        style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                      >
+                        {isPlanned ? "View plan →" : "Plan →"}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ROSTER — team member list */}
+        {teamTab === "Roster" && (
+          <div>
+            <div style={{ marginBottom: 28 }}>
+              <p style={mono}>Team members</p>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Roster</h2>
+            </div>
+            {roster.length === 0 ? (
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No members yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {roster.map((m, i) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: i < roster.length - 1 ? "1px solid #F0EDE8" : undefined }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "#F6F4EF" }}>{m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+                    </div>
+                    <p style={{ flex: 1, fontSize: 15, fontWeight: 500, color: "#13101A", margin: 0 }}>{m.name}</p>
+                    <span style={{ padding: "3px 12px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: 12, fontWeight: 500 }}>{m.role}</span>
+                    {m.user_id === userId && <span style={{ fontSize: 11, color: "#8A8497" }}>you</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* RESOURCES — role links/docs */}
+        {teamTab === "Resources" && (
+          <div>
+            <div style={{ marginBottom: 28 }}>
+              <p style={mono}>Team resources</p>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
+            </div>
+            <StudentOrgRoleTabContent teamId={teamId} roleName="General" userId={userId} canWrite={canEdit} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
-  const [studentOrgTab, setStudentOrgTab] = useState("General")
-  // Reset nested Plan UI whenever the active team changes.
+  // Reset open team whenever the active team changes.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setStudentOrgTab("General"); setOpenTeam(null) }, [activeTeamId])
+  useEffect(() => { setOpenTeam(null) }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
@@ -1098,27 +1478,20 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
     color: "#8A8497",
   }
 
-  const teamsToShow = isAdmin ? allTeams : userTeams.map(t => ({ id: t.teamId, name: t.teamName, icon: t.teamIcon, description: t.teamDescription, created_by: "", member_count: 0 }))
-
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
   const activeTeamLabel = activeTeamName.toLowerCase()
   const activeTeamPerms = activeUserTeam?.permissions ?? []
   const isStudentOrgBoard = /\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
-  const studentOrgUserTeam = isStudentOrgBoard ? activeUserTeam : null
-  const studentOrgRole = studentOrgUserTeam?.roleName ?? ""
+  const studentOrgRole = (isStudentOrgBoard ? activeUserTeam?.roleName : undefined) ?? ""
+  const canEditStudentOrg = isAdmin || activeTeamPerms.includes("can_plan_events")
 
   const isPraiseTeam = /\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p))
   const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
   const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
-  const studentOrgTabs: string[] = (() => {
-    if (!isStudentOrgBoard) return []
-    if (isAdmin || studentOrgRole === "President") return ["General", "President", "Treasurer", "Secretary", "Event Coordinator"]
-    if (studentOrgRole === "Treasurer") return ["General", "Treasurer"]
-    if (studentOrgRole === "Secretary") return ["General", "Secretary"]
-    if (studentOrgRole === "Event Coordinator") return ["General", "Event Coordinator"]
-    return ["General"]
-  })()
+
+  const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0 } : undefined)
 
   return (
     <div className="pb-2 md:pb-0">
@@ -1142,28 +1515,26 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         )}
       </div>
 
-      {/* Mobile title */}
-      <div className="flex items-end justify-between px-5 mb-5 md:hidden">
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
-      </div>
-
-      {/* Desktop Editorial Header */}
-      <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        <div>
-          <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-            {activeTeamName}
-          </h1>
-          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
-            The week as it stands. Groups to prepare, people to thank.
-          </p>
+      {/* Mobile title — only shown when not on a student org team */}
+      {!isStudentOrgBoard && (
+        <div className="flex items-end justify-between px-5 mb-5 md:hidden">
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
         </div>
-        {(() => {
-          const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
-          const activeTeamFull: Team | undefined = allTeams.find(t => t.id === activeTeamId)
-            ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0 } : undefined)
-          if (!activeTeamFull) return null
-          return (
+      )}
+
+      {/* Desktop Editorial Header — only for non-student-org teams */}
+      {!isStudentOrgBoard && (
+        <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
+          <div>
+            <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+            <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+              {activeTeamName}
+            </h1>
+            <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+              The week as it stands. Groups to prepare, people to thank.
+            </p>
+          </div>
+          {activeTeamFull && (
             <button
               onClick={() => setOpenTeam(activeTeamFull)}
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
@@ -1171,104 +1542,56 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             >
               <Settings className="w-4 h-4 text-[#5A5466]" />
             </button>
-          )
-        })()}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Desktop content */}
       <div className="hidden md:block">
-        {isStudentOrgBoard && studentOrgTabs.length > 0 && (
-          <div style={{ borderBottom: "1px solid #ECE8DE", overflowX: "auto", paddingLeft: "56px" }}>
-            <div style={{ display: "flex" }}>
-              {studentOrgTabs.map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setStudentOrgTab(tab)}
-                  style={{
-                    padding: "12px 16px",
-                    fontSize: 14,
-                    fontFamily: "var(--font-inter)",
-                    fontWeight: studentOrgTab === tab ? 600 : 400,
-                    color: studentOrgTab === tab ? "#3E1540" : "#8A8497",
-                    boxShadow: studentOrgTab === tab ? "inset 0 -2px 0 0 #3E1540" : "none",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    outline: "none",
-                  }}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+        {isPraiseTeam && activeTeamId ? (
+          <div className="px-14 py-7">
+            <PraiseTeamTab
+              teamId={activeTeamId}
+              ministryId={ministryId}
+              userId={userId}
+              canManage={canManageWorship}
+              canManageSchedule={canManageSchedule}
+            />
+          </div>
+        ) : isStudentOrgBoard ? (
+          <StudentOrgTeamHome
+            teamId={activeTeamId}
+            teamName={activeTeamName}
+            teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            userRole={studentOrgRole}
+            isAdmin={isAdmin}
+            canEdit={canEditStudentOrg}
+            onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+          />
+        ) : (
+          <div className="px-14 py-7">
+            {(() => {
+              const perms = activeUserTeam?.permissions ?? []
+              const showCalendar = isAdmin || perms.includes("can_plan_events")
+              if (!showCalendar) return null
+              return (
+                <MinistryCalendar
+                  ministryId={ministryId}
+                  teamId={activeTeamId}
+                  userId={userId}
+                  canEdit={isAdmin || perms.includes("can_plan_events")}
+                />
+              )
+            })()}
           </div>
         )}
-        <div className="px-14 py-7">
-          {(() => {
-            if (isPraiseTeam && activeTeamId) {
-              return (
-                <PraiseTeamTab
-                  teamId={activeTeamId}
-                  ministryId={ministryId}
-                  userId={userId}
-                  canManage={canManageWorship}
-                  canManageSchedule={canManageSchedule}
-                />
-              )
-            }
-            if (isStudentOrgBoard) {
-              const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
-              const perms = activeUserTeam?.permissions ?? []
-              const canEdit = isAdmin || perms.includes('can_plan_events')
-              if (studentOrgTab === "General") {
-                return (
-                  <>
-                    <MinistryCalendar
-                      ministryId={ministryId}
-                      teamId={activeTeamId}
-                      userId={userId}
-                      canEdit={canEdit}
-                    />
-                    <MeetingNotesSection
-                      teamId={activeTeamId}
-                      userId={userId}
-                      userName={userName}
-                      canWrite={isAdmin || !!studentOrgUserTeam}
-                    />
-                  </>
-                )
-              }
-              const canWrite = studentOrgRole === "President" || studentOrgRole === studentOrgTab
-              return (
-                <StudentOrgRoleTabContent
-                  teamId={activeTeamId}
-                  roleName={studentOrgTab}
-                  userId={userId}
-                  canWrite={canWrite}
-                />
-              )
-            }
-            const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
-            const perms = activeUserTeam?.permissions ?? []
-            const showCalendar = perms.includes('can_plan_events')
-            if (!showCalendar) return null
-            const canEdit = isAdmin || perms.includes('can_plan_events')
-            return (
-              <MinistryCalendar
-                ministryId={ministryId}
-                teamId={activeTeamId}
-                userId={userId}
-                canEdit={canEdit}
-              />
-            )
-          })()}
-        </div>
       </div>
 
       {/* Mobile content */}
       <div className="md:hidden px-5 pb-4">
-        {/* Praise Team — replaces default mobile content */}
         {isPraiseTeam && activeTeamId ? (
           <PraiseTeamTab
             teamId={activeTeamId}
@@ -1277,121 +1600,68 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
+        ) : isStudentOrgBoard ? (
+          <StudentOrgTeamHome
+            teamId={activeTeamId}
+            teamName={activeTeamName}
+            teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            userRole={studentOrgRole}
+            isAdmin={isAdmin}
+            canEdit={canEditStudentOrg}
+            onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+          />
         ) : (
-        <>
-        {/* Student Org Board tabs — mobile */}
-        {isStudentOrgBoard && studentOrgTabs.length > 0 && (
-          <div className="mb-6">
-            <div style={{ borderBottom: "1px solid #ECE8DE", marginLeft: -20, marginRight: -20, paddingLeft: 20, overflowX: "auto" }}>
-              <div style={{ display: "flex" }}>
-                {studentOrgTabs.map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setStudentOrgTab(tab)}
-                    style={{
-                      padding: "12px 16px",
-                      fontSize: 14,
-                      fontFamily: "var(--font-inter)",
-                      fontWeight: studentOrgTab === tab ? 600 : 400,
-                      color: studentOrgTab === tab ? "#3E1540" : "#8A8497",
-                      boxShadow: studentOrgTab === tab ? "inset 0 -2px 0 0 #3E1540" : "none",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      outline: "none",
-                    }}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="pt-5">
-              {studentOrgTab === "General" ? (
-                <>
-                  <MinistryCalendar
-                    ministryId={ministryId}
-                    teamId={activeTeamId}
-                    userId={userId}
-                    canEdit={isAdmin || (userTeams.find(t => t.teamId === activeTeamId)?.permissions?.includes('can_plan_events') ?? false)}
-                  />
-                  <MeetingNotesSection
-                    teamId={activeTeamId}
-                    userId={userId}
-                    userName={userName}
-                    canWrite={isAdmin || !!studentOrgUserTeam}
-                  />
-                </>
-              ) : (
-                <StudentOrgRoleTabContent
-                  teamId={activeTeamId}
-                  roleName={studentOrgTab}
-                  userId={userId}
-                  canWrite={studentOrgRole === "President" || studentOrgRole === studentOrgTab}
-                />
-              )}
-            </div>
-          </div>
-        )}
-        {/* Admin: team management */}
-        {isAdmin && (
-          <div className="mb-8">
-            <PlanSectionHeader>Teams</PlanSectionHeader>
-            {allTeams.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
-                <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet.</p>
-                <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {allTeams.map((team) => (
-                  <button
-                    key={team.id}
-                    onClick={() => setOpenTeam(team)}
-                    className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
-                  >
-                    <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
-                      <p className="text-[12px] text-[#8A8497]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
-                  </button>
-                ))}
+          <>
+            {/* Admin: team management */}
+            {isAdmin && (
+              <div className="mb-8">
+                <PlanSectionHeader>Teams</PlanSectionHeader>
+                {allTeams.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                    <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet.</p>
+                    <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {allTeams.map((team) => (
+                      <button
+                        key={team.id}
+                        onClick={() => setOpenTeam(team)}
+                        className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
+                      >
+                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
+                          <p className="text-[12px] text-[#8A8497]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-
-        <div className="mt-4">
-          <PlanSectionHeader>Tools</PlanSectionHeader>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { icon: "set", name: "Set" },
-              { icon: "sparkle", name: "Slides" },
-              { icon: "calendar", name: "Schedule" },
-              { icon: "book", name: "Bible Study" },
-            ].map((tool) => (
-              <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
-                <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
-                <div>
-                  <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
-                  <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
-                </div>
+            <div className="mt-4">
+              <PlanSectionHeader>Tools</PlanSectionHeader>
+              <div className="grid grid-cols-2 gap-2">
+                {[{ icon: "set", name: "Set" }, { icon: "sparkle", name: "Slides" }, { icon: "calendar", name: "Schedule" }, { icon: "book", name: "Bible Study" }].map((tool) => (
+                  <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
+                    <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
+                      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
-          <EmptyState
-            icon={<ClipboardList className="w-6 h-6" />}
-            title="You're not on a team yet."
-            subtitle="Ask a leader to add you."
-          />
-        )}
-        </>
+            </div>
+            {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
+              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet." subtitle="Ask a leader to add you." />
+            )}
+          </>
         )}
       </div>
 
