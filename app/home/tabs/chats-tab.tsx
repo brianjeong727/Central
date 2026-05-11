@@ -1277,7 +1277,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 ${inline ? "pt-4" : "pt-12 md:pt-5"} pb-3 bg-[#FBF8F2] border-b border-[#E8E2D2]`} style={{ paddingLeft: inline ? undefined : undefined }}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
         {!inline && (
           <button
             onClick={onClose}
@@ -1289,14 +1289,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         {/* Group avatar */}
         <div
           className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
-          style={{ width: 44, height: 44, borderRadius: 11, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 17, display: "grid", placeItems: "center" }}
+          style={{ width: 40, height: 40, borderRadius: 10, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 16, display: "grid", placeItems: "center" }}
         >
           {getInitials(displayName)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="truncate leading-tight" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "24px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
+            <div className="hidden md:flex items-center flex-shrink-0">
               {memberFirstNames.slice(0, 4).map((name, i) => (
                 <span
                   key={i}
@@ -1312,16 +1312,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 >{name.charAt(0).toUpperCase()}</span>
               ))}
             </div>
-            <p className="text-[12px] text-[#8A8497] truncate">
+            <p className="hidden md:block text-[12px] text-[#8A8497] truncate">
               {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
             </p>
           </div>
+          <p className="md:hidden text-[12px] text-[#8A8497] mt-0.5">
+            {memberCount} member{memberCount !== 1 ? "s" : ""}
+          </p>
         </div>
         {/* Desktop action buttons */}
         <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
           {[Search, Bell, User].map((Icon, i) => (
-            <button key={i} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
-              <Icon size={15} />
+            <button key={i} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+              <Icon size={14} />
             </button>
           ))}
         </div>
@@ -1626,9 +1629,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-4">
-          <div className="flex items-end gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-2.5">
-            <button className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors pb-0.5">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-3.5">
+          <div className="flex items-center gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3" style={{ minHeight: 44 }}>
+            <button className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors">
               <Plus className="w-4 h-4" />
             </button>
             <textarea
@@ -1637,8 +1640,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               onKeyDown={handleKeyDown}
               placeholder={`Message ${displayName}`}
               rows={1}
-              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-28 overflow-y-auto"
-              style={{ lineHeight: "1.5" }}
+              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-28 overflow-y-auto self-center"
+              style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0 }}
             />
             <div className="flex items-center gap-0.5 flex-shrink-0">
               <button className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg text-[#5A5466] text-[13px] font-bold hover:bg-[#E8E2D2] transition-colors">B</button>
@@ -1649,7 +1652,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 onClick={handleSend}
                 disabled={!inputText.trim() || sending}
                 className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
-                style={{ width: 38, height: 38, borderRadius: 10 }}
+                style={{ width: 34, height: 34, borderRadius: 10 }}
               >
                 <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
               </button>
