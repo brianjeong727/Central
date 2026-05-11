@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, ChevronRight, ChevronDown, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, Bell, User } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Edit3, Info, Download, User } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -803,6 +803,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const myTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [searchMode, setSearchMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchMatchIndex, setSearchMatchIndex] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    const q = searchQuery.toLowerCase().trim()
+    return messages
+      .filter(m => !m.deleted && m.content.toLowerCase().includes(q))
+      .map(m => m.id)
+  }, [messages, searchQuery])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -1121,10 +1133,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages (suppressed while in search mode)
   useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+    if (!searchMode) scrollToBottom()
+  }, [messages, scrollToBottom, searchMode])
+
+  // Scroll to the current search match
+  useEffect(() => {
+    if (searchMatches.length === 0) return
+    const matchId = searchMatches[searchMatchIndex]
+    if (matchId) messageRefs.current[matchId]?.scrollIntoView({ behavior: "smooth", block: "center" })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchMatchIndex, searchMatches])
 
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInputText(e.target.value)
@@ -1226,6 +1246,50 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     return map
   }, [messages, memberReadMap, userId])
 
+  function openSearch() {
+    setSearchMode(true)
+    setSearchQuery("")
+    setSearchMatchIndex(0)
+    setTimeout(() => searchInputRef.current?.focus(), 50)
+  }
+
+  function closeSearch() {
+    setSearchMode(false)
+    setSearchQuery("")
+    setSearchMatchIndex(0)
+  }
+
+  function goToNextMatch() {
+    if (searchMatches.length === 0) return
+    setSearchMatchIndex(i => (i + 1) % searchMatches.length)
+  }
+
+  function goToPrevMatch() {
+    if (searchMatches.length === 0) return
+    setSearchMatchIndex(i => (i - 1 + searchMatches.length) % searchMatches.length)
+  }
+
+  function highlightText(text: string, query: string, isCurrent: boolean): React.ReactNode {
+    const q = query.toLowerCase().trim()
+    if (!q) return text
+    const lower = text.toLowerCase()
+    const parts: React.ReactNode[] = []
+    let i = 0
+    let key = 0
+    while (i < text.length) {
+      const idx = lower.indexOf(q, i)
+      if (idx === -1) { parts.push(text.slice(i)); break }
+      if (idx > i) parts.push(text.slice(i, idx))
+      parts.push(
+        <mark key={key++} style={{ background: isCurrent ? "#D4A45C" : "rgba(212,164,92,0.45)", color: "#13101A", borderRadius: 2, padding: "0 1px" }}>
+          {text.slice(idx, idx + q.length)}
+        </mark>
+      )
+      i = idx + q.length
+    }
+    return <>{parts}</>
+  }
+
   async function handleReact(messageId: string, emoji: string) {
     setEmojiPickerFor(null)
     const existing = (reactions[messageId] ?? []).find(
@@ -1278,63 +1342,108 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
-        {!inline && (
-          <button
-            onClick={onClose}
-            className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
-          >
-            <ArrowLeft className="w-5 h-5 text-[#13101A]" />
-          </button>
-        )}
-        {/* Group avatar */}
-        <div
-          className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
-          style={{ width: 40, height: 40, borderRadius: 10, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 16, display: "grid", placeItems: "center" }}
-        >
-          {getInitials(displayName)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
-            <div className="hidden md:flex items-center flex-shrink-0">
-              {memberFirstNames.slice(0, 4).map((name, i) => (
-                <span
-                  key={i}
-                  style={{
-                    width: 16, height: 16, borderRadius: 99,
-                    background: MEMBER_AVATAR_COLORS[i % MEMBER_AVATAR_COLORS.length],
-                    color: "#FBF8F2", fontSize: 9, fontWeight: 600,
-                    display: "inline-grid", placeItems: "center",
-                    marginLeft: i ? -4 : 0,
-                    border: "1.5px solid #FBF8F2",
-                    flexShrink: 0,
-                  }}
-                >{name.charAt(0).toUpperCase()}</span>
-              ))}
-            </div>
-            <p className="hidden md:block text-[12px] text-[#8A8497] truncate">
-              {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
-            </p>
-          </div>
-          <p className="md:hidden text-[12px] text-[#8A8497] mt-0.5">
-            {memberCount} member{memberCount !== 1 ? "s" : ""}
-          </p>
-        </div>
-        {/* Desktop action buttons */}
-        <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
-          {[Search, Bell, User].map((Icon, i) => (
-            <button key={i} onClick={i === 2 ? () => setShowSettings(true) : undefined} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
-              <Icon size={14} />
+        {searchMode ? (
+          <>
+            {/* Search bar mode */}
+            <button
+              onClick={closeSearch}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0 }}
+            >
+              <X size={14} />
             </button>
-          ))}
-        </div>
-        {/* Mobile settings */}
-        <button
-          onClick={() => setShowSettings(true)}
-          className="flex-shrink-0 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
-        >
-          <Settings className="w-5 h-5 text-[#8A8497]" />
-        </button>
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setSearchMatchIndex(0) }}
+              onKeyDown={e => {
+                if (e.key === "Escape") closeSearch()
+                else if (e.key === "Enter") { e.preventDefault(); goToNextMatch() }
+                else if (e.key === "ArrowDown") { e.preventDefault(); goToNextMatch() }
+                else if (e.key === "ArrowUp") { e.preventDefault(); goToPrevMatch() }
+              }}
+              placeholder="Search messages…"
+              className="flex-1 bg-transparent outline-none text-[14px] text-[#13101A] placeholder:text-[#A09A8C] min-w-0"
+            />
+            {searchQuery.trim() && (
+              <span style={{ fontSize: "12px", color: "#8A8497", whiteSpace: "nowrap", flexShrink: 0 }}>
+                {searchMatches.length === 0 ? "No results" : `${searchMatchIndex + 1} / ${searchMatches.length}`}
+              </span>
+            )}
+            {searchMatches.length > 0 && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={goToPrevMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                  <ChevronUp size={12} />
+                </button>
+                <button onClick={goToNextMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                  <ChevronDown size={12} />
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {!inline && (
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
+              >
+                <ArrowLeft className="w-5 h-5 text-[#13101A]" />
+              </button>
+            )}
+            {/* Group avatar */}
+            <div
+              className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
+              style={{ width: 40, height: 40, borderRadius: 10, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 16, display: "grid", placeItems: "center" }}
+            >
+              {getInitials(displayName)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
+                <div className="hidden md:flex items-center flex-shrink-0">
+                  {memberFirstNames.slice(0, 4).map((name, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: 16, height: 16, borderRadius: 99,
+                        background: MEMBER_AVATAR_COLORS[i % MEMBER_AVATAR_COLORS.length],
+                        color: "#FBF8F2", fontSize: 9, fontWeight: 600,
+                        display: "inline-grid", placeItems: "center",
+                        marginLeft: i ? -4 : 0,
+                        border: "1.5px solid #FBF8F2",
+                        flexShrink: 0,
+                      }}
+                    >{name.charAt(0).toUpperCase()}</span>
+                  ))}
+                </div>
+                <p className="hidden md:block text-[12px] text-[#8A8497] truncate">
+                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
+                </p>
+              </div>
+              <p className="md:hidden text-[12px] text-[#8A8497] mt-0.5">
+                {memberCount} member{memberCount !== 1 ? "s" : ""}
+              </p>
+            </div>
+            {/* Desktop action buttons — Search + User only */}
+            <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+              <button onClick={openSearch} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <Search size={14} />
+              </button>
+              <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <User size={14} />
+              </button>
+            </div>
+            {/* Mobile: search + settings */}
+            <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
+              <button onClick={openSearch} className="p-1.5 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+                <Search className="w-4 h-4 text-[#8A8497]" />
+              </button>
+              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+                <Settings className="w-5 h-5 text-[#8A8497]" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Messages area ── */}
@@ -1514,7 +1623,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               </div>
                             )}
                             <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
-                              {msg.content}
+                              {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
+                                ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
+                                : msg.content}
                             </div>
                           </>
                         )}
