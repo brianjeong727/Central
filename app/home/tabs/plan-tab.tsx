@@ -1188,56 +1188,6 @@ export function StudentOrgTeamHome({
 
   return (
     <div>
-      {/* ── Plum hero banner ── */}
-      <div style={{
-        position: "relative",
-        background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-        color: "#FBF8F2",
-        padding: "30px 56px 32px",
-      }}>
-        <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
-        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
-          {/* Icon chip */}
-          <span style={{ width: 84, height: 84, borderRadius: 16, background: "rgba(251,248,242,0.08)", border: "1px solid rgba(251,248,242,0.18)", display: "grid", placeItems: "center", fontSize: 34, flexShrink: 0 }}>
-            {teamIcon || "🏛️"}
-          </span>
-          {/* Identity */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...mono, color: "rgba(251,248,242,0.65)", marginBottom: 0 }}>
-              {teamName.toUpperCase()}{userRole ? ` · ${userRole.toUpperCase()}` : ""}
-            </p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 48, lineHeight: 1, margin: "8px 0 0", letterSpacing: "-0.01em", color: "#FBF8F2" }}>
-              {teamName}
-            </h1>
-            <p style={{ fontSize: 14, color: "rgba(251,248,242,0.72)", marginTop: 10 }}>
-              {roster.length > 0 ? `${roster.length} members` : "Team"} · {calEvents.filter(ev => {
-                const d = new Date(ev.start_date)
-                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-              }).length} events this month
-            </p>
-          </div>
-          {/* Action buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-            {canEdit && (
-              <button
-                onClick={() => { setTeamTab("General") }}
-                style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Plus className="w-3.5 h-3.5" /> New event
-              </button>
-            )}
-            {onTeamSettings && (
-              <button
-                onClick={onTeamSettings}
-                style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, cursor: "pointer" }}
-              >
-                Settings
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
       <div style={{ paddingLeft: 56, borderBottom: "1px solid #E8E2D2", display: "flex", gap: 32 }}>
         {(["General", "Plan", "Roster", "Resources"] as const).map(t => (
@@ -1515,36 +1465,32 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         )}
       </div>
 
-      {/* Mobile title — only shown when not on a student org team */}
-      {!isStudentOrgBoard && (
-        <div className="flex items-end justify-between px-5 mb-5 md:hidden">
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
-        </div>
-      )}
+      {/* Mobile title */}
+      <div className="flex items-end justify-between px-5 mb-5 md:hidden">
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
+      </div>
 
-      {/* Desktop Editorial Header — only for non-student-org teams */}
-      {!isStudentOrgBoard && (
-        <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-          <div>
-            <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-            <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-              {activeTeamName}
-            </h1>
-            <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
-              The week as it stands. Groups to prepare, people to thank.
-            </p>
-          </div>
-          {activeTeamFull && (
-            <button
-              onClick={() => setOpenTeam(activeTeamFull)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-              title="Team settings"
-            >
-              <Settings className="w-4 h-4 text-[#5A5466]" />
-            </button>
-          )}
+      {/* Desktop Editorial Header */}
+      <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
+        <div>
+          <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+            {activeTeamName}
+          </h1>
+          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+            The week as it stands. Groups to prepare, people to thank.
+          </p>
         </div>
-      )}
+        {activeTeamFull && (
+          <button
+            onClick={() => setOpenTeam(activeTeamFull)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+            title="Team settings"
+          >
+            <Settings className="w-4 h-4 text-[#5A5466]" />
+          </button>
+        )}
+      </div>
 
       {/* Desktop content */}
       <div className="hidden md:block">
