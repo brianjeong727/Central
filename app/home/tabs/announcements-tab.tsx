@@ -113,19 +113,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
-        <div className="flex items-center gap-4 px-5 pt-12 pb-4 md:pt-5 md:px-10">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
+          <p style={monoStyle}>{isEditing ? "Editing announcement · Draft" : "New announcement · Draft"}</p>
           <button
             onClick={onClose}
             style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
           >
             <X className="w-3.5 h-3.5 text-[#5A5466]" />
           </button>
-          <div>
-            <p style={monoStyle}>{isEditing ? "Editing announcement" : "New announcement · Draft"}</p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: "2px 0 0" }}>
-              {isEditing ? "Edit" : "Write"}
-            </h1>
-          </div>
         </div>
       </div>
 
