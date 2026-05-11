@@ -1085,6 +1085,7 @@ export function MeetingNotesSection({
 
 export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, onTeamSettings,
+  planningEvent, onPlanningEventChange,
 }: {
   teamId: string | null
   teamName: string
@@ -1096,10 +1097,11 @@ export function StudentOrgTeamHome({
   isAdmin: boolean
   canEdit: boolean
   onTeamSettings?: () => void
+  planningEvent: CalendarEvent | null
+  onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
   const supabase = createClient()
   const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources">("General")
-  const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
 
   // Calendar
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
@@ -1164,7 +1166,7 @@ export function StudentOrgTeamHome({
       const sorted = [...calEvents, newEv as CalendarEvent].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
       setCalEvents(sorted)
       setQuickTitle(""); setQuickDate("")
-      setPlanningEvent(newEv as CalendarEvent)
+      onPlanningEventChange(newEv as CalendarEvent)
     }
   }
 
@@ -1177,11 +1179,12 @@ export function StudentOrgTeamHome({
     return (
       <EventPlanWorkspace
         inline
+        hideHero
         calendarEvent={planningEvent}
         ministryId={ministryId}
         userId={userId}
         canEdit={canEdit}
-        onClose={() => setPlanningEvent(null)}
+        onClose={() => onPlanningEventChange(null)}
       />
     )
   }
@@ -1238,7 +1241,7 @@ export function StudentOrgTeamHome({
                     events={calEvents}
                     currentMonth={currentMonth}
                     onMonthChange={setCurrentMonth}
-                    onSelectEvent={(ev) => setPlanningEvent(ev)}
+                    onSelectEvent={(ev) => onPlanningEventChange(ev)}
                   />
                 )}
 
@@ -1254,7 +1257,7 @@ export function StudentOrgTeamHome({
 
                 {upNext ? (
                   <button
-                    onClick={() => setPlanningEvent(upNext)}
+                    onClick={() => onPlanningEventChange(upNext)}
                     style={{ position: "relative", textAlign: "left", border: "none", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)", color: "#FBF8F2" }}
                   >
                     <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }} />
@@ -1356,7 +1359,7 @@ export function StudentOrgTeamHome({
                         {isPlanned ? "Planned ✓" : "Needs planning"}
                       </span>
                       <button
-                        onClick={() => setPlanningEvent(ev)}
+                        onClick={() => onPlanningEventChange(ev)}
                         style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
                       >
                         {isPlanned ? "View plan →" : "Plan →"}
@@ -1414,9 +1417,10 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
-  // Reset open team whenever the active team changes.
+  const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
+  // Reset per-team transient state whenever the active team changes.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setOpenTeam(null) }, [activeTeamId])
+  useEffect(() => { setOpenTeam(null); setStudentOrgPlanningEvent(null) }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
@@ -1470,25 +1474,60 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
       </div>
 
-      {/* Desktop Editorial Header */}
+      {/* Desktop Editorial Header — swaps to event header when an event plan is open */}
       <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        <div>
-          <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-            {activeTeamName}
-          </h1>
-          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
-            The week as it stands. Groups to prepare, people to thank.
-          </p>
-        </div>
-        {activeTeamFull && (
-          <button
-            onClick={() => setOpenTeam(activeTeamFull)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-            title="Team settings"
-          >
-            <Settings className="w-4 h-4 text-[#5A5466]" />
-          </button>
+        {isStudentOrgBoard && studentOrgPlanningEvent ? (() => {
+          const ev = studentOrgPlanningEvent
+          const evStart = new Date(ev.start_date)
+          const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+          const evCfg = CATEGORY_CONFIG[ev.category]
+          const evDesc = [ev.description, ev.location].filter(Boolean).join(" · ")
+          return (
+            <>
+              <div>
+                <button
+                  onClick={() => setStudentOrgPlanningEvent(null)}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)", fontSize: "12px", color: "#8A8497", display: "flex", alignItems: "center", gap: 4 }}
+                >
+                  <ArrowLeft className="w-3 h-3" /> Back to calendar
+                </button>
+                <p style={{ ...monoStyle, marginTop: 12 }}>{evCfg.label.toUpperCase()} · {evDateStr.toUpperCase()}</p>
+                <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+                  {ev.title}
+                </h1>
+                {evDesc && <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>{evDesc}</p>}
+              </div>
+              {canEditStudentOrg && (
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+                  title="Edit event"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-[#5A5466]" />
+                </button>
+              )}
+            </>
+          )
+        })() : (
+          <>
+            <div>
+              <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+              <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
+                {activeTeamName}
+              </h1>
+              <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
+                The week as it stands. Groups to prepare, people to thank.
+              </p>
+            </div>
+            {activeTeamFull && (
+              <button
+                onClick={() => setOpenTeam(activeTeamFull)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+                title="Team settings"
+              >
+                <Settings className="w-4 h-4 text-[#5A5466]" />
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -1516,6 +1555,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
             onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+            planningEvent={studentOrgPlanningEvent}
+            onPlanningEventChange={setStudentOrgPlanningEvent}
           />
         ) : (
           <div className="px-14 py-7">
@@ -1558,6 +1599,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
             onTeamSettings={activeTeamFull ? () => setOpenTeam(activeTeamFull) : undefined}
+            planningEvent={studentOrgPlanningEvent}
+            onPlanningEventChange={setStudentOrgPlanningEvent}
           />
         ) : (
           <>
@@ -1727,7 +1770,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
   const subTabStyle = (active: boolean): React.CSSProperties => ({
     padding: "12px 16px", fontSize: 14, fontFamily: "var(--font-inter)", fontWeight: active ? 600 : 400,
     color: active ? "#3E1540" : "#8A8497", boxShadow: active ? "inset 0 -2px 0 0 #3E1540" : "none",
@@ -2274,7 +2317,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
 
           {/* Add week inline form */}
           {showAddWeek && (
-            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: 20, marginBottom: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+            <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New worship week</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
@@ -2310,7 +2353,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
           {scheduleLoading ? (
             <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
           ) : visibleWeeks.length === 0 ? (
-            <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
               <p style={{ fontSize: 13, color: "#8A8497" }}>{canManageSchedule ? "Add one to get started." : "Check back later or set your availability."}</p>
             </div>
@@ -2325,9 +2368,9 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                   !alreadyAssigned.has(m.user_id) && m.name.toLowerCase().includes(addMemberSearch.toLowerCase())
                 )
                 return (
-                  <div key={week.id} style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
                     {/* Card header */}
-                    <div style={{ padding: "16px 18px", borderBottom: "1px solid #ECE8DE" }}>
+                    <div style={{ padding: "16px 18px", borderBottom: "1px solid #E2DDCF" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
                           {worshipWeekDateLabel(week.week_date)}
@@ -2344,7 +2387,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                         </div>
                       </div>
                       {confirmDeleteWeekId === week.id && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #ECE8DE" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2DDCF" }}>
                           <span style={{ fontSize: 13, color: "#5A5466" }}>Delete this week?</span>
                           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                             <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
@@ -2374,19 +2417,17 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       {week.roles.length === 0 ? (
                         <p style={{ fontSize: 13, color: "#8A8497", paddingBottom: 4 }}>No members assigned yet.</p>
                       ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 2 }}>
+                        <div style={{ display: "flex", flexDirection: "column", marginBottom: 2 }}>
                           {week.roles.map(role => (
-                            <div key={role.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ ...monoStyle, minWidth: 52 }}>{role.role_name}</span>
-                                <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
-                              </div>
-                              {(canManageSchedule || isLeader) && (
+                            <div key={role.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr auto", alignItems: "center", gap: 16, paddingTop: 10, paddingBottom: 10, borderTop: "1px solid #EFE9DA" }}>
+                              <span style={{ ...monoStyle }}>{role.role_name}</span>
+                              <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
+                              {(canManageSchedule || isLeader) ? (
                                 <button onClick={() => handleRemoveMember(role.id)}
                                   style={{ padding: "1px 6px", fontSize: 12, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1 }}>
                                   ✕
                                 </button>
-                              )}
+                              ) : <span />}
                             </div>
                           ))}
                         </div>
@@ -2451,7 +2492,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
       {subTab === "setlist" && (
         <div>
           {weeks.length === 0 ? (
-            <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
               <p style={{ fontSize: 13, color: "#8A8497" }}>Add a week in the Schedule tab first.</p>
             </div>
@@ -2461,9 +2502,9 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 const songs = [...(songsByWeek[week.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
                 const isUploadingThis = uploadingChartWeek === week.id
                 return (
-                  <div key={week.id} style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, boxShadow: "0 2px 8px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
                     {/* Card header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid #ECE8DE" : "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid #E2DDCF" : "none" }}>
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
                         {worshipWeekDateLabel(week.week_date)}
                       </p>
@@ -2491,7 +2532,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                           const needsKey = !song.key
                           const isOcr = ocrInProgress.has(song.id)
                           return (
-                            <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                            <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                               {/* Position number */}
                               <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
 
@@ -2508,12 +2549,12 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                                     onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
                                     onBlur={handleSaveInlineEdit}
                                     onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: "100%", border: "none", outline: "none", fontSize: 14, color: "#13101A", background: "transparent", padding: "2px 0", borderBottom: "1px solid #ECE8DE" }}
+                                    style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", background: "transparent", padding: "2px 0", borderBottom: "1px solid #E2DDCF" }}
                                   />
                                 ) : (
                                   <button
                                     onClick={() => song.chart_url ? setViewingChart(song) : setEditingSong({ songId: song.id, field: "title", value: song.title })}
-                                    style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}
+                                    style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, lineHeight: 1.2 }}
                                   >
                                     {song.title}
                                   </button>
@@ -2532,12 +2573,12 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                                       onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                       onBlur={handleSaveInlineEdit}
                                       onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                      style={{ width: 52, border: "none", outline: "none", fontSize: 12, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "3px 8px", textAlign: "center" as const }}
+                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
                                     />
                                   ) : (
                                     <button
                                       onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                      style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "3px 8px", border: "none", cursor: "pointer" }}
+                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
                                     >
                                       {song.key || "—"}
                                     </button>
@@ -2562,7 +2603,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                           )
                         })}
                         {isUploadingThis && (
-                          <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #ECE8DE" : "none", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #EFE9DA" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>—</span>
                             <span style={{ fontSize: 13, color: "#8A8497" }}>Parsing chart…</span>
                           </div>
@@ -2602,19 +2643,19 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
             {songsLoading ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
             ) : slidesSongs.length === 0 ? (
-              <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+              <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No songs in the set list yet.</p>
                 <p style={{ fontSize: 13, color: "#8A8497" }}>Add songs in the Set List tab first.</p>
               </div>
             ) : (
               <div>
                 {/* Song list preview */}
-                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(19,16,26,0.06)", marginBottom: 16 }}>
+                <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
                   {slidesSongs.map((song, i) => (
-                    <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: i < slidesSongs.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                    <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: i < slidesSongs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                       <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-                      <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{song.title || <span style={{ color: "#C4C4C4" }}>Untitled</span>}</span>
-                      {song.key && <span style={{ fontSize: 11, fontWeight: 700, color: "#3E1540", background: "#F4F0F8", borderRadius: 6, padding: "2px 8px" }}>{song.key}</span>}
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
+                      {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8 }}>{song.key}</span>}
                       {!rawOcrBySong[song.id] && !song.chart_url && (
                         <span style={{ fontSize: 11, color: "#C4C4C4" }}>no chart</span>
                       )}
@@ -2657,32 +2698,32 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               <div style={{ marginBottom: 32 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>My availability</p>
                 {weeks.length === 0 ? (
-                  <div style={{ background: "white", border: "1.5px dashed #ECE8DE", borderRadius: 16, padding: "32px 24px", textAlign: "center" }}>
+                  <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
                     <p style={{ fontSize: 13, color: "#8A8497" }}>No weeks scheduled this month. Check the Schedule tab.</p>
                   </div>
                 ) : (
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+                  <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
                     {weeks.map((week, i) => {
                       const date = week.week_date
                       const avail = myAvailability[date]
                       const isSaving = savingAvail === date
                       return (
-                        <div key={week.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weeks.length - 1 ? "1px solid #ECE8DE" : "none", flexWrap: "wrap" as const }}>
+                        <div key={week.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weeks.length - 1 ? "1px solid #E2DDCF" : "none", flexWrap: "wrap" as const }}>
                           <p style={{ fontSize: 14, color: "#13101A", flexShrink: 0 }}>{worshipWeekDateLabel(date)}</p>
                           <div style={{ display: "flex", gap: 6, opacity: isSaving ? 0.5 : 1, pointerEvents: isSaving ? "none" : "auto" }}>
                             {(["available", "busy", "unsure"] as AvailStatus[]).map(s => {
                               const active = avail === s
                               const cfg = {
-                                available: { label: "Available", activeBg: "#EDFAF3", activeColor: "#2D7A4F", activeBorder: "#6EE7B7" },
-                                busy:      { label: "Busy",      activeBg: "#FEF2F2", activeColor: "#B91C1C", activeBorder: "#FCA5A5" },
-                                unsure:    { label: "Unsure",    activeBg: "#FFFBEB", activeColor: "#92400E", activeBorder: "#FCD34D" },
+                                available: { label: "Available", activeBg: "#E5EFE5", activeColor: "#2C5F2C", activeBorder: "#A3D9A3" },
+                                busy:      { label: "Busy",      activeBg: "#F4E2E2", activeColor: "#8A2C2C", activeBorder: "#E8A0A0" },
+                                unsure:    { label: "Unsure",    activeBg: "#F4ECDB", activeColor: "#B58940", activeBorder: "#E0C883" },
                               }[s]
                               return (
                                 <button key={s} onClick={() => handleSetAvailability(date, s)}
                                   style={{
                                     padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                                    border: `1px solid ${active ? cfg.activeBorder : "#ECE8DE"}`,
-                                    background: active ? cfg.activeBg : "white",
+                                    border: `1px solid ${active ? cfg.activeBorder : "#E8E2D2"}`,
+                                    background: active ? cfg.activeBg : "transparent",
                                     color: active ? cfg.activeColor : "#8A8497",
                                     cursor: "pointer", transition: "all 0.15s",
                                   }}>
@@ -2702,13 +2743,13 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               {weeks.length > 0 && teamMembers.length > 0 && (
                 <div>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>Team availability</p>
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflowX: "auto", boxShadow: "0 2px 8px rgba(19,16,26,0.06)" }}>
+                  <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
-                        <tr style={{ borderBottom: "1px solid #ECE8DE" }}>
-                          <th style={{ textAlign: "left", padding: "10px 16px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>Member</th>
+                        <tr style={{ borderBottom: "1px solid #E2DDCF" }}>
+                          <th style={{ textAlign: "left", padding: "10px 16px", color: "#8A8497", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
                           {weeks.map(w => (
-                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontWeight: 500, fontSize: 11, whiteSpace: "nowrap" as const }}>
+                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
                               {new Date(w.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </th>
                           ))}
@@ -2716,18 +2757,18 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                       </thead>
                       <tbody>
                         {teamMembers.map((member, i) => (
-                          <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                          <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid #E2DDCF" : "none" }}>
                             <td style={{ padding: "10px 16px", color: "#13101A", fontWeight: 500, whiteSpace: "nowrap" as const }}>{member.name}</td>
                             {weeks.map(w => {
                               const a = allAvailability[member.user_id]?.[w.week_date]
                               return (
                                 <td key={w.id} style={{ textAlign: "center", padding: "10px 12px" }}>
                                   {a === "available"
-                                    ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#EDFAF3", color: "#2D7A4F", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✓</span>
+                                    ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#E5EFE5", color: "#2C5F2C", fontSize: 11, fontWeight: 700 }}>✓</span>
                                     : a === "busy"
-                                      ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#FEF2F2", color: "#B91C1C", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>✕</span>
+                                      ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4E2E2", color: "#8A2C2C", fontSize: 11, fontWeight: 700 }}>✕</span>
                                       : a === "unsure"
-                                        ? <span style={{ display: "inline-block", width: 20, height: 20, borderRadius: "50%", background: "#FFFBEB", color: "#92400E", lineHeight: "20px", fontSize: 11, fontWeight: 700, textAlign: "center" as const }}>?</span>
+                                        ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4ECDB", color: "#B58940", fontSize: 11, fontWeight: 700 }}>?</span>
                                         : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
                                   }
                                 </td>
@@ -3775,6 +3816,7 @@ export function EventPlanWorkspace({
   canEdit,
   onClose,
   inline = false,
+  hideHero = false,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -3782,6 +3824,7 @@ export function EventPlanWorkspace({
   canEdit: boolean
   onClose: () => void
   inline?: boolean
+  hideHero?: boolean
 }) {
   const supabase = createClient()
   const cfg = CATEGORY_CONFIG[calendarEvent.category]
@@ -4134,8 +4177,8 @@ export function EventPlanWorkspace({
       }
       className={inline ? "" : "md:left-[296px]"}
     >
-      {/* Plum hero header */}
-      <div style={{ padding: inline ? "18px 56px 0" : "0 24px", paddingTop: 18 }}>
+      {/* Plum hero header — hidden when the parent already renders a calm header (hideHero) */}
+      {!hideHero && <div style={{ padding: inline ? "18px 56px 0" : "0 24px", paddingTop: 18 }}>
         <div style={{
           position: "relative",
           borderRadius: 18,
@@ -4177,7 +4220,7 @@ export function EventPlanWorkspace({
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Underline section tabs */}
       <div style={{ borderBottom: "1px solid #E8E2D2", zIndex: inline ? undefined : 10, padding: inline ? "0 56px" : "0 24px", marginTop: 22 }}>
