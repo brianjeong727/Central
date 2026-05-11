@@ -1168,10 +1168,15 @@ export function StudentOrgTeamHome({
     }
   }
 
-  // Open EventPlanWorkspace directly when user clicks an event
+  const mono: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
   if (planningEvent) {
     return (
       <EventPlanWorkspace
+        inline
         calendarEvent={planningEvent}
         ministryId={ministryId}
         userId={userId}
@@ -1179,11 +1184,6 @@ export function StudentOrgTeamHome({
         onClose={() => setPlanningEvent(null)}
       />
     )
-  }
-
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
   }
 
   return (
@@ -3808,6 +3808,7 @@ export function MinistryCalendar({
 
       {planningEvent && (
         <EventPlanWorkspace
+          inline
           calendarEvent={planningEvent}
           ministryId={ministryId}
           userId={userId}
@@ -3827,12 +3828,14 @@ export function EventPlanWorkspace({
   userId,
   canEdit,
   onClose,
+  inline = false,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
   userId: string
   canEdit: boolean
   onClose: () => void
+  inline?: boolean
 }) {
   const supabase = createClient()
   const cfg = CATEGORY_CONFIG[calendarEvent.category]
@@ -4179,11 +4182,14 @@ export function EventPlanWorkspace({
 
   return (
     <div
-      style={{ position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }}
-      className="md:left-[296px]"
+      style={inline
+        ? { background: "#FBF8F2", minHeight: "100%" }
+        : { position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }
+      }
+      className={inline ? "" : "md:left-[296px]"}
     >
       {/* Plum hero header */}
-      <div style={{ padding: "0 24px", paddingTop: 18 }}>
+      <div style={{ padding: inline ? "18px 56px 0" : "0 24px", paddingTop: 18 }}>
         <div style={{
           position: "relative",
           borderRadius: 18,
@@ -4228,8 +4234,8 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Underline section tabs */}
-      <div style={{ borderBottom: "1px solid #E8E2D2", zIndex: 10, padding: "0 24px", marginTop: 22 }}>
-        <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", gap: 32 }}>
+      <div style={{ borderBottom: "1px solid #E8E2D2", zIndex: inline ? undefined : 10, padding: inline ? "0 56px" : "0 24px", marginTop: 22 }}>
+        <div style={{ display: "flex", gap: 32 }}>
           {sections.map((s) => (
             <button
               key={s.key}
@@ -4254,7 +4260,7 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 24px 80px" }}>
+      <div style={{ padding: inline ? "36px 56px 80px" : "24px 24px 80px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
         ) : (
