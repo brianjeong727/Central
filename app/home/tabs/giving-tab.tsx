@@ -105,7 +105,7 @@ export function GivingTab({ ministryId, userId, isAdmin }: Props) {
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
       <DesktopTopbar crumbs={["Central", "Give"]} />
 
-      <div className="px-5 pt-14 md:pt-0 md:px-10 md:py-8 max-w-[740px] md:max-w-none">
+      <div className="px-5 pt-14 md:px-10 md:py-8 max-w-[740px] md:max-w-none">
 
         {/* Scripture hero */}
         <div className="mb-7 mt-6 md:mt-0 md:mb-8 md:max-w-[680px]">
