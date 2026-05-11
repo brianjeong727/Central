@@ -106,28 +106,26 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
   const monoStyle: React.CSSProperties = {
     fontFamily: "ui-monospace, ‘SF Mono’, Menlo, monospace",
-    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497",
   }
 
   return (
     <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
-        <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
-          <div className="flex items-center gap-4">
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#FBF8F2] border border-[#E8E2D2] flex items-center justify-center hover:bg-[#F1ECDE] transition-colors flex-shrink-0">
-              <X className="w-4 h-4 text-[#13101A]" />
-            </button>
-            <div>
-              <p style={monoStyle}>{isEditing ? "Editing announcement" : "New announcement · Draft"}</p>
-              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: "2px 0 0" }}>
-                {isEditing ? "Edit" : "Write"}
-              </h1>
-            </div>
-          </div>
-          <button type="submit" form="ann-form" disabled={submitting} className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-60 text-[#F6F4EF] font-semibold transition-colors text-[13px]">
-            {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
+        <div className="flex items-center gap-4 px-5 pt-12 pb-4 md:pt-5 md:px-10">
+          <button
+            onClick={onClose}
+            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+          >
+            <X className="w-3.5 h-3.5 text-[#5A5466]" />
           </button>
+          <div>
+            <p style={monoStyle}>{isEditing ? "Editing announcement" : "New announcement · Draft"}</p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: "2px 0 0" }}>
+              {isEditing ? "Edit" : "Write"}
+            </h1>
+          </div>
         </div>
       </div>
 
@@ -205,40 +203,42 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
       {/* Desktop: two-column editorial layout */}
       <form id="ann-form" onSubmit={handleSubmit} className="hidden md:flex flex-1 overflow-hidden">
-        {/* Main writing area */}
+        {/* Writing surface */}
         <div className="flex-1 flex flex-col overflow-hidden border-r border-[#E8E2D2]">
-          <div className="flex-1 overflow-y-auto px-10 pt-8 pb-6">
+          <div className="flex-1 overflow-y-auto flex flex-col px-10 pt-8 pb-6">
             {error && <div className="mb-6 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
-            {/* Serif title input */}
+            {/* Inline serif title — §4.4 */}
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="A clear, scannable headline"
-              required
+              className="placeholder:text-[#8A8497]"
               style={{
-                fontFamily: "var(--font-instrument-serif)", fontSize: "36px",
-                letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1,
-                background: "transparent", border: "none", borderBottom: "1px solid #E8E2D2",
-                outline: "none", width: "100%", paddingBottom: "14px",
+                fontFamily: "var(--font-instrument-serif)", fontSize: "40px",
+                letterSpacing: "-0.5px", color: "#13101A", lineHeight: 1.1,
+                background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF",
+                outline: "none", width: "100%", paddingBottom: "16px", flexShrink: 0,
               }}
             />
-            {/* Body textarea */}
+            {/* 1px hairline separates title from body */}
+            <div style={{ height: 1, background: "#E2DDCF", flexShrink: 0, marginTop: 0 }} />
+            {/* Serif body — §4.4 */}
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Write the full announcement here. Take all the space you need — share scripture, walk through logistics, link to sign-ups. The body is where the work lives."
-              required
+              placeholder="Write the full announcement here. Take all the space you need — share scripture, walk through logistics, link to sign-ups."
+              className="placeholder:text-[#8A8497] flex-1"
               style={{
-                fontFamily: "var(--font-instrument-serif)", fontSize: "18px", lineHeight: "1.65",
+                fontFamily: "var(--font-instrument-serif)", fontSize: "19px", lineHeight: "1.65",
                 color: "#13101A", background: "transparent", border: "none", outline: "none",
-                resize: "none", width: "100%", marginTop: "20px", minHeight: "320px",
+                resize: "none", width: "100%", marginTop: "20px", minHeight: "540px",
               }}
             />
           </div>
-          {/* Footer */}
-          <div className="flex-shrink-0 border-t border-[#E8E2D2] px-10 py-4 flex items-center gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[10px] border border-[#E8E2D2] text-[13px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">
+          {/* Footer — §7.3 */}
+          <div className="flex-shrink-0 border-t border-[#E8E2D2] px-10 py-4 flex items-center">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[10px] border border-[#E2DDCF] text-[13px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">
               Cancel
             </button>
             <div className="flex-1" />
@@ -248,45 +248,70 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           </div>
         </div>
 
-        {/* Right rail */}
-        <aside className="w-[300px] flex-shrink-0 overflow-y-auto px-7 pt-8 pb-6 flex flex-col gap-7">
-          {/* Audience */}
-          <div>
+        {/* Right settings rail — 280px, flat sections separated by hairlines */}
+        <aside className="w-[280px] flex-shrink-0 overflow-y-auto flex flex-col">
+          {/* Audience — §4.7 pills */}
+          <div className="px-6 pt-7 pb-6">
             <p style={monoStyle} className="mb-3">Audience</p>
             <div className="flex flex-wrap gap-2">
               {AUDIENCE_OPTIONS.map((opt) => (
-                <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#2D0F2E] text-[#F6F4EF] border-[#2D0F2E]" : "bg-transparent text-[#5A5466] border-[#E8E2D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAudience(opt.value)}
+                  style={{
+                    padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                    border: `1px solid ${audience === opt.value ? "#2D0F2E" : "#E2DDCF"}`,
+                    background: audience === opt.value ? "#2D0F2E" : "#FBF8F2",
+                    color: audience === opt.value ? "#FBF8F2" : "#5A5466",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {opt.label}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Options */}
-          <div className="border border-[#E8E2D2] rounded-[14px] bg-[#FBF8F2] p-5 flex flex-col gap-5">
+          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+
+          {/* Options — §4.9 toggles */}
+          <div className="px-6 py-6 flex flex-col gap-5">
             <p style={monoStyle}>Options</p>
             <div className="flex items-start gap-3">
-              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 mt-0.5" style={{ background: isEvent ? "#3E1540" : "#D6D0C0" }}>
-                <span className="absolute top-0.5 w-4 h-4 rounded-full bg-[#FBF8F2] shadow-sm transition-all duration-200" style={{ left: isEvent ? "17px" : "2px" }} />
+              <button
+                type="button"
+                onClick={() => setIsEvent((v) => !v)}
+                style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+              >
+                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
               </button>
               <div>
                 <p className="text-[13px] font-medium text-[#13101A]">This is an event</p>
-                <p className="text-[11px] text-[#8A8497] mt-0.5">Adds RSVP button + calendar marker</p>
+                <p className="text-[12px] text-[#8A8497] mt-0.5">Adds RSVP button + calendar marker</p>
               </div>
             </div>
             {isEvent && (
               <div className="flex items-start gap-3">
-                <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 mt-0.5" style={{ background: showAttendees ? "#3E1540" : "#D6D0C0" }}>
-                  <span className="absolute top-0.5 w-4 h-4 rounded-full bg-[#FBF8F2] shadow-sm transition-all duration-200" style={{ left: showAttendees ? "17px" : "2px" }} />
+                <button
+                  type="button"
+                  onClick={() => setShowAttendees((v) => !v)}
+                  style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                >
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                 </button>
                 <div>
                   <p className="text-[13px] font-medium text-[#13101A]">Show attendees publicly</p>
-                  <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
+                  <p className="text-[12px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Image attachment */}
-          <div>
+          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+
+          {/* Attachment — §4.18 dashed placeholder */}
+          <div className="px-6 py-6">
             <p style={monoStyle} className="mb-3">Attachment</p>
             {imagePreview ? (
               <div className="relative rounded-[10px] overflow-hidden">
@@ -297,7 +322,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full h-24 rounded-[10px] border border-dashed border-[#C4C0B0] flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#F1ECDE] hover:text-[#3E1540]/70 transition-all">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-7 rounded-[10px] border border-dashed border-[#C4C0B0] bg-transparent flex flex-col items-center justify-center gap-2 text-[#5A5466] hover:border-[#3E1540]/40 hover:bg-[#F1ECDE] transition-all"
+              >
                 <ImageIcon className="w-4 h-4" />
                 <span className="text-[12px]">Add image or file</span>
               </button>
