@@ -165,8 +165,19 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    if (activeTab === "directory" || activeTab === "giving") {
+    if (activeTab === "directory") {
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
+    }
+
+    if (activeTab === "giving") {
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
+          <button style={subItemStyle(true)} onClick={() => onTabChange("giving")}>
+            <span style={{ flex: 1 }}>Give</span>
+          </button>
+        </div>
+      )
     }
 
     if (activeTab === "profile") {
@@ -264,7 +275,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       </div>
 
       {/* Context Panel — hidden for chats/directory (those tabs have their own left panel) */}
-      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" || activeTab === "giving" ? "" : "md:flex"}`}>
+      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}>
         {/* Workspace header */}
         <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
           <p style={monoStyle}>Workspace</p>

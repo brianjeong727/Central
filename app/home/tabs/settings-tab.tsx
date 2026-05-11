@@ -197,7 +197,7 @@ export function SettingsTab({
 
   return (
     <div className="md:h-full md:overflow-y-auto">
-      <DesktopTopbar crumbs={[ministryName, "Church Settings"]} />
+      <DesktopTopbar crumbs={["Central", "Church Settings"]} />
 
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
