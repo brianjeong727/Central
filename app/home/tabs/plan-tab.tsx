@@ -2371,118 +2371,125 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                   !alreadyAssigned.has(m.user_id) && m.name.toLowerCase().includes(addMemberSearch.toLowerCase())
                 )
                 return (
-                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
-                    {/* Card header */}
-                    <div style={{ padding: "16px 18px", borderBottom: "1px solid #E2DDCF" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
-                          {worshipWeekDateLabel(week.week_date)}
-                        </p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
-                          {canManage && (
-                            <button
-                              onClick={() => setConfirmDeleteWeekId(confirmDeleteWeekId === week.id ? null : week.id)}
-                              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center", borderRadius: 6 }}>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {confirmDeleteWeekId === week.id && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2DDCF" }}>
-                          <span style={{ fontSize: 13, color: "#5A5466" }}>Delete this week?</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                            <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                            <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
-                          </div>
-                        </div>
-                      )}
-                      {/* Leader row */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ ...monoStyle, color: !week.leader_id ? "#DC2626" : undefined }}>Leader</span>
-                        {canManageSchedule ? (
-                          <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
-                            style={{ flex: 1, fontSize: 13, color: week.leader_id ? "#13101A" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
-                            <option value="">— required —</option>
-                            {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-                          </select>
-                        ) : (
-                          <span style={{ fontSize: 13, color: week.leader_name ? "#13101A" : "#DC2626" }}>
-                            {week.leader_name ?? "Not assigned"}
-                          </span>
+                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+
+                    {/* ── Date / status / delete row ── */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2, margin: 0 }}>
+                        {worshipWeekDateLabel(week.week_date)}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
+                        {canManage && (
+                          <button
+                            onClick={() => setConfirmDeleteWeekId(confirmDeleteWeekId === week.id ? null : week.id)}
+                            style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center", borderRadius: 6 }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Roster */}
-                    <div style={{ padding: "12px 18px" }}>
-                      {week.roles.length === 0 ? (
-                        <p style={{ fontSize: 13, color: "#8A8497", paddingBottom: 4 }}>No members assigned yet.</p>
+                    {/* ── Confirm delete ── */}
+                    {confirmDeleteWeekId === week.id && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                        <span style={{ fontSize: 13, color: "#5A5466" }}>Delete this week?</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                          <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                          <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Leader row ── */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52 }}>
+                      <span style={{ ...monoStyle, color: !week.leader_id ? "#DC2626" : undefined, flexShrink: 0, width: 80 }}>Leader</span>
+                      {canManageSchedule ? (
+                        <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
+                          style={{ flex: 1, fontSize: 14, color: week.leader_id ? "#13101A" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
+                          <option value="">— required —</option>
+                          {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                        </select>
                       ) : (
-                        <div style={{ display: "flex", flexDirection: "column", marginBottom: 2 }}>
-                          {week.roles.map(role => (
-                            <div key={role.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr auto", alignItems: "center", gap: 16, paddingTop: 10, paddingBottom: 10, borderTop: "1px solid #EFE9DA" }}>
-                              <span style={{ ...monoStyle }}>{role.role_name}</span>
-                              <span style={{ fontSize: 13, color: "#13101A" }}>{role.user_name}</span>
-                              {(canManageSchedule || isLeader) ? (
-                                <button onClick={() => handleRemoveMember(role.id)}
-                                  style={{ padding: "1px 6px", fontSize: 12, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1 }}>
-                                  ✕
-                                </button>
-                              ) : <span />}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {(canManageSchedule || isLeader) && !isThisWeekAddTarget && (
-                        <button onClick={() => { setAddMemberToWeekId(week.id); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberRole("Vocals") }}
-                          style={{ marginTop: 10, fontSize: 13, color: "#3E1540", fontWeight: 500, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                          + Add member
-                        </button>
-                      )}
-
-                      {/* Inline add-member form */}
-                      {isThisWeekAddTarget && (
-                        <div style={{ marginTop: 12, padding: 14, background: "#FBF8F2", borderRadius: 10, border: "1px solid #ECE8DE" }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            <div style={{ position: "relative" }}>
-                              <input type="text" placeholder="Search member…" value={addMemberSearch}
-                                onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
-                                onFocus={() => setAddMemberFocused(true)}
-                                onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
-                                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
-                              {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
-                                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #ECE8DE", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-                                  {filteredMembers.map(m => (
-                                    <button key={m.user_id}
-                                      onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
-                                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
-                                      {m.name}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <select value={addMemberRole} onChange={e => setAddMemberRole(e.target.value)}
-                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
-                              {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
-                                style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
-                                {addingMember ? "Adding…" : "Add"}
-                              </button>
-                              <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
-                                style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #ECE8DE", cursor: "pointer" }}>
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <span style={{ fontSize: 14, color: week.leader_name ? "#13101A" : "#DC2626", flex: 1 }}>
+                          {week.leader_name ?? "Not assigned"}
+                        </span>
                       )}
                     </div>
+
+                    {/* ── Member roster rows ── */}
+                    {week.roles.length === 0 && !(canManageSchedule || isLeader) && (
+                      <div style={{ padding: "13px 20px", borderTop: "1px solid #EFE9DA" }}>
+                        <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>No members assigned yet.</p>
+                      </div>
+                    )}
+                    {week.roles.map(role => (
+                      <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52, borderTop: "1px solid #EFE9DA" }}>
+                        <span style={{ ...monoStyle, flexShrink: 0, width: 80 }}>{role.role_name}</span>
+                        <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                        {(canManageSchedule || isLeader) && (
+                          <button onClick={() => handleRemoveMember(role.id)}
+                            style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* ── + Add member row ── */}
+                    {(canManageSchedule || isLeader) && !isThisWeekAddTarget && (
+                      <button
+                        onClick={() => { setAddMemberToWeekId(week.id); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberRole("Vocals") }}
+                        style={{
+                          display: "block", width: "100%", padding: "14px 20px",
+                          borderTop: "1px solid #EFE9DA", borderRight: "none", borderBottom: "none", borderLeft: "none",
+                          background: "transparent", cursor: "pointer", textAlign: "left" as const,
+                          fontSize: 14, color: "#5A5466",
+                        }}
+                      >
+                        + Add member
+                      </button>
+                    )}
+
+                    {/* ── Inline add-member form ── */}
+                    {isThisWeekAddTarget && (
+                      <div style={{ padding: "14px 20px", borderTop: "1px solid #EFE9DA" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ position: "relative" }}>
+                            <input type="text" placeholder="Search member…" value={addMemberSearch}
+                              onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
+                              onFocus={() => setAddMemberFocused(true)}
+                              onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
+                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                            {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
+                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                                {filteredMembers.map(m => (
+                                  <button key={m.user_id}
+                                    onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
+                                    style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                    {m.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <select value={addMemberRole} onChange={e => setAddMemberRole(e.target.value)}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
+                            {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
+                              style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
+                              {addingMember ? "Adding…" : "Add"}
+                            </button>
+                            <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
+                              style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
