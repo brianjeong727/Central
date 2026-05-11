@@ -5061,7 +5061,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; email?: string }[]>([])
   const [addSearch, setAddSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedRoleId, setSelectedRoleId] = useState<string>("")
@@ -5124,10 +5124,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     const memberIds = new Set([...members.map((m) => m.user_id)])
     supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, email")
       .eq("ministry_id", ministryId)
       .order("name")
-      .then(({ data }) => setMinistryMembers((data ?? []).filter((m) => !memberIds.has(m.id))))
+      .then(({ data }) => {
+        const seen = new Set<string>()
+        setMinistryMembers(
+          (data ?? []).filter((m) => {
+            if (memberIds.has(m.id) || seen.has(m.id)) return false
+            seen.add(m.id)
+            return true
+          })
+        )
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddMember, members.length])
 
@@ -5193,20 +5202,23 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 
   const addMemberForm = (
-    <div className="flex flex-col gap-4 pb-24">
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Role picker */}
       {roles.length > 1 && (
-        <div className="flex flex-col gap-2">
-          <label className="text-[12px] font-medium text-[#5A5466]">Assign role</label>
-          <div className="flex gap-2 flex-wrap">
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 10 }}>Assign Role</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setSelectedRoleId(r.id)}
-                className={`text-[12px] font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-                  selectedRoleId === r.id
-                    ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
-                    : "bg-white border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
-                }`}
+                style={{
+                  padding: "7px 14px", borderRadius: 999, fontSize: 13,
+                  border: `1px solid ${selectedRoleId === r.id ? "#2D0F2E" : "#E2DDCF"}`,
+                  background: selectedRoleId === r.id ? "#2D0F2E" : "#FBF8F2",
+                  color: selectedRoleId === r.id ? "#FBF8F2" : "#5A5466",
+                  cursor: "pointer", transition: "all 0.12s",
+                }}
               >
                 {r.name}
               </button>
@@ -5214,57 +5226,74 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           </div>
         </div>
       )}
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {ministryMembers.filter((m) => selectedIds.has(m.id)).map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setSelectedIds((prev) => { const next = new Set(prev); next.delete(m.id); return next })}
-              className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
-            >
-              {m.name.split(" ")[0]}
-              <X className="w-3 h-3 opacity-70" />
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
+
+      {/* Search bar */}
+      <div style={{ position: "relative" }}>
+        <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#8A8497", pointerEvents: "none" }} />
         <input
           type="text"
           value={addSearch}
           onChange={(e) => setAddSearch(e.target.value)}
           placeholder="Search members…"
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+          style={{ width: "100%", padding: "12px 14px 12px 44px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", outline: "none", boxSizing: "border-box" as const }}
         />
       </div>
-      <div className="flex flex-col gap-1.5">
-        {filteredAdd.length === 0 && (
-          <p className="text-[13px] text-[#8A8497] text-center py-6">No members to add.</p>
+
+      {/* Member list */}
+      <div>
+        {filteredAdd.length === 0 ? (
+          <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "32px 24px", textAlign: "center" as const }}>
+            <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>No members to add.</p>
+          </div>
+        ) : (
+          <div>
+            {filteredAdd.map((member, i) => {
+              const selected = selectedIds.has(member.id)
+              const isLast = i === filteredAdd.length - 1
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => setSelectedIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(member.id)) next.delete(member.id)
+                    else next.add(member.id)
+                    return next
+                  })}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 14, width: "100%",
+                    minHeight: 52, padding: "14px 0",
+                    borderTop: "none", borderLeft: "none", borderRight: "none",
+                    borderBottom: isLast ? "none" : "1px solid #EFE9DA",
+                    background: selected ? "#F1ECDE" : "transparent",
+                    cursor: "pointer", textAlign: "left" as const,
+                    transition: "background 0.12s",
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                    background: i % 2 === 0 ? "#3E1540" : "#13101A",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#FBF8F2", fontSize: 13, fontWeight: 600,
+                  }}>
+                    {getInitials(member.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
+                    {member.email && <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2, marginBottom: 0 }}>{member.email}</p>}
+                  </div>
+                  {selected && (
+                    <div style={{
+                      width: 20, height: 20, borderRadius: 5, background: "#3E1540", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Check style={{ width: 11, height: 11, color: "#FBF8F2" }} />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         )}
-        {filteredAdd.map((member) => {
-          const selected = selectedIds.has(member.id)
-          return (
-            <button
-              key={member.id}
-              onClick={() => setSelectedIds((prev) => {
-                const next = new Set(prev)
-                if (next.has(member.id)) next.delete(member.id)
-                else next.add(member.id)
-                return next
-              })}
-              className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
-                selected ? "bg-[#3E1540]/5 border-[#3E1540]/30" : "bg-white border-[#ECE8DE] hover:bg-[#FDFBF7]"
-              }`}
-            >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(member.name)}`}>
-                {getInitials(member.name)}
-              </div>
-              <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
-              {selected && <Check className="w-4 h-4 text-[#3E1540]" />}
-            </button>
-          )
-        })}
       </div>
     </div>
   )
@@ -5598,24 +5627,34 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
             )}
           </div>
         ) : (
-          <div className="hidden md:block px-10 py-8 max-w-[640px]">
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1, marginBottom: 6 }}>Add members</p>
-            <p style={{ fontSize: 14, color: "#5A5466", marginBottom: 24 }}>Select members below and assign them a role.</p>
+          <div className="hidden md:block px-10 py-8">
+            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: 6 }}>
+              TEAM SETTINGS · {team.name.toUpperCase()}
+            </p>
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
+            <p style={{ fontSize: 15, color: "#5A5466", marginBottom: 32 }}>Select people from your ministry and assign them a role on this team.</p>
             {addMemberForm}
           </div>
         )}
       </div>
 
-      {/* Sticky add button */}
+      {/* Sticky action footer */}
       {showAddMember && selectedIds.size > 0 && (
-        <div className="flex-shrink-0 px-5 pb-8 pt-3 bg-[#FBF8F2] border-t border-[#ECE8DE]">
-          <button
-            onClick={handleAddMembers}
-            disabled={saving}
-            className="w-full py-3.5 rounded-2xl bg-[#3E1540] text-[#F6F4EF] text-[15px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
-          >
-            {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
-          </button>
+        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
+          className="px-5 md:px-10 py-4 pb-8 md:pb-5"
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "#13101A" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
+            </p>
+            <button
+              onClick={handleAddMembers}
+              disabled={saving}
+              style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
+            </button>
+          </div>
         </div>
       )}
     </div>
