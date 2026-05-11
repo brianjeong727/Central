@@ -681,7 +681,7 @@ export function ProfileTab({
 
       {/* Desktop Topbar */}
       <DesktopTopbar
-        crumbs={["Central", "Profile"]}
+        crumbs={activeSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]}
         right={
           activeSection === "spiritual-profile" ? (
             <div className="hidden md:flex items-center gap-2">
@@ -704,6 +704,30 @@ export function ProfileTab({
         }
       />
 
+      {activeSection === "journal" && (
+        <div className="pb-6 md:pb-0">
+          {/* Mobile header */}
+          <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
+            <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+              <RingCrossLogo size={26} />
+              <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+            </a>
+          </div>
+
+          {/* Journal page header */}
+          <div className="px-5 pt-6 pb-2 md:px-14 md:pt-11 md:pb-6">
+            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: "12px" }}>Your Journal</p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(34px,4vw,52px)", fontWeight: 400, color: "#13101A", lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0 }}>Journal</h1>
+            <p style={{ fontSize: "14px", color: "#5A5466", marginTop: "12px", lineHeight: 1.5 }}>Your prayers, reflections, and devotionals.</p>
+          </div>
+
+          <div className="md:px-6">
+            <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
+          </div>
+        </div>
+      )}
+
+      {activeSection === "spiritual-profile" && <>
       {/* Mobile header */}
       <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
@@ -906,6 +930,7 @@ export function ProfileTab({
             </div>
           </div>
         </div>
+      </>}
     </div>
   )
 }
