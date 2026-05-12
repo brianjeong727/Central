@@ -5080,6 +5080,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [activeRole, setActiveRole] = useState(0)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [hoveredRoleId, setHoveredRoleId] = useState<string | null>(null)
+  const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState<string | null>(null)
+  const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
 
   const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
   const canDelete = isAdmin || isPresident
@@ -5382,11 +5385,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       />
 
       {confirmDelete && (
-        <div className="mx-5 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-3">
-          <span className="text-[13px] text-red-700 font-medium">Delete this team?</span>
-          <div className="flex gap-2">
-            <button onClick={() => setConfirmDelete(false)} className="text-[12px] font-semibold text-[#8A8497] hover:text-[#13101A]">Cancel</button>
-            <button onClick={handleDeleteTeam} className="text-[12px] font-semibold text-red-600 hover:text-red-800">Delete</button>
+        <div style={{ margin: "16px 20px 0", background: "#FDF0F0", border: "1px solid #9F3030", borderRadius: 10, padding: 16 }}>
+          <p style={{ fontSize: 13, color: "#13101A", marginBottom: 12, lineHeight: 1.5 }}>
+            This will permanently delete the team and remove all members. This cannot be undone.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 20 }}>
+            <button onClick={() => setConfirmDelete(false)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+            <button onClick={handleDeleteTeam} style={{ fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>Delete team</button>
           </div>
         </div>
       )}
@@ -5442,9 +5447,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                       {members.length === 0 && <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>}
                       {members.map((m, i) => {
                         const isConfirming = confirmRemoveId === m.user_id
+                        const isRevealed = mobileRevealMemberId === m.user_id
                         return (
                           <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[#ECE8DE] p-3"
                             style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
+                            onClick={() => { if (isAdmin && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
                               {getInitials(m.name)}
@@ -5456,11 +5463,14 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             {isAdmin && m.user_id !== userId && (
                               isConfirming ? (
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                                  <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
-                                  <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
+                                  <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                                  <button onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
                                 </div>
                               ) : (
-                                <button onClick={() => setConfirmRemoveId(m.user_id)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+                                <button
+                                  onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.user_id); setMobileRevealMemberId(null) }}
+                                  style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                                >
                                   Remove
                                 </button>
                               )
@@ -5525,30 +5535,52 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                       <div style={{ borderRight: "1px solid #ECE8DE", background: "#FBF8F2" }}>
                         {roles.map((role, i) => {
                           const roleCount = members.filter(m => m.role_id === role.id).length
+                          const isRoleConfirming = confirmDeleteRoleId === role.id
                           return (
                             <div
                               key={role.id}
-                              onClick={() => setActiveRole(i)}
+                              onClick={() => { if (!isRoleConfirming) setActiveRole(i) }}
+                              onMouseEnter={() => setHoveredRoleId(role.id)}
+                              onMouseLeave={() => setHoveredRoleId(null)}
                               style={{
                                 padding: "16px 20px",
                                 borderBottom: i < roles.length - 1 ? "1px solid #ECE8DE" : "none",
                                 borderLeft: activeRole === i ? "2px solid #3E1540" : "2px solid transparent",
-                                background: activeRole === i ? "white" : "transparent",
-                                cursor: "pointer",
+                                background: isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "white" : "transparent"),
+                                cursor: isRoleConfirming ? "default" : "pointer",
+                                transition: "background 0.1s",
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A" }}>{role.name}</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                  {!isRoleConfirming && (
+                                    <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                  )}
                                   {canManageTeam && (
-                                    <button
-                                      onClick={e => { e.stopPropagation(); handleDeleteRole(role.id) }}
-                                      style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", borderRadius: 4, cursor: "pointer", color: "#C4C4C4", flexShrink: 0 }}
-                                      title="Delete role"
-                                    >
-                                      <Trash2 style={{ width: 12, height: 12 }} />
-                                    </button>
+                                    isRoleConfirming ? (
+                                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                        <button
+                                          onClick={e => { e.stopPropagation(); handleDeleteRole(role.id); setConfirmDeleteRoleId(null) }}
+                                          style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}
+                                        >
+                                          <Check className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null) }}
+                                          style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(role.id) }}
+                                        style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, opacity: hoveredRoleId === role.id ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hoveredRoleId === role.id ? "auto" : "none" }}
+                                      >
+                                        Remove
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               </div>
