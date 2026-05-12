@@ -5082,6 +5082,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [hoveredRoleId, setHoveredRoleId] = useState<string | null>(null)
   const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState<string | null>(null)
+  const [roleDeleteError, setRoleDeleteError] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
 
   const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
@@ -5192,12 +5193,27 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   }
 
   async function handleDeleteRole(roleId: string) {
-    await supabase.from("team_roles").delete().eq("id", roleId)
+    // Nullify role references on any members so the FK constraint doesn't block deletion
+    const { error: memberErr } = await supabase
+      .from("team_members")
+      .update({ role_id: null })
+      .eq("role_id", roleId)
+      .eq("team_id", team.id)
+
+    const { error: deleteErr } = await supabase.from("team_roles").delete().eq("id", roleId)
+    if (deleteErr) {
+      setRoleDeleteError(memberErr ? "Cannot delete: members are still assigned to this role." : deleteErr.message)
+      return
+    }
+
     setRoles(prev => {
       const next = prev.filter(r => r.id !== roleId)
       setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
       return next
     })
+    setMembers(prev => prev.map(m => m.role_id === roleId ? { ...m, role_id: "", role_name: "No role" } : m))
+    setConfirmDeleteRoleId(null)
+    setRoleDeleteError(null)
   }
 
   async function handleAddRole() {
@@ -5469,9 +5485,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                               ) : (
                                 <button
                                   onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.user_id); setMobileRevealMemberId(null) }}
-                                  style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0, opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
                                 >
-                                  Remove
+                                  <X style={{ width: 14, height: 14 }} />
                                 </button>
                               )
                             )}
@@ -5559,26 +5575,38 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                   )}
                                   {canManageTeam && (
                                     isRoleConfirming ? (
-                                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                        <button
-                                          onClick={e => { e.stopPropagation(); handleDeleteRole(role.id); setConfirmDeleteRoleId(null) }}
-                                          style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}
-                                        >
-                                          <Check className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null) }}
-                                          style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </button>
-                                      </div>
+                                      roleDeleteError ? (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                          <span style={{ fontSize: 11, color: "#9F3030", maxWidth: 100 }}>{roleDeleteError}</span>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null); setRoleDeleteError(null) }}
+                                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497", flexShrink: 0 }}
+                                          >
+                                            <X style={{ width: 12, height: 12 }} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); handleDeleteRole(role.id) }}
+                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}
+                                          >
+                                            <Check className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null) }}
+                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      )
                                     ) : (
                                       <button
                                         onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(role.id) }}
-                                        style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, opacity: hoveredRoleId === role.id ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hoveredRoleId === role.id ? "auto" : "none" }}
+                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: hoveredRoleId === role.id ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hoveredRoleId === role.id ? "auto" : "none" }}
                                       >
-                                        Remove
+                                        <X style={{ width: 14, height: 14 }} />
                                       </button>
                                     )
                                   )}
@@ -5712,9 +5740,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             ) : (
                               <button
                                 onClick={() => setConfirmRemoveId(m.user_id)}
-                                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
                               >
-                                Remove
+                                <X style={{ width: 14, height: 14 }} />
                               </button>
                             )
                           )}

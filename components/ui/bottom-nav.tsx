@@ -2,7 +2,7 @@
 
 import { Home, MessageCircle, User, ClipboardList, Heart, BookUser } from "lucide-react"
 
-type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings"
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings" | "forms"
 
 interface BottomNavProps {
   activeTab: Tab
