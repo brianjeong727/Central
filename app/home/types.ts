@@ -1,6 +1,6 @@
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings" | "forms"
 
 export interface Profile {
   id: string
@@ -72,6 +72,46 @@ export interface EnrichedAnnouncement extends Announcement {
   rsvp_count: number
   user_has_rsvped: boolean
   rsvp_attendees: RsvpAttendee[]
+  has_form: boolean
+  form_id: string | null
+  user_has_responded: boolean
+}
+
+export type FieldType = 'text' | 'multiple_choice' | 'checkbox' | 'dropdown'
+
+export interface FormField {
+  id: string
+  form_id: string
+  label: string
+  type: FieldType
+  options: string[]
+  required: boolean
+  order_index: number
+}
+
+export interface FormResponse {
+  id: string
+  form_id: string
+  announcement_id: string
+  ministry_id: string
+  user_id: string
+  submitted_at: string
+}
+
+export interface FormAnswer {
+  id: string
+  response_id: string
+  field_id: string
+  value: string | null
+  values: string[]
+}
+
+export interface FormsTabProps {
+  userId: string
+  userName: string
+  userRole: string
+  ministryId: string
+  ministryName: string
 }
 
 export interface ChatGroup {
@@ -162,6 +202,7 @@ export interface AnnouncementCardProps {
   onRsvpToggle: (id: string) => void
   onEdit: (ann: EnrichedAnnouncement) => void
   onDelete: (id: string) => void
+  onOpenForm: (formId: string, announcementId: string, title: string) => void
 }
 
 export interface CreateChatScreenProps {

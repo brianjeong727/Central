@@ -24,13 +24,14 @@ import { DirectoryTab } from "./tabs/directory-tab"
 import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
 import { SettingsTab } from "./tabs/settings-tab"
+import { FormsTab } from "./tabs/forms-tab"
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "profile", "settings"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "profile", "settings", "forms"]
   const initialTab = (searchParams.get("tab") as Tab | null)
   const [activeTab, setActiveTabState] = useState<Tab>(
     initialTab && validTabs.includes(initialTab) ? initialTab : "home"
@@ -535,6 +536,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
               onPublicChange={setMinistryIsPublic}
               userRole={initialProfile.role}
               userId={userId}
+            />
+          )}
+
+          {activeTab === "forms" && (
+            <FormsTab
+              userId={userId}
+              userName={initialProfile.name}
+              userRole={initialProfile.role}
+              ministryId={ministryId}
+              ministryName={ministryName}
             />
           )}
 

@@ -202,10 +202,11 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    // Home panel — Home, Announcements, and Settings (admin-only)
-    const homeItems: { label: string; tab: "home" | "announcements" | "settings" }[] = [
+    // Home panel — Home, Announcements, Forms, and Settings (admin-only)
+    const homeItems: { label: string; tab: "home" | "announcements" | "forms" | "settings" }[] = [
       { label: "Home", tab: "home" },
       { label: "Announcements", tab: "announcements" },
+      { label: "Forms", tab: "forms" },
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
     return (
@@ -238,7 +239,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         </a>
 
         {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements"))
+          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms"))
           return (
             <button
               key={id}

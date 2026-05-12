@@ -1,12 +1,27 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3 } from "lucide-react"
+import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
-import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
+import { FormFillView } from "./forms-tab"
+import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
+
+// ── Form builder types (local) ────────────────────────────────────────────────
+
+interface DraftField {
+  tempId: string
+  existingId?: string
+  label: string
+  type: FieldType
+  options: string[]
+  required: boolean
+}
+
+let _tempIdCounter = 0
+function newTempId() { return `draft-${++_tempIdCounter}` }
 
 const AUDIENCE_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -36,6 +51,41 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Form builder
+  const [hasForm, setHasForm] = useState(false)
+  const [formFields, setFormFields] = useState<DraftField[]>([])
+  const [existingFormId, setExistingFormId] = useState<string | null>(null)
+
+  // Load existing form when editing
+  useEffect(() => {
+    if (!isEditing || !existing) return
+    async function loadExistingForm() {
+      const { data: formData } = await supabase
+        .from("announcement_forms")
+        .select("id")
+        .eq("announcement_id", existing!.id)
+        .maybeSingle()
+      if (!formData) return
+      setExistingFormId(formData.id)
+      setHasForm(true)
+      const { data: fieldData } = await supabase
+        .from("form_fields")
+        .select("*")
+        .eq("form_id", formData.id)
+        .order("order_index")
+      setFormFields((fieldData ?? []).map(f => ({
+        tempId: newTempId(),
+        existingId: f.id,
+        label: f.label,
+        type: f.type as FieldType,
+        options: Array.isArray(f.options) ? f.options : [],
+        required: f.required ?? false,
+      })))
+    }
+    loadExistingForm()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -71,23 +121,49 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       imageUrl = imagePreview
     }
 
+    let announcementId: string
+    let resultAnn: Announcement
+
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
         .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
-      setSuccess(true)
-      setTimeout(() => { onSuccess((data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl }) as Announcement); onClose() }, 1000)
+      announcementId = existing.id
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
         .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
-      setSuccess(true)
-      setTimeout(() => { onSuccess(data as Announcement); onClose() }, 1200)
+      announcementId = data.id
+      resultAnn = data as Announcement
     }
+
+    // Sync form attachment
+    if (hasForm && formFields.length > 0) {
+      let formId = existingFormId
+      if (!formId) {
+        const { data: fd } = await supabase
+          .from("announcement_forms")
+          .insert({ announcement_id: announcementId, ministry_id: ministryId, created_by: userId })
+          .select().single()
+        formId = fd?.id ?? null
+      }
+      if (formId) {
+        if (existingFormId) await supabase.from("form_fields").delete().eq("form_id", formId)
+        await supabase.from("form_fields").insert(
+          formFields.map((f, i) => ({ form_id: formId, label: f.label, type: f.type, options: f.options, required: f.required, order_index: i }))
+        )
+      }
+    } else if (!hasForm && existingFormId) {
+      await supabase.from("announcement_forms").delete().eq("id", existingFormId)
+    }
+
+    setSuccess(true)
+    setTimeout(() => { onSuccess(resultAnn); onClose() }, isEditing ? 1000 : 1200)
   }
 
   if (success) {
@@ -328,6 +404,118 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             )}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
           </div>
+
+          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+
+          {/* Form builder */}
+          <div className="px-6 py-6">
+            <div className="flex items-center justify-between mb-1">
+              <p style={monoStyle}>Form</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setHasForm(v => !v)
+                  if (!hasForm && formFields.length === 0) {
+                    setFormFields([{ tempId: newTempId(), label: '', type: 'text', options: [], required: false }])
+                  }
+                }}
+                style={{ width: 34, height: 20, borderRadius: 999, background: hasForm ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, transition: "background 0.2s" }}
+              >
+                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: hasForm ? "16px" : "2px" }} />
+              </button>
+            </div>
+            <p className="text-[12px] text-[#8A8497] mb-4">Attach questions to this announcement</p>
+
+            {hasForm && (
+              <div className="flex flex-col gap-4">
+                {formFields.map((field, idx) => (
+                  <div key={field.tempId} style={{ border: "1px solid #E8E2D2", borderRadius: 10, padding: "12px 14px", background: "#FAFAF8" }}>
+                    {/* Field label */}
+                    <input
+                      type="text"
+                      value={field.label}
+                      onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, label: e.target.value } : f))}
+                      placeholder="Question label…"
+                      style={{ width: "100%", fontSize: 13, color: "#13101A", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid #E2DDCF", paddingBottom: 6, marginBottom: 10 }}
+                    />
+                    {/* Type pills */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {([
+                        { value: 'text', label: 'Text' },
+                        { value: 'multiple_choice', label: 'Multiple' },
+                        { value: 'checkbox', label: 'Checkboxes' },
+                        { value: 'dropdown', label: 'Dropdown' },
+                      ] as { value: FieldType; label: string }[]).map(t => (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, type: t.value, options: t.value !== 'text' && f.options.length === 0 ? ['Option 1'] : f.options } : f))}
+                          style={{
+                            padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: "pointer",
+                            border: `1px solid ${field.type === t.value ? "#3E1540" : "#E2DDCF"}`,
+                            background: field.type === t.value ? "#3E1540" : "transparent",
+                            color: field.type === t.value ? "#F6F4EF" : "#5A5466",
+                          }}
+                        >{t.label}</button>
+                      ))}
+                    </div>
+
+                    {/* Options for choice-based types */}
+                    {field.type !== 'text' && (
+                      <div className="flex flex-col gap-1.5 mb-3">
+                        {field.options.map((opt, oi) => (
+                          <div key={oi} className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={opt}
+                              onChange={e => setFormFields(prev => prev.map(f => {
+                                if (f.tempId !== field.tempId) return f
+                                const opts = [...f.options]; opts[oi] = e.target.value
+                                return { ...f, options: opts }
+                              }))}
+                              style={{ flex: 1, fontSize: 12, color: "#13101A", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid #E2DDCF", paddingBottom: 3 }}
+                              placeholder={`Option ${oi + 1}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: f.options.filter((_, i) => i !== oi) } : f))}
+                              style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#C4C0B0", flexShrink: 0 }}
+                            ><X style={{ width: 10, height: 10 }} /></button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: [...f.options, `Option ${f.options.length + 1}`] } : f))}
+                          style={{ fontSize: 11, color: "#8A8497", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0", marginTop: 2 }}
+                        >+ Add option</button>
+                      </div>
+                    )}
+
+                    {/* Row: required + reorder + delete */}
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={field.required} onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, required: e.target.checked } : f))} className="w-3 h-3" />
+                        <span style={{ fontSize: 11, color: "#8A8497" }}>Required</span>
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button type="button" disabled={idx === 0} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#D6D0C0" : "#8A8497" }}><ChevronUp style={{ width: 12, height: 12 }} /></button>
+                        <button type="button" disabled={idx === formFields.length - 1} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === formFields.length - 1 ? "default" : "pointer", color: idx === formFields.length - 1 ? "#D6D0C0" : "#8A8497" }}><ChevronDown style={{ width: 12, height: 12 }} /></button>
+                        <button type="button" onClick={() => setFormFields(prev => prev.filter(f => f.tempId !== field.tempId))} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#C4C0B0", marginLeft: 2 }}><Trash2 style={{ width: 11, height: 11 }} /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setFormFields(prev => [...prev, { tempId: newTempId(), label: '', type: 'text', options: [], required: false }])}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "transparent", color: "#8A8497", fontSize: 12, cursor: "pointer" }}
+                >
+                  <Plus style={{ width: 12, height: 12 }} /> Add question
+                </button>
+              </div>
+            )}
+          </div>
         </aside>
       </form>
     </div>
@@ -471,6 +659,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   const [editDraft, setEditDraft] = useState<{ title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean } | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
+  // Form fill overlay state
+  const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
+
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
 
   const loadAnnouncements = useCallback(async () => {
@@ -494,14 +685,29 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     if (anns.length === 0) { setAnnouncements([]); setLoading(false); return }
 
     const ids = anns.map((a) => a.id)
-    const [{ data: viewRows }, { data: rsvpRows }] = await Promise.all([
+    const [{ data: viewRows }, { data: rsvpRows }, { data: formRows }] = await Promise.all([
       supabase.from("announcement_views").select("announcement_id").in("announcement_id", ids),
       supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", ids),
+      supabase.from("announcement_forms").select("id, announcement_id").in("announcement_id", ids),
     ])
 
     supabase.from("announcement_views")
       .upsert(ids.map((id) => ({ announcement_id: id, user_id: userId })), { onConflict: "announcement_id,user_id" })
       .then()
+
+    // Form data
+    const formByAnn: Record<string, string> = {}
+    for (const f of formRows ?? []) formByAnn[f.announcement_id] = f.id
+    const formIds = Object.values(formByAnn)
+    const respondedFormIds = new Set<string>()
+    if (formIds.length > 0) {
+      const { data: responseRows } = await supabase
+        .from("form_responses")
+        .select("form_id")
+        .in("form_id", formIds)
+        .eq("user_id", userId)
+      for (const r of responseRows ?? []) respondedFormIds.add(r.form_id)
+    }
 
     // Fetch names for all RSVP attendees
     const allRsvpUserIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
@@ -534,6 +740,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       rsvp_count: rsvpCountMap[ann.id] ?? 0,
       user_has_rsvped: userRsvpSet.has(ann.id),
       rsvp_attendees: rsvpAttendeesMap[ann.id] ?? [],
+      has_form: !!formByAnn[ann.id],
+      form_id: formByAnn[ann.id] ?? null,
+      user_has_responded: formByAnn[ann.id] ? respondedFormIds.has(formByAnn[ann.id]) : false,
     })))
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -561,7 +770,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   }
 
   function handleNewAnnouncement(newAnn: Announcement) {
-    setAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [] }, ...prev])
+    setAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: false, form_id: null, user_has_responded: false }, ...prev])
   }
 
   function handleDeleteAnnouncement(id: string) {
@@ -684,6 +893,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 onRsvpToggle={handleRsvpToggle}
                 onEdit={handleEditSuccess}
                 onDelete={handleDeleteAnnouncement}
+                onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
               />
             ))}
           </div>
@@ -827,6 +1037,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                {ann.has_form && (
+                                  ann.user_has_responded
+                                    ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
+                                    : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
+                                )}
                                 {ann.is_event && (
                                   <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
                                     {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
@@ -877,6 +1092,21 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
       {showCreate && (
         <CreateAnnouncementModal userId={userId} ministryId={ministryId} onClose={() => setShowCreate(false)} onSuccess={handleNewAnnouncement} />
+      )}
+
+      {formFillState && (
+        <FormFillView
+          formId={formFillState.formId}
+          announcementId={formFillState.announcementId}
+          announcementTitle={formFillState.title}
+          userId={userId}
+          ministryId={ministryId}
+          onClose={() => setFormFillState(null)}
+          onSubmitted={() => {
+            setAnnouncements(prev => prev.map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a))
+            setFormFillState(null)
+          }}
+        />
       )}
     </div>
   )
@@ -943,7 +1173,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onOpenForm }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -1086,6 +1316,14 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                     )}
                   </>
                 )}
+                {announcement.has_form && (
+                  <div className="mt-3">
+                    {announcement.user_has_responded
+                      ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                      : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                    }
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1174,6 +1412,14 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                       )}
                     </div>
                   )}
+                </div>
+              )}
+              {announcement.has_form && (
+                <div className={`${!announcement.is_event ? "pt-3 border-t border-[#EFEAE0]" : "mt-2"}`}>
+                  {announcement.user_has_responded
+                    ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                    : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                  }
                 </div>
               )}
             </>
