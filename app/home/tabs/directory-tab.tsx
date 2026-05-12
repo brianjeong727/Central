@@ -204,7 +204,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
                     <div className="flex items-center gap-2">
                       {member.graduation_year && <span className="text-[11px] text-[#8A8497] font-medium">Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white" : "bg-[#F4F1E8] text-[#3E1540]"}`}>
+                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[#3E1540] border-transparent"}`}>
                           {member.role}
                         </span>
                       )}
@@ -496,7 +496,7 @@ export function MemberSheet({
                 <span className="text-[12px] text-[#8A8497]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F4F1E8] text-[#3E1540]"}`}>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[#3E1540] border-transparent"}`}>
                   {member.role}
                 </span>
               )}

@@ -398,7 +398,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       <p className="text-[13px] font-semibold text-[#13101A] truncate">{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {profile.role && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${profile.role.toLowerCase() === "admin" || profile.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(profile.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>
                             {profile.role}
                           </span>
                         )}
@@ -552,8 +552,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       {member.role && (
                         <span style={{
                           fontSize: 11, padding: "3px 10px", borderRadius: 999,
-                          background: ["admin","leader"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : "#FBF8F2",
+                          background: ["admin","leader"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : member.role.toLowerCase() === "visitor" ? "white" : "#FBF8F2",
                           color: ["admin","leader"].includes(member.role.toLowerCase()) ? "#3E1540" : "#8A8497",
+                          border: member.role.toLowerCase() === "visitor" ? "1px solid #D8D3C8" : "none",
                           letterSpacing: "0.04em", textTransform: "uppercase" as const,
                         }}>
                           {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
@@ -718,7 +719,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${member.role.toLowerCase() === "admin" || member.role.toLowerCase() === "leader" ? "bg-[#3E1540] text-white" : "bg-[#F3EDE6] text-[#3E1540]"}`}>{member.role}</span>}
+                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>{member.role}</span>}
                         {member.graduation_year && <span className="text-[11px] text-[#8A8497]/50">Class of {member.graduation_year}</span>}
                       </div>
                     </div>

@@ -1,14 +1,14 @@
 # CENTRAL — Product Requirements Document
 
-> **Version:** 2.0  
-> **Last updated:** April 2026  
+> **Version:** 2.1  
+> **Last updated:** May 2026  
 > **Purpose:** Comprehensive product context for AI agents, engineers, and contributors working on this codebase.
 
 ---
 
 ## 1. Product Overview
 
-**CENTRAL** is a mobile-first church communication and ministry management platform built for college ministries. It is a multi-tenant platform — any college ministry can sign up, create their own workspace, and invite their members.
+**CENTRAL** is a multi-tenant church communication and ministry management platform built for college ministries. It is deployed at **joincentral.app**.
 
 The name "CENTRAL" is intentional: it is meant to be the single place where all ministry communication and planning happens, replacing group texts, emails, scattered messaging apps, and disconnected planning tools.
 
@@ -22,13 +22,17 @@ The name "CENTRAL" is intentional: it is meant to be the single place where all 
 
 | Role | Description | Access Level |
 |------|-------------|--------------|
-| **Ministry Admin** | Pastor, deacon, or founding leader who registers the ministry. | Full control over workspace — members, teams, all features |
-| **Admin** | Trusted leader assigned by Ministry Admin. | All features + destructive actions within the ministry |
-| **Team Member** | Member assigned to a team (PT, DGL, CCSF, etc). | Access to their team's Plan tab tools only |
-| **Member** | Regular church attendee. | Chats, directory, announcements, RSVP, profile |
-| **Visitor** | Not yet implemented. Intended for first-time guests. | Limited read access (planned) |
+| **Admin** | Pastor, deacon, elder, or founding leader. | Full control — members, teams, settings, all features, destructive actions |
+| **Leader** | DGL, Student Board member, Praise Team member. | Announcements CRUD, church chat management, team planning tools |
+| **Member** | Regular church attendee. | Chats, directory, announcements, RSVP, profile, journal, giving |
+| **Visitor** | Participant before formal membership. | Identical to Member — full standard access, no admin/leader actions |
 
 > **Note:** A person can be a Member AND be on multiple teams simultaneously. Team membership grants additional access to the Plan tab — it does not replace their base member access.
+
+> **Visitor vs Member:** Visitors have identical permissions to Members in every check. Any code that allows Members must allow Visitors: `["member", "visitor"].includes(role)`. The distinction is purely social/organizational — admins can tell at a glance who hasn't completed membership (white outlined badge vs. filled cream badge).
+
+**Leader subtypes:** DGL, Student Org Board, Praise Team — all share the leader permission tier.  
+**Admin subtypes:** Pastors, Deacons, Elders — all share the admin permission tier.
 
 ---
 
@@ -36,157 +40,101 @@ The name "CENTRAL" is intentional: it is meant to be the single place where all 
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js (App Router, v16) |
+| Framework | Next.js 16 (App Router) |
 | Database + Auth | Supabase (Postgres + Row Level Security + Realtime) |
 | Styling | Tailwind CSS v4 |
 | Components | shadcn/ui (Radix primitives) |
 | Language | TypeScript (strict) |
-| Font | Instrument Serif (display) / Inter (UI) |
+| Fonts | Instrument Serif (display) / Inter (UI) |
 | Hosting | Vercel |
+| Domain | joincentral.app (Namecheap → Vercel) |
 
 ### Key conventions
 - All components use Tailwind utility classes — no CSS modules, no styled-components.
-- The app renders in a **max-width 390px centered column** to simulate a native mobile app in the browser.
+- The desktop app uses a three-column shell: dark icon rail (76px) + cream sidebar (304px) + flexible main column.
 - All database reads/writes go through the Supabase JS client (`lib/supabase.ts` for client, `lib/supabase-server.ts` for server components).
 - Server actions live in `app/actions/`.
-- The entire app shell lives in `app/home/home-app.tsx` — a single large client component file organized into tab components.
+- The entire app shell lives in `app/home/home-app.tsx` — a single large client component, intentionally not split.
+- Middleware lives in `proxy.ts` — `middleware.ts` was deleted and must not be recreated.
 
 ---
 
 ## 4. Design System
 
-> **Direction: Quiet Modern** — regal plum palette, warm ivory surfaces, Instrument Serif for display text.
+> **Direction: Quiet Modern** — editorial cream-and-plum aesthetic. Read `skills/design-system/design-system.md` for the full spec. The summary below is for quick reference only.
 
-### Colors
-| Token | Value | Usage |
-|-------|-------|-------|
-| Primary (regal plum) | `#3E1540` | Buttons, active nav, hero card bg, chat avatars (alternating) |
-| Primary hover | `#2D0F2E` | Hover states on plum elements |
-| Ink | `#13101A` | Primary headings, message content, second avatar color |
-| Gold accent | `#C9A34B` | Unread badges only — sparingly |
-| Surface | `#FBF8F2` | Page background, card bg, input fills |
-| Border | `#ECE8DE` | Card borders, inputs, dividers |
-| Body text | `#5A5466` | Announcement body, chat previews |
-| Muted text | `#8A8497` | Timestamps, secondary labels |
-| Faint text | `#C4C4C4` | Placeholders |
-| Ivory | `#F6F4EF` | Text/icons on plum backgrounds |
+### Core colors
+| Token | Hex | Use |
+|-------|-----|-----|
+| `--plum` | `#3E1540` | Primary accent, active borders, hero gradients |
+| `--plum-2` | `#2D0F2E` | Primary button background, active text |
+| `--ink` | `#13101A` | Primary headings, message content |
+| `--gold` | `#D4A45C` | Avatar accent only — never as button color |
+| `--cream` | `#FBF8F2` | Primary surface (page bg, cards) |
+| `--body` | `#5A5466` | Body text, descriptions |
+| `--muted` | `#8A8497` | Timestamps, secondary labels |
+| `--line` | `#E8E2D2` | Primary hairline |
 
-> **Rules:** Max 2–3 plum elements per screen. Gold only for unread badges. No colored shadows — neutral only (`rgba(19,16,26,0.08)`).
-
-### Layout
-- Outer wrapper: `max-w-[390px] mx-auto` — always centered, never full-width.
-- Full-screen overlays: `fixed inset-0 z-[N]` with `max-w-[390px] mx-auto w-full h-full flex flex-col`.
-- Bottom nav height: accounted for with `pb-28` on scrollable content.
-- Safe area: `pt-12` on full-screen overlay headers (accounts for iOS status bar).
+> **Rules:** Max 2–3 plum elements per screen. Gold for avatar accent only. No colored shadows. No pure white — always cream. Full token list in `skills/design-system/design-system.md`.
 
 ### Typography
-- **Display / headings:** Instrument Serif via `var(--font-instrument-serif)`
-- **UI / body:** Inter via `var(--font-inter)`
-- Section headers: Instrument Serif ~26px, weight 400, `#13101A`. No uppercase label bars.
-- Primary headings: Instrument Serif 36px, `#13101A`.
-- Chat bubbles: `text-[14px] leading-relaxed`.
+- **Display / headings:** Instrument Serif — page titles, section headers, card titles, stat numbers
+- **UI / body:** Inter — all other text
+- **Eyebrows:** monospace, 11px, tracking 1.4, all-caps — required above every H1 and H2
+- Never bold serif. Never Inter for headlines.
+
+### Shell layout (desktop)
+[ 76px dark icon rail ] [ 304px cream sidebar ] [ flexible main column ]
+- Icon rail: `#13101A` background, plum primary "+" button, section icons
+- Sidebar: cream `#FBF8F2`, 304px, verse callout always present at bottom
+- Main column: cream, breadcrumb header top, content below
 
 ### Z-index layers
-| Layer | Z value | Element |
-|-------|---------|---------|
-| Bottom nav | 50 | `BottomNav` |
-| Announcement detail | 50 | `AnnouncementDetail` |
-| Member sheet | 60 | `MemberSheet` |
-| Announcements modal | 60 | `CreateAnnouncementModal` |
-| Chat screen | 100 | `ChatScreen` |
-| Chat settings | 110 | `ChatSettings` |
-| Emoji dismiss overlay | 150 | Dismiss overlay |
-| Emoji picker | 160 | Picker pill |
+| Element | Z |
+|---------|---|
+| Bottom nav | 50 |
+| Announcement detail | 50 |
+| Member sheet | 60 |
+| Announcements modal | 60 |
+| Chat screen | 100 |
+| Chat settings | 110 |
+| Emoji dismiss overlay | 150 |
+| Emoji picker | 160 |
 
 ---
 
 ## 5. Database Schema
 
 ### `ministries`
-The core multi-tenant table. Each ministry is a fully isolated workspace.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | PK |
 | `name` | text | e.g. "Central Church Student Fellowship" |
-| `university` | text | e.g. "University of Pittsburgh" |
+| `university` | text | |
 | `size` | text | `"small"`, `"medium"`, `"large"` |
-| `invite_code` | text | Unique short code members use to join |
-| `created_by` | UUID | FK → auth.users (the Ministry Admin) |
+| `invite_code` | text | Unique, members use to join |
+| `is_public` | boolean | Controls public discovery listing |
+| `created_by` | UUID | FK → auth.users |
 | `created_at` | timestamptz | |
 
 ### `profiles`
-Stores all user profile data. Created on signup.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | Matches `auth.users.id` |
-| `ministry_id` | UUID | FK → ministries(id) |
+| `ministry_id` | UUID | FK → ministries(id) — NULL until user completes /join |
 | `name` | text | |
 | `email` | text | |
 | `graduation_year` | int | |
-| `role` | text | `"admin"`, `"leader"`, `"member"` — always lowercase |
+| `role` | text | `"admin"`, `"leader"`, `"member"`, `"visitor"` — always lowercase |
 | `about_me` | text? | |
 | `bible_verse` | text? | |
 | `prayer_request` | text? | |
 | `pray_for_me` | text? | |
 
-### `teams`
-Flexible teams within a ministry. Created and named by the ministry admin.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `ministry_id` | UUID | FK → ministries(id) |
-| `name` | text | e.g. "Praise Team", "CCSF Board" |
-| `description` | text? | |
-| `icon` | text? | Emoji icon |
-| `created_by` | UUID | FK → profiles(id) |
-| `created_at` | timestamptz | |
-
-### `team_roles`
-Custom roles within each team with granular permissions.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `team_id` | UUID | FK → teams(id) |
-| `name` | text | e.g. "President", "Worship Leader", "Member" |
-| `permissions` | JSONB | Array of permission flags |
-| `created_at` | timestamptz | |
-
-**Permission flags:**
-- `can_manage_worship_set`
-- `can_view_worship_set`
-- `can_generate_slides`
-- `can_create_dgs`
-- `can_view_dgs`
-- `can_generate_bible_study`
-- `can_track_attendance`
-- `can_plan_events`
-- `can_view_finances`
-- `can_manage_members`
-- `can_manage_team`
-
-### `team_members`
-Join table linking users to teams with their assigned role.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `team_id` | UUID | FK → teams(id) |
-| `user_id` | UUID | FK → profiles(id) |
-| `role_id` | UUID | FK → team_roles(id) |
-| `added_by` | UUID | FK → profiles(id) |
-| `joined_at` | timestamptz | |
-
-**Rule:** Any existing team member can add new members to their team.  
-**Constraint:** `UNIQUE(team_id, user_id)`
-
 ### `groups`
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | UUID | |
+| `id` | UUID | PK |
 | `ministry_id` | UUID | FK → ministries(id) |
 | `name` | text | |
 | `type` | text | `"church"`, `"my"`, `"dm"` |
@@ -219,8 +167,7 @@ Join table linking users to teams with their assigned role.
 | `emoji` | text | One of: 👍 ❤️ 😂 🙏 🔥 😮 |
 | `created_at` | timestamptz | |
 
-**Constraint:** `UNIQUE(message_id, user_id, emoji)`  
-**Config:** REPLICA IDENTITY FULL + Realtime enabled.
+**Constraint:** `UNIQUE(message_id, user_id, emoji)`
 
 ### `announcements`
 | Column | Type | Notes |
@@ -235,250 +182,43 @@ Join table linking users to teams with their assigned role.
 | `image_url` | text? | |
 | `audience` | text? | `"all"`, `"2025"`–`"2028"`, `"group"` |
 | `created_by` | UUID? | |
+| `show_attendees` | boolean | Controls whether members can see RSVP list |
 
 ### `announcement_views`
 | Column | Type | Notes |
 |--------|------|-------|
 | `announcement_id` | UUID | |
 | `user_id` | UUID | |
+**Constraint:** `UNIQUE(announcement_id, user_id)`
 
 ### `rsvps`
 | Column | Type | Notes |
 |--------|------|-------|
 | `announcement_id` | UUID | |
 | `user_id` | UUID | |
-
-### Storage Buckets
-- `announcement-images` — Public bucket.
-
----
-
-## 6. Row Level Security (RLS) Summary
-
-All data is scoped by `ministry_id`. Users can only see data belonging to their ministry.
-
-### `ministries`
-- **SELECT:** Any authenticated user (for ministry search/discovery)
-- **INSERT:** Any authenticated user (to register a new ministry)
-- **UPDATE:** Ministry Admin only
-
-### `profiles`
-- **SELECT:** Members of the same ministry
-- **UPDATE:** Own row only
-
-### `groups`
-- **SELECT:** User must be in `group_members` for that group
-- **INSERT:** Any ministry member
-- **UPDATE:** Admin/leader for church type; any member for my/dm type
-
-### `group_members`
-- **SELECT:** Any ministry member
-- **INSERT:** Any ministry member
-- **UPDATE:** Own row only (for `last_read_at`)
-- **DELETE:** Self-remove always; admin/leader can remove others from church chats
-
-### `messages`
-- **SELECT:** User must be a group member
-- **INSERT:** User must be a group member, `sender_id` must equal `auth.uid()`
-
-### `message_reactions`
-- **SELECT:** Via group membership
-- **INSERT/DELETE:** Own rows only
+**Constraint:** `UNIQUE(announcement_id, user_id)` — enforces one RSVP per person, enables toggle behavior
 
 ### `teams`
-- **SELECT:** Ministry members
-- **INSERT/UPDATE:** Ministry Admin or Admin
-
-### `team_roles`
-- **SELECT:** Ministry members
-- **INSERT/UPDATE:** Team members with `can_manage_team` permission
-
-### `team_members`
-- **SELECT:** Ministry members
-- **INSERT:** Any existing member of that team
-- **DELETE:** Self-remove or `can_manage_team` permission
-
----
-
-## 7. Application Structure
-
-### Routing
-Got it — here's the fully updated PRD:
-
-markdown
-# CENTRAL — Product Requirements Document
-
-> **Version:** 2.0  
-> **Last updated:** April 2026  
-> **Purpose:** Comprehensive product context for AI agents, engineers, and contributors working on this codebase.
-
----
-
-## 1. Product Overview
-
-**CENTRAL** is a mobile-first church communication and ministry management platform built for college ministries. It is a multi-tenant platform — any college ministry can sign up, create their own workspace, and invite their members.
-
-The name "CENTRAL" is intentional: it is meant to be the single place where all ministry communication and planning happens, replacing group texts, emails, scattered messaging apps, and disconnected planning tools.
-
-**The core problem it solves:** College ministries are highly relational but logistically fragmented. Leaders blast announcements via text, members use different apps to chat, praise teams coordinate over iMessage, discipleship group leaders have no tools, and no one has a single place to find who someone is, how to pray for them, or what events are coming up.
-
-**The platform vision:** Like Slack for churches — every ministry gets their own isolated workspace with their own members, chats, announcements, teams, and planning tools. A pastor registers their ministry in 5 minutes and invites their congregation.
-
----
-
-## 2. Target Users
-
-| Role | Description | Access Level |
-|------|-------------|--------------|
-| **Ministry Admin** | Pastor, deacon, or founding leader who registers the ministry. | Full control over workspace — members, teams, all features |
-| **Admin** | Trusted leader assigned by Ministry Admin. | All features + destructive actions within the ministry |
-| **Team Member** | Member assigned to a team (PT, DGL, CCSF, etc). | Access to their team's Plan tab tools only |
-| **Member** | Regular church attendee. | Chats, directory, announcements, RSVP, profile |
-| **Visitor** | Not yet implemented. Intended for first-time guests. | Limited read access (planned) |
-
-> **Note:** A person can be a Member AND be on multiple teams simultaneously. Team membership grants additional access to the Plan tab — it does not replace their base member access.
-
----
-
-## 3. Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js (App Router, v16) |
-| Database + Auth | Supabase (Postgres + Row Level Security + Realtime) |
-| Styling | Tailwind CSS v4 |
-| Components | shadcn/ui (Radix primitives) |
-| Language | TypeScript (strict) |
-| Font | Instrument Serif (display) / Inter (UI) |
-| Hosting | Vercel |
-
-### Key conventions
-- All components use Tailwind utility classes — no CSS modules, no styled-components.
-- The app renders in a **max-width 390px centered column** to simulate a native mobile app in the browser.
-- All database reads/writes go through the Supabase JS client (`lib/supabase.ts` for client, `lib/supabase-server.ts` for server components).
-- Server actions live in `app/actions/`.
-- The entire app shell lives in `app/home/home-app.tsx` — a single large client component file organized into tab components.
-
----
-
-## 4. Design System
-
-> **Direction: Quiet Modern** — regal plum palette, warm ivory surfaces, Instrument Serif for display text.
-
-### Colors
-| Token | Value | Usage |
-|-------|-------|-------|
-| Primary (regal plum) | `#3E1540` | Buttons, active nav, hero card bg, chat avatars (alternating) |
-| Primary hover | `#2D0F2E` | Hover states on plum elements |
-| Ink | `#13101A` | Primary headings, message content, second avatar color |
-| Gold accent | `#C9A34B` | Unread badges only — sparingly |
-| Surface | `#FBF8F2` | Page background, card bg, input fills |
-| Border | `#ECE8DE` | Card borders, inputs, dividers |
-| Body text | `#5A5466` | Announcement body, chat previews |
-| Muted text | `#8A8497` | Timestamps, secondary labels |
-| Faint text | `#C4C4C4` | Placeholders |
-| Ivory | `#F6F4EF` | Text/icons on plum backgrounds |
-
-> **Rules:** Max 2–3 plum elements per screen. Gold only for unread badges. No colored shadows — neutral only (`rgba(19,16,26,0.08)`).
-
-### Layout
-- Outer wrapper: `max-w-[390px] mx-auto` — always centered, never full-width.
-- Full-screen overlays: `fixed inset-0 z-[N]` with `max-w-[390px] mx-auto w-full h-full flex flex-col`.
-- Bottom nav height: accounted for with `pb-28` on scrollable content.
-- Safe area: `pt-12` on full-screen overlay headers (accounts for iOS status bar).
-
-### Typography
-- **Display / headings:** Instrument Serif via `var(--font-instrument-serif)`
-- **UI / body:** Inter via `var(--font-inter)`
-- Section headers: Instrument Serif ~26px, weight 400, `#13101A`. No uppercase label bars.
-- Primary headings: Instrument Serif 36px, `#13101A`.
-- Chat bubbles: `text-[14px] leading-relaxed`.
-
-### Z-index layers
-| Layer | Z value | Element |
-|-------|---------|---------|
-| Bottom nav | 50 | `BottomNav` |
-| Announcement detail | 50 | `AnnouncementDetail` |
-| Member sheet | 60 | `MemberSheet` |
-| Announcements modal | 60 | `CreateAnnouncementModal` |
-| Chat screen | 100 | `ChatScreen` |
-| Chat settings | 110 | `ChatSettings` |
-| Emoji dismiss overlay | 150 | Dismiss overlay |
-| Emoji picker | 160 | Picker pill |
-
----
-
-## 5. Database Schema
-
-### `ministries`
-The core multi-tenant table. Each ministry is a fully isolated workspace.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | PK |
-| `name` | text | e.g. "Central Church Student Fellowship" |
-| `university` | text | e.g. "University of Pittsburgh" |
-| `size` | text | `"small"`, `"medium"`, `"large"` |
-| `invite_code` | text | Unique short code members use to join |
-| `created_by` | UUID | FK → auth.users (the Ministry Admin) |
-| `created_at` | timestamptz | |
-
-### `profiles`
-Stores all user profile data. Created on signup.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | Matches `auth.users.id` |
 | `ministry_id` | UUID | FK → ministries(id) |
 | `name` | text | |
-| `email` | text | |
-| `graduation_year` | int | |
-| `role` | text | `"admin"`, `"leader"`, `"member"` — always lowercase |
-| `about_me` | text? | |
-| `bible_verse` | text? | |
-| `prayer_request` | text? | |
-| `pray_for_me` | text? | |
-
-### `teams`
-Flexible teams within a ministry. Created and named by the ministry admin.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `ministry_id` | UUID | FK → ministries(id) |
-| `name` | text | e.g. "Praise Team", "CCSF Board" |
 | `description` | text? | |
 | `icon` | text? | Emoji icon |
 | `created_by` | UUID | FK → profiles(id) |
 | `created_at` | timestamptz | |
 
 ### `team_roles`
-Custom roles within each team with granular permissions.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | PK |
 | `team_id` | UUID | FK → teams(id) |
-| `name` | text | e.g. "President", "Worship Leader", "Member" |
+| `name` | text | |
 | `permissions` | JSONB | Array of permission flags |
 | `created_at` | timestamptz | |
 
-**Permission flags:**
-- `can_manage_worship_set`
-- `can_view_worship_set`
-- `can_generate_slides`
-- `can_create_dgs`
-- `can_view_dgs`
-- `can_generate_bible_study`
-- `can_track_attendance`
-- `can_plan_events`
-- `can_view_finances`
-- `can_manage_members`
-- `can_manage_team`
-
 ### `team_members`
-Join table linking users to teams with their assigned role.
-
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | PK |
@@ -487,451 +227,183 @@ Join table linking users to teams with their assigned role.
 | `role_id` | UUID | FK → team_roles(id) |
 | `added_by` | UUID | FK → profiles(id) |
 | `joined_at` | timestamptz | |
-
-**Rule:** Any existing team member can add new members to their team.  
 **Constraint:** `UNIQUE(team_id, user_id)`
 
-### `groups`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | |
-| `ministry_id` | UUID | FK → ministries(id) |
-| `name` | text | |
-| `type` | text | `"church"`, `"my"`, `"dm"` |
-| `created_by` | UUID | |
-| `archived` | boolean | |
+### Worship tables
+`worship_weeks`, `worship_songs`, `worship_roles`, `worship_availability`, `worship_charts`, `worship_annotations` — see §8.12 for full schema.
 
-### `group_members`
-| Column | Type | Notes |
-|--------|------|-------|
-| `group_id` | UUID | |
-| `user_id` | UUID | |
-| `last_read_at` | timestamptz? | |
-
-### `messages`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | |
-| `group_id` | UUID | |
-| `sender_id` | UUID | |
-| `content` | text | |
-| `created_at` | timestamptz | |
-| `reply_to_id` | UUID? | FK → messages(id) ON DELETE SET NULL |
-
-### `message_reactions`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | |
-| `message_id` | UUID | |
-| `user_id` | UUID | |
-| `emoji` | text | One of: 👍 ❤️ 😂 🙏 🔥 😮 |
-| `created_at` | timestamptz | |
-
-**Constraint:** `UNIQUE(message_id, user_id, emoji)`  
-**Config:** REPLICA IDENTITY FULL + Realtime enabled.
-
-### `announcements`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | |
-| `ministry_id` | UUID | FK → ministries(id) |
-| `title` | text | |
-| `body` | text | |
-| `created_at` | timestamptz | |
-| `is_pinned` | boolean | |
-| `is_event` | boolean | |
-| `image_url` | text? | |
-| `audience` | text? | `"all"`, `"2025"`–`"2028"`, `"group"` |
-| `created_by` | UUID? | |
-
-### `announcement_views`
-| Column | Type | Notes |
-|--------|------|-------|
-| `announcement_id` | UUID | |
-| `user_id` | UUID | |
-
-### `rsvps`
-| Column | Type | Notes |
-|--------|------|-------|
-| `announcement_id` | UUID | |
-| `user_id` | UUID | |
-
-### Storage Buckets
-- `announcement-images` — Public bucket.
+### Storage buckets
+| Bucket | Access |
+|--------|--------|
+| `announcement-images` | Public |
+| `devotionals` | Public |
+| `profile-images` | Needs public toggle + policies |
+| `worship-charts` | Public |
 
 ---
 
-## 6. Row Level Security (RLS) Summary
+## 6. Row Level Security (RLS)
 
-All data is scoped by `ministry_id`. Users can only see data belonging to their ministry.
+All data is scoped by `ministry_id`. Two SECURITY DEFINER helpers bypass profile-table RLS to prevent recursion:
+- `auth_ministry_id()` — returns current user's `ministry_id`
+- `auth_is_admin_or_leader()` — returns `true` if role is admin or leader
 
-### `ministries`
-- **SELECT:** Any authenticated user (for ministry search/discovery)
-- **INSERT:** Any authenticated user (to register a new ministry)
-- **UPDATE:** Ministry Admin only
+**Never query `profiles` directly inside other table RLS policies — use these helpers.**
 
-### `profiles`
-- **SELECT:** Members of the same ministry
-- **UPDATE:** Own row only
-
-### `groups`
-- **SELECT:** User must be in `group_members` for that group
-- **INSERT:** Any ministry member
-- **UPDATE:** Admin/leader for church type; any member for my/dm type
-
-### `group_members`
-- **SELECT:** Any ministry member
-- **INSERT:** Any ministry member
-- **UPDATE:** Own row only (for `last_read_at`)
-- **DELETE:** Self-remove always; admin/leader can remove others from church chats
-
-### `messages`
-- **SELECT:** User must be a group member
-- **INSERT:** User must be a group member, `sender_id` must equal `auth.uid()`
-
-### `message_reactions`
-- **SELECT:** Via group membership
-- **INSERT/DELETE:** Own rows only
-
-### `teams`
-- **SELECT:** Ministry members
-- **INSERT/UPDATE:** Ministry Admin or Admin
-
-### `team_roles`
-- **SELECT:** Ministry members
-- **INSERT/UPDATE:** Team members with `can_manage_team` permission
-
-### `team_members`
-- **SELECT:** Ministry members
-- **INSERT:** Any existing member of that team
-- **DELETE:** Self-remove or `can_manage_team` permission
+### Per-table summary
+- **`ministries`** — SELECT: any authenticated user. INSERT: any authenticated user. UPDATE: admin only.
+- **`profiles`** — SELECT: same ministry members. UPDATE: own row only.
+- **`groups`** — SELECT: group member. INSERT: any ministry member. UPDATE: admin/leader for church type.
+- **`group_members`** — SELECT: any ministry member. INSERT: any ministry member. UPDATE: own row. DELETE: self or admin/leader.
+- **`messages`** — SELECT/INSERT: group members only. `sender_id` must equal `auth.uid()`.
+- **`message_reactions`** — SELECT: via group membership. INSERT/DELETE: own rows only.
+- **`teams`** — SELECT: ministry members. INSERT/UPDATE: admin only.
+- **`team_roles`** — SELECT: ministry members. INSERT/UPDATE: `can_manage_team` permission.
+- **`team_members`** — SELECT: ministry members. INSERT: existing team member. DELETE: self or `can_manage_team`.
+- **`rsvps`** — INSERT: own row only. DELETE: own row only. SELECT: own row always; all rows for admin/leader; all rows for members when `show_attendees = true`.
 
 ---
 
 ## 7. Application Structure
 
-### Routing
-/                    → redirect based on auth state
-/landing             → three entry paths (new)
-/login               → email + password login
-/signup              → create account
-/onboarding          → ministry registration wizard (new)
-/join                → find and join a ministry (new)
-/home                → main app shell
+### Middleware
+Lives in `proxy.ts` — never recreate `middleware.ts`.
 
+**Public routes:** `/`, `/landing`, `/login`, `/signup`, `/join`, `/onboarding`, `/ministries`, `/auth/`
 
-### Entry Paths (Landing)
-Landing
+**Routing logic:**
+Unauthenticated → /login
+Authenticated, no ministry_id → /join
+Authenticated, has ministry_id → /home
+
+### Entry paths
+Landing (joincentral.app)
 ├── I have an account → /login → /home
-├── Find my ministry → /join → search → request → pending
+├── Find my ministry → /join → browse or invite code
 └── Register my ministry → /onboarding → wizard → /home
 
+### Tab structure
+Desktop shell (home-app.tsx)
+├── HomeTab           — greeting, role badge, up next event, stats, recent chats
+├── AnnouncementsTab  — full feed, RSVP, admin/leader CRUD, Cards/Compact view
+├── ChatsTab          — Church Chats / My Chats, search, unread badges
+├── PlanTab           — team planning (Praise Team, Student Org Board, Small Groups)
+├── DirectoryTab      — searchable member list, DM creation
+├── JournalTab        — devotionals, prayers, verses
+├── GivingTab         — Zelle info, editable by admins
+└── ProfileTab        — spiritual profile fields (About, Verse, Prayer)
 
-### Tab Structure
-BottomNav
-├── Home          → HomeTab
-├── Announcements → AnnouncementsTab
-├── Chats         → ChatsTab
-├── Directory     → DirectoryTab
-├── Plan          → PlanTab (only visible to team members + admins)
-└── Profile       → ProfileTab
+### Sidebar nav modes
+- `navMode="home"` — Home, Announcements, Church Settings (admin only)
+- `navMode="teams"` — team-scoped surfaces (Plan tab)
+- `navMode="profile"` — Profile, Journal
+- `navMode="give"` — Give
 
-
-### Global State (HomeApp)
-- `activeTab`
-- `globalOpenChat`
-- `totalChatsUnread`
-- `chatRefreshKey`
-- `recentChats`
-- `currentMinistry` — the ministry the user belongs to (new)
-- `userTeams` — teams the current user is on (new)
+### Global state (HomeApp)
+- `activeTab` — which tab is visible
+- `globalOpenChat` — mounts ChatScreen above everything when non-null
+- `totalChatsUnread` — drives BottomNav badge
+- `chatRefreshKey` — incremented on chat close to trigger refreshes
+- `recentChats` — top 3 chats by latest message, kept live via Realtime
+- `ministryId` — current user's ministry UUID, passed to all DB-writing components
 
 ---
 
 ## 8. Feature Specifications
 
 ### 8.1 Authentication
-- Email + password via `supabase.auth.signUp()` / `signInWithPassword()`.
-- On signup, a Postgres trigger (`handle_new_user`, SECURITY DEFINER) fires `AFTER INSERT ON auth.users` and auto-creates the `profiles` row from `raw_user_meta_data` (name, email, graduation_year, role defaults to `"member"`).
-- **`profiles.ministry_id` is `NULL` immediately after signup.** Middleware detects this and redirects to `/join` before allowing access to `/home`.
-- At `/join`, the user either enters an invite code (`joinMinistryByCode`) or registers a new ministry (`registerMinistry`). Both server actions update `profiles.ministry_id` and redirect to `/home`.
+- Email + password via Supabase auth. Google OAuth supported (desktop verified, mobile in progress).
+- Email verification enabled.
+- On signup, `handle_new_user()` trigger fires `AFTER INSERT ON auth.users` and auto-creates `profiles` row. `ministry_id` is NULL until user completes `/join`.
 - Middleware uses `supabase.auth.getUser()` exclusively — never `getSession()`.
 
 ### 8.2 Home Tab
-*(unchanged)*
+- Personal greeting with first name, time-of-day aware.
+- Role badge (Admin / Leader / Member) shown below name.
+- Stats row: upcoming events, unread messages, member count (member count visible to admins only).
+- "Up Next" hero card — next upcoming event by date, plum gradient treatment.
+- "For You" section — unread announcements and events the user hasn't RSVPed to.
+- Recent chats preview (top 3).
 
 ### 8.3 Announcements Tab
-*(unchanged)*
+- Feed with Cards and Compact view toggle.
+- Filter pills: All, Events, Posts, Pinned.
+- RSVP is a toggle — one row per (user, announcement). Insert on first click, delete on second. Duplicate RSVPs are impossible.
+- Leaders and admins always see the full RSVP attendee list.
+- Admins can toggle `show_attendees` per announcement to control member visibility.
+- Admin/leader CRUD: create, edit, delete announcements.
+- View count tracking via `announcement_views`.
 
 ### 8.4 Chats Tab
-*(unchanged)*
+- Two sub-tabs: Church Chats (leader/admin created) and My Chats (any member).
+- Search across all chats.
+- Unread badge tracking.
+- New chats appear in sidebar without page refresh.
+- Admins can delete any chat.
 
 ### 8.5 ChatScreen
-*(unchanged)*
+- Real-time messaging via Supabase Realtime.
+- Tap (< 400ms) = emoji picker. Long-press (≥ 400ms) = reply/context menu. Never break this distinction.
+- Emoji reactions: 👍 ❤️ 😂 🙏 🔥 😮
+- Threaded replies with quoted message preview.
+- Read receipts via `last_read_at` on `group_members`.
 
-### 8.6 ChatSettings
-*(unchanged)*
+### 8.6 Directory Tab
+- Searchable member list scoped to the current ministry.
+- Opens MemberSheet with spiritual profile fields.
+- DM creation from member sheet.
 
-### 8.7 Directory Tab
-*(unchanged)*
+### 8.7 Profile Tab
+- Editable fields: About me, Bible verse, Prayer request, How to pray for me this week.
+- Plum hero banner with name and role badge.
+- Profile and Journal sub-tabs.
+- Sign out in sidebar only — not on profile page.
 
-### 8.8 Profile Tab
-*(unchanged)*
+### 8.8 Journal Tab
+- Devotionals, prayers, and verses.
+- Personal — not visible to other members.
 
----
+### 8.9 Giving Tab
+- Displays ministry's Zelle destination (email/phone).
+- Admins can edit the Zelle info.
+- Disclaimer: Central does not process payments or track gifts.
+- Amount selector UI (purely informational — opens Zelle externally).
 
-### 8.9 Onboarding Flow (Ministry Registration)
+### 8.10 Church Settings Tab
+- Visible to admins only. Hidden entirely from members and leaders.
+- Ministry profile card with edit capability (name, description, university).
+- Member list — shows 6 members by default, "View all N members →" expands.
+- Role management — admins can change any member's role (promote to leader/admin, demote, remove).
+- Overview stat cards: Members, Leaders, Admins, Regular members.
+- Discovery toggle — controls `is_public` on the ministry.
+- Invite code with copy and regenerate.
+- Danger zone — archive/delete ministry with confirmation modal.
 
-**Purpose:** Guide a pastor or ministry leader through setting up their ministry workspace in under 5 minutes.
-
+### 8.11 Onboarding Flow
 **Route:** `/onboarding` — full screen wizard, no bottom nav.
 
-**Step 1 — Basic Info**
-- Ministry name
-- University name
-- Approximate size: Under 50 / 50–100 / 100+
+- Step 1: Basic info (ministry name, university, size)
+- Step 2: Structure questions (praise team, small groups, student org, tech team)
+- Step 3: Preset team recommendations based on answers
+- Step 4: Customize team names, roles, permissions
+- Step 5: Invite first members or share invite code
 
-**Step 2 — Structure Questions**
-- "Does your ministry have a praise or worship team?" YES / NO
-- "Do you have small groups or bible studies?" YES / NO
-- "Are you a registered student organization at your university?" YES / NO
-- "Do you have a tech team?" YES / NO
-
-**Step 3 — Preset Recommendations**
-Based on answers, show recommended team cards:
-- YES to praise team → Praise Team preset (Worship Leader + Member roles, worship/slides tools)
-- YES to small groups → Small Group Leaders preset (DGL President + Leader roles, DG + bible study tools)
-- YES to student org → Student Org Board preset (President, Secretary, Treasurer, Event Coordinator roles, events/finances/attendance tools)
-- YES to tech team → Tech Team preset (Member role, slides/set view tools)
-
-Each preset shown as a card with name, roles, and tools listed. Admin can accept, edit, or remove each.
-
-**Step 4 — Customize**
-For each accepted preset the admin can:
-- Rename the team
-- Add, rename, or remove roles
-- Toggle permissions on/off per role
-
-**Step 5 — Invite First Members**
-- Search existing CENTRAL users by name/email
-- Assign them to teams with a role
-- Or share the ministry invite code for members to join themselves
-
-On completion: ministry created in DB, admin's profile linked to ministry, redirect to `/home`.
-
----
-
-### 8.10 Teams & Roles System
-
-**Purpose:** Flexible org management that adapts to any ministry structure.
-
-**Key rules:**
-- Ministry Admin creates teams during onboarding or later via settings
-- Any existing team member can add new members to their team
-- Roles are defined per team — not global
-- Permissions are a JSONB array of feature flags on each role
-- A user can be on multiple teams with different roles in each
-
-**Preset templates** (applied during onboarding, fully editable after):
-
-| Preset | Default Roles | Default Permissions |
-|--------|--------------|---------------------|
-| Praise Team | Worship Leader, Member | `can_manage_worship_set`, `can_view_worship_set`, `can_generate_slides` |
-| Small Group Leaders | DGL President, Leader | `can_create_dgs`, `can_view_dgs`, `can_generate_bible_study`, `can_track_attendance` |
-| Student Org Board | President, Secretary, Treasurer, Event Coordinator | `can_plan_events`, `can_view_finances`, `can_manage_members`, `can_track_attendance` |
-| Tech Team | Member | `can_view_worship_set`, `can_generate_slides` |
-
----
-
-### 8.11 Plan Tab
-
-**Purpose:** Leader-facing planning hub. Only visible to users on at least one team or with admin role.
-
-**Sections (shown only if user has access):**
-
-**Worship** (PT + TT members)
-- This Week's Set — song list, keys, who's leading each song
-- Set Builder — search/add songs, reorder, assign keys and roles
-- Slide Generator — generate lyric slides from the set
-- Team Schedule — who's playing what this Sunday
-
-**Discipleship** (DGL members)
-- My Group — members of the user's assigned discipleship group
-- Bible Study Generator — AI-generated study guide from a passage or topic
-- Attendance — track who showed up each week
-
-**Ministry** (Student Org Board + Admin)
-- Events — plan and manage upcoming events (links to Announcements)
-- Attendance Overview — ministry-wide attendance trends
-- Member Pipeline — new visitors, follow-up status, conversion to members
-- Finances — budget tracking, income/expenses (Treasurer + President only)
-
----
+On completion: ministry created, admin profile linked, redirect to `/home`.
 
 ### 8.12 Praise Team Plan Tab
+Four sub-tabs: **Schedule**, **Set Builder**, **Slides**, **Charts**.
 
-**Purpose:** Replace Planning Center, Google Drive, and Messenger for praise team coordination. The President sets up the monthly schedule, Leaders fill out their assigned weeks, and Members only see what's relevant to them.
+**Roles:** President (full access), Leader (assigned weeks only), Member (read-only, own weeks only).
 
-**UI location:** Praise Team tab inside the Plan tab. Four sub-tabs: **Schedule** (default), **Set Builder**, **Slides**, **Charts**.
+**Features:**
+- Monthly schedule with weekly set cards (date, leader, set list, roster, status)
+- Availability system — members mark Sundays, leaders see availability when building roster
+- Song set list with title, key, assigned song leader, drag-and-drop reorder
+- Lyric slide generator via Anthropic API
+- Chord chart upload (PDF) with OCR extraction via Tesseract.js
+- In-app chart viewer
 
----
-
-#### Roles & Visibility
-
-| Role | What They See | What They Can Edit |
-|------|--------------|-------------------|
-| **President** | Full monthly schedule — all weeks, all assignments, all members | Create weeks, assign leaders, assign members to roles, edit any week's set list and roster |
-| **Leader** | All weeks for the team | Only weeks they are assigned to lead — set list, key assignments, role roster |
-| **Member** | Only weeks they are personally assigned to | Cannot edit — read-only view of their role, the song list, and their week's roster |
-
----
-
-#### Weekly Set Card
-
-Each week in the month is a card displaying:
-- **Date** of the Sunday service
-- **Assigned leader** for that week
-- **Set list** — ordered songs, each with a title, key, and assigned song leader
-- **Role roster** — each member with their instrument or vocal part
-- **Status badge** — `Draft` → `Filled Out` → `Confirmed`
-
----
-
-#### President Flow
-1. Creates weeks for the month (one card per Sunday).
-2. Assigns a leader to each week.
-3. Assigns members to roles for each week.
-4. Can view and edit any week at any time.
-5. Can move members between weeks to handle conflicts or availability.
-
-#### Leader Flow
-1. Assigned weeks are highlighted in the schedule.
-2. Fills out the set list — adds songs, sets keys, assigns who leads each song.
-3. Fills out the role roster — confirms who is playing what instrument/part.
-4. Sends in-app notifications to members for their assigned week.
-5. Can rearrange roles without touching Google Drive.
-
-#### Member Flow
-1. Receives an in-app notification when assigned to a week.
-2. Sees only their assigned weeks, their specific role, the full song list, and the roster for that week.
-3. Can mark availability for upcoming weeks using the availability system.
-
----
-
-#### Availability System
-- Members mark which Sundays they are available on a simple monthly calendar view.
-- Leaders and the President see each member's availability when building the roster for a week.
-- Unavailable members are visually flagged when being assigned to a week.
-
----
-
-#### Song Set List
-- Each week has an ordered set list of songs.
-- Each song has: **title**, **key** (e.g. G, A♭), **assigned song leader**.
-- Songs are reorderable by drag-and-drop.
-- Only the President and the assigned Leader can edit the set list for a given week.
-
----
-
-#### Lyric Slide Generator
-- From any week's set list, the President or Leader can trigger slide generation.
-- CENTRAL auto-generates a lyrics slide deck from the ordered song list.
-- Slides are viewable in-app and exportable.
-- Replaces the manual slide creation process entirely.
-
----
-
-#### SongSelect / Charts Integration
-- Each song in the set list can have a **chord chart** attached.
-- Charts are either uploaded as a PDF or pulled from SongSelect (when integration is available).
-- Charts are viewable in-app by all members assigned to that week.
-- The Leader can add **annotations** to a chart; annotations are visible to all members on the same week.
-- This is the key feature that competes with the Charts app.
-
----
-
-#### New Database Tables
-
-### `worship_weeks`
-One row per Sunday service week for a praise team.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `team_id` | UUID | FK → teams(id) |
-| `ministry_id` | UUID | FK → ministries(id) |
-| `week_date` | date | The Sunday date |
-| `leader_id` | UUID? | FK → profiles(id) — assigned leader for this week |
-| `status` | text | `"draft"`, `"filled_out"`, `"confirmed"` |
-| `created_at` | timestamptz | |
-
-### `worship_songs`
-Songs in a week's set list, ordered by `order_index`.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `week_id` | UUID | FK → worship_weeks(id) |
-| `title` | text | Song name |
-| `key` | text | e.g. `"G"`, `"Ab"` |
-| `song_leader_id` | UUID? | FK → profiles(id) |
-| `order_index` | int | Sort order (drag-and-drop) |
-| `created_at` | timestamptz | |
-
-### `worship_roles`
-Role roster for a given week — who is playing or singing what.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `week_id` | UUID | FK → worship_weeks(id) |
-| `user_id` | UUID | FK → profiles(id) |
-| `role_name` | text | e.g. `"keys"`, `"drums"`, `"vocals"`, `"guitar"`, `"bass"` |
-| `created_at` | timestamptz | |
-
-### `worship_availability`
-Member availability declarations per week date.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `team_id` | UUID | FK → teams(id) |
-| `user_id` | UUID | FK → profiles(id) |
-| `week_date` | date | The Sunday in question |
-| `is_available` | boolean | |
-| `created_at` | timestamptz | |
-
-**Constraint:** `UNIQUE(team_id, user_id, week_date)`
-
-### `worship_charts`
-Chord chart file attached to a specific song.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `song_id` | UUID | FK → worship_songs(id) |
-| `chart_url` | text | PDF URL from Supabase Storage |
-| `uploaded_by` | UUID | FK → profiles(id) |
-| `created_at` | timestamptz | |
-
-### `worship_annotations`
-Leader annotations on a chord chart, visible to all members on that week.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | UUID | PK |
-| `chart_id` | UUID | FK → worship_charts(id) |
-| `user_id` | UUID | FK → profiles(id) |
-| `annotation_data` | JSONB | Position, text, color, etc. |
-| `created_at` | timestamptz | |
-
-#### RLS for Worship Tables
-- **`worship_weeks` / `worship_songs` / `worship_roles` / `worship_charts` / `worship_annotations`**
-  - **SELECT:** Any ministry member on the praise team. Members additionally filtered — only see weeks where they have a `worship_roles` row.
-  - **INSERT/UPDATE:** President (full access) or the assigned Leader for that week.
-- **`worship_availability`**
-  - **SELECT:** Team members (leaders/president need to see everyone's).
-  - **INSERT/UPDATE/DELETE:** Own rows only.
+**Worship tables:** `worship_weeks`, `worship_songs`, `worship_roles`, `worship_availability`, `worship_charts`, `worship_annotations`
 
 ---
 
@@ -946,39 +418,74 @@ Leader annotations on a chord chart, visible to all members on that week.
 
 ---
 
-## 10. Known Gaps and Technical Debt
+## 10. Roles & Permissions
 
-1. ~~**Role casing**~~ — Resolved.
-2. ~~**Announcement audience filtering**~~ — Resolved.
-3. ~~**Home tab RSVP**~~ — Resolved.
-4. ~~**Unread on home preview**~~ — Resolved.
-5. ~~**Unused components**~~ — Resolved.
-6. ~~**Debug code in handleReact**~~ — Resolved.
-7. ~~**onRead decrement**~~ — Resolved.
-8. **`createGroup` misleading parameter** — `createdBy` param is ignored, uses `auth.uid()` server-side. Correct behavior but misleading API.
-9. **Single large file** — `home-app.tsx` is ~3300+ lines. Will split per tab in a future refactor.
-10. ~~**Multi-tenant migration pending**~~ — Resolved. `ministries`, `teams`, `team_roles`, `team_members` tables exist. `ministry_id` is on `profiles`, `groups`, and `announcements`. RLS policies enforce tenant isolation. Middleware redirects users without `ministry_id` to `/join`.
+| Feature | Member | Leader | Admin |
+|---------|--------|--------|-------|
+| View announcements | ✓ | ✓ | ✓ |
+| Create/edit/delete announcements | ✗ | ✓ | ✓ |
+| Create church chats | ✗ | ✓ | ✓ |
+| Create my/DM chats | ✓ | ✓ | ✓ |
+| Archive/manage church chats | ✗ | ✓ | ✓ |
+| Delete any chat | ✗ | ✗ | ✓ |
+| View RSVP attendee list | ✗ | ✓ | ✓ |
+| Toggle public attendee visibility | ✗ | ✗ | ✓ |
+| Access Church Settings | ✗ | ✗ | ✓ |
+| Change member roles | ✗ | ✗ | ✓ |
+| Remove members | ✗ | ✗ | ✓ |
+| Edit giving info | ✗ | ✗ | ✓ |
+| Edit ministry profile | ✗ | ✗ | ✓ |
+| Regenerate invite code | ✗ | ✗ | ✓ |
+| Toggle public discovery | ✗ | ✗ | ✓ |
+
+**Role check pattern:** always `["admin", "leader"].includes(userRole.toLowerCase())`
 
 ---
 
-## 11. File Map
+## 11. Critical Conventions
+
+1. **Never use `localStorage` or `sessionStorage`** — Supabase session only
+2. **Optimistic updates** on all user-facing writes (messages, reactions, RSVPs)
+3. **All DB writes** go through the browser Supabase client or server actions — no raw fetch
+4. **Don't split `home-app.tsx`** — intentionally one file
+5. **Tap vs long-press in ChatScreen:** < 400ms = emoji picker, ≥ 400ms = reply — never break this
+6. **ministry_id on all writes:** every INSERT/UPDATE must include `.eq("ministry_id", ministryId)` — defense-in-depth on top of RLS
+7. **RSVP is a toggle:** UNIQUE constraint on (announcement_id, user_id). Insert = going, delete = not going. Never duplicate.
+8. **Middleware is `proxy.ts`:** never recreate `middleware.ts`
+9. **Always read `skills/design-system/SKILL.md`** before writing or editing any UI code
+
+---
+
+## 12. Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (auth callback) |
+| `ANTHROPIC_API_KEY` | Praise team slideshow generator |
+| `NEXT_PUBLIC_SITE_URL` | `https://joincentral.app` |
+
+---
+
+## 13. File Map
 central/
 ├── app/
 │   ├── (auth)/
 │   │   ├── login/page.tsx
 │   │   └── signup/page.tsx
-│   ├── join/
-│   │   └── page.tsx              # Post-signup: enter invite code or register ministry
-│   ├── landing/
-│   │   └── page.tsx              # Public landing page — three entry paths
+│   ├── join/page.tsx
+│   ├── landing/page.tsx
+│   ├── ministries/page.tsx
+│   ├── onboarding/page.tsx
 │   ├── actions/
 │   │   ├── create-group.ts
-│   │   └── ministry.ts           # joinMinistryByCode, registerMinistry
+│   │   └── ministry.ts
 │   ├── home/
-│   │   ├── home-app.tsx          # Main app shell (~3300 lines, will split)
+│   │   ├── home-app.tsx
 │   │   └── page.tsx
 │   ├── globals.css
-│   ├── layout.tsx                # Inter + Instrument Serif fonts
+│   ├── layout.tsx
 │   └── page.tsx
 ├── components/ui/
 │   ├── avatar.tsx
@@ -992,72 +499,79 @@ central/
 │   ├── supabase.ts
 │   ├── supabase-server.ts
 │   └── utils.ts
+├── skills/
+│   └── design-system/
+│       ├── SKILL.md
+│       └── design-system.md
 ├── supabase/
-│   ├── chat_features_migration.sql
-│   ├── chat_settings_migration.sql
-│   ├── messages_rls.sql
-│   ├── reactions_migration.sql
-│   ├── reply_to_migration.sql
-│   ├── read_receipts_migration.sql
-│   ├── multi_tenant_migration.sql    # Full multi-tenant schema + RLS + helpers
-│   └── profile_trigger_migration.sql # handle_new_user trigger
-├── middleware.ts
+│   ├── multi_tenant_migration.sql
+│   ├── profile_trigger_migration.sql
+│   └── [other migration files]
+├── proxy.ts
+├── CLAUDE.md
 └── PRD.md
-
 
 ---
 
-## 12. Vision and Principles
+## 14. Vision and Principles
 
-**What CENTRAL should feel like:** A native iOS app running in the browser. Smooth, fast, personal.
+**What CENTRAL should feel like:** A calm, focused workspace built for ministry — not a generic SaaS tool, not a social feed.
 
 **What it is NOT:**
 - Not a general-purpose Slack clone
 - Not a social media feed
-- Not accessible to the public
+- Not publicly accessible without an invite
 
 **Design principles:**
-1. **Quiet Modern.** Regal plum (`#3E1540`) is the brand color — used sparingly. Gold (`#C9A34B`) for unread badges only.
-2. **Content over chrome.** Minimal UI decoration. Instrument Serif gives warmth; Inter keeps it legible.
+1. **Quiet Modern.** Editorial cream and plum. Instrument Serif gives warmth; Inter keeps it legible.
+2. **Content over chrome.** Minimal decoration. Whitespace is load-bearing.
 3. **Realtime first.** The app should never feel stale.
 4. **Spiritual intentionality.** Prayer requests, Bible verses, and "pray for me this week" are first-class features.
-5. **Role-appropriate simplicity.** The UI should feel appropriately minimal for each role.
-6. **Platform thinking.** CENTRAL is built for any college ministry, not just one church. Every feature should work for a ministry at Pitt, Penn State, or anywhere else.
+5. **Role-appropriate simplicity.** Members see a calm focused app. Leaders and admins see tools. The UI reflects who you are.
+6. **Platform thinking.** Built for any college ministry anywhere — not just one church.
 
 ---
 
-## 13. Roadmap
+## 15. Roadmap
 
 ### Completed
-- Real-time messaging with reply threading
-- Emoji reactions
-- Read receipts
-- Message deletion
-- Announcements with RSVP, audience targeting, image uploads
+- Real-time messaging with reply threading and emoji reactions
+- Read receipts and unread badge tracking
+- Announcements with RSVP toggle, attendee visibility control, audience targeting, image uploads
 - Member directory with DM creation
-- Chat settings (rename, add/remove members, archive)
-- Unread badge tracking
-- RLS + security across all tables
-- **Multi-tenant architecture** — `ministries` table, `ministry_id` on all tenant tables, invite-code join flow (`/join`), ministry registration, middleware tenant routing, SECURITY DEFINER RLS helpers
-- **Teams & roles schema** — `teams`, `team_roles`, `team_members` with granular JSONB permissions
+- Chat settings (rename, add/remove members, archive, delete)
+- Multi-tenant architecture with RLS and invite-code join flow
+- Teams and roles schema
+- Plan tab — Praise Team (schedule, set builder, slide generator, chart upload + OCR)
+- Church Settings — member management, role assignment, discovery toggle, invite code
+- Giving tab with Zelle info
+- Journal tab with devotionals, prayers, verses
+- Public ministry discovery (/ministries, /join)
+- Ministry registration wizard (/onboarding)
+- Google OAuth (desktop)
+- Landing page with chapel photo hero
+- Design system documented in `skills/design-system/`
 
 ### In Progress
-- Teams & roles system (schema complete; UI not yet built)
-- Plan tab (Worship, Discipleship, Ministry sections)
+- Google OAuth mobile
+- Design consistency pass using design system skill
+- Home page redesign (personal briefing, role badge, stats)
+- Settings page expansion (full admin control panel)
+
+### Near-term
+- Push notifications (Web Push API + VAPID keys)
+- Security review before church presentation
+- Chat UX fixes (new chat in sidebar without refresh)
 
 ### Mid-term
-- Praise team scheduling
-- Song key detection from audio
-- Worship slide generation
-- Discipleship group tools
+- Small group leaders tools
 - Bible study generator
 - Event planning tools
 - Attendance tracking
-- Finances tracking
+- PWA support
 
 ### Long-term
-- PWA + push notifications
 - SongSelect integration
 - Visitor onboarding flow
-- Multi-ministry discovery and search
-- Analytics dashboard for ministry admins
+- Analytics dashboard
+- Finances tracking

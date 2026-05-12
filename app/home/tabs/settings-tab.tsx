@@ -28,12 +28,13 @@ interface MinistryInfo {
   size: string
 }
 
-type RoleFilter = "all" | "member" | "leader" | "admin"
+type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin"
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-  admin:  { bg: "#2D0F2E", color: "#FBF8F2", border: "#2D0F2E", label: "Admin" },
-  leader: { bg: "#F1ECDE", color: "#3E1540", border: "rgba(62,21,64,0.2)", label: "Leader" },
-  member: { bg: "#F1ECDE", color: "#8A8497", border: "#E2DDCF", label: "Member" },
+  admin:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Admin"   },
+  leader:  { bg: "#F1ECDE",  color: "#3E1540", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
+  member:  { bg: "#F1ECDE",  color: "#8A8497", border: "#E2DDCF",              label: "Member"  },
+  visitor: { bg: "white",    color: "#8A8497", border: "#D8D3C8",              label: "Visitor" },
 }
 
 function roleBadge(role: string) {
@@ -90,6 +91,7 @@ export function SettingsTab({
   const totalMembers = members.length
   const totalLeaders = members.filter(m => m.role.toLowerCase() === "leader").length
   const totalAdmins = members.filter(m => m.role.toLowerCase() === "admin").length
+  const totalVisitors = members.filter(m => m.role.toLowerCase() === "visitor").length
 
   // Invite code
   const [inviteCode, setInviteCode] = useState<string | null>(null)
@@ -149,7 +151,7 @@ export function SettingsTab({
   }
 
   // ── Role change ─────────────────────────────────────────────────────────────
-  async function handleRoleChange(memberId: string, newRole: "member" | "leader" | "admin") {
+  async function handleRoleChange(memberId: string, newRole: "visitor" | "member" | "leader" | "admin") {
     const { error } = await updateMemberRole(memberId, newRole)
     if (!error) setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
   }
@@ -324,7 +326,8 @@ export function SettingsTab({
                     { value: totalMembers, label: "Members", filter: "all" as RoleFilter },
                     { value: totalLeaders, label: "Leaders", filter: "leader" as RoleFilter },
                     { value: totalAdmins, label: "Admins", filter: "admin" as RoleFilter },
-                    { value: totalMembers - totalLeaders - totalAdmins, label: "Regular", filter: "member" as RoleFilter },
+                    { value: totalMembers - totalLeaders - totalAdmins - totalVisitors, label: "Regular", filter: "member" as RoleFilter },
+                    { value: totalVisitors, label: "Visitors", filter: "visitor" as RoleFilter },
                   ].map(({ value, label, filter }) => (
                     <button
                       key={label}
@@ -500,7 +503,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
   isAdmin: boolean
   initialFilter: RoleFilter
   onClose: () => void
-  onRoleChange: (id: string, role: "member" | "leader" | "admin") => Promise<void>
+  onRoleChange: (id: string, role: "visitor" | "member" | "leader" | "admin") => Promise<void>
   onRemoveMember: (id: string) => Promise<void>
 }) {
   const [search, setSearch] = useState("")
@@ -516,7 +519,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
     return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
   })
 
-  async function handleRoleChange(memberId: string, role: "member" | "leader" | "admin") {
+  async function handleRoleChange(memberId: string, role: "visitor" | "member" | "leader" | "admin") {
     setChangingRole(memberId)
     setRoleMenuOpen(null)
     await onRoleChange(memberId, role)
@@ -555,7 +558,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
           />
         </div>
         <div style={{ display: "flex", gap: 6, paddingBottom: 12 }}>
-          {(["all", "member", "leader", "admin"] as const).map(f => (
+          {(["all", "visitor", "member", "leader", "admin"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -617,7 +620,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
                       {menuOpen && (
                         <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #E8E2D2", padding: "6px 0", minWidth: 160 }}>
                           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
-                          {(["member", "leader", "admin"] as const).map(r => (
+                          {(["visitor", "member", "leader", "admin"] as const).map(r => (
                             <button key={r} onClick={() => handleRoleChange(m.id, r)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                               {r.charAt(0).toUpperCase() + r.slice(1)}
                               {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
