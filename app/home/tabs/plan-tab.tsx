@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
@@ -1430,11 +1431,53 @@ export function StudentOrgTeamHome({
 export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
+  const router = useRouter()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
-  // Reset per-team transient state whenever the active team changes.
+
+  function replaceParam(key: string, value: string | null) {
+    const params = new URLSearchParams(window.location.search)
+    if (value === null) params.delete(key)
+    else params.set(key, value)
+    router.replace(`/home?${params.toString()}`, { scroll: false })
+  }
+
+  function openSettings(team: Team) {
+    setOpenTeam(team)
+    replaceParam("view", "settings")
+  }
+
+  function closeSettings() {
+    setOpenTeam(null)
+    replaceParam("view", null)
+  }
+
+  // Read the initial view param once so the auto-open effect is stable across re-renders.
+  const [initialViewParam] = useState(() =>
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null
+  )
+  const [didAutoOpen, setDidAutoOpen] = useState(false)
+
+  // Auto-open settings when page is refreshed with ?view=settings in the URL.
+  useEffect(() => {
+    if (didAutoOpen || initialViewParam !== 'settings' || !activeTeamId || allTeams.length === 0) return
+    const team = allTeams.find(t => t.id === activeTeamId)
+    if (!team) return
+    setOpenTeam(team)
+    setDidAutoOpen(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTeams, activeTeamId, didAutoOpen])
+
+  // Clear view=settings from URL when the user switches to a different team.
+  const teamSwitchRef = useRef(false)
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setOpenTeam(null); setStudentOrgPlanningEvent(null) }, [activeTeamId])
+  useEffect(() => {
+    if (!teamSwitchRef.current) { teamSwitchRef.current = true; return }
+    setOpenTeam(null)
+    setStudentOrgPlanningEvent(null)
+    replaceParam("view", null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTeamId])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
@@ -1537,7 +1580,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             </div>
             {activeTeamFull && canOpenTeamSettings && (
               <button
-                onClick={() => setOpenTeam(activeTeamFull)}
+                onClick={() => openSettings(activeTeamFull)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
                 title="Team settings"
               >
@@ -1571,7 +1614,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             userRole={studentOrgRole}
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
-            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => setOpenTeam(activeTeamFull) : undefined}
+            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
           />
@@ -1615,7 +1658,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             userRole={studentOrgRole}
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
-            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => setOpenTeam(activeTeamFull) : undefined}
+            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
           />
@@ -1635,7 +1678,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                     {allTeams.map((team) => (
                       <button
                         key={team.id}
-                        onClick={() => setOpenTeam(team)}
+                        onClick={() => openSettings(team)}
                         className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
                       >
                         <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
@@ -1687,8 +1730,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           userId={userId}
           ministryId={ministryId}
           isAdmin={isAdmin}
-          onClose={() => setOpenTeam(null)}
-          onChanged={() => { setOpenTeam(null); onTeamsChange() }}
+          onClose={closeSettings}
+          onChanged={() => { closeSettings(); onTeamsChange() }}
         />
       )}
     </div>
@@ -5457,18 +5500,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         }
       />
 
-      {confirmDelete && (
-        <div style={{ margin: "16px 20px 0", background: "#FDF0F0", border: "1px solid #9F3030", borderRadius: 10, padding: 16 }}>
-          <p style={{ fontSize: 13, color: "#13101A", marginBottom: 12, lineHeight: 1.5 }}>
-            This will permanently delete the team and remove all members. This cannot be undone.
-          </p>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 20 }}>
-            <button onClick={() => setConfirmDelete(false)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-            <button onClick={handleDeleteTeam} style={{ fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>Delete team</button>
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 overflow-y-auto">
         {error && (
           <div className="mx-5 mt-4 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>
@@ -5847,29 +5878,49 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       )}
 
-      {/* Sticky action footer — save permission changes */}
-      {!showAddMember && hasPermChanges && (
+      {/* Sticky action footer — delete confirmation or save permission changes */}
+      {!showAddMember && (confirmDelete || hasPermChanges) && (
         <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
           className="px-5 md:px-10 py-4 pb-8 md:pb-5"
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>Unsaved permission changes</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={handleDiscardPermissions}
-                style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
-              >
-                Discard
-              </button>
-              <button
-                onClick={handleSavePermissions}
-                disabled={savingPerms}
-                style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
-              >
-                {savingPerms ? "Saving…" : "Save changes"}
-              </button>
+          {confirmDelete ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <p style={{ fontSize: 14, color: "#9F3030", margin: 0 }}>Delete this team? This cannot be undone.</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteTeam}
+                  style={{ padding: "10px 22px", background: "#9F3030", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  Delete team
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>Unsaved permission changes</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleDiscardPermissions}
+                  style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSavePermissions}
+                  disabled={savingPerms}
+                  style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
+                >
+                  {savingPerms ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
