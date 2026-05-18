@@ -45,6 +45,20 @@ const PERMISSION_LABELS: Record<string, string> = {
 
 const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS)
 
+const TEAM_PERMISSION_FILTERS: Record<string, string[]> = {
+  praise: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule", "can_manage_team"],
+  student_org: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"],
+  small_group: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"],
+}
+
+function getVisiblePermissions(teamName: string): string[] {
+  const lower = teamName.toLowerCase()
+  if (/praise|worship/.test(lower)) return TEAM_PERMISSION_FILTERS.praise
+  if (/student.*org|student.*board|org.*board/.test(lower)) return TEAM_PERMISSION_FILTERS.student_org
+  if (/small.*group|dgl|discipleship/.test(lower)) return TEAM_PERMISSION_FILTERS.small_group
+  return ALL_PERMISSIONS
+}
+
 const TEAM_PRESETS = [
   {
     id: "praise",
@@ -5067,6 +5081,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 }) {
   const supabase = createClient()
   const [roles, setRoles] = useState<TeamRole[]>([])
+  const [savedPerms, setSavedPerms] = useState<Record<string, string[]>>({})
+  const [savingPerms, setSavingPerms] = useState(false)
   const [members, setMembers] = useState<TeamMemberDisplay[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -5119,7 +5135,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         profiles: { name: string } | { name: string }[] | null
         team_roles: { name: string } | { name: string }[] | null
       }
-      setRoles((rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] })))
+      const parsedRoles = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
+      setRoles(parsedRoles)
+      setSavedPerms(Object.fromEntries(parsedRoles.map(r => [r.id, r.permissions])))
       setMembers(
         (membersData ?? []).map((m: RawMember) => {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
@@ -5211,6 +5229,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
       return next
     })
+    setSavedPerms(prev => { const next = { ...prev }; delete next[roleId]; return next })
     setMembers(prev => prev.map(m => m.role_id === roleId ? { ...m, role_id: "", role_name: "No role" } : m))
     setConfirmDeleteRoleId(null)
     setRoleDeleteError(null)
@@ -5225,6 +5244,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     if (data) {
       const newRole = { ...data, permissions: [] as string[] }
       setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
+      setSavedPerms(prev => ({ ...prev, [data.id]: [] }))
     }
     setAddingRole(false)
     setNewRoleName("")
@@ -5236,6 +5256,43 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     await supabase.from("team_roles").update({ name: val }).eq("id", roleId)
     setRoles(prev => prev.map(r => r.id === roleId ? { ...r, name: val } : r))
     setRenamingRoleId(null)
+  }
+
+  const visiblePerms = getVisiblePermissions(team.name)
+
+  const hasPermChanges = roles.some(r => {
+    const saved = savedPerms[r.id]
+    if (saved === undefined) return false
+    return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
+  })
+
+  function togglePermission(perm: string) {
+    if (!canManageTeam) return
+    setRoles(prev => prev.map((r, i) =>
+      i === activeRole
+        ? { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter(p => p !== perm) : [...r.permissions, perm] }
+        : r
+    ))
+  }
+
+  async function handleSavePermissions() {
+    setSavingPerms(true)
+    const toSave = roles.filter(r => {
+      const saved = savedPerms[r.id]
+      if (saved === undefined) return false
+      return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
+    })
+    await Promise.all(toSave.map(r => supabase.from("team_roles").update({ permissions: r.permissions }).eq("id", r.id)))
+    setSavedPerms(prev => {
+      const next = { ...prev }
+      toSave.forEach(r => { next[r.id] = r.permissions })
+      return next
+    })
+    setSavingPerms(false)
+  }
+
+  function handleDiscardPermissions() {
+    setRoles(prev => prev.map(r => savedPerms[r.id] !== undefined ? { ...r, permissions: [...savedPerms[r.id]] } : r))
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
@@ -5664,17 +5721,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                 </div>
                               )}
                               <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
-                                {roles[activeRole].permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
+                                {roles[activeRole].permissions.filter(p => visiblePerms.includes(p)).length} of {visiblePerms.length} permissions enabled
                               </p>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column" }}>
-                              {ALL_PERMISSIONS.map((perm, pi) => {
+                              {visiblePerms.map((perm, pi) => {
                                 const on = roles[activeRole].permissions.includes(perm)
                                 return (
-                                  <div key={perm} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: pi < ALL_PERMISSIONS.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                                  <div
+                                    key={perm}
+                                    onClick={() => togglePermission(perm)}
+                                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: pi < visiblePerms.length - 1 ? "1px solid #ECE8DE" : "none", cursor: canManageTeam ? "pointer" : "default" }}
+                                  >
                                     <p style={{ flex: 1, fontSize: 14, color: "#13101A", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
-                                    <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "#3E1540" : "#ECE8DE", position: "relative", flexShrink: 0 }}>
-                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                                    <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "#3E1540" : "#ECE8DE", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
                                     </div>
                                   </div>
                                 )
@@ -5766,7 +5827,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         )}
       </div>
 
-      {/* Sticky action footer */}
+      {/* Sticky action footer — add members */}
       {showAddMember && selectedIds.size > 0 && (
         <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
           className="px-5 md:px-10 py-4 pb-8 md:pb-5"
@@ -5782,6 +5843,32 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
             >
               {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky action footer — save permission changes */}
+      {!showAddMember && hasPermChanges && (
+        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
+          className="px-5 md:px-10 py-4 pb-8 md:pb-5"
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>Unsaved permission changes</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleDiscardPermissions}
+                style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSavePermissions}
+                disabled={savingPerms}
+                style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
+              >
+                {savingPerms ? "Saving…" : "Save changes"}
+              </button>
+            </div>
           </div>
         </div>
       )}
