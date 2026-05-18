@@ -282,15 +282,25 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
       const fs = (fieldData ?? []).map(f => ({ ...f, options: Array.isArray(f.options) ? f.options : [] })) as FormFieldRow[]
       setFields(fs)
 
-      type RawResponse = { id: string; user_id: string; submitted_at: string; profiles: { name: string } | { name: string }[] | null }
+      type RawResponse = { id: string; user_id: string; submitted_at: string }
       const { data: responseData } = await supabase
         .from("form_responses")
-        .select("id, user_id, submitted_at, profiles!user_id(name)")
+        .select("id, user_id, submitted_at")
         .eq("form_id", formId)
         .order("submitted_at", { ascending: false })
 
       const responses = (responseData ?? []) as RawResponse[]
       const responseIds = responses.map(r => r.id)
+      const userIds = [...new Set(responses.map(r => r.user_id))]
+
+      const profileMap: Record<string, string> = {}
+      if (userIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds)
+        for (const p of profileData ?? []) profileMap[p.id] = p.name
+      }
 
       let allAnswers: FormAnswerRow[] = []
       if (responseIds.length > 0) {
@@ -307,10 +317,12 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
         byResponse[a.response_id].push(a)
       }
 
-      setRespondents(responses.map(r => {
-        const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
-        return { userId: r.user_id, userName: p?.name ?? 'Unknown', submittedAt: r.submitted_at, answers: byResponse[r.id] ?? [] }
-      }))
+      setRespondents(responses.map(r => ({
+        userId: r.user_id,
+        userName: profileMap[r.user_id] ?? 'Unknown',
+        submittedAt: r.submitted_at,
+        answers: byResponse[r.id] ?? [],
+      })))
       setLoading(false)
     }
     load()
