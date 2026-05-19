@@ -6012,9 +6012,17 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 }
 
-// ── QuickCreateTeamModal ───────────────────────────────────────────────────────
+// ── QuickCreateTeamModal — 4-step wizard ──────────────────────────────────────
 
 const QUICK_EMOJI_OPTIONS = ["👥","🎵","📖","🏛️","💻","⚽","🎓","🤝","✝️","🙏","🌟","🎯"]
+
+const WIZARD_PRESETS = [
+  { id: "praise", icon: "🎵", label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts" },
+  { id: "board",  icon: "🏛️", label: "Student Org Board",   desc: "Event planning, finances, attendance, member management" },
+  { id: "dgl",    icon: "📖", label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance" },
+  { id: "tech",   icon: "💻", label: "Tech Team",           desc: "Slides and worship set viewing" },
+  { id: "custom", icon: "✨", label: "Custom",              desc: "Start from scratch, no preset roles or permissions" },
+]
 
 export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }: {
   userId: string
@@ -6023,35 +6031,70 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
   onCreated: (teamId: string) => void
 }) {
   const supabase = createClient()
+  const [step, setStep] = useState(1)
   const [name, setName] = useState("")
   const [icon, setIcon] = useState("👥")
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
+  const [roles, setRoles] = useState<Array<{ name: string; permissions: string[] }>>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleCreate() {
-    if (!name.trim()) { setError("Team name is required."); return }
-    setSaving(true)
-    setError(null)
+  function applyPreset(presetId: string) {
+    if (presetId === "custom") { setRoles([]); return }
+    const preset = TEAM_PRESETS.find(p => p.id === presetId)
+    if (!preset) return
+    if (!name.trim()) { setName(preset.name); setIcon(preset.icon) }
+    setRoles(preset.roles.map(r => ({ name: r.name, permissions: [...r.permissions] })))
+  }
 
+  function toggleRolePermission(ri: number, perm: string) {
+    setRoles(prev => prev.map((r, i) => {
+      if (i !== ri) return r
+      return { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter(p => p !== perm) : [...r.permissions, perm] }
+    }))
+  }
+
+  function getPresetVisiblePerms(): string[] {
+    if (!selectedPresetId || selectedPresetId === "custom") return ALL_PERMISSIONS
+    const map: Record<string, string[]> = {
+      praise: TEAM_PERMISSION_FILTERS.praise,
+      board:  TEAM_PERMISSION_FILTERS.student_org,
+      dgl:    TEAM_PERMISSION_FILTERS.small_group,
+    }
+    return map[selectedPresetId] ?? ALL_PERMISSIONS
+  }
+
+  async function handleCreate() {
+    setSaving(true); setError(null)
     const { data: team, error: teamErr } = await supabase
-      .from("teams")
-      .insert({ name: name.trim(), icon, ministry_id: ministryId, created_by: userId })
+      .from("teams").insert({ name: name.trim(), icon, ministry_id: ministryId, created_by: userId })
       .select("id").single()
     if (teamErr || !team) { setError(teamErr?.message ?? "Failed to create team."); setSaving(false); return }
 
-    const { data: role, error: roleErr } = await supabase
-      .from("team_roles")
-      .insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
-      .select("id").single()
-    if (roleErr || !role) { setError(roleErr?.message ?? "Failed to create role."); setSaving(false); return }
-
-    const { error: memberErr } = await supabase
-      .from("team_members")
-      .insert({ team_id: team.id, user_id: userId, role_id: role.id, added_by: userId })
-    if (memberErr) { setError(memberErr.message); setSaving(false); return }
-
+    let topRoleId: string | null = null
+    for (let i = 0; i < roles.length; i++) {
+      const { data: role, error: re } = await supabase
+        .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions })
+        .select("id").single()
+      if (re || !role) { setError(re?.message ?? "Failed to create role."); setSaving(false); return }
+      if (i === 0) topRoleId = role.id
+    }
+    if (!topRoleId) {
+      const { data: adminRole, error: ae } = await supabase
+        .from("team_roles").insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
+        .select("id").single()
+      if (ae || !adminRole) { setError(ae?.message ?? "Failed to create role."); setSaving(false); return }
+      topRoleId = adminRole.id
+    }
+    const { error: me } = await supabase
+      .from("team_members").insert({ team_id: team.id, user_id: userId, role_id: topRoleId, added_by: userId })
+    if (me) { setError(me.message); setSaving(false); return }
     onCreated(team.id)
   }
+
+  const visiblePerms = getPresetVisiblePerms()
+  const selectedPresetInfo = WIZARD_PRESETS.find(p => p.id === selectedPresetId)
+  const canContinue = step === 1 ? !!name.trim() : step === 2 ? !!selectedPresetId : true
 
   return (
     <div
@@ -6059,69 +6102,221 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
       style={{ background: "rgba(19,16,26,0.4)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: "#FBF8F2", borderRadius: 16, padding: "28px 28px 24px", width: 360, boxShadow: "0 8px 40px rgba(19,16,26,0.18)" }}>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", marginBottom: 20, lineHeight: 1 }}>
-          New Team
-        </p>
+      <div style={{ background: "#FBF8F2", borderRadius: 16, width: 440, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(19,16,26,0.18)", overflow: "hidden" }}>
 
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>
-          Icon
-        </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 20 }}>
-          {QUICK_EMOJI_OPTIONS.map(e => (
+        {/* Header */}
+        <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div>
+              {step > 1 ? (
+                <button
+                  onClick={() => setStep(s => s - 1)}
+                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 10 }}
+                >
+                  <ChevronLeft style={{ width: 13, height: 13 }} /> Back
+                </button>
+              ) : <div style={{ height: 23, marginBottom: 10 }} />}
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", lineHeight: 1.1, margin: 0 }}>
+                {step === 1 && "New Team"}
+                {step === 2 && "What kind of team?"}
+                {step === 3 && "Review roles"}
+                {step === 4 && "Ready to create"}
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, paddingTop: 2 }}>
+              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
+                <X style={{ width: 15, height: 15 }} />
+              </button>
+              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#B8B2C4", letterSpacing: "0.08em" }}>
+                Step {step} of 4
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ height: 1, background: "#E8E2D2", marginTop: 16 }} />
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+
+          {/* Step 1 — Name + icon */}
+          {step === 1 && (
+            <>
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8, marginTop: 0 }}>Icon</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 22 }}>
+                {QUICK_EMOJI_OPTIONS.map(e => (
+                  <button key={e} onClick={() => setIcon(e)} style={{
+                    width: 38, height: 38, borderRadius: 9, fontSize: 20, cursor: "pointer",
+                    border: icon === e ? "1.5px solid #3E1540" : "1px solid #ECE8DE",
+                    background: icon === e ? "#F3EEF3" : "white",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "border-color 0.1s, background 0.1s",
+                  }}>{e}</button>
+                ))}
+              </div>
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>Team name</p>
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Escape") onClose() }}
+                placeholder="e.g. Media Team"
+                style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 10,
+                  border: "1px solid #E8E2D2", fontSize: 14, color: "#13101A",
+                  background: "white", outline: "none", boxSizing: "border-box" as const,
+                }}
+              />
+              {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 8 }}>{error}</p>}
+            </>
+          )}
+
+          {/* Step 2 — Preset picker */}
+          {step === 2 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {WIZARD_PRESETS.map(p => (
+                <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
+                  display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", borderRadius: 12,
+                  textAlign: "left" as const, width: "100%", cursor: "pointer",
+                  border: selectedPresetId === p.id ? "1.5px solid #3E1540" : "1px solid #E8E2D2",
+                  background: selectedPresetId === p.id ? "#F3EEF3" : "white",
+                  transition: "border-color 0.1s, background 0.1s",
+                }}>
+                  <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{p.icon}</span>
+                  <div>
+                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#13101A", margin: 0, marginBottom: 2 }}>{p.label}</p>
+                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{p.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Step 3 — Review + customize roles */}
+          {step === 3 && (
+            <div>
+              {selectedPresetId === "custom" && roles.length === 0 && (
+                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 16 }}>No roles yet. Add one to get started.</p>
+              )}
+              {roles.map((role, ri) => (
+                <div key={ri} style={{ border: "1px solid #E8E2D2", borderRadius: 12, padding: "14px 16px", marginBottom: 10, background: "white" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <input
+                      value={role.name}
+                      onChange={e => setRoles(prev => prev.map((r, i) => i === ri ? { ...r, name: e.target.value } : r))}
+                      style={{ fontSize: 14, fontWeight: 600, color: "#13101A", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
+                    />
+                    <button
+                      onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))}
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#B8B2C4" }}
+                    >
+                      <X style={{ width: 13, height: 13 }} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
+                    {visiblePerms.map(perm => {
+                      const active = role.permissions.includes(perm)
+                      return (
+                        <button key={perm} onClick={() => toggleRolePermission(ri, perm)} style={{
+                          padding: "4px 10px", borderRadius: 20, fontSize: 11.5, cursor: "pointer",
+                          border: active ? "1px solid #3E1540" : "1px solid #E8E2D2",
+                          background: active ? "#3E1540" : "white",
+                          color: active ? "#FBF8F2" : "#8A8497",
+                          fontWeight: active ? 500 : 400,
+                          transition: "all 0.1s",
+                        }}>
+                          {PERMISSION_LABELS[perm] ?? perm}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              {selectedPresetId === "custom" && (
+                <button
+                  onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    width: "100%", padding: "10px 0", borderRadius: 10,
+                    border: "1px dashed #C8C0D8", background: "none", cursor: "pointer",
+                    fontSize: 13, color: "#8A8497", marginTop: roles.length > 0 ? 2 : 0,
+                  }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} /> Add role
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Step 4 — Summary */}
+          {step === 4 && (
+            <>
+              <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", padding: "16px 20px", marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 28, lineHeight: 1 }}>{icon}</span>
+                  <div>
+                    <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{name}</p>
+                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0, marginTop: 3 }}>
+                      {selectedPresetInfo?.label ?? "Custom"} · {roles.length} role{roles.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {roles.length > 0 && (
+                <>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 10 }}>Roles</p>
+                  {roles.map((r, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < roles.length - 1 ? "1px solid #F0EDE8" : "none" }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 500, color: "#13101A" }}>{r.name}</span>
+                      <span style={{ fontSize: 12, color: "#8A8497" }}>{r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 16 }}>{error}</p>}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px 22px", borderTop: "1px solid #E8E2D2", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {step < 4 ? (
             <button
-              key={e}
-              onClick={() => setIcon(e)}
-              style={{
-                width: 38, height: 38, borderRadius: 9, fontSize: 20, cursor: "pointer",
-                border: icon === e ? "1px solid #3E1540" : "1px solid #ECE8DE",
-                background: icon === e ? "#F3EEF3" : "white",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "border-color 0.1s, background 0.1s",
+              disabled={!canContinue}
+              onClick={() => {
+                if (step === 1) {
+                  if (!name.trim()) { setError("Team name is required."); return }
+                  setError(null); setStep(2)
+                } else if (step === 2) {
+                  if (selectedPresetId) { applyPreset(selectedPresetId); setStep(3) }
+                } else {
+                  setStep(4)
+                }
               }}
-            >{e}</button>
-          ))}
+              style={{
+                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
+                borderRadius: 10, fontSize: 14, fontWeight: 600,
+                cursor: canContinue ? "pointer" : "not-allowed", opacity: canContinue ? 1 : 0.5,
+                transition: "opacity 0.1s",
+              }}
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              onClick={handleCreate}
+              disabled={saving}
+              style={{
+                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
+                borderRadius: 10, fontSize: 14, fontWeight: 600,
+                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1,
+              }}
+            >
+              {saving ? "Creating…" : "Create team"}
+            </button>
+          )}
         </div>
 
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>
-          Team name
-        </p>
-        <input
-          autoFocus
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onClose() }}
-          placeholder="e.g. Media Team"
-          style={{
-            width: "100%", padding: "10px 14px", borderRadius: 10,
-            border: "1px solid #E8E2D2", fontSize: 14, color: "#13101A",
-            background: "white", outline: "none", boxSizing: "border-box" as const,
-          }}
-        />
-
-        {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 8 }}>{error}</p>}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button
-            onClick={onClose}
-            style={{ padding: "10px 18px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 14, color: "#5A5466", cursor: "pointer" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={saving || !name.trim()}
-            style={{
-              padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
-              borderRadius: 10, fontSize: 14, fontWeight: 600,
-              cursor: saving || !name.trim() ? "not-allowed" : "pointer",
-              opacity: saving || !name.trim() ? 0.5 : 1,
-              transition: "opacity 0.1s",
-            }}
-          >
-            {saving ? "Creating…" : "Create team"}
-          </button>
-        </div>
       </div>
     </div>
   )
