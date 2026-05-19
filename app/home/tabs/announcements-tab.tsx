@@ -190,7 +190,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
-          <p style={monoStyle}>{isEditing ? "Editing announcement · Draft" : "New announcement · Draft"}</p>
+          <p style={monoStyle}>{isEditing ? "Edit announcement" : "New announcement · Draft"}</p>
           <button
             onClick={onClose}
             style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
@@ -654,10 +654,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   const [compact, setCompact] = useState(false)
   const [filter, setFilter] = useState<FilterType>("all")
 
-  // Desktop inline edit state
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<{ title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean } | null>(null)
-  const [editSaving, setEditSaving] = useState(false)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<EnrichedAnnouncement | null>(null)
 
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
@@ -781,34 +778,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     setAnnouncements((prev) => prev.map((ann) => ann.id === updated.id ? { ...ann, ...updated } : ann))
   }
 
+  function handleOpenEditor(ann: EnrichedAnnouncement) {
+    setEditingAnnouncement(ann)
+  }
+
   async function handleDesktopDelete(ann: EnrichedAnnouncement) {
     setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id))
     await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
-  }
-
-  function startDesktopEdit(ann: EnrichedAnnouncement) {
-    setEditingId(ann.id)
-    setEditDraft({ title: ann.title, body: ann.body, audience: ann.audience ?? "all", isEvent: ann.is_event ?? false, showAttendees: ann.show_attendees ?? false })
-  }
-
-  function cancelDesktopEdit() {
-    setEditingId(null)
-    setEditDraft(null)
-  }
-
-  async function saveDesktopEdit() {
-    if (!editingId || !editDraft) return
-    setEditSaving(true)
-    const { data, error } = await supabase
-      .from("announcements")
-      .update({ title: editDraft.title.trim(), body: editDraft.body.trim(), audience: editDraft.audience, is_event: editDraft.isEvent, show_attendees: editDraft.showAttendees })
-      .eq("id", editingId).eq("ministry_id", ministryId)
-      .select().maybeSingle()
-    setEditSaving(false)
-    if (!error) {
-      handleEditSuccess((data ?? { id: editingId, title: editDraft.title, body: editDraft.body, audience: editDraft.audience, is_event: editDraft.isEvent, show_attendees: editDraft.showAttendees }) as Announcement)
-      cancelDesktopEdit()
-    }
   }
 
   const pinnedAnn = announcements.find(a => a.is_pinned)
@@ -891,7 +867,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 ministryId={ministryId}
                 userRole={userRole}
                 onRsvpToggle={handleRsvpToggle}
-                onEdit={handleEditSuccess}
+                onEdit={handleOpenEditor}
                 onDelete={handleDeleteAnnouncement}
                 onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
               />
@@ -912,47 +888,30 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "22px 28px", }}>
                 <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
                 <div className="relative">
-                  {editingId === pinnedAnn.id && editDraft ? (
-                    <>
-                      <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.5, marginBottom: "12px" }}>📌 Editing pinned</p>
-                      <InlineEditFields
-                        title={editDraft.title} body={editDraft.body}
-                        audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
-                        onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
-                        onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
-                        onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
-                        onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
-                        onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
-                        onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
-                        saving={editSaving} dark
-                      />
-                    </>
-                  ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}>
-                      <div>
-                        <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.6, marginBottom: "8px" }}>📌 Pinned</p>
-                        <h2 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
-                        <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
-                      </div>
-                      <div className="flex gap-2.5 items-center">
-                        {pinnedAnn.is_event && (
-                          <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: pinnedAnn.user_has_rsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "8px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
-                            {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
-                          </button>
-                        )}
-                        {isLeaderOrAdmin && (
-                          <>
-                            <button onClick={() => startDesktopEdit(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
-                              <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
-                            </button>
-                            <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                              <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}>
+                    <div>
+                      <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.6, marginBottom: "8px" }}>📌 Pinned</p>
+                      <h2 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
+                      <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
                     </div>
-                  )}
+                    <div className="flex gap-2.5 items-center">
+                      {pinnedAnn.is_event && (
+                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: pinnedAnn.user_has_rsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "8px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                          {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
+                        </button>
+                      )}
+                      {isLeaderOrAdmin && (
+                        <>
+                          <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
+                            <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                          </button>
+                          <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                            <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -967,43 +926,27 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 </div>
                 {filteredDesktop.map((ann, i) => (
                   <div key={ann.id} style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}>
-                    {editingId === ann.id && editDraft ? (
-                      <div style={{ padding: "16px 20px" }}>
-                        <InlineEditFields
-                          title={editDraft.title} body={editDraft.body}
-                          audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
-                          onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
-                          onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
-                          onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
-                          onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
-                          onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
-                          onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
-                          saving={editSaving}
-                        />
+                    <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
+                      <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
+                      <div>
+                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2 }}>{ann.title}</div>
+                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
                       </div>
-                    ) : (
-                      <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
-                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
-                        <div>
-                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2 }}>{ann.title}</div>
-                          <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
-                        </div>
-                        <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
-                        <div className="flex justify-end items-center gap-1.5">
-                          {ann.is_event && (
-                            <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
-                              {ann.user_has_rsvped ? "Going" : "RSVP"}
-                            </button>
-                          )}
-                          {isLeaderOrAdmin && (
-                            <>
-                              <button onClick={() => startDesktopEdit(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
-                              <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
-                            </>
-                          )}
-                        </div>
+                      <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
+                      <div className="flex justify-end items-center gap-1.5">
+                        {ann.is_event && (
+                          <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
+                            {ann.user_has_rsvped ? "Going" : "RSVP"}
+                          </button>
+                        )}
+                        {isLeaderOrAdmin && (
+                          <>
+                            <button onClick={() => setEditingAnnouncement(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
+                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1013,63 +956,47 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 {filteredDesktop.map((ann) => (
                   <article key={ann.id} className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
                     <div style={{ padding: "26px 28px 22px" }}>
-                      {editingId === ann.id && editDraft ? (
-                        <InlineEditFields
-                          title={editDraft.title} body={editDraft.body}
-                          audience={editDraft.audience} isEvent={editDraft.isEvent} showAttendees={editDraft.showAttendees}
-                          onTitle={v => setEditDraft(d => d ? { ...d, title: v } : d)}
-                          onBody={v => setEditDraft(d => d ? { ...d, body: v } : d)}
-                          onAudience={v => setEditDraft(d => d ? { ...d, audience: v } : d)}
-                          onIsEvent={v => setEditDraft(d => d ? { ...d, isEvent: v } : d)}
-                          onShowAttendees={v => setEditDraft(d => d ? { ...d, showAttendees: v } : d)}
-                          onSave={saveDesktopEdit} onCancel={cancelDesktopEdit}
-                          saving={editSaving}
-                        />
-                      ) : (
-                        <>
-                          <div className="flex justify-between items-center mb-4">
-                            <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
-                            <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
-                          </div>
-                          <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
-                          <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
-                          <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                              <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                {ann.has_form && (
-                                  ann.user_has_responded
-                                    ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
-                                    : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
-                                )}
-                                {ann.is_event && (
-                                  <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
-                                    {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
-                                  </button>
-                                )}
-                                {isLeaderOrAdmin && (
-                                  <>
-                                    <button onClick={() => startDesktopEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
-                                    <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            {ann.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees) && (
-                              <div style={{ marginTop: 12 }}>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {ann.rsvp_attendees.slice(0, 10).map(a => (
-                                    <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                                  ))}
-                                  {ann.rsvp_attendees.length > 10 && (
-                                    <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
-                                  )}
-                                </div>
-                              </div>
+                      <div className="flex justify-between items-center mb-4">
+                        <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
+                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
+                      </div>
+                      <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
+                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
+                      <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                          <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            {ann.has_form && (
+                              ann.user_has_responded
+                                ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
+                                : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
+                            )}
+                            {ann.is_event && (
+                              <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
+                                {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
+                              </button>
+                            )}
+                            {isLeaderOrAdmin && (
+                              <>
+                                <button onClick={() => setEditingAnnouncement(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
+                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                              </>
                             )}
                           </div>
-                        </>
-                      )}
+                        </div>
+                        {ann.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees) && (
+                          <div style={{ marginTop: 12 }}>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ann.rsvp_attendees.slice(0, 10).map(a => (
+                                <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                              ))}
+                              {ann.rsvp_attendees.length > 10 && (
+                                <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -1092,6 +1019,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
       {showCreate && (
         <CreateAnnouncementModal userId={userId} ministryId={ministryId} onClose={() => setShowCreate(false)} onSuccess={handleNewAnnouncement} />
+      )}
+
+      {editingAnnouncement && (
+        <CreateAnnouncementModal userId={userId} ministryId={ministryId} existing={editingAnnouncement} onClose={() => setEditingAnnouncement(null)} onSuccess={handleEditSuccess} />
       )}
 
       {formFillState && (
@@ -1181,45 +1112,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
   const [deleting, setDeleting] = useState(false)
   const [showDetail, setShowDetail] = useState(false)
 
-  // Inline edit state
-  const [isEditing, setIsEditing] = useState(false)
-  const [editTitle, setEditTitle] = useState(announcement.title)
-  const [editBody, setEditBody] = useState(announcement.body)
-  const [editAudience, setEditAudience] = useState(announcement.audience ?? "all")
-  const [editIsEvent, setEditIsEvent] = useState(announcement.is_event ?? false)
-  const [editShowAttendees, setEditShowAttendees] = useState(announcement.show_attendees ?? false)
-  const [editSaving, setEditSaving] = useState(false)
-
   const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
-
-  function startEdit() {
-    setEditTitle(announcement.title)
-    setEditBody(announcement.body)
-    setEditAudience(announcement.audience ?? "all")
-    setEditIsEvent(announcement.is_event ?? false)
-    setEditShowAttendees(announcement.show_attendees ?? false)
-    setIsEditing(true)
-    setShowMenu(false)
-  }
-
-  function cancelEdit() {
-    setIsEditing(false)
-  }
-
-  async function handleSaveEdit() {
-    if (!editTitle.trim() || !editBody.trim()) return
-    setEditSaving(true)
-    const { data, error } = await supabase
-      .from("announcements")
-      .update({ title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent, show_attendees: editShowAttendees })
-      .eq("id", announcement.id).eq("ministry_id", ministryId)
-      .select().maybeSingle()
-    setEditSaving(false)
-    if (!error) {
-      onEdit({ ...announcement, title: editTitle.trim(), body: editBody.trim(), audience: editAudience, is_event: editIsEvent, show_attendees: editShowAttendees, ...(data ?? {}) } as EnrichedAnnouncement)
-      setIsEditing(false)
-    }
-  }
 
   async function handleRsvp() {
     if (rsvping) return
@@ -1246,85 +1139,72 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
         <div className="relative rounded-[22px] bg-[#3E1540] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
           <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
 
-          {!isEditing && announcement.image_url && (
+          {announcement.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={announcement.image_url} alt={announcement.title} className="w-full h-44 object-cover" />
           )}
 
           <div className="p-6 relative">
-            {isEditing ? (
-              <>
-                <p style={{ fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", marginBottom: 12 }}>Editing</p>
-                <InlineEditFields
-                  title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent} showAttendees={editShowAttendees}
-                  onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent} onShowAttendees={setEditShowAttendees}
-                  onSave={handleSaveEdit} onCancel={cancelEdit} saving={editSaving} dark
-                />
-              </>
-            ) : (
-              <>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {isPinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Pinned ·</span>}
-                    <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
-                    {announcement.audience && announcement.audience !== "all" && (
-                      <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {announcement.view_count > 0 && (
-                      <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
-                    )}
-                    {isAdminOrLeader && (
-                      <div className="relative">
-                        {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                        <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
-                          <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
-                        </button>
-                        {showMenu && (
-                          <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
-                            <button onClick={startEdit} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
-                            <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                          </div>
-                        )}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isPinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Pinned ·</span>}
+                <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
+                {announcement.audience && announcement.audience !== "all" && (
+                  <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {announcement.view_count > 0 && (
+                  <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
+                )}
+                {isAdminOrLeader && (
+                  <div className="relative">
+                    {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
+                      <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
+                    </button>
+                    {showMenu && (
+                      <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
+                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
+                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+            </div>
+
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
+            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{announcement.body}</p>
+            <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
+
+            {announcement.is_event && (
+              <>
+                <div className="flex items-center gap-4">
+                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}>
+                    {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
+                  </button>
+                  {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
                 </div>
-
-                <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
-                <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{announcement.body}</p>
-                <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
-
-                {announcement.is_event && (
-                  <>
-                    <div className="flex items-center gap-4">
-                      <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}>
-                        {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
-                      </button>
-                      {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
-                    </div>
-                    {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {announcement.rsvp_attendees.slice(0, 8).map(a => (
-                          <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                        ))}
-                        {announcement.rsvp_attendees.length > 8 && (
-                          <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
-                        )}
-                      </div>
+                {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {announcement.rsvp_attendees.slice(0, 8).map(a => (
+                      <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                    ))}
+                    {announcement.rsvp_attendees.length > 8 && (
+                      <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
                     )}
-                  </>
-                )}
-                {announcement.has_form && (
-                  <div className="mt-3">
-                    {announcement.user_has_responded
-                      ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                      : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
-                    }
                   </div>
                 )}
               </>
+            )}
+            {announcement.has_form && (
+              <div className="mt-3">
+                {announcement.user_has_responded
+                  ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                }
+              </div>
             )}
           </div>
 
@@ -1350,79 +1230,66 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
   return (
     <>
       <div className="relative rounded-[22px] bg-white border border-[#E5E0D2] overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
-        {!isEditing && announcement.image_url && (
+        {announcement.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={announcement.image_url} alt={announcement.title} className="w-full h-36 object-cover" />
         )}
 
         <div className="p-5">
-          {isEditing ? (
-            <>
-              <p style={{ fontSize: 11, letterSpacing: "1px", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Editing</p>
-              <InlineEditFields
-                title={editTitle} body={editBody} audience={editAudience} isEvent={editIsEvent} showAttendees={editShowAttendees}
-                onTitle={setEditTitle} onBody={setEditBody} onAudience={setEditAudience} onIsEvent={setEditIsEvent} onShowAttendees={setEditShowAttendees}
-                onSave={handleSaveEdit} onCancel={cancelEdit} saving={editSaving}
-              />
-            </>
-          ) : (
-            <>
-              <div className="flex items-start justify-between mb-2.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span style={MONO_STYLE}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
-                  {announcement.audience && announcement.audience !== "all" && (
-                    <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", color: "#5A5466", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
-                  )}
-                </div>
-                {isAdminOrLeader && (
-                  <div className="relative">
-                    {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[#F4F1E8] transition-colors">
-                      <MoreHorizontal className="w-4 h-4 text-[#8A8497]" />
-                    </button>
-                    {showMenu && (
-                      <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
-                        <button onClick={startEdit} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
-                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                      </div>
-                    )}
+          <div className="flex items-start justify-between mb-2.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span style={MONO_STYLE}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
+              {announcement.audience && announcement.audience !== "all" && (
+                <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", color: "#5A5466", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+              )}
+            </div>
+            {isAdminOrLeader && (
+              <div className="relative">
+                {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
+                <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[#F4F1E8] transition-colors">
+                  <MoreHorizontal className="w-4 h-4 text-[#8A8497]" />
+                </button>
+                {showMenu && (
+                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
+                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
+                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
-              <p className="text-[13px] leading-relaxed line-clamp-2 mb-1" style={{ color: "#5A5466" }}>{announcement.body}</p>
-              <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
+          <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
+          <p className="text-[13px] leading-relaxed line-clamp-2 mb-1" style={{ color: "#5A5466" }}>{announcement.body}</p>
+          <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
 
-              {announcement.is_event && (
-                <div className="pt-3 border-t border-[#EFEAE0]">
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.98]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.98]"}`}>
-                      {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
-                    </button>
-                    {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
-                  </div>
-                  {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
-                    <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      {announcement.rsvp_attendees.slice(0, 8).map(a => (
-                        <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                      ))}
-                      {announcement.rsvp_attendees.length > 8 && (
-                        <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
-                      )}
-                    </div>
+          {announcement.is_event && (
+            <div className="pt-3 border-t border-[#EFEAE0]">
+              <div className="flex items-center gap-3">
+                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.98]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.98]"}`}>
+                  {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
+                </button>
+                {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
+              </div>
+              {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {announcement.rsvp_attendees.slice(0, 8).map(a => (
+                    <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                  ))}
+                  {announcement.rsvp_attendees.length > 8 && (
+                    <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
                   )}
                 </div>
               )}
-              {announcement.has_form && (
-                <div className={`${!announcement.is_event ? "pt-3 border-t border-[#EFEAE0]" : "mt-2"}`}>
-                  {announcement.user_has_responded
-                    ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                    : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
-                  }
-                </div>
-              )}
-            </>
+            </div>
+          )}
+          {announcement.has_form && (
+            <div className={`${!announcement.is_event ? "pt-3 border-t border-[#EFEAE0]" : "mt-2"}`}>
+              {announcement.user_has_responded
+                ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+              }
+            </div>
           )}
         </div>
 

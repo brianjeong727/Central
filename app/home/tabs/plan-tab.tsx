@@ -5126,6 +5126,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [roles, setRoles] = useState<TeamRole[]>([])
   const [savedPerms, setSavedPerms] = useState<Record<string, string[]>>({})
   const [savingPerms, setSavingPerms] = useState(false)
+  const [draftRoleIds, setDraftRoleIds] = useState<Set<string>>(new Set())
+  const [pendingDeleteRoleIds, setPendingDeleteRoleIds] = useState<Set<string>>(new Set())
   const [members, setMembers] = useState<TeamMemberDisplay[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -5253,42 +5255,30 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setEditingTeamName(false)
   }
 
-  async function handleDeleteRole(roleId: string) {
-    // Nullify role references on any members so the FK constraint doesn't block deletion
-    const { error: memberErr } = await supabase
-      .from("team_members")
-      .update({ role_id: null })
-      .eq("role_id", roleId)
-      .eq("team_id", team.id)
-
-    const { error: deleteErr } = await supabase.from("team_roles").delete().eq("id", roleId)
-    if (deleteErr) {
-      setRoleDeleteError(memberErr ? "Cannot delete: members are still assigned to this role." : deleteErr.message)
-      return
+  function handleDeleteRole(roleId: string) {
+    if (draftRoleIds.has(roleId)) {
+      // Draft (not yet in DB): just remove from local state
+      setRoles(prev => {
+        const next = prev.filter(r => r.id !== roleId)
+        setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
+        return next
+      })
+      setDraftRoleIds(prev => { const n = new Set(prev); n.delete(roleId); return n })
+    } else {
+      // Existing: mark as pending delete (stays visible, committed on Save)
+      setPendingDeleteRoleIds(prev => new Set([...prev, roleId]))
     }
-
-    setRoles(prev => {
-      const next = prev.filter(r => r.id !== roleId)
-      setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
-      return next
-    })
-    setSavedPerms(prev => { const next = { ...prev }; delete next[roleId]; return next })
-    setMembers(prev => prev.map(m => m.role_id === roleId ? { ...m, role_id: "", role_name: "No role" } : m))
     setConfirmDeleteRoleId(null)
     setRoleDeleteError(null)
   }
 
-  async function handleAddRole() {
+  function handleAddRole() {
     const val = newRoleName.trim()
     if (!val) { setAddingRole(false); return }
-    const { data } = await supabase.from("team_roles")
-      .insert({ team_id: team.id, name: val, permissions: [] })
-      .select("id, team_id, name, permissions").single()
-    if (data) {
-      const newRole = { ...data, permissions: [] as string[] }
-      setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
-      setSavedPerms(prev => ({ ...prev, [data.id]: [] }))
-    }
+    const tempId = `draft-${Date.now()}`
+    const newRole: TeamRole = { id: tempId, team_id: team.id, name: val, permissions: [] }
+    setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
+    setDraftRoleIds(prev => new Set([...prev, tempId]))
     setAddingRole(false)
     setNewRoleName("")
   }
@@ -5303,11 +5293,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   const visiblePerms = getVisiblePermissions(team.name)
 
-  const hasPermChanges = roles.some(r => {
-    const saved = savedPerms[r.id]
-    if (saved === undefined) return false
-    return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
-  })
+  const hasChanges =
+    draftRoleIds.size > 0 ||
+    pendingDeleteRoleIds.size > 0 ||
+    roles.some(r => {
+      if (draftRoleIds.has(r.id)) return false
+      const saved = savedPerms[r.id]
+      if (saved === undefined) return false
+      return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
+    })
 
   function togglePermission(perm: string) {
     if (!canManageTeam) return
@@ -5318,9 +5312,53 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     ))
   }
 
-  async function handleSavePermissions() {
+  async function handleSaveChanges() {
     setSavingPerms(true)
-    const toSave = roles.filter(r => {
+    const snapRoles = [...roles]
+    const snapDrafts = new Set(draftRoleIds)
+    const snapDeletes = new Set(pendingDeleteRoleIds)
+
+    // 1. Delete pending-delete roles
+    if (snapDeletes.size > 0) {
+      const ids = [...snapDeletes]
+      await Promise.all(ids.map(id =>
+        supabase.from("team_members").update({ role_id: null }).eq("role_id", id).eq("team_id", team.id)
+      ))
+      await Promise.all(ids.map(id => supabase.from("team_roles").delete().eq("id", id)))
+      setRoles(prev => {
+        const next = prev.filter(r => !snapDeletes.has(r.id))
+        setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
+        return next
+      })
+      setSavedPerms(prev => { const next = { ...prev }; ids.forEach(id => delete next[id]); return next })
+      setMembers(prev => prev.map(m => snapDeletes.has(m.role_id ?? "") ? { ...m, role_id: "", role_name: "No role" } : m))
+      setPendingDeleteRoleIds(new Set())
+    }
+
+    // 2. Insert draft roles
+    if (snapDrafts.size > 0) {
+      const idMap: Record<string, string> = {}
+      for (const dr of snapRoles.filter(r => snapDrafts.has(r.id))) {
+        const { data } = await supabase.from("team_roles")
+          .insert({ team_id: team.id, name: dr.name, permissions: dr.permissions })
+          .select("id, team_id, name, permissions").single()
+        if (data) idMap[dr.id] = data.id
+      }
+      setRoles(prev => prev.map(r => idMap[r.id] ? { ...r, id: idMap[r.id] } : r))
+      setSavedPerms(prev => {
+        const next = { ...prev }
+        for (const [tmp, real] of Object.entries(idMap)) {
+          delete next[tmp]
+          next[real] = snapRoles.find(r => r.id === tmp)?.permissions ?? []
+        }
+        return next
+      })
+      setDraftRoleIds(new Set())
+    }
+
+    // 3. Save permission edits for existing roles
+    const toSave = snapRoles.filter(r => {
+      if (snapDrafts.has(r.id) || snapDeletes.has(r.id)) return false
       const saved = savedPerms[r.id]
       if (saved === undefined) return false
       return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
@@ -5331,11 +5369,18 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       toSave.forEach(r => { next[r.id] = r.permissions })
       return next
     })
+
     setSavingPerms(false)
   }
 
-  function handleDiscardPermissions() {
-    setRoles(prev => prev.map(r => savedPerms[r.id] !== undefined ? { ...r, permissions: [...savedPerms[r.id]] } : r))
+  function handleDiscardChanges() {
+    const surviving = roles
+      .filter(r => !draftRoleIds.has(r.id))
+      .map(r => savedPerms[r.id] !== undefined ? { ...r, permissions: [...savedPerms[r.id]] } : r)
+    setRoles(surviving)
+    setActiveRole(cur => Math.min(cur, Math.max(0, surviving.length - 1)))
+    setDraftRoleIds(new Set())
+    setPendingDeleteRoleIds(new Set())
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
@@ -5445,22 +5490,39 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
-          onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : onClose}
+          onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : confirmDelete ? () => setConfirmDelete(false) : onClose}
           className="size-9 bg-white border border-[#ECE8DE] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
         >
           <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
         <div className="flex items-center gap-2">
-          {!showAddMember && <span className="text-[18px]">{team.icon ?? "👥"}</span>}
+          {!showAddMember && <span className="text-[18px]">{confirmDelete ? "⚠️" : (team.icon ?? "👥")}</span>}
           <span className="text-[14px] font-semibold text-[#13101A]">
-            {showAddMember ? "Add Member" : team.name}
+            {showAddMember ? "Add Member" : confirmDelete ? "Delete team?" : team.name}
           </span>
         </div>
-        <div className="w-9 flex justify-end">
-          {!showAddMember && canDelete && (
-            <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-              <Trash2 className="w-4 h-4 text-[#8A8497] hover:text-red-500" />
-            </button>
+        <div className="flex justify-end">
+          {!showAddMember && (
+            confirmDelete ? (
+              <button
+                onClick={handleDeleteTeam}
+                style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+              >
+                Delete
+              </button>
+            ) : hasChanges ? (
+              <button
+                onClick={handleSaveChanges}
+                disabled={savingPerms}
+                style={{ height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
+              >
+                {savingPerms ? "Saving…" : "Save"}
+              </button>
+            ) : canDelete ? (
+              <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
+                <Trash2 className="w-4 h-4 text-[#8A8497]" />
+              </button>
+            ) : null
           )}
         </div>
       </div>
@@ -5473,29 +5535,71 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         }
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {canDelete && !showAddMember && (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
-              >
-                <Trash2 style={{ width: 13, height: 13 }} /> Delete team
-              </button>
+            {showAddMember ? (
+              <>
+                <button
+                  onClick={() => { setShowAddMember(false); setError(null) }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
+                >
+                  <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
+                >
+                  <X style={{ width: 15, height: 15 }} />
+                </button>
+              </>
+            ) : confirmDelete ? (
+              <>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteTeam}
+                  style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                >
+                  Delete team
+                </button>
+              </>
+            ) : hasChanges ? (
+              <>
+                <button
+                  onClick={handleDiscardChanges}
+                  style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={savingPerms}
+                  style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
+                >
+                  {savingPerms ? "Saving…" : "Save changes"}
+                </button>
+              </>
+            ) : (
+              <>
+                {canDelete && (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
+                  >
+                    <Trash2 style={{ width: 13, height: 13 }} /> Delete team
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
+                  title="Close settings"
+                >
+                  <X style={{ width: 15, height: 15 }} />
+                </button>
+              </>
             )}
-            {showAddMember && (
-              <button
-                onClick={() => { setShowAddMember(false); setError(null) }}
-                style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
-              >
-                <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
-              title="Close settings"
-            >
-              <X style={{ width: 15, height: 15 }} />
-            </button>
           </div>
         }
       />
@@ -5878,51 +5982,121 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       )}
 
-      {/* Sticky action footer — delete confirmation or save permission changes */}
-      {!showAddMember && (confirmDelete || hasPermChanges) && (
-        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
-          className="px-5 md:px-10 py-4 pb-8 md:pb-5"
-        >
-          {confirmDelete ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <p style={{ fontSize: 14, color: "#9F3030", margin: 0 }}>Delete this team? This cannot be undone.</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteTeam}
-                  style={{ padding: "10px 22px", background: "#9F3030", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
-                >
-                  Delete team
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>Unsaved permission changes</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={handleDiscardPermissions}
-                  style={{ padding: "10px 18px", background: "transparent", color: "#5A5466", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "1px solid #ECE8DE", cursor: "pointer" }}
-                >
-                  Discard
-                </button>
-                <button
-                  onClick={handleSavePermissions}
-                  disabled={savingPerms}
-                  style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
-                >
-                  {savingPerms ? "Saving…" : "Save changes"}
-                </button>
-              </div>
-            </div>
-          )}
+    </div>
+  )
+}
+
+// ── QuickCreateTeamModal ───────────────────────────────────────────────────────
+
+const QUICK_EMOJI_OPTIONS = ["👥","🎵","📖","🏛️","💻","⚽","🎓","🤝","✝️","🙏","🌟","🎯"]
+
+export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }: {
+  userId: string
+  ministryId: string
+  onClose: () => void
+  onCreated: (teamId: string) => void
+}) {
+  const supabase = createClient()
+  const [name, setName] = useState("")
+  const [icon, setIcon] = useState("👥")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCreate() {
+    if (!name.trim()) { setError("Team name is required."); return }
+    setSaving(true)
+    setError(null)
+
+    const { data: team, error: teamErr } = await supabase
+      .from("teams")
+      .insert({ name: name.trim(), icon, ministry_id: ministryId, created_by: userId })
+      .select("id").single()
+    if (teamErr || !team) { setError(teamErr?.message ?? "Failed to create team."); setSaving(false); return }
+
+    const { data: role, error: roleErr } = await supabase
+      .from("team_roles")
+      .insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
+      .select("id").single()
+    if (roleErr || !role) { setError(roleErr?.message ?? "Failed to create role."); setSaving(false); return }
+
+    const { error: memberErr } = await supabase
+      .from("team_members")
+      .insert({ team_id: team.id, user_id: userId, role_id: role.id, added_by: userId })
+    if (memberErr) { setError(memberErr.message); setSaving(false); return }
+
+    onCreated(team.id)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center"
+      style={{ background: "rgba(19,16,26,0.4)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: "#FBF8F2", borderRadius: 16, padding: "28px 28px 24px", width: 360, boxShadow: "0 8px 40px rgba(19,16,26,0.18)" }}>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, color: "#13101A", marginBottom: 20, lineHeight: 1 }}>
+          New Team
+        </p>
+
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>
+          Icon
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 20 }}>
+          {QUICK_EMOJI_OPTIONS.map(e => (
+            <button
+              key={e}
+              onClick={() => setIcon(e)}
+              style={{
+                width: 38, height: 38, borderRadius: 9, fontSize: 20, cursor: "pointer",
+                border: icon === e ? "1px solid #3E1540" : "1px solid #ECE8DE",
+                background: icon === e ? "#F3EEF3" : "white",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "border-color 0.1s, background 0.1s",
+              }}
+            >{e}</button>
+          ))}
         </div>
-      )}
+
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>
+          Team name
+        </p>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onClose() }}
+          placeholder="e.g. Media Team"
+          style={{
+            width: "100%", padding: "10px 14px", borderRadius: 10,
+            border: "1px solid #E8E2D2", fontSize: 14, color: "#13101A",
+            background: "white", outline: "none", boxSizing: "border-box" as const,
+          }}
+        />
+
+        {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 8 }}>{error}</p>}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "10px 18px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 14, color: "#5A5466", cursor: "pointer" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={saving || !name.trim()}
+            style={{
+              padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
+              borderRadius: 10, fontSize: 14, fontWeight: 600,
+              cursor: saving || !name.trim() ? "not-allowed" : "pointer",
+              opacity: saving || !name.trim() ? 0.5 : 1,
+              transition: "opacity 0.1s",
+            }}
+          >
+            {saving ? "Creating…" : "Create team"}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

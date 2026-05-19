@@ -19,7 +19,7 @@ import { DesktopSidebar } from "./components/desktop-nav"
 import { HomeTab } from "./tabs/home-tab"
 import { AnnouncementsTab } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
-import { PlanTab } from "./tabs/plan-tab"
+import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
 import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
@@ -58,6 +58,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [showQuickCreateTeam, setShowQuickCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(searchParams.get("team"))
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
   const validSections = ["spiritual-profile", "journal"] as const
@@ -381,7 +382,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         activeGroupId={globalOpenChat?.id}
         onLogout={handleLogout}
         isAdmin={isAdmin}
-        onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
+        onCreateTeam={() => setShowQuickCreateTeam(true)}
         activeTeamId={activeTeamId}
         onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
@@ -582,6 +583,21 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         onTabChange={(tab) => { setPaletteOpen(false); handleSidebarTabChange(tab) }}
         onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
       />
+
+      {showQuickCreateTeam && (
+        <QuickCreateTeamModal
+          userId={userId}
+          ministryId={ministryId}
+          onClose={() => setShowQuickCreateTeam(false)}
+          onCreated={(teamId) => {
+            setShowQuickCreateTeam(false)
+            loadUserTeams()
+            loadAllTeams()
+            setActiveTab("plan")
+            handleTeamChange(teamId)
+          }}
+        />
+      )}
     </div>
   )
 }
