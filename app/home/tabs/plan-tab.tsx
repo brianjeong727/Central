@@ -5515,7 +5515,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
         <div className="flex items-center gap-2">
-          {!showAddMember && <span className="text-[18px]">{confirmDelete ? "⚠️" : (team.icon ?? "👥")}</span>}
+          {!showAddMember && (confirmDelete
+            ? <span className="text-[18px]">⚠️</span>
+            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="#3E1540" fg="#FBF8F2" radius={6} />
+          )}
           <span className="text-[14px] font-semibold text-[#13101A]">
             {showAddMember ? "Add Member" : confirmDelete ? "Delete team?" : team.name}
           </span>
@@ -5721,9 +5724,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               <>
                 {/* Hero strip */}
                 <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                  <div style={{ width: 76, height: 76, borderRadius: 20, background: "#3E1540", color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, flexShrink: 0 }}>
-                    {team.icon ?? "👥"}
-                  </div>
+                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="#3E1540" fg="#F6F4EF" radius={20} />
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
                     {editingTeamName ? (
@@ -6012,17 +6013,37 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 }
 
-// ── QuickCreateTeamModal — 4-step wizard ──────────────────────────────────────
+// ── QuickCreateTeamModal — 3-step design-system-aligned wizard ────────────────
 
-const QUICK_EMOJI_OPTIONS = ["👥","🎵","📖","🏛️","💻","⚽","🎓","🤝","✝️","🙏","🌟","🎯"]
-
-const WIZARD_PRESETS = [
-  { id: "praise", icon: "🎵", label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts" },
-  { id: "board",  icon: "🏛️", label: "Student Org Board",   desc: "Event planning, finances, attendance, member management" },
-  { id: "dgl",    icon: "📖", label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance" },
-  { id: "tech",   icon: "💻", label: "Tech Team",           desc: "Slides and worship set viewing" },
-  { id: "custom", icon: "✨", label: "Custom",              desc: "Start from scratch, no preset roles or permissions" },
+// SVG paths for the icon picker grid (Lucide-stroked, 24×24 viewBox)
+const WIZARD_ICON_OPTIONS = [
+  { key: "users",    d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7-8a4 4 0 0 1 0 7.75" },
+  { key: "music",    d: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" },
+  { key: "book",     d: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" },
+  { key: "slides",   d: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8 21h8M12 17v4" },
+  { key: "chat",     d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
+  { key: "plan",     d: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" },
+  { key: "calendar", d: "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 2v4M16 2v4" },
+  { key: "globe",    d: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" },
+  { key: "sparkle",  d: "M12 3v6M12 15v6M3 12h6M15 12h6M6.4 6.4l3.2 3.2M14.4 14.4l3.2 3.2M6.4 17.6l3.2-3.2M14.4 9.6l3.2-3.2" },
+  { key: "clipboard",d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" },
 ]
+
+// Step 1 preset display data (icon keys, no emojis)
+const WIZARD_PRESETS_DISPLAY = [
+  { id: "praise", iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts." },
+  { id: "board",  iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management." },
+  { id: "dgl",    iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance." },
+  { id: "tech",   iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing." },
+]
+
+const WIZARD_MONO = {
+  fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" as const,
+  fontSize: 11,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase" as const,
+  color: "#8A8497",
+}
 
 export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }: {
   userId: string
@@ -6031,9 +6052,9 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
   onCreated: (teamId: string) => void
 }) {
   const supabase = createClient()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [name, setName] = useState("")
-  const [icon, setIcon] = useState("👥")
+  const [iconKey, setIconKey] = useState("users")
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
   const [roles, setRoles] = useState<Array<{ name: string; permissions: string[] }>>([])
   const [saving, setSaving] = useState(false)
@@ -6041,10 +6062,10 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
 
   function applyPreset(presetId: string) {
     if (presetId === "custom") { setRoles([]); return }
-    const preset = TEAM_PRESETS.find(p => p.id === presetId)
-    if (!preset) return
-    if (!name.trim()) { setName(preset.name); setIcon(preset.icon) }
-    setRoles(preset.roles.map(r => ({ name: r.name, permissions: [...r.permissions] })))
+    const display = WIZARD_PRESETS_DISPLAY.find(p => p.id === presetId)
+    const data    = TEAM_PRESETS.find(p => p.id === presetId)
+    if (display) { if (!name.trim()) setName(display.label); setIconKey(display.iconKey) }
+    if (data) setRoles(data.roles.map(r => ({ name: r.name, permissions: [...r.permissions] })))
   }
 
   function toggleRolePermission(ri: number, perm: string) {
@@ -6054,175 +6075,268 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
     }))
   }
 
-  function getPresetVisiblePerms(): string[] {
+  function getVisiblePerms(): string[] {
     if (!selectedPresetId || selectedPresetId === "custom") return ALL_PERMISSIONS
-    const map: Record<string, string[]> = {
-      praise: TEAM_PERMISSION_FILTERS.praise,
-      board:  TEAM_PERMISSION_FILTERS.student_org,
-      dgl:    TEAM_PERMISSION_FILTERS.small_group,
-    }
+    const map: Record<string, string[]> = { praise: TEAM_PERMISSION_FILTERS.praise, board: TEAM_PERMISSION_FILTERS.student_org, dgl: TEAM_PERMISSION_FILTERS.small_group }
     return map[selectedPresetId] ?? ALL_PERMISSIONS
   }
 
   async function handleCreate() {
     setSaving(true); setError(null)
-    const { data: team, error: teamErr } = await supabase
-      .from("teams").insert({ name: name.trim(), icon, ministry_id: ministryId, created_by: userId })
+    const { data: team, error: tErr } = await supabase
+      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId })
       .select("id").single()
-    if (teamErr || !team) { setError(teamErr?.message ?? "Failed to create team."); setSaving(false); return }
+    if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
 
     let topRoleId: string | null = null
     for (let i = 0; i < roles.length; i++) {
-      const { data: role, error: re } = await supabase
+      const { data: role, error: rErr } = await supabase
         .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions })
         .select("id").single()
-      if (re || !role) { setError(re?.message ?? "Failed to create role."); setSaving(false); return }
+      if (rErr || !role) { setError(rErr?.message ?? "Failed to create role."); setSaving(false); return }
       if (i === 0) topRoleId = role.id
     }
     if (!topRoleId) {
-      const { data: adminRole, error: ae } = await supabase
+      const { data: admin, error: aErr } = await supabase
         .from("team_roles").insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
         .select("id").single()
-      if (ae || !adminRole) { setError(ae?.message ?? "Failed to create role."); setSaving(false); return }
-      topRoleId = adminRole.id
+      if (aErr || !admin) { setError(aErr?.message ?? "Failed to create role."); setSaving(false); return }
+      topRoleId = admin.id
     }
-    const { error: me } = await supabase
+    const { error: mErr } = await supabase
       .from("team_members").insert({ team_id: team.id, user_id: userId, role_id: topRoleId, added_by: userId })
-    if (me) { setError(me.message); setSaving(false); return }
+    if (mErr) { setError(mErr.message); setSaving(false); return }
     onCreated(team.id)
   }
 
-  const visiblePerms = getPresetVisiblePerms()
-  const selectedPresetInfo = WIZARD_PRESETS.find(p => p.id === selectedPresetId)
-  const canContinue = step === 1 ? !!name.trim() : step === 2 ? !!selectedPresetId : true
+  const visiblePerms = getVisiblePerms()
+  const selectedDisplay = WIZARD_PRESETS_DISPLAY.find(p => p.id === selectedPresetId)
+  const topRoleName = roles[0]?.name ?? "Admin"
+
+  const stepTitles = { 1: "Choose a template", 2: "Name your team", 3: "Review & create" } as const
 
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center"
-      style={{ background: "rgba(19,16,26,0.4)" }}
+      style={{ background: "rgba(20,16,26,0.32)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: "#FBF8F2", borderRadius: 16, width: 440, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(19,16,26,0.18)", overflow: "hidden" }}>
+      <div style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
 
-        {/* Header */}
-        <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-            <div>
-              {step > 1 ? (
-                <button
-                  onClick={() => setStep(s => s - 1)}
-                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 10 }}
-                >
-                  <ChevronLeft style={{ width: 13, height: 13 }} /> Back
-                </button>
-              ) : <div style={{ height: 23, marginBottom: 10 }} />}
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", lineHeight: 1.1, margin: 0 }}>
-                {step === 1 && "New Team"}
-                {step === 2 && "What kind of team?"}
-                {step === 3 && "Review roles"}
-                {step === 4 && "Ready to create"}
-              </p>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, paddingTop: 2 }}>
-              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
-                <X style={{ width: 15, height: 15 }} />
-              </button>
-              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#B8B2C4", letterSpacing: "0.08em" }}>
-                Step {step} of 4
-              </span>
+        {/* Modal header */}
+        <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {step > 1 ? (
+            <button onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+              <ArrowLeft style={{ width: 14, height: 14 }} /> Back
+            </button>
+          ) : <span />}
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <X style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
+
+        <div style={{ padding: "12px 32px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <div>
+            <div style={WIZARD_MONO}>NEW TEAM</div>
+            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 34, margin: "6px 0 0", letterSpacing: "-0.4px", color: "#13101A", fontWeight: 400, lineHeight: 1.1 }}>
+              {stepTitles[step]}
+            </h2>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <span style={{ ...WIZARD_MONO, fontSize: 10, letterSpacing: "0.08em" }}>STEP {step} OF 3</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[1, 2, 3].map(i => <span key={i} style={{ width: 22, height: 3, borderRadius: 99, background: i <= step ? "#3E1540" : "#E2DDCF" }} />)}
             </div>
           </div>
         </div>
 
-        <div style={{ height: 1, background: "#E8E2D2", marginTop: 16 }} />
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px 28px" }}>
 
-        {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-
-          {/* Step 1 — Name + icon */}
+          {/* ── Step 1: Choose a template ── */}
           {step === 1 && (
-            <>
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8, marginTop: 0 }}>Icon</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const, marginBottom: 22 }}>
-                {QUICK_EMOJI_OPTIONS.map(e => (
-                  <button key={e} onClick={() => setIcon(e)} style={{
-                    width: 38, height: 38, borderRadius: 9, fontSize: 20, cursor: "pointer",
-                    border: icon === e ? "1.5px solid #3E1540" : "1px solid #ECE8DE",
-                    background: icon === e ? "#F3EEF3" : "white",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "border-color 0.1s, background 0.1s",
-                  }}>{e}</button>
-                ))}
-              </div>
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 8 }}>Team name</p>
-              <input
-                autoFocus
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Escape") onClose() }}
-                placeholder="e.g. Media Team"
-                style={{
-                  width: "100%", padding: "10px 14px", borderRadius: 10,
-                  border: "1px solid #E8E2D2", fontSize: 14, color: "#13101A",
-                  background: "white", outline: "none", boxSizing: "border-box" as const,
-                }}
-              />
-              {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 8 }}>{error}</p>}
-            </>
-          )}
-
-          {/* Step 2 — Preset picker */}
-          {step === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {WIZARD_PRESETS.map(p => (
-                <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
-                  display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", borderRadius: 12,
-                  textAlign: "left" as const, width: "100%", cursor: "pointer",
-                  border: selectedPresetId === p.id ? "1.5px solid #3E1540" : "1px solid #E8E2D2",
-                  background: selectedPresetId === p.id ? "#F3EEF3" : "white",
-                  transition: "border-color 0.1s, background 0.1s",
-                }}>
-                  <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{p.icon}</span>
-                  <div>
-                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#13101A", margin: 0, marginBottom: 2 }}>{p.label}</p>
-                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{p.desc}</p>
-                  </div>
-                </button>
-              ))}
+              {WIZARD_PRESETS_DISPLAY.map(p => {
+                const on = selectedPresetId === p.id
+                const roleCount = TEAM_PRESETS.find(t => t.id === p.id)?.roles.length ?? 0
+                const iconOpt = WIZARD_ICON_OPTIONS.find(o => o.key === p.iconKey)
+                return (
+                  <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
+                    display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
+                    textAlign: "left" as const, width: "100%", cursor: "pointer", fontFamily: "inherit",
+                    border: "1px solid " + (on ? "#3E1540" : "#E8E2D2"),
+                    background: on ? "#F6F2E8" : "#FBF8F2",
+                    boxShadow: on ? "inset 0 0 0 1px #3E1540" : "none",
+                    transition: "border-color 0.1s, background 0.1s",
+                  }}>
+                    <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: on ? "#3E1540" : "#F1ECDE", color: on ? "#FBF8F2" : "#3E1540", display: "grid", placeItems: "center" }}>
+                      {iconOpt && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconOpt.d}/></svg>}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#13101A" }}>{p.label}</span>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#F1ECDE", color: "#8A8497", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 500 }}>{roleCount} roles</span>
+                      </span>
+                      <span style={{ display: "block", fontSize: 12.5, color: "#5A5466", marginTop: 3 }}>{p.desc}</span>
+                    </span>
+                    <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid " + (on ? "#3E1540" : "#C4C0B0"), background: on ? "#3E1540" : "transparent", display: "grid", placeItems: "center" }}>
+                      {on && <span style={{ width: 7, height: 7, borderRadius: 99, background: "#FBF8F2" }} />}
+                    </span>
+                  </button>
+                )
+              })}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0 2px" }}>
+                <span style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+                <span style={{ ...WIZARD_MONO, fontSize: 10 }}>OR</span>
+                <span style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+              </div>
+
+              <button onClick={() => setSelectedPresetId("custom")} style={{
+                display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
+                textAlign: "left" as const, width: "100%", cursor: "pointer", fontFamily: "inherit",
+                border: selectedPresetId === "custom" ? "1px solid #3E1540" : "1px dashed #C4C0B0",
+                background: selectedPresetId === "custom" ? "#F6F2E8" : "transparent",
+                boxShadow: selectedPresetId === "custom" ? "inset 0 0 0 1px #3E1540" : "none",
+              }}>
+                <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: selectedPresetId === "custom" ? "#3E1540" : "transparent", color: selectedPresetId === "custom" ? "#FBF8F2" : "#5A5466", border: selectedPresetId === "custom" ? "none" : "1px dashed #C4C0B0", display: "grid", placeItems: "center" }}>
+                  <Plus style={{ width: 16, height: 16 }} />
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#13101A" }}>Custom team</span>
+                  <span style={{ display: "block", fontSize: 12.5, color: "#5A5466", marginTop: 3 }}>Start blank — set up roles and permissions yourself.</span>
+                </span>
+                {selectedPresetId === "custom" && (
+                  <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid #3E1540", background: "#3E1540", display: "grid", placeItems: "center" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: "#FBF8F2" }} />
+                  </span>
+                )}
+              </button>
             </div>
           )}
 
-          {/* Step 3 — Review + customize roles */}
-          {step === 3 && (
-            <div>
-              {selectedPresetId === "custom" && roles.length === 0 && (
-                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 16 }}>No roles yet. Add one to get started.</p>
-              )}
-              {roles.map((role, ri) => (
-                <div key={ri} style={{ border: "1px solid #E8E2D2", borderRadius: 12, padding: "14px 16px", marginBottom: 10, background: "white" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <input
-                      value={role.name}
-                      onChange={e => setRoles(prev => prev.map((r, i) => i === ri ? { ...r, name: e.target.value } : r))}
-                      style={{ fontSize: 14, fontWeight: 600, color: "#13101A", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
-                    />
-                    <button
-                      onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))}
-                      style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#B8B2C4" }}
-                    >
-                      <X style={{ width: 13, height: 13 }} />
+          {/* ── Step 2: Name your team ── */}
+          {step === 2 && (
+            <>
+              {/* Live preview tile */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#F6F2E8", marginBottom: 28 }}>
+                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" radius={12} />
+                <div>
+                  <div style={WIZARD_MONO}>PREVIEW</div>
+                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginTop: 4, letterSpacing: "-0.2px", fontWeight: 400, lineHeight: 1.1 }}>
+                    {name || selectedDisplay?.label || "Your Team"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#8A8497", marginTop: 3 }}>
+                    {roles.length} role{roles.length !== 1 ? "s" : ""} · You will be {topRoleName}
+                  </div>
+                </div>
+              </div>
+
+              <label style={{ display: "block", marginBottom: 24 }}>
+                <div style={WIZARD_MONO}>TEAM NAME</div>
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={e => { setName(e.target.value); setError(null) }}
+                  onKeyDown={e => { if (e.key === "Escape") onClose() }}
+                  placeholder={selectedDisplay?.label ?? "e.g. Media Team"}
+                  style={{
+                    width: "100%", padding: "11px 14px", marginTop: 8,
+                    border: "1px solid " + (error ? "#9F3030" : "#E2DDCF"), borderRadius: 10,
+                    background: "#FBF8F2", fontSize: 15, fontFamily: "inherit", color: "#13101A",
+                    outline: "none", boxSizing: "border-box" as const,
+                  }}
+                />
+                {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 6 }}>{error}</p>}
+              </label>
+
+              <div>
+                <div style={WIZARD_MONO}>ICON</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 8, marginTop: 10 }}>
+                  {WIZARD_ICON_OPTIONS.map(opt => (
+                    <button key={opt.key} onClick={() => setIconKey(opt.key)} style={{
+                      aspectRatio: "1", borderRadius: 10, cursor: "pointer", padding: 8,
+                      border: "1px solid " + (iconKey === opt.key ? "#3E1540" : "#E2DDCF"),
+                      background: iconKey === opt.key ? "#3E1540" : "#FBF8F2",
+                      color: iconKey === opt.key ? "#FBF8F2" : "#5A5466",
+                      boxShadow: iconKey === opt.key ? "0 0 0 3px #F6F2E8 inset" : "none",
+                      display: "grid", placeItems: "center",
+                      transition: "border-color 0.1s, background 0.1s",
+                    }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d={opt.d}/>
+                      </svg>
                     </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 11.5, color: "#8A8497", marginTop: 8 }}>One small, monochromatic mark — keeps the sidebar legible.</p>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 3: Review & create ── */}
+          {step === 3 && (
+            <>
+              {/* Identity summary */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", marginBottom: 24 }}>
+                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" radius={12} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: "-0.2px", fontWeight: 400 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>
+                    {selectedDisplay ? `Based on ${selectedDisplay.label}` : "Custom"} · {roles.length} role{roles.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
+                <button onClick={() => setStep(2)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Edit3 style={{ width: 13, height: 13 }} /> Edit
+                </button>
+              </div>
+
+              {/* Roles header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={WIZARD_MONO}>ROLES · {roles.length}</div>
+                {selectedPresetId === "custom" && (
+                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])} style={{ background: "none", border: "none", color: "#3E1540", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                    <Plus style={{ width: 13, height: 13 }} /> Add role
+                  </button>
+                )}
+              </div>
+
+              {selectedPresetId === "custom" && roles.length === 0 && (
+                <button onClick={() => setRoles([{ name: "New Role", permissions: [] }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "#8A8497", fontFamily: "inherit" }}>
+                  <Plus style={{ width: 13, height: 13 }} /> Add first role
+                </button>
+              )}
+
+              {roles.map((role, ri) => (
+                <div key={ri} style={{ padding: "14px 0", borderTop: ri > 0 ? "1px solid #EFE9DA" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    {selectedPresetId === "custom" ? (
+                      <input
+                        value={role.name}
+                        onChange={e => setRoles(prev => prev.map((r, i) => i === ri ? { ...r, name: e.target.value } : r))}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "#13101A", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
+                      />
+                    ) : (
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A" }}>{role.name}</span>
+                    )}
+                    {ri === 0 && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#2D0F2E", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontSize: 12, color: "#8A8497" }}>{role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}</span>
+                    {selectedPresetId === "custom" && (
+                      <button onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))} style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: "#8A8497", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                        <X style={{ width: 13, height: 13 }} />
+                      </button>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
                     {visiblePerms.map(perm => {
                       const active = role.permissions.includes(perm)
                       return (
                         <button key={perm} onClick={() => toggleRolePermission(ri, perm)} style={{
-                          padding: "4px 10px", borderRadius: 20, fontSize: 11.5, cursor: "pointer",
-                          border: active ? "1px solid #3E1540" : "1px solid #E8E2D2",
-                          background: active ? "#3E1540" : "white",
-                          color: active ? "#FBF8F2" : "#8A8497",
-                          fontWeight: active ? 500 : 400,
+                          padding: "5px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                          border: "1px solid " + (active ? "#C8C0D8" : "#E8E2D2"),
+                          background: active ? "#F1ECDE" : "#FBF8F2",
+                          color: active ? "#2D0F2E" : "#A09A8C",
                           transition: "all 0.1s",
                         }}>
                           {PERMISSION_LABELS[perm] ?? perm}
@@ -6232,88 +6346,50 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
                   </div>
                 </div>
               ))}
-              {selectedPresetId === "custom" && (
-                <button
-                  onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    width: "100%", padding: "10px 0", borderRadius: 10,
-                    border: "1px dashed #C8C0D8", background: "none", cursor: "pointer",
-                    fontSize: 13, color: "#8A8497", marginTop: roles.length > 0 ? 2 : 0,
-                  }}
-                >
-                  <Plus style={{ width: 13, height: 13 }} /> Add role
-                </button>
-              )}
-            </div>
-          )}
 
-          {/* Step 4 — Summary */}
-          {step === 4 && (
-            <>
-              <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", padding: "16px 20px", marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 28, lineHeight: 1 }}>{icon}</span>
-                  <div>
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{name}</p>
-                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0, marginTop: 3 }}>
-                      {selectedPresetInfo?.label ?? "Custom"} · {roles.length} role{roles.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              {roles.length > 0 && (
-                <>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "#8A8497", marginBottom: 10 }}>Roles</p>
-                  {roles.map((r, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < roles.length - 1 ? "1px solid #F0EDE8" : "none" }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 500, color: "#13101A" }}>{r.name}</span>
-                      <span style={{ fontSize: 12, color: "#8A8497" }}>{r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
-                    </div>
-                  ))}
-                </>
-              )}
               {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 16 }}>{error}</p>}
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "14px 24px 22px", borderTop: "1px solid #E8E2D2", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          {step < 4 ? (
-            <button
-              disabled={!canContinue}
-              onClick={() => {
-                if (step === 1) {
-                  if (!name.trim()) { setError("Team name is required."); return }
-                  setError(null); setStep(2)
-                } else if (step === 2) {
-                  if (selectedPresetId) { applyPreset(selectedPresetId); setStep(3) }
-                } else {
-                  setStep(4)
-                }
-              }}
-              style={{
-                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
-                borderRadius: 10, fontSize: 14, fontWeight: 600,
-                cursor: canContinue ? "pointer" : "not-allowed", opacity: canContinue ? 1 : 0.5,
-                transition: "opacity 0.1s",
-              }}
-            >
-              Continue
-            </button>
-          ) : (
-            <button
-              onClick={handleCreate}
-              disabled={saving}
-              style={{
-                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none",
-                borderRadius: 10, fontSize: 14, fontWeight: 600,
-                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1,
-              }}
-            >
-              {saving ? "Creating…" : "Create team"}
-            </button>
+        <div style={{ padding: "16px 28px 22px", borderTop: "1px solid #E8E2D2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2" }}>
+          {step === 1 && (
+            <>
+              <span style={{ fontSize: 12, color: "#8A8497" }}>Templates pre-fill icon, roles, and permissions. You can change anything next.</span>
+              <button
+                disabled={!selectedPresetId}
+                onClick={() => { if (selectedPresetId) { applyPreset(selectedPresetId); setStep(2) } }}
+                style={{ padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, cursor: selectedPresetId ? "pointer" : "not-allowed", opacity: selectedPresetId ? 1 : 0.45 }}
+              >
+                Continue <ChevronRight style={{ width: 14, height: 14 }} />
+              </button>
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <span style={{ fontSize: 12, color: "#8A8497" }}>
+                Based on <span style={{ color: "#2D0F2E", fontWeight: 500 }}>{selectedDisplay?.label ?? "custom"}</span>
+              </span>
+              <button
+                onClick={() => { if (!name.trim()) { setError("Team name is required."); return }; setError(null); setStep(3) }}
+                style={{ padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                Continue <ChevronRight style={{ width: 14, height: 14 }} />
+              </button>
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <span style={{ fontSize: 12, color: "#8A8497" }}>You can edit roles & permissions any time from team settings.</span>
+              <button
+                onClick={handleCreate}
+                disabled={saving}
+                style={{ padding: "11px 24px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}
+              >
+                {saving ? "Creating…" : <><Check style={{ width: 14, height: 14 }} /> Create team</>}
+              </button>
+            </>
           )}
         </div>
 
