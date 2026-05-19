@@ -1116,7 +1116,18 @@ export function StudentOrgTeamHome({
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
   const supabase = createClient()
-  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources">("General")
+  const router = useRouter()
+  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources">(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
+    return (["General", "Plan", "Roster", "Resources"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources"
+  })
+
+  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources") {
+    setTeamTab(tab)
+    const sp = new URLSearchParams(window.location.search)
+    sp.set("sotab", tab)
+    router.replace(`?${sp.toString()}`, { scroll: false })
+  }
 
   // Calendar
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
@@ -1211,7 +1222,7 @@ export function StudentOrgTeamHome({
         {(["General", "Plan", "Roster", "Resources"] as const).map(t => (
           <button
             key={t}
-            onClick={() => setTeamTab(t)}
+            onClick={() => setTeamTabAndUrl(t)}
             style={{
               padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--font-inter)",
               color: teamTab === t ? "#2D0F2E" : "#8A8497",
@@ -1460,13 +1471,17 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
   // Auto-open settings when page is refreshed with ?view=settings in the URL.
   useEffect(() => {
-    if (didAutoOpen || initialViewParam !== 'settings' || !activeTeamId || allTeams.length === 0) return
-    const team = allTeams.find(t => t.id === activeTeamId)
+    if (didAutoOpen || initialViewParam !== 'settings' || !activeTeamId) return
+    const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
+      const ut = userTeams.find(t => t.teamId === activeTeamId)
+      if (!ut) return null
+      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0 } satisfies Team
+    })()
     if (!team) return
     setOpenTeam(team)
     setDidAutoOpen(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTeams, activeTeamId, didAutoOpen])
+  }, [allTeams, userTeams, activeTeamId, didAutoOpen])
 
   // Clear view=settings from URL when the user switches to a different team.
   const teamSwitchRef = useRef(false)
@@ -1476,6 +1491,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
     setOpenTeam(null)
     setStudentOrgPlanningEvent(null)
     replaceParam("view", null)
+    replaceParam("sotab", null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
 
@@ -5264,6 +5280,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         return next
       })
       setDraftRoleIds(prev => { const n = new Set(prev); n.delete(roleId); return n })
+    } else if (pendingDeleteRoleIds.has(roleId)) {
+      // Already staged: toggle off (un-stage)
+      setPendingDeleteRoleIds(prev => { const n = new Set(prev); n.delete(roleId); return n })
     } else {
       // Existing: mark as pending delete (stays visible, committed on Save)
       setPendingDeleteRoleIds(prev => new Set([...prev, roleId]))
@@ -5744,6 +5763,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         {roles.map((role, i) => {
                           const roleCount = members.filter(m => m.role_id === role.id).length
                           const isRoleConfirming = confirmDeleteRoleId === role.id
+                          const isPendingDelete = pendingDeleteRoleIds.has(role.id)
+                          const isDraft = draftRoleIds.has(role.id)
                           return (
                             <div
                               key={role.id}
@@ -5753,14 +5774,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                               style={{
                                 padding: "16px 20px",
                                 borderBottom: i < roles.length - 1 ? "1px solid #ECE8DE" : "none",
-                                borderLeft: activeRole === i ? "2px solid #3E1540" : "2px solid transparent",
-                                background: isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "white" : "transparent"),
+                                borderLeft: isPendingDelete ? "2px solid #9F3030" : (activeRole === i ? "2px solid #3E1540" : "2px solid transparent"),
+                                background: isPendingDelete ? "#FDF0F0" : (isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "white" : "transparent")),
                                 cursor: isRoleConfirming ? "default" : "pointer",
                                 transition: "background 0.1s",
+                                opacity: isPendingDelete ? 0.6 : 1,
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A" }}>{role.name}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                  <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPendingDelete ? "#9F3030" : "#13101A", textDecoration: isPendingDelete ? "line-through" : "none" }}>{role.name}</span>
+                                  {isDraft && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#2F7A3E", background: "#E8F5EB", border: "1px solid #C2E0C8", borderRadius: 4, padding: "1px 5px" }}>NEW</span>}
+                                  {isPendingDelete && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
+                                </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   {!isRoleConfirming && (
                                     <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
@@ -5795,8 +5821,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                       )
                                     ) : (
                                       <button
-                                        onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(role.id) }}
-                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: hoveredRoleId === role.id ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hoveredRoleId === role.id ? "auto" : "none" }}
+                                        onClick={e => { e.stopPropagation(); isPendingDelete ? handleDeleteRole(role.id) : setConfirmDeleteRoleId(role.id) }}
+                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: isPendingDelete ? "#9F3030" : "#8A8497", opacity: (hoveredRoleId === role.id || isPendingDelete) ? 1 : 0, transition: "opacity 0.15s", pointerEvents: (hoveredRoleId === role.id || isPendingDelete) ? "auto" : "none" }}
                                       >
                                         <X style={{ width: 14, height: 14 }} />
                                       </button>
