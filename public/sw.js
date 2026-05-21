@@ -18,6 +18,7 @@ self.addEventListener('activate', (event) => {
 // Network-first: always try the network, fall back to cache when offline
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
+  if (!event.request.url.startsWith('http')) return
   event.respondWith(
     fetch(event.request)
       .then((res) => {
