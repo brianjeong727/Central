@@ -218,17 +218,17 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [displayGroupName, setDisplayGroupName] = useState(groupName)
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(groupName)
-  const [saving, setSaving] = useState(false)
   const [showAddMembers, setShowAddMembers] = useState(false)
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
-  const [addingMembers, setAddingMembers] = useState(false)
+  const [pendingAddMembers, setPendingAddMembers] = useState<GroupMember[]>([])
+  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(new Set())
   const [muted, setMuted] = useState(false)
   const [savedMuted, setSavedMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [savedPinned, setSavedPinned] = useState(false)
-  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | null>(null)
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
@@ -276,13 +276,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function loadAllProfiles() {
-    const memberIds = new Set(members.map((m) => m.user_id))
+    const existingIds = new Set([...members.map((m) => m.user_id), ...pendingAddMembers.map(m => m.user_id)])
     const { data } = await supabase
       .from("profiles")
       .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
       .eq("ministry_id", ministryId)
       .order("name")
-    setAllProfiles((data ?? []).filter((p: Profile) => !memberIds.has(p.id)))
+    setAllProfiles((data ?? []).filter((p: Profile) => !existingIds.has(p.id)))
   }
 
   async function handleRename() {
@@ -298,25 +298,63 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setRenaming(false)
   }
 
-  async function handleRemoveMember(memberId: string) {
-    await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId)
-    setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+  function stageRemoveMember(memberId: string) {
+    setPendingRemoveIds(prev => new Set([...prev, memberId]))
     setConfirmRemoveMemberId(null)
+    setMobileRevealMemberId(null)
   }
 
-  const hasPreferenceChanges = muted !== savedMuted || pinned !== savedPinned
+  function unstageRemoveMember(memberId: string) {
+    setPendingRemoveIds(prev => { const n = new Set(prev); n.delete(memberId); return n })
+  }
 
-  async function handleSavePreferences() {
-    setSavingPrefs(true)
+  function stageAddMembers() {
+    if (selectedToAdd.length === 0) return
+    const toStage = allProfiles
+      .filter(p => selectedToAdd.includes(p.id))
+      .map(p => ({ user_id: p.id, name: p.name, role: p.role, graduation_year: p.graduation_year ?? null, avatar_url: p.avatar_url ?? null }))
+    setPendingAddMembers(prev => {
+      const existingIds = new Set([...members.map(m => m.user_id), ...prev.map(m => m.user_id)])
+      return [...prev, ...toStage.filter(m => !existingIds.has(m.user_id))]
+    })
+    setSelectedToAdd([])
+    setShowAddMembers(false)
+    setSearchAdd("")
+  }
+
+  function unstagePendingAdd(memberId: string) {
+    setPendingAddMembers(prev => prev.filter(m => m.user_id !== memberId))
+  }
+
+  const hasChanges = pendingAddMembers.length > 0 || pendingRemoveIds.size > 0 || muted !== savedMuted || pinned !== savedPinned
+
+  async function handleSaveChanges() {
+    setSaving(true)
+    if (pendingRemoveIds.size > 0) {
+      await Promise.all([...pendingRemoveIds].map(id =>
+        supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", id)
+      ))
+      setMembers(prev => prev.filter(m => !pendingRemoveIds.has(m.user_id)))
+      setPendingRemoveIds(new Set())
+    }
+    if (pendingAddMembers.length > 0) {
+      await supabase.from("group_members").insert(pendingAddMembers.map(m => ({ group_id: groupId, user_id: m.user_id })))
+      setMembers(prev => [...prev, ...pendingAddMembers])
+      setPendingAddMembers([])
+    }
     await supabase.from("group_members").update({ muted, pinned }).eq("group_id", groupId).eq("user_id", userId)
     setSavedMuted(muted)
     setSavedPinned(pinned)
-    setSavingPrefs(false)
+    setSaving(false)
   }
 
-  function handleDiscardPreferences() {
+  function handleDiscard() {
+    setPendingRemoveIds(new Set())
+    setPendingAddMembers([])
     setMuted(savedMuted)
     setPinned(savedPinned)
+    setConfirmRemoveMemberId(null)
+    setMobileRevealMemberId(null)
   }
 
   async function handleLeave() {
@@ -337,17 +375,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   async function handleDelete() {
     const { error } = await deleteGroup(groupId)
     if (!error) onClose()
-  }
-
-  async function handleAddMembers() {
-    if (selectedToAdd.length === 0) return
-    setAddingMembers(true)
-    await supabase.from("group_members").insert(selectedToAdd.map((uid) => ({ group_id: groupId, user_id: uid })))
-    await loadMembers()
-    setSelectedToAdd([])
-    setAddingMembers(false)
-    setShowAddMembers(false)
-    setSearchAdd("")
   }
 
   const filteredProfiles = allProfiles.filter((p) =>
@@ -440,13 +467,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
         <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4">
           <button
-            onClick={handleAddMembers}
-            disabled={selectedToAdd.length === 0 || addingMembers}
+            onClick={stageAddMembers}
+            disabled={selectedToAdd.length === 0}
             className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide"
           >
-            {addingMembers
-              ? "Adding…"
-              : selectedToAdd.length > 0
+            {selectedToAdd.length > 0
               ? `Add ${selectedToAdd.length} Member${selectedToAdd.length !== 1 ? "s" : ""}`
               : "Add Members"}
           </button>
@@ -468,9 +493,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
         <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Chat Info</h2>
-        {hasPreferenceChanges && (
-          <button onClick={handleSavePreferences} disabled={savingPrefs} style={{ height: 32, padding: "0 12px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPrefs ? "not-allowed" : "pointer", opacity: savingPrefs ? 0.6 : 1 }}>
-            {savingPrefs ? "Saving…" : "Save"}
+        {hasChanges && (
+          <button onClick={handleSaveChanges} disabled={saving} style={{ height: 32, padding: "0 12px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Saving…" : "Save"}
           </button>
         )}
       </div>
@@ -480,11 +505,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <DesktopTopbar
           crumbs={["Central", "Chats", displayGroupName, "Info"]}
           right={
-            hasPreferenceChanges ? (
+            hasChanges ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={handleDiscardPreferences} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
-                <button onClick={handleSavePreferences} disabled={savingPrefs} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPrefs ? "not-allowed" : "pointer", opacity: savingPrefs ? 0.6 : 1 }}>
-                  {savingPrefs ? "Saving…" : "Save changes"}
+                <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
+                <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+                  {saving ? "Saving…" : "Save changes"}
                 </button>
               </div>
             ) : (
@@ -605,7 +630,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && member.user_id !== userId && (
                       isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                          <button onClick={() => handleRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
+                          <button onClick={() => stageRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check style={{ width: 14, height: 14 }} />
                           </button>
                           <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>
@@ -798,7 +823,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && member.user_id !== userId && (
                       isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                          <button onClick={e => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
+                          <button onClick={e => { e.stopPropagation(); stageRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check className="w-4 h-4" />
                           </button>
                           <button onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>

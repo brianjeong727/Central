@@ -7,6 +7,7 @@ import {
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
+  Shuffle, Download, GripVertical, Loader2,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -17,6 +18,7 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
+import { generateGroupsAction, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/app/actions/generate-groups"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -1117,12 +1119,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources" | "Groups">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Plan", "Roster", "Resources"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources"
+    return (["General", "Plan", "Roster", "Resources", "Groups"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources" | "Groups"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources") {
+  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources" | "Groups") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1219,7 +1221,7 @@ export function StudentOrgTeamHome({
     <div>
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
       <div style={{ paddingLeft: 56, borderBottom: "1px solid #E8E2D2", display: "flex", gap: 32 }}>
-        {(["General", "Plan", "Roster", "Resources"] as const).map(t => (
+        {(["General", "Plan", "Roster", "Resources", "Groups"] as const).map(t => (
           <button
             key={t}
             onClick={() => setTeamTabAndUrl(t)}
@@ -1433,6 +1435,16 @@ export function StudentOrgTeamHome({
             </div>
             <StudentOrgRoleTabContent teamId={teamId} roleName="General" userId={userId} canWrite={canEdit} />
           </div>
+        )}
+
+        {/* GROUPS — group generator */}
+        {teamTab === "Groups" && (
+          <GroupsTab
+            teamId={teamId}
+            ministryId={ministryId}
+            userId={userId}
+            canEdit={canEdit}
+          />
         )}
       </div>
     </div>
@@ -4683,6 +4695,954 @@ export function EventPlanWorkspace({
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── GroupsTab ─────────────────────────────────────────────────────────────────
+
+type GroupSessionRecord = {
+  id: string
+  name: string
+  source_type: string
+  config: Record<string, unknown>
+  created_at: string
+  num_groups: number
+  num_people: number
+}
+
+function GroupsTab({
+  teamId, ministryId, userId, canEdit,
+}: {
+  teamId: string | null
+  ministryId: string
+  userId: string
+  canEdit: boolean
+}) {
+  const supabase = createClient()
+  const [sessions, setSessions] = useState<GroupSessionRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showWizard, setShowWizard] = useState(false)
+  const [viewSession, setViewSession] = useState<GroupSessionRecord | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const mono: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  async function loadSessions() {
+    if (!teamId) { setLoading(false); return }
+    setLoading(true)
+    const { data: rawSessions } = await supabase
+      .from("group_sessions")
+      .select("id, name, source_type, config, created_at")
+      .eq("team_id", teamId)
+      .order("created_at", { ascending: false })
+
+    const ids = (rawSessions ?? []).map((s: Record<string, unknown>) => s.id as string)
+    let statsMap: Record<string, { num_groups: number; num_people: number }> = {}
+
+    if (ids.length > 0) {
+      const { data: gData } = await supabase
+        .from("generated_groups")
+        .select("id, session_id")
+        .in("session_id", ids)
+      const gIds = (gData ?? []).map((g: Record<string, unknown>) => g.id as string)
+      const { data: mData } = gIds.length > 0
+        ? await supabase.from("generated_group_members").select("group_id").in("group_id", gIds)
+        : { data: [] }
+      const memberCount: Record<string, number> = {}
+      ;(mData ?? []).forEach((m: Record<string, unknown>) => {
+        const gid = m.group_id as string
+        memberCount[gid] = (memberCount[gid] ?? 0) + 1
+      })
+      ;(gData ?? []).forEach((g: Record<string, unknown>) => {
+        const sid = g.session_id as string
+        if (!statsMap[sid]) statsMap[sid] = { num_groups: 0, num_people: 0 }
+        statsMap[sid].num_groups++
+        statsMap[sid].num_people += memberCount[g.id as string] ?? 0
+      })
+    }
+
+    setSessions((rawSessions ?? []).map((s: Record<string, unknown>) => ({
+      id: s.id as string,
+      name: s.name as string,
+      source_type: s.source_type as string,
+      config: (s.config ?? {}) as Record<string, unknown>,
+      created_at: s.created_at as string,
+      num_groups: statsMap[s.id as string]?.num_groups ?? 0,
+      num_people: statsMap[s.id as string]?.num_people ?? 0,
+    })))
+    setLoading(false)
+  }
+
+  useEffect(() => { loadSessions() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleDelete(sessionId: string) {
+    setDeletingId(sessionId)
+    await supabase.from("group_sessions").delete().eq("id", sessionId)
+    setSessions(prev => prev.filter(s => s.id !== sessionId))
+    setDeletingId(null)
+  }
+
+  if (viewSession) {
+    return (
+      <GroupSessionView
+        session={viewSession}
+        onBack={() => setViewSession(null)}
+      />
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={mono}>Group generator</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Groups</h2>
+        </div>
+        {canEdit && sessions.length > 0 && (
+          <button
+            onClick={() => setShowWizard(true)}
+            style={{ padding: "10px 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}
+          >
+            <Plus style={{ width: 15, height: 15 }} />
+            Generate groups
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
+          <Loader2 style={{ width: 24, height: 24, color: "#8A8497" }} className="animate-spin" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <button
+          onClick={canEdit ? () => setShowWizard(true) : undefined}
+          disabled={!canEdit}
+          style={{
+            width: "100%", padding: "48px 24px", border: "1px dashed #C4C0B0",
+            borderRadius: 14, background: "transparent",
+            cursor: canEdit ? "pointer" : "default",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed #C4C0B0", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497" }}>
+            <Plus style={{ width: 20, height: 20 }} />
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 15, color: "#5A5466", fontWeight: 500, margin: 0 }}>Generate your first group set</p>
+            <p style={{ fontSize: 13, color: "#8A8497", margin: "4px 0 0" }}>Split your ministry into balanced small groups.</p>
+          </div>
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {sessions.map(session => (
+            <div
+              key={session.id}
+              style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "18px 22px", display: "flex", alignItems: "center", gap: 16 }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{session.name}</p>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: "4px 0 0" }}>
+                  {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setViewSession(session)}
+                  style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  View
+                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => handleDelete(session.id)}
+                    disabled={deletingId === session.id}
+                    style={{ padding: "6px 14px", border: "1px solid #9F3030", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                  >
+                    {deletingId === session.id ? "…" : "Delete"}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showWizard && (
+        <GroupGeneratorWizard
+          teamId={teamId}
+          ministryId={ministryId}
+          userId={userId}
+          onClose={() => setShowWizard(false)}
+          onSaved={() => { setShowWizard(false); loadSessions() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── GroupSessionView ───────────────────────────────────────────────────────────
+
+function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; onBack: () => void }) {
+  const supabase = createClient()
+  const [groups, setGroups] = useState<{ id: string; name: string; order_index: number; members: { id: string; name: string; graduation_year: number | null; role: string }[] }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const mono: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  useEffect(() => {
+    async function load() {
+      const { data: gData } = await supabase
+        .from("generated_groups")
+        .select("id, name, order_index")
+        .eq("session_id", session.id)
+        .order("order_index")
+      if (!gData || gData.length === 0) { setLoading(false); return }
+      const gIds = gData.map((g: Record<string, unknown>) => g.id as string)
+      const { data: mData } = await supabase
+        .from("generated_group_members")
+        .select("group_id, profiles(id, name, graduation_year, role)")
+        .in("group_id", gIds)
+      const membersByGroup: Record<string, { id: string; name: string; graduation_year: number | null; role: string }[]> = {}
+      ;(mData ?? []).forEach((m: Record<string, unknown>) => {
+        const gid = m.group_id as string
+        if (!membersByGroup[gid]) membersByGroup[gid] = []
+        const p = m.profiles as { id: string; name: string; graduation_year: number | null; role: string } | null
+        if (p) membersByGroup[gid].push(p)
+      })
+      setGroups(gData.map((g: Record<string, unknown>) => ({
+        id: g.id as string,
+        name: g.name as string,
+        order_index: g.order_index as number,
+        members: membersByGroup[g.id as string] ?? [],
+      })))
+      setLoading(false)
+    }
+    load()
+  }, [session.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function exportCSV() {
+    const rows = [["Name", "Group", "Graduation Year", "Role"]]
+    for (const g of groups) {
+      for (const m of g.members) {
+        rows.push([m.name, g.name, String(m.graduation_year ?? ""), m.role])
+      }
+    }
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = `${session.name.replace(/[^a-zA-Z0-9]/g, "_")}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const totalPeople = groups.reduce((s, g) => s + g.members.length, 0)
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <button
+          onClick={onBack}
+          style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466", flexShrink: 0 }}
+        >
+          <ArrowLeft style={{ width: 14, height: 14 }} />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={mono}>Saved grouping</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, margin: "2px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>{session.name}</h2>
+        </div>
+        <button
+          onClick={exportCSV}
+          style={{ padding: "8px 16px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}
+        >
+          <Download style={{ width: 13, height: 13 }} />
+          Export CSV
+        </button>
+      </div>
+      <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 24 }}>
+        {groups.length} groups · {totalPeople} people · Created {new Date(session.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+      </p>
+
+      {loading ? (
+        <div style={{ padding: "40px 0", display: "flex", justifyContent: "center" }}>
+          <Loader2 style={{ width: 22, height: 22, color: "#8A8497" }} className="animate-spin" />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+          {groups.map(g => (
+            <div key={g.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "18px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>{g.name}</p>
+                <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {g.members.map(m => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "#FBF8F2" }}>
+                        {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                      <p style={{ fontSize: 11, color: "#8A8497", margin: 0 }}>
+                        {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}{m.graduation_year && m.role ? " · " : ""}{m.role}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── GroupGeneratorWizard ───────────────────────────────────────────────────────
+
+function GroupGeneratorWizard({
+  teamId, ministryId, userId, onClose, onSaved,
+}: {
+  teamId: string | null
+  ministryId: string
+  userId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const supabase = createClient()
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+
+  // Step 1 state
+  const [sourceType, setSourceType] = useState<"everyone" | "announcement" | "form">("everyone")
+  const [sourceId, setSourceId] = useState<string>("")
+  const [announcements, setAnnouncements] = useState<{ id: string; title: string; rsvp_count: number }[]>([])
+  const [forms, setForms] = useState<{ id: string; title: string; response_count: number }[]>([])
+  const [poolCount, setPoolCount] = useState<number | null>(null)
+  const [countLoading, setCountLoading] = useState(false)
+
+  // Step 2 state
+  const [numGroups, setNumGroups] = useState(8)
+  const [balanceByYear, setBalanceByYear] = useState(true)
+  const [separateVisitors, setSeparateVisitors] = useState(true)
+  const [hasVisitors, setHasVisitors] = useState(false)
+  const [smallGroupMode, setSmallGroupMode] = useState(false)
+  const [prevCSVText, setPrevCSVText] = useState("")
+  const [naming, setNaming] = useState<"numeric" | "alpha">("numeric")
+
+  // Step 3 state
+  const [groups, setGroups] = useState<GeneratedGroup[]>([])
+  const [sessionName, setSessionName] = useState("")
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Drag state
+  const [dragSource, setDragSource] = useState<{ groupIdx: number; memberIdx: number } | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
+
+  const mono: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  // Load announcements + forms on mount
+  useEffect(() => {
+    async function loadOptions() {
+      // Load announcements with RSVP counts
+      const { data: anns } = await supabase
+        .from("announcements")
+        .select("id, title")
+        .eq("ministry_id", ministryId)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (anns && anns.length > 0) {
+        const annIds = anns.map((a: Record<string, unknown>) => a.id as string)
+        const { data: rsvpCounts } = await supabase
+          .from("rsvps")
+          .select("announcement_id")
+          .in("announcement_id", annIds)
+        const countMap: Record<string, number> = {}
+        ;(rsvpCounts ?? []).forEach((r: Record<string, unknown>) => {
+          const aid = r.announcement_id as string
+          countMap[aid] = (countMap[aid] ?? 0) + 1
+        })
+        setAnnouncements(
+          anns
+            .map((a: Record<string, unknown>) => ({ id: a.id as string, title: a.title as string, rsvp_count: countMap[a.id as string] ?? 0 }))
+            .filter(a => a.rsvp_count > 0)
+        )
+      }
+
+      // Load forms via announcement_forms
+      const { data: formRows } = await supabase
+        .from("announcement_forms")
+        .select("id, announcement_id, announcements(title)")
+        .in("announcement_id", anns ? anns.map((a: Record<string, unknown>) => a.id as string) : [])
+      if (formRows && formRows.length > 0) {
+        const formIds = formRows.map((f: Record<string, unknown>) => f.id as string)
+        const { data: respCounts } = await supabase
+          .from("form_responses")
+          .select("form_id")
+          .in("form_id", formIds)
+        const respMap: Record<string, number> = {}
+        ;(respCounts ?? []).forEach((r: Record<string, unknown>) => {
+          const fid = r.form_id as string
+          respMap[fid] = (respMap[fid] ?? 0) + 1
+        })
+        setForms(
+          formRows
+            .map((f: Record<string, unknown>) => {
+              const ann = f.announcements as { title?: string } | null
+              return { id: f.id as string, title: ann?.title ?? "Untitled form", response_count: respMap[f.id as string] ?? 0 }
+            })
+            .filter(f => f.response_count > 0)
+        )
+      }
+    }
+    loadOptions()
+
+    // Check if any visitors exist in ministry
+    supabase.from("profiles").select("id").eq("ministry_id", ministryId).eq("role", "visitor").limit(1)
+      .then(({ data }) => setHasVisitors((data ?? []).length > 0))
+  }, [ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update pool count when source changes
+  useEffect(() => {
+    async function fetchCount() {
+      setCountLoading(true)
+      setPoolCount(null)
+      if (sourceType === "everyone") {
+        const { count } = await supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("ministry_id", ministryId)
+        setPoolCount(count ?? 0)
+      } else if (sourceType === "announcement" && sourceId) {
+        const { count } = await supabase
+          .from("rsvps")
+          .select("user_id", { count: "exact", head: true })
+          .eq("announcement_id", sourceId)
+        setPoolCount(count ?? 0)
+      } else if (sourceType === "form" && sourceId) {
+        const { count } = await supabase
+          .from("form_responses")
+          .select("user_id", { count: "exact", head: true })
+          .eq("form_id", sourceId)
+        setPoolCount(count ?? 0)
+      } else {
+        setPoolCount(null)
+      }
+      setCountLoading(false)
+    }
+    fetchCount()
+  }, [sourceType, sourceId, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function parsePrevCSV(text: string): PrevPairing[] {
+    const lines = text.trim().split(/\r?\n/).slice(1) // skip header
+    return lines.flatMap(line => {
+      const cols = line.split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+      if (cols.length < 2 || !cols[0] || !cols[1]) return []
+      return [{ name: cols[0], groupLabel: cols[1] }]
+    })
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setGenError(null)
+    const prevPairings = smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : []
+    const { groups: result, error } = await generateGroupsAction({
+      ministryId,
+      sourceType,
+      sourceId: sourceId || undefined,
+      numGroups,
+      balanceByYear,
+      separateVisitors: separateVisitors && hasVisitors,
+      smallGroupMode,
+      prevPairings,
+      naming,
+    })
+    if (error || result.length === 0) {
+      setGenError(error ?? "No groups generated.")
+      setGenerating(false)
+      return
+    }
+    setGroups(result)
+    if (!sessionName) setSessionName(`Group Set — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`)
+    setStep(3)
+    setGenerating(false)
+  }
+
+  async function handleSave() {
+    if (!sessionName.trim()) return
+    setSaving(true)
+    const { data: sessionData, error: sessionErr } = await supabase
+      .from("group_sessions")
+      .insert({
+        team_id: teamId,
+        ministry_id: ministryId,
+        name: sessionName.trim(),
+        source_type: sourceType,
+        source_id: sourceId || null,
+        config: { numGroups, balanceByYear, separateVisitors, smallGroupMode, naming },
+        created_by: userId,
+      })
+      .select("id")
+      .single()
+
+    if (sessionErr || !sessionData) { setSaving(false); return }
+
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i]
+      const { data: groupData } = await supabase
+        .from("generated_groups")
+        .insert({ session_id: sessionData.id, name: g.name, order_index: i })
+        .select("id")
+        .single()
+      if (!groupData) continue
+      if (g.members.length > 0) {
+        await supabase.from("generated_group_members").insert(
+          g.members.map(m => ({ group_id: groupData.id, user_id: m.id }))
+        )
+      }
+    }
+
+    setSaving(false)
+    onSaved()
+  }
+
+  // Drag-and-drop handlers
+  function handleDragStart(groupIdx: number, memberIdx: number) {
+    setDragSource({ groupIdx, memberIdx })
+  }
+
+  function handleDrop(targetGroupIdx: number) {
+    if (!dragSource) return
+    if (dragSource.groupIdx === targetGroupIdx) { setDragSource(null); setDragOver(null); return }
+    const newGroups = groups.map(g => ({ ...g, members: [...g.members] }))
+    const [moved] = newGroups[dragSource.groupIdx].members.splice(dragSource.memberIdx, 1)
+    newGroups[targetGroupIdx].members.push(moved)
+    setGroups(newGroups)
+    setDragSource(null)
+    setDragOver(null)
+  }
+
+  const estGroupSize = poolCount != null && numGroups > 0
+    ? Math.ceil(poolCount / numGroups)
+    : null
+
+  const step1Ready = sourceType === "everyone" || (sourceId.length > 0)
+
+  const STEPS = ["Pick pool", "Configure", "Preview"]
+  const stepIdx = step - 1
+
+  return (
+    <div
+      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col"
+      style={{ left: 0 }}
+    >
+      {/* Header */}
+      <div style={{ padding: "20px 32px 0", borderBottom: "1px solid #E8E2D2", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={step === 1 ? onClose : () => setStep(s => (s - 1) as 1 | 2 | 3)}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466" }}
+            >
+              <ArrowLeft style={{ width: 14, height: 14 }} />
+            </button>
+            <div>
+              <p style={mono}>Step {step} of {STEPS.length}</p>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, margin: "2px 0 0", color: "#13101A", letterSpacing: "-0.01em" }}>
+                {STEPS[stepIdx]}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466" }}>
+            <X style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
+        {/* Stepper */}
+        <div style={{ display: "flex", gap: 8, paddingBottom: 0 }}>
+          {STEPS.map((s, i) => (
+            <div key={s} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: 999,
+                background: i < stepIdx ? "#3E1540" : i === stepIdx ? "#13101A" : "transparent",
+                border: i > stepIdx ? "1px solid #E2DDCF" : "none",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, color: i <= stepIdx ? "#FBF8F2" : "#8A8497", fontWeight: 600,
+              }}>
+                {i < stepIdx ? <Check style={{ width: 10, height: 10 }} /> : i + 1}
+              </div>
+              <span style={{ fontSize: 12, color: i === stepIdx ? "#13101A" : "#8A8497", fontWeight: i === stepIdx ? 500 : 400 }}>{s}</span>
+              {i < STEPS.length - 1 && <div style={{ width: 20, height: 1, background: "#E8E2D2", margin: "0 4px" }} />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px 40px" }}>
+
+        {/* ── Step 1: Pick pool ── */}
+        {step === 1 && (
+          <div style={{ maxWidth: 560 }}>
+            <p style={{ fontSize: 14, color: "#5A5466", marginBottom: 24 }}>
+              Choose who to draw from. The algorithm will run on this set of people.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {([
+                { value: "everyone", label: "Everyone in the ministry", desc: "All members, leaders, and visitors." },
+                { value: "announcement", label: "People who RSVPed to an event", desc: "Anyone who RSVPed to a specific announcement." },
+                { value: "form", label: "Form respondents", desc: "Anyone who submitted a response to a form." },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setSourceType(opt.value); setSourceId("") }}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 18px",
+                    border: sourceType === opt.value ? "1px solid #3E1540" : "1px solid #E2DDCF",
+                    borderRadius: 12, background: sourceType === opt.value ? "#F6F2E8" : "#FBF8F2",
+                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                    boxShadow: sourceType === opt.value ? "inset 0 0 0 1px #3E1540" : "none",
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginTop: 2,
+                    border: "2px solid " + (sourceType === opt.value ? "#3E1540" : "#C4C0B0"),
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {sourceType === opt.value && <div style={{ width: 8, height: 8, borderRadius: 999, background: "#3E1540" }} />}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>{opt.label}</p>
+                    <p style={{ fontSize: 12, color: "#5A5466", margin: "3px 0 0" }}>{opt.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Dropdown for announcement/form */}
+            {sourceType === "announcement" && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ ...mono, display: "block", marginBottom: 6 }}>Select event</label>
+                {announcements.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>No announcements with RSVPs found.</p>
+                ) : (
+                  <select
+                    value={sourceId}
+                    onChange={e => setSourceId(e.target.value)}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit" }}
+                  >
+                    <option value="">Choose an announcement…</option>
+                    {announcements.map(a => (
+                      <option key={a.id} value={a.id}>{a.title} ({a.rsvp_count} RSVPs)</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {sourceType === "form" && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ ...mono, display: "block", marginBottom: 6 }}>Select form</label>
+                {forms.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>No forms with responses found.</p>
+                ) : (
+                  <select
+                    value={sourceId}
+                    onChange={e => setSourceId(e.target.value)}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit" }}
+                  >
+                    <option value="">Choose a form…</option>
+                    {forms.map(f => (
+                      <option key={f.id} value={f.id}>{f.title} ({f.response_count} responses)</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Pool count preview */}
+            <div style={{ marginTop: 20, padding: "14px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10 }}>
+              {countLoading ? (
+                <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Counting…</p>
+              ) : poolCount !== null ? (
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>
+                  {poolCount === 0 ? "No people in this pool" : `${poolCount} ${poolCount === 1 ? "person" : "people"} in this pool`}
+                </p>
+              ) : (
+                <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Select a source above to see the pool size.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Configure ── */}
+        {step === 2 && (
+          <div style={{ maxWidth: 520 }}>
+            {/* Num groups */}
+            <div style={{ marginBottom: 28 }}>
+              <label style={{ ...mono, display: "block", marginBottom: 8 }}>Number of groups</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={poolCount ?? 100}
+                  value={numGroups}
+                  onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                  style={{ width: 80, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", fontFamily: "inherit" }}
+                />
+                {estGroupSize !== null && (
+                  <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
+                    ~{estGroupSize} {estGroupSize === 1 ? "person" : "people"} per group
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: "#E8E2D2", margin: "0 0 24px" }} />
+
+            {/* Diversity toggles */}
+            <p style={{ ...mono, marginBottom: 16 }}>Diversity settings</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <GgToggle
+                checked={balanceByYear}
+                onChange={setBalanceByYear}
+                label="Balance by graduation year"
+                desc="Distributes each graduating class evenly across groups."
+              />
+              {hasVisitors && (
+                <GgToggle
+                  checked={separateVisitors}
+                  onChange={setSeparateVisitors}
+                  label="Spread visitors across groups"
+                  desc="Visitors are distributed evenly rather than grouped together."
+                />
+              )}
+              <GgToggle
+                checked={smallGroupMode}
+                onChange={setSmallGroupMode}
+                label="Small group mode"
+                desc="Penalizes re-grouping people who were together last time."
+              />
+            </div>
+
+            {/* CSV upload for small group mode */}
+            {smallGroupMode && (
+              <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 12 }}>
+                <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
+                <p style={{ fontSize: 12, color: "#5A5466", margin: "0 0 10px" }}>
+                  Format: <code style={{ fontFamily: "ui-monospace,monospace", background: "#ECE8DE", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
+                </p>
+                <textarea
+                  value={prevCSVText}
+                  onChange={e => setPrevCSVText(e.target.value)}
+                  placeholder={"Name,Group\nJane Smith,Group 1\nJohn Doe,Group 2"}
+                  rows={6}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2DDCF", borderRadius: 8, background: "#FBF8F2", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "#13101A", boxSizing: "border-box" }}
+                />
+              </div>
+            )}
+
+            {/* Divider */}
+            <div style={{ height: 1, background: "#E8E2D2", margin: "24px 0" }} />
+
+            {/* Naming */}
+            <p style={{ ...mono, marginBottom: 12 }}>Group naming</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              {([
+                { value: "numeric", label: "Group 1, 2, 3…" },
+                { value: "alpha", label: "Group A, B, C…" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setNaming(opt.value)}
+                  style={{
+                    padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    border: "1px solid " + (naming === opt.value ? "#3E1540" : "#E2DDCF"),
+                    background: naming === opt.value ? "#3E1540" : "transparent",
+                    color: naming === opt.value ? "#FBF8F2" : "#5A5466",
+                    cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {genError && (
+              <div style={{ marginTop: 18, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 8 }}>
+                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{genError}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 3: Preview & adjust ── */}
+        {step === 3 && (
+          <div>
+            {/* Session name */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ ...mono, display: "block", marginBottom: 6 }}>Session name</label>
+              <input
+                type="text"
+                value={sessionName}
+                onChange={e => setSessionName(e.target.value)}
+                placeholder="e.g. Fall Retreat Groups 2026"
+                style={{ width: "100%", maxWidth: 440, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
+              {groups.length} groups · {groups.reduce((s, g) => s + g.members.length, 0)} people. Drag members between groups to adjust.
+            </p>
+
+            {/* Groups grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {groups.map((g, gIdx) => (
+                <div
+                  key={gIdx}
+                  onDragOver={e => { e.preventDefault(); setDragOver(gIdx) }}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={() => handleDrop(gIdx)}
+                  style={{
+                    background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "#3E1540" : "#E8E2D2"),
+                    borderRadius: 14, padding: "16px 18px", minHeight: 80,
+                    transition: "border-color 0.1s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
+                    <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {g.members.map((m, mIdx) => (
+                      <div
+                        key={m.id}
+                        draggable
+                        onDragStart={() => handleDragStart(gIdx, mIdx)}
+                        onDragEnd={() => { setDragSource(null); setDragOver(null) }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
+                          border: "1px solid #E8E2D2", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                          cursor: "grab",
+                        }}
+                      >
+                        <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
+                        <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
+                            {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                          <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
+                            {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
+                            {m.graduation_year && m.role ? " · " : ""}
+                            {m.role}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop: "1px solid #E8E2D2", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: "#FBF8F2" }}>
+        <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
+          {step === 1 && (poolCount != null ? `${poolCount} people in pool` : "")}
+          {step === 2 && "You can adjust individual assignments in the next step."}
+          {step === 3 && "Changes are not saved until you click Save."}
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          {step === 3 && (
+            <button
+              onClick={() => { setStep(2); setGroups([]) }}
+              style={{ padding: "10px 18px", border: "1px solid #E2DDCF", borderRadius: 10, background: "transparent", color: "#5A5466", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
+            >
+              <Shuffle style={{ width: 13, height: 13 }} />
+              Regenerate
+            </button>
+          )}
+          {step < 3 && (
+            <button
+              onClick={step === 1 ? () => setStep(2) : handleGenerate}
+              disabled={(step === 1 && !step1Ready) || generating}
+              style={{
+                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2",
+                borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
+                cursor: generating || (step === 1 && !step1Ready) ? "not-allowed" : "pointer",
+                opacity: (step === 1 && !step1Ready) ? 0.5 : 1,
+                display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit",
+              }}
+            >
+              {generating ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : null}
+              {step === 1 ? "Next" : generating ? "Generating…" : "Generate"}
+            </button>
+          )}
+          {step === 3 && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !sessionName.trim()}
+              style={{
+                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2",
+                borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
+                cursor: saving || !sessionName.trim() ? "not-allowed" : "pointer",
+                opacity: !sessionName.trim() ? 0.5 : 1,
+                display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit",
+              }}
+            >
+              {saving ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : <Check style={{ width: 14, height: 14 }} />}
+              {saving ? "Saving…" : "Save grouping"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Shared toggle component for GroupGeneratorWizard
+function GgToggle({ checked, onChange, label, desc }: { checked: boolean; onChange: (v: boolean) => void; label: string; desc: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+      <button
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 36, height: 20, borderRadius: 999, flexShrink: 0,
+          background: checked ? "#3E1540" : "#D6D0C0",
+          border: "none", cursor: "pointer", position: "relative", transition: "background 0.15s", marginTop: 2,
+        }}
+      >
+        <div style={{
+          position: "absolute", top: 2, left: checked ? 18 : 2,
+          width: 16, height: 16, borderRadius: 999, background: "#FBF8F2",
+          transition: "left 0.15s",
+        }} />
+      </button>
+      <div>
+        <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{desc}</p>
       </div>
     </div>
   )
