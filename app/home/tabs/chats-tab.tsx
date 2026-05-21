@@ -581,11 +581,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
               <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400 }}>Members</h3>
-              <span style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>{members.length} people</span>
+              <span style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>{members.length + pendingAddMembers.length - pendingRemoveIds.size} people</span>
             </div>
-            {loading ? <Spinner /> : (
+            {loading ? <Spinner /> : (() => {
+              const allRows = [...members, ...pendingAddMembers]
+              return (
               <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
-                {members.map((member, i) => {
+                {allRows.map((member, i) => {
+                  const isPendingRemove = pendingRemoveIds.has(member.user_id)
+                  const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
                   const isConfirming = confirmRemoveMemberId === member.user_id
                   const isHovered = hoveredMemberId === member.user_id
                   return (
@@ -595,8 +599,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{
                       display: "grid", gridTemplateColumns: "40px 1fr auto auto",
                       alignItems: "center", gap: 14, padding: "15px 20px",
-                      borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
-                      background: isConfirming ? "#FDF0F0" : "white",
+                      borderBottom: i < allRows.length - 1 ? "1px solid #ECE8DE" : "none",
+                      background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white",
                       transition: "background 0.1s",
                     }}>
                     <Avatar className={`w-10 h-10 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
@@ -605,10 +609,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     </Avatar>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500 }}>{member.name}</p>
+                        <p style={{ fontSize: 14, color: isPendingRemove ? "#9F3030" : "#13101A", fontWeight: 500, textDecoration: isPendingRemove ? "line-through" : "none" }}>{member.name}</p>
                         {member.user_id === userId && (
                           <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#FBF8F2", color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>
                         )}
+                        {isPendingRemove && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
+                        {isPendingAdd && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
                       </div>
                       {member.graduation_year && (
                         <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Class of {member.graduation_year}</p>
@@ -628,7 +634,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       )}
                     </div>
                     {canManage && member.user_id !== userId && (
-                      isConfirming ? (
+                      isPendingAdd ? (
+                        <button onClick={() => unstagePendingAdd(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : isPendingRemove ? (
+                        <button onClick={() => unstageRemoveMember(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                           <button onClick={() => stageRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check style={{ width: 14, height: 14 }} />
@@ -655,7 +669,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   </button>
                 )}
               </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* Preferences + Manage */}
@@ -791,20 +806,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "#8A8497", flexShrink: 0 }} />}
                   </div>
                 )}
-                <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length} member{members.length !== 1 ? "s" : ""}</p>
+                <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length + pendingAddMembers.length - pendingRemoveIds.size} member{members.length + pendingAddMembers.length - pendingRemoveIds.size !== 1 ? "s" : ""}</p>
               </div>
             </div>
             {loading ? <Spinner /> : (
               <div className="flex flex-col gap-2 mb-6">
-                {members.map((member) => {
+                {[...members, ...pendingAddMembers].map((member) => {
+                  const isPendingRemove = pendingRemoveIds.has(member.user_id)
+                  const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
                   const isConfirming = confirmRemoveMemberId === member.user_id
                   const isRevealed = mobileRevealMemberId === member.user_id
                   return (
                   <div
                     key={member.user_id}
                     className="rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
-                    style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
-                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
+                    style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white", transition: "background 0.1s" }}
+                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
                   >
                     <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
                       {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
@@ -812,8 +829,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-[13px] font-semibold text-[#13101A] truncate">{member.name}</p>
+                        <p className={`text-[13px] font-semibold truncate ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
+                        {isPendingRemove && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
+                        {isPendingAdd && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>{member.role}</span>}
@@ -821,7 +840,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       </div>
                     </div>
                     {canManage && member.user_id !== userId && (
-                      isConfirming ? (
+                      isPendingAdd ? (
+                        <button onClick={e => { e.stopPropagation(); unstagePendingAdd(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497" }}>
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : isPendingRemove ? (
+                        <button onClick={e => { e.stopPropagation(); unstageRemoveMember(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497" }}>
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
                           <button onClick={e => { e.stopPropagation(); stageRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check className="w-4 h-4" />
