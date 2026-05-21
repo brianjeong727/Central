@@ -224,10 +224,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
   const [addingMembers, setAddingMembers] = useState(false)
-  const [removingId, setRemovingId] = useState<string | null>(null)
   const [muted, setMuted] = useState(false)
+  const [savedMuted, setSavedMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [savedPinned, setSavedPinned] = useState(false)
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | null>(null)
+  const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
+  const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
+  const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
 
   const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
@@ -294,10 +299,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleRemoveMember(memberId: string) {
-    setRemovingId(memberId)
     await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
-    setRemovingId(null)
+    setConfirmRemoveMemberId(null)
+  }
+
+  const hasPreferenceChanges = muted !== savedMuted || pinned !== savedPinned
+
+  async function handleSavePreferences() {
+    setSavingPrefs(true)
+    await supabase.from("group_members").update({ muted, pinned }).eq("group_id", groupId).eq("user_id", userId)
+    setSavedMuted(muted)
+    setSavedPinned(pinned)
+    setSavingPrefs(false)
+  }
+
+  function handleDiscardPreferences() {
+    setMuted(savedMuted)
+    setPinned(savedPinned)
   }
 
   async function handleLeave() {
@@ -449,6 +468,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
         <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Chat Info</h2>
+        {hasPreferenceChanges && (
+          <button onClick={handleSavePreferences} disabled={savingPrefs} style={{ height: 32, padding: "0 12px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPrefs ? "not-allowed" : "pointer", opacity: savingPrefs ? 0.6 : 1 }}>
+            {savingPrefs ? "Saving…" : "Save"}
+          </button>
+        )}
       </div>
 
       {/* ── Desktop topbar ── */}
@@ -456,9 +480,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <DesktopTopbar
           crumbs={["Central", "Chats", displayGroupName, "Info"]}
           right={
-            <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white">
-              <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
-            </button>
+            hasPreferenceChanges ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={handleDiscardPreferences} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
+                <button onClick={handleSavePreferences} disabled={savingPrefs} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPrefs ? "not-allowed" : "pointer", opacity: savingPrefs ? 0.6 : 1 }}>
+                  {savingPrefs ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            ) : (
+              <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white">
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
+              </button>
+            )
           }
         />
       </div>
@@ -527,12 +560,20 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
             {loading ? <Spinner /> : (
               <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
-                {members.map((member, i) => (
-                  <div key={member.user_id} style={{
-                    display: "grid", gridTemplateColumns: "40px 1fr auto auto",
-                    alignItems: "center", gap: 14, padding: "15px 20px",
-                    borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
-                  }}>
+                {members.map((member, i) => {
+                  const isConfirming = confirmRemoveMemberId === member.user_id
+                  const isHovered = hoveredMemberId === member.user_id
+                  return (
+                  <div key={member.user_id}
+                    onMouseEnter={() => setHoveredMemberId(member.user_id)}
+                    onMouseLeave={() => setHoveredMemberId(null)}
+                    style={{
+                      display: "grid", gridTemplateColumns: "40px 1fr auto auto",
+                      alignItems: "center", gap: 14, padding: "15px 20px",
+                      borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
+                      background: isConfirming ? "#FDF0F0" : "white",
+                      transition: "background 0.1s",
+                    }}>
                     <Avatar className={`w-10 h-10 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
                       {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                       <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
@@ -562,12 +603,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       )}
                     </div>
                     {canManage && member.user_id !== userId && (
-                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} style={{ width: 28, height: 28, borderRadius: 999, border: "none", background: "transparent", color: "#C4C4C4", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} className="hover:text-red-400 transition-colors disabled:opacity-40">
-                        <X style={{ width: 14, height: 14 }} />
-                      </button>
+                      isConfirming ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <button onClick={() => handleRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
+                            <Check style={{ width: 14, height: 14 }} />
+                          </button>
+                          <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>
+                            <X style={{ width: 14, height: 14 }} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmRemoveMemberId(member.user_id)}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
+                        >
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      )
                     )}
                   </div>
-                ))}
+                  )
+                })}
                 {canManage && (
                   <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", borderTop: "1px solid #ECE8DE", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
                     <Plus style={{ width: 14, height: 14 }} /> Add members from directory
@@ -637,12 +693,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Danger */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {canArchive && (
-                <button onClick={handleArchive} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
                   Archive chat
                 </button>
               )}
               {canUnarchive && (
-                <button onClick={handleUnarchive} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
                   Unarchive chat
                 </button>
               )}
@@ -652,19 +708,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 </button>
               )}
               {canDelete && (
-                confirmDelete ? (
-                  <div style={{ background: "#FFF5F5", border: "1px solid #FFD7D7", borderRadius: 12, padding: "12px 14px" }}>
-                    <p style={{ fontSize: 13, color: "#B0413E", marginBottom: 10, fontWeight: 500 }}>Delete this chat and all its messages? This cannot be undone.</p>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={handleDelete} style={{ flex: 1, padding: "8px 0", background: "#B0413E", color: "white", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete</button>
-                      <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: "8px 0", background: "#F4F1E8", color: "#5A5466", borderRadius: 10, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}>Cancel</button>
-                    </div>
+                <button onClick={() => setConfirmAction("delete")} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #FFD7D7", cursor: "pointer" }}>
+                  Delete chat
+                </button>
+              )}
+              {confirmAction && (
+                <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>
+                    {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
+                     confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
+                     "Delete this chat and all its messages? This cannot be undone."}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                    <button
+                      onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
+                      style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                    >
+                      {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
+                    </button>
                   </div>
-                ) : (
-                  <button onClick={() => setConfirmDelete(true)} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #FFD7D7", cursor: "pointer" }}>
-                    Delete chat
-                  </button>
-                )
+                </div>
               )}
             </div>
           </div>
@@ -707,8 +771,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
             {loading ? <Spinner /> : (
               <div className="flex flex-col gap-2 mb-6">
-                {members.map((member) => (
-                  <div key={member.user_id} className="bg-white rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3">
+                {members.map((member) => {
+                  const isConfirming = confirmRemoveMemberId === member.user_id
+                  const isRevealed = mobileRevealMemberId === member.user_id
+                  return (
+                  <div
+                    key={member.user_id}
+                    className="rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
+                    style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
+                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
+                  >
                     <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
                       {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                       <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
@@ -724,12 +796,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       </div>
                     </div>
                     {canManage && member.user_id !== userId && (
-                      <button onClick={() => handleRemoveMember(member.user_id)} disabled={removingId === member.user_id} className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-40">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      isConfirming ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                          <button onClick={e => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                        >
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      )
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -746,22 +833,28 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
-            <div className="px-5 pb-10">
-              {canArchive && <button onClick={handleArchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
-              {canUnarchive && <button onClick={handleUnarchive} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] mb-3 hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Unarchive chat</button>}
+            <div className="px-5 pb-10 flex flex-col gap-3">
+              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
+              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Unarchive chat</button>}
               {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Leave chat</button>}
-              {canDelete && (
-                confirmDelete ? (
-                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4">
-                    <p className="text-[13px] text-[#B0413E] font-medium mb-3">Delete this chat and all its messages? This cannot be undone.</p>
-                    <div className="flex gap-2">
-                      <button onClick={handleDelete} className="flex-1 py-2.5 rounded-xl bg-[#B0413E] text-white text-[13px] font-semibold">Delete</button>
-                      <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2.5 rounded-xl bg-[#F4F1E8] text-[#5A5466] text-[13px] font-medium">Cancel</button>
-                    </div>
+              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>}
+              {confirmAction && (
+                <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>
+                    {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
+                     confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
+                     "Delete this chat and all its messages? This cannot be undone."}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                    <button
+                      onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
+                      style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                    >
+                      {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
+                    </button>
                   </div>
-                ) : (
-                  <button onClick={() => setConfirmDelete(true)} className="mt-3 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>
-                )
+                </div>
               )}
             </div>
           )}
