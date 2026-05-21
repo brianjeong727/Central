@@ -145,14 +145,13 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
                   borderLeftColor: isActive ? "#3E1540" : "transparent",
                   width: "100%", textAlign: "left",
                 }}>
-                  <div style={{
-                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                    background: isActive ? "#3E1540" : "#F4F1E8",
-                    color: isActive ? "#F6F4EF" : "#13101A",
-                    display: "grid", placeItems: "center", fontSize: "16px",
-                  }}>
-                    {t.teamIcon ?? "👥"}
-                  </div>
+                  <PlanLineIcon
+                    iconKey={t.teamIcon ?? "users"}
+                    bg={isActive ? "#3E1540" : "#F4F1E8"}
+                    fg={isActive ? "#F6F4EF" : "#13101A"}
+                    size={30}
+                    radius={8}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.teamName}</div>
                     <div style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.4px" }}>{t.roleName}</div>

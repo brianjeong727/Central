@@ -4937,19 +4937,6 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
               ))}
             </div>
 
-            <button
-              onClick={() => { setTeamName(""); setTeamIcon("👥"); setTeamDesc(""); setRoles([{ name: "Member", permissions: [] }]); setStep("customize") }}
-              className="w-full mt-3 bg-transparent rounded-2xl border border-dashed border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/30 hover:bg-[#FDFBF7] transition-all flex items-center gap-3 md:mt-4"
-            >
-              <div className="w-8 h-8 rounded-lg border border-dashed border-[#C4C4C4] flex items-center justify-center text-[#8A8497] flex-shrink-0">
-                <Plus className="w-4 h-4" />
-              </div>
-              <div>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17 }} className="text-[#13101A]">Start from scratch</p>
-                <p className="text-[12px] text-[#8A8497] mt-0.5">Build custom roles and permissions</p>
-              </div>
-            </button>
-
             {/* Desktop: footer nav */}
             <div className="hidden md:flex justify-end mt-8 pt-6 border-t border-[#ECE8DE]">
               <p className="text-[12px] text-[#8A8497] flex-1 self-center">You can change everything later.</p>
@@ -6061,7 +6048,6 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
   const [error, setError] = useState<string | null>(null)
 
   function applyPreset(presetId: string) {
-    if (presetId === "custom") { setRoles([]); return }
     const display = WIZARD_PRESETS_DISPLAY.find(p => p.id === presetId)
     const data    = TEAM_PRESETS.find(p => p.id === presetId)
     if (display) { if (!name.trim()) setName(display.label); setIconKey(display.iconKey) }
@@ -6076,7 +6062,7 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
   }
 
   function getVisiblePerms(): string[] {
-    if (!selectedPresetId || selectedPresetId === "custom") return ALL_PERMISSIONS
+    if (!selectedPresetId) return ALL_PERMISSIONS
     const map: Record<string, string[]> = { praise: TEAM_PERMISSION_FILTERS.praise, board: TEAM_PERMISSION_FILTERS.student_org, dgl: TEAM_PERMISSION_FILTERS.small_group }
     return map[selectedPresetId] ?? ALL_PERMISSIONS
   }
@@ -6186,32 +6172,6 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
                 )
               })}
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0 2px" }}>
-                <span style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
-                <span style={{ ...WIZARD_MONO, fontSize: 10 }}>OR</span>
-                <span style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
-              </div>
-
-              <button onClick={() => setSelectedPresetId("custom")} style={{
-                display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
-                textAlign: "left" as const, width: "100%", cursor: "pointer", fontFamily: "inherit",
-                border: selectedPresetId === "custom" ? "1px solid #3E1540" : "1px dashed #C4C0B0",
-                background: selectedPresetId === "custom" ? "#F6F2E8" : "transparent",
-                boxShadow: selectedPresetId === "custom" ? "inset 0 0 0 1px #3E1540" : "none",
-              }}>
-                <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: selectedPresetId === "custom" ? "#3E1540" : "transparent", color: selectedPresetId === "custom" ? "#FBF8F2" : "#5A5466", border: selectedPresetId === "custom" ? "none" : "1px dashed #C4C0B0", display: "grid", placeItems: "center" }}>
-                  <Plus style={{ width: 16, height: 16 }} />
-                </span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#13101A" }}>Custom team</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "#5A5466", marginTop: 3 }}>Start blank — set up roles and permissions yourself.</span>
-                </span>
-                {selectedPresetId === "custom" && (
-                  <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid #3E1540", background: "#3E1540", display: "grid", placeItems: "center" }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 99, background: "#FBF8F2" }} />
-                  </span>
-                )}
-              </button>
             </div>
           )}
 
