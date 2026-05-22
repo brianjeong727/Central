@@ -52,6 +52,11 @@ Wrap every DB call in a try/catch or check the error return. For each failure mo
 - Is there visible user feedback (toast, inline error, disabled button)?
 - Does it fail silently? If so, fix it.
 
+**Server action error handling is mandatory — not optional:**
+- Every `"use server"` action body must be wrapped in `try/catch`. Without it, any DB error becomes a `500 Internal Server Error` in production with no visible message. Return `{ error: e.message }` from the catch — never let the action throw to the client.
+- Every client call to a server action needs `catch`, not just `finally`. Pattern: `try { const r = await action(); if (r.error) setErr(r.error) } catch (e) { setErr(e.message) } finally { setLoading(false) }`.
+- Supabase delete/insert/update return `{ error }` — always check it and return a descriptive message, not just "Failed to save."
+
 ### 7. Realtime
 If the feature uses Supabase Realtime (`supabase.channel(...)`):
 - Verify the channel is created with a unique topic per resource (e.g. `meeting-note-{noteId}`)
@@ -66,6 +71,16 @@ Open the feature at 390px width. Confirm:
 
 ### 9. Concurrent actions
 For any resource that two users might touch simultaneously (RSVPs, chat messages, group edits), verify the DB has a UNIQUE constraint or the server action handles conflicts. "INSERT ... ON CONFLICT DO NOTHING" or optimistic locking is required — not just hoping it doesn't happen.
+
+---
+
+## Date / semester boundary verification
+
+Any time a feature uses a computed label (semester, academic year, cohort) as a DB filter key:
+
+1. **Print the computed value before writing queries.** `console.log(getSemesterLabel())` in the dev console or a node one-liner. Never assume the boundary logic is correct — `month <= 4` and `month <= 5` differ by a whole month.
+2. **Confirm seeded test data uses the same label.** If the seed script uses `spring_2026` but the app computes `summer_2026`, every query silently returns empty. Verify they match *before* testing, not after a confusing empty-state bug.
+3. **Test from both sides of every boundary.** For `month <= 5` (spring through May): test May 31 (spring) and June 1 (summer). Off-by-one errors only appear at the boundary.
 
 ---
 
