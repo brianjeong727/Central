@@ -18,7 +18,7 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
-import { generateGroupsAction, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/app/actions/generate-groups"
+import { runAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/lib/group-algorithm"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
   type DGLSlot, type DGLRole, type ProposedAssignment,
@@ -2052,7 +2052,21 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     if (!addMemberUserId) return
     setAddingMember(true)
     const { error } = await supabase.from("worship_roles").insert({ week_id: weekId, user_id: addMemberUserId, role_name: addMemberRole })
-    if (!error) { setAddMemberToWeekId(null); setAddMemberUserId(""); setAddMemberRole("Vocals"); setAddMemberSearch(""); await loadSchedule() }
+    if (!error) {
+      setAddMemberToWeekId(null); setAddMemberUserId(""); setAddMemberRole("Vocals"); setAddMemberSearch(""); await loadSchedule()
+      // If week is already confirmed and has no chat yet, create chat now that a role exists
+      const week = weeks.find(w => w.id === weekId)
+      if (week?.status === "confirmed" && !week.chat_group_id) {
+        try {
+          const result = await createPraiseTeamChatAction(weekId, ministryId)
+          if (result.groupId) {
+            setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, chat_group_id: result.groupId } : w))
+          }
+        } catch {
+          // non-blocking
+        }
+      }
+    }
     setAddingMember(false)
   }
 
@@ -2073,9 +2087,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     if (status === "confirmed") {
       const week = weeks.find(w => w.id === weekId)
       if (week && !week.chat_group_id) {
-        const result = await createPraiseTeamChatAction(weekId, ministryId)
-        if (result.groupId) {
-          setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, chat_group_id: result.groupId } : w))
+        try {
+          const result = await createPraiseTeamChatAction(weekId, ministryId)
+          if (result.groupId) {
+            setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, chat_group_id: result.groupId } : w))
+          }
+        } catch {
+          // Chat creation failure is non-blocking — week status is already saved
         }
       }
     }
@@ -5274,27 +5292,77 @@ function GroupGeneratorWizard({
     setGenerating(true)
     setGenError(null)
     try {
+      // Fetch pool client-side — avoids server-action admin client dependency
+      let pool: PoolPerson[] = []
+
+      if (sourceType === "everyone") {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, name, graduation_year, role")
+          .eq("ministry_id", ministryId)
+          .not("name", "is", null)
+        if (error) throw new Error("Failed to fetch members.")
+        pool = (data ?? []) as PoolPerson[]
+      } else if (sourceType === "announcement" && sourceId) {
+        const { data, error } = await supabase
+          .from("rsvps")
+          .select("user_id, profiles(id, name, graduation_year, role)")
+          .eq("announcement_id", sourceId)
+        if (error) throw new Error("Failed to fetch RSVP list.")
+        pool = ((data ?? []) as Record<string, unknown>[])
+          .map((r) => {
+            const p = r.profiles
+            return Array.isArray(p) ? p[0] : p
+          })
+          .filter(Boolean) as PoolPerson[]
+      } else if (sourceType === "form" && sourceId) {
+        const { data: respData, error: respErr } = await supabase
+          .from("form_responses")
+          .select("user_id")
+          .eq("form_id", sourceId)
+        if (respErr) throw new Error("Failed to fetch form responses.")
+        const seen = new Set<string>()
+        const userIds = ((respData ?? []) as { user_id: string }[])
+          .map((r) => r.user_id)
+          .filter((id) => { if (seen.has(id)) return false; seen.add(id); return true })
+        if (userIds.length > 0) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("id, name, graduation_year, role")
+            .in("id", userIds)
+          if (error) throw new Error("Failed to fetch profiles.")
+          pool = (data ?? []) as PoolPerson[]
+        }
+      }
+
+      if (pool.length === 0) {
+        setGenError("No people found in this pool.")
+        return
+      }
+
       const prevPairings = smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : []
-      const { groups: result, error } = await generateGroupsAction({
+      const resolvedNumGroups = Math.min(Math.max(1, numGroups), pool.length)
+      const result = runAlgorithm(pool, {
         ministryId,
         sourceType,
         sourceId: sourceId || undefined,
-        numGroups,
+        numGroups: resolvedNumGroups,
         balanceByYear,
         separateVisitors: separateVisitors && hasVisitors,
         smallGroupMode,
         prevPairings,
         naming,
       })
-      if (error || result.length === 0) {
-        setGenError(error ?? "No groups generated.")
+
+      if (result.length === 0) {
+        setGenError("No groups generated.")
         return
       }
       setGroups(result)
       if (!sessionName) setSessionName(`Group Set — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`)
       setStep(3)
-    } catch {
-      setGenError("Generation failed. Please try again.")
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Generation failed. Please try again.")
     } finally {
       setGenerating(false)
     }
