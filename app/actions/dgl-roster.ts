@@ -75,43 +75,48 @@ export async function confirmDGLRosterAction(
 ): Promise<{ error?: string }> {
   if (userIds.length === 0) return { error: "Select at least one DGL." }
 
-  const admin = createAdminClient()
-  const now = new Date().toISOString()
+  try {
+    const admin = createAdminClient()
+    const now = new Date().toISOString()
 
-  // Delete old roster rows for this semester
-  await admin.from("dgl_roster").delete()
-    .eq("team_id", teamId)
-    .eq("semester", semester)
+    // Delete old roster rows for this semester
+    const { error: delErr } = await admin.from("dgl_roster").delete()
+      .eq("team_id", teamId)
+      .eq("semester", semester)
+    if (delErr) return { error: `Failed to clear roster: ${delErr.message}` }
 
-  // Insert new rows
-  const { error: insertErr } = await admin.from("dgl_roster").insert(
-    userIds.map(uid => ({
-      team_id: teamId,
-      ministry_id: ministryId,
-      user_id: uid,
-      semester,
-      confirmed_at: now,
-      added_by: presidentId,
-    }))
-  )
-  if (insertErr) return { error: "Failed to save roster." }
+    // Insert new rows
+    const { error: insertErr } = await admin.from("dgl_roster").insert(
+      userIds.map(uid => ({
+        team_id: teamId,
+        ministry_id: ministryId,
+        user_id: uid,
+        semester,
+        confirmed_at: now,
+        added_by: presidentId,
+      }))
+    )
+    if (insertErr) return { error: `Failed to save roster: ${insertErr.message}` }
 
-  // Upsert status
-  const { error: statusErr } = await admin.from("dgl_roster_status").upsert(
-    {
-      team_id: teamId,
-      ministry_id: ministryId,
-      semester,
-      confirmed: true,
-      confirmed_at: now,
-      confirmed_by: presidentId,
-      needs_roster_renewal: false,
-    },
-    { onConflict: "team_id,semester" }
-  )
-  if (statusErr) return { error: "Failed to update roster status." }
+    // Upsert status
+    const { error: statusErr } = await admin.from("dgl_roster_status").upsert(
+      {
+        team_id: teamId,
+        ministry_id: ministryId,
+        semester,
+        confirmed: true,
+        confirmed_at: now,
+        confirmed_by: presidentId,
+        needs_roster_renewal: false,
+      },
+      { onConflict: "team_id,semester" }
+    )
+    if (statusErr) return { error: `Failed to update roster status: ${statusErr.message}` }
 
-  return {}
+    return {}
+  } catch (e) {
+    return { error: `Unexpected error: ${e instanceof Error ? e.message : String(e)}` }
+  }
 }
 
 // ── handleRosterRenewalAction ─────────────────────────────────────────────────

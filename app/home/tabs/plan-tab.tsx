@@ -7870,6 +7870,8 @@ function SmallGroupLeadersTab({
       setRosterAddMode(false)
       setEditingRoster(false)
       await Promise.all([loadRosterForHome(), loadSchedule()])
+    } catch (e) {
+      setRosterError(e instanceof Error ? e.message : "Something went wrong. Please try again.")
     } finally {
       setConfirmingRoster(false)
     }

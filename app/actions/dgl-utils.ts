@@ -4,7 +4,7 @@ export function getSemesterLabel(date: Date = new Date()): string {
   const month = date.getMonth() + 1
   const year = date.getFullYear()
   if (month >= 9) return `fall_${year}`
-  if (month <= 4) return `spring_${year}`
+  if (month <= 5) return `spring_${year}`
   return `summer_${year}`
 }
 
