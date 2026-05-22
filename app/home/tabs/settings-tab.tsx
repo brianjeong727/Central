@@ -11,6 +11,7 @@ import {
   removeMember,
   archiveMinistry,
 } from "@/app/actions/ministry"
+import { updateAutomationSettings } from "@/app/actions/auto-chats"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { getInitials } from "../utils"
 
@@ -103,6 +104,15 @@ export function SettingsTab({
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [toggling, setToggling] = useState(false)
 
+  // Automations
+  const [automationSettings, setAutomationSettings] = useState<Record<string, boolean>>({
+    auto_praise_chat: true,
+    auto_archive_praise: true,
+    auto_sg_chats: true,
+    auto_grade_chats: true,
+    auto_central_chat: true,
+  })
+
   // Danger Zone
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [archiveConfirmText, setArchiveConfirmText] = useState("")
@@ -114,7 +124,7 @@ export function SettingsTab({
   useEffect(() => {
     async function load() {
       const [{ data: min }, { data: profiles }] = await Promise.all([
-        supabase.from("ministries").select("name, university, size, invite_code, is_public").eq("id", ministryId).maybeSingle(),
+        supabase.from("ministries").select("name, university, size, invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
       ])
 
@@ -122,6 +132,9 @@ export function SettingsTab({
         setMinistryInfo({ name: min.name, university: min.university, size: min.size })
         setInviteCode(min.invite_code)
         setIsPublic(min.is_public ?? false)
+        if (min.automation_settings) {
+          setAutomationSettings(s => ({ ...s, ...(min.automation_settings as Record<string, boolean>) }))
+        }
       }
       setMembers(profiles ?? [])
       setLoading(false)
@@ -176,6 +189,14 @@ export function SettingsTab({
     const { code, error } = await regenerateInviteCode()
     if (!error && code) setInviteCode(code)
     setRegenerating(false)
+  }
+
+  // ── Automation toggle ────────────────────────────────────────────────────────
+  async function handleAutomationToggle(key: string) {
+    if (!isAdmin) return
+    const next = { ...automationSettings, [key]: !automationSettings[key] }
+    setAutomationSettings(next)
+    updateAutomationSettings(ministryId, next)
   }
 
   // ── Discovery toggle ─────────────────────────────────────────────────────────
@@ -362,6 +383,35 @@ export function SettingsTab({
                       <div className="absolute top-0.5 w-5 h-5 rounded-full bg-[#FBF8F2] transition-transform duration-200" style={{ transform: isPublic ? "translateX(21px)" : "translateX(2px)" }} />
                     </button>
                   </div>
+                </div>
+              </section>
+
+              {/* Automations */}
+              <section>
+                <p style={SECTION_LABEL} className="mb-3">Automations</p>
+                <div style={CARD} className="divide-y divide-[#F0EBE0]">
+                  {([
+                    { key: "auto_praise_chat",    label: "Auto-create praise team chats when a week is confirmed" },
+                    { key: "auto_archive_praise", label: "Auto-archive praise team chats after Sunday" },
+                    { key: "auto_sg_chats",       label: "Auto-create small group chats when groups are confirmed" },
+                    { key: "auto_grade_chats",    label: "Auto-add new members to grade chats" },
+                    { key: "auto_central_chat",   label: `Auto-add new members to ${ministryName} Chat` },
+                  ] as { key: string; label: string }[]).map(({ key, label }) => {
+                    const on = automationSettings[key] !== false
+                    return (
+                      <div key={key} className="flex items-center justify-between gap-4 px-5 py-4">
+                        <p style={{ fontSize: "13px", color: "#13101A", lineHeight: 1.5 }}>{label}</p>
+                        <button
+                          onClick={() => handleAutomationToggle(key)}
+                          disabled={!isAdmin}
+                          className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${!isAdmin ? "opacity-50 cursor-not-allowed" : ""}`}
+                          style={{ background: on ? "#3E1540" : "#D6D0C0" }}
+                        >
+                          <div className="absolute top-0.5 w-5 h-5 rounded-full bg-[#FBF8F2] transition-transform duration-200" style={{ transform: on ? "translateX(21px)" : "translateX(2px)" }} />
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               </section>
 

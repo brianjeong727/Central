@@ -7,12 +7,21 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo, MONO_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
+import { respondToGradCheck } from "@/app/actions/auto-chats"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
 
 export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
   const supabase = createClient()
+
+  // Grad-check banner state (optimistic clear)
+  const [needsGradCheck, setNeedsGradCheck] = useState(profile.needs_grad_check ?? false)
+
+  async function handleGradCheck(graduated: boolean) {
+    setNeedsGradCheck(false)
+    respondToGradCheck(profile.id, graduated)
+  }
 
   // Hero event state
   const [heroAnn, setHeroAnn] = useState<Announcement | null>(null)
@@ -188,6 +197,30 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           )}
         </button>
       </div>
+
+      {/* Grad-check banner — shown only to seniors who haven't responded yet */}
+      {needsGradCheck && (
+        <div style={{ margin: "12px 20px 0", borderRadius: 12, border: "1px solid #E5E0D2", borderLeft: "4px solid #3E1540", background: "white", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Have you graduated?</p>
+            <p style={{ fontSize: 13, color: "#8A8497" }}>Let us know so we can move you to the right group.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => handleGradCheck(true)}
+              style={{ flex: 1, background: "#3E1540", color: "white", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-inter)", border: "none", borderRadius: 8, padding: "8px 0", cursor: "pointer" }}
+            >
+              I&apos;ve graduated
+            </button>
+            <button
+              onClick={() => handleGradCheck(false)}
+              style={{ flex: 1, background: "none", color: "#13101A", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)", border: "1px solid #E5E0D2", borderRadius: 8, padding: "8px 0", cursor: "pointer" }}
+            >
+              Still a student
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="px-5 md:px-14 pt-8"><Spinner /></div>

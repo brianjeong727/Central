@@ -16,7 +16,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id, avatar_url")
+    .select("id, name, email, graduation_year, grade, needs_grad_check, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id, avatar_url")
     .eq("id", user.id)
     .single()
 
@@ -33,6 +33,8 @@ export default async function HomePage() {
     name: user.email?.split("@")[0] ?? "Member",
     email: user.email ?? "",
     graduation_year: null,
+    grade: null,
+    needs_grad_check: false,
     role: "member",
     about_me: null,
     bible_verse: null,

@@ -7,6 +7,8 @@ export interface Profile {
   name: string
   email: string
   graduation_year: number | null
+  grade?: string | null
+  needs_grad_check?: boolean
   role: string
   about_me: string | null
   bible_verse: string | null
@@ -406,6 +408,8 @@ export interface WorshipWeek {
   leader_id: string | null
   leader_name: string | null
   status: "draft" | "filled" | "confirmed"
+  auto_archive_date: string | null
+  chat_group_id: string | null
   roles: WorshipRoleRow[]
 }
 

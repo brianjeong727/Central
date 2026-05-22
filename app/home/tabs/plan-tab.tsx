@@ -25,6 +25,7 @@ import {
 } from "@/app/actions/generate-dgl-rotation"
 import { SLOT_ROLES, SLOTS } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks } from "@/app/actions/dgl-utils"
+import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -1951,7 +1952,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     setScheduleLoading(true)
     const { data: weeksData } = await supabase
       .from("worship_weeks")
-      .select("id, week_date, leader_id, status, profiles!leader_id(name)")
+      .select("id, week_date, leader_id, status, auto_archive_date, chat_group_id, profiles!leader_id(name)")
       .eq("team_id", teamId)
       .gte("week_date", monthStart)
       .lte("week_date", monthEnd)
@@ -1977,7 +1978,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     setWeeks(weeksData.map(w => {
       const raw = w as unknown as { id: string; week_date: string; leader_id: string | null; status: string; profiles: { name: string } | { name: string }[] | null }
       const p = Array.isArray(raw.profiles) ? raw.profiles[0] : raw.profiles
-      return { id: raw.id, week_date: raw.week_date, leader_id: raw.leader_id, leader_name: p?.name ?? null, status: raw.status as WorshipWeek["status"], roles: rolesByWeek[raw.id] ?? [] }
+      return { id: raw.id, week_date: raw.week_date, leader_id: raw.leader_id, leader_name: p?.name ?? null, status: raw.status as WorshipWeek["status"], auto_archive_date: (raw as { auto_archive_date?: string | null }).auto_archive_date ?? null, chat_group_id: (raw as { chat_group_id?: string | null }).chat_group_id ?? null, roles: rolesByWeek[raw.id] ?? [] }
     }))
     setScheduleLoading(false)
   }
@@ -2069,6 +2070,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   async function handleStatusChange(weekId: string, status: string) {
     await supabase.from("worship_weeks").update({ status }).eq("id", weekId)
     setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, status: status as WorshipWeek["status"] } : w))
+    if (status === "confirmed") {
+      const week = weeks.find(w => w.id === weekId)
+      if (week && week.roles.length > 0 && !week.chat_group_id) {
+        createPraiseTeamChatAction(weekId, ministryId)
+      }
+    }
   }
 
   async function handleDeleteWeek(weekId: string) {
@@ -2561,6 +2568,23 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                         )}
                       </div>
                     </div>
+
+                    {/* ── Auto-archive date (president only) ── */}
+                    {canManage && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                        <span style={{ fontSize: 12, color: "#8A8497", fontFamily: "var(--font-inter)", flexShrink: 0 }}>Auto-archive</span>
+                        <input
+                          type="date"
+                          value={week.auto_archive_date ?? ""}
+                          onChange={async e => {
+                            const val = e.target.value
+                            setWeeks(prev => prev.map(w => w.id === week.id ? { ...w, auto_archive_date: val || null } : w))
+                            await supabase.from("worship_weeks").update({ auto_archive_date: val || null }).eq("id", week.id)
+                          }}
+                          style={{ fontSize: 12, color: "#5A5466", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                        />
+                      </div>
+                    )}
 
                     {/* ── Confirm delete ── */}
                     {confirmDeleteWeekId === week.id && (
@@ -7488,6 +7512,18 @@ function SmallGroupLeadersTab({
   const [isPublishing, setIsPublishing] = useState(false)
   const [rotErr, setRotErr] = useState<string | null>(null)
 
+  // Group chats confirmation (president only)
+  const [confirmGroupsLoading, setConfirmGroupsLoading] = useState(false)
+  const [confirmGroupsResult, setConfirmGroupsResult] = useState<{ created: number; updated: number } | null>(null)
+
+  async function handleConfirmGroupChats() {
+    setConfirmGroupsLoading(true)
+    setConfirmGroupsResult(null)
+    const result = await confirmSmallGroupChatsAction(teamId, ministryId)
+    setConfirmGroupsLoading(false)
+    if (!result.error) setConfirmGroupsResult({ created: result.created, updated: result.updated })
+  }
+
   useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function init() {
@@ -7833,6 +7869,31 @@ function SmallGroupLeadersTab({
               title="No small group assigned yet."
               subtitle="Your team president will assign you to a group."
             />
+          )}
+
+          {/* Group Chats (president only) */}
+          {isPresident && (
+            <div>
+              <PlanSectionHeader>Group Chats</PlanSectionHeader>
+              <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] p-5">
+                <p className="text-[13px] text-[#5A5466] mb-4">
+                  Create church chats for each small group and paired group based on current assignments.
+                </p>
+                <button
+                  onClick={handleConfirmGroupChats}
+                  disabled={confirmGroupsLoading}
+                  style={{ width: "100%", background: "#3E1540", color: "white", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-inter)", border: "none", borderRadius: 10, padding: "10px 0", cursor: confirmGroupsLoading ? "not-allowed" : "pointer", opacity: confirmGroupsLoading ? 0.7 : 1 }}
+                >
+                  {confirmGroupsLoading ? "Creating chats…" : "Confirm Groups & Create Chats"}
+                </button>
+                {confirmGroupsResult && (
+                  <p className="text-[13px] text-[#5A5466] mt-3 text-center">
+                    {confirmGroupsResult.created} chat{confirmGroupsResult.created !== 1 ? "s" : ""} created
+                    {confirmGroupsResult.updated > 0 ? `, ${confirmGroupsResult.updated} updated` : ""}.
+                  </p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

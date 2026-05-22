@@ -6,8 +6,13 @@ import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
-const CURRENT_YEAR = new Date().getFullYear()
-const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + i - 1)
+const GRADES = [
+  { value: "freshman",    label: "Freshman" },
+  { value: "sophomore",   label: "Sophomore" },
+  { value: "junior",      label: "Junior" },
+  { value: "senior",      label: "Senior" },
+  { value: "young_adult", label: "Young Adult" },
+] as const
 
 function SignupContent() {
   const searchParams = useSearchParams()
@@ -15,7 +20,7 @@ function SignupContent() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [graduationYear, setGraduationYear] = useState<string>("")
+  const [grade, setGrade] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -30,7 +35,7 @@ function SignupContent() {
       email,
       password,
       options: {
-        data: { name, graduation_year: Number(graduationYear) },
+        data: { name, grade },
       },
     })
 
@@ -144,23 +149,38 @@ function SignupContent() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-medium text-[#5A5466]">Graduation year</label>
-              <select
-                value={graduationYear}
-                onChange={(e) => setGraduationYear(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all appearance-none"
-              >
-                <option value="" disabled>Select a year</option>
-                {GRAD_YEARS.map((year) => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
+              <label className="text-[12px] font-medium text-[#5A5466]">Year</label>
+              <div className="flex flex-wrap gap-2">
+                {GRADES.map(({ value, label }) => {
+                  const active = grade === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setGrade(value)}
+                      style={{
+                        padding: "7px 14px",
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 400,
+                        fontFamily: "var(--font-inter)",
+                        borderRadius: 20,
+                        border: active ? "1px solid #3E1540" : "1px solid #E2DDCF",
+                        background: active ? "#2D0F2E" : "#FBF8F2",
+                        color: active ? "#F5F0E8" : "#5A5466",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !grade}
               className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px] mt-1"
             >
               {loading ? "Creating account…" : "Create account"}
