@@ -53,21 +53,22 @@ export async function generateGroupsAction(
         .map((r) => r.profiles)
         .filter(Boolean) as PoolPerson[]
     } else if (params.sourceType === "form" && params.sourceId) {
-      const { data } = await admin
+      // form_responses.user_id → auth.users, not profiles — must do two-step lookup
+      const { data: respData } = await admin
         .from("form_responses")
-        .select("user_id, profiles(id, name, graduation_year, role)")
+        .select("user_id")
         .eq("form_id", params.sourceId)
-      // deduplicate by user_id (in case of multiple responses)
       const seen = new Set<string>()
-      pool = ((data ?? []) as Record<string, unknown>[])
-        .map((r) => r.profiles)
-        .filter((p): p is PoolPerson => {
-          if (!p || typeof p !== "object") return false
-          const person = p as PoolPerson
-          if (seen.has(person.id)) return false
-          seen.add(person.id)
-          return true
-        })
+      const userIds = ((respData ?? []) as { user_id: string }[])
+        .map((r) => r.user_id)
+        .filter((id) => { if (seen.has(id)) return false; seen.add(id); return true })
+      if (userIds.length > 0) {
+        const { data } = await admin
+          .from("profiles")
+          .select("id, name, graduation_year, role")
+          .in("id", userIds)
+        pool = (data ?? []) as PoolPerson[]
+      }
     }
   } catch {
     return { groups: [], error: "Failed to fetch pool from database." }
