@@ -19,6 +19,12 @@ import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
 import { generateGroupsAction, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/app/actions/generate-groups"
+import {
+  generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
+  SLOT_ROLES, SLOTS,
+  type DGLSlot, type DGLRole, type ProposedAssignment,
+} from "@/app/actions/generate-dgl-rotation"
+import { getSemesterLabel, getSemesterWeeks } from "@/app/actions/dgl-utils"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -680,11 +686,16 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
     })
 
     // Presence: who's viewing/editing this note
-    channel.on("presence", { event: "sync" }, () => {
-      const state = channel.presenceState()
-      const users = (Object.values(state).flat() as unknown as CollabUser[]).filter(u => u.userId !== userId)
-      setActiveUsers(users)
-    })
+    // Guard: presence listeners cannot be added after subscribe() — skip if channel already joined
+    try {
+      channel.on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState()
+        const users = (Object.values(state).flat() as unknown as CollabUser[]).filter(u => u.userId !== userId)
+        setActiveUsers(users)
+      })
+    } catch {
+      // Channel already subscribed (React Strict Mode double-invoke) — presence will sync on next mount
+    }
 
     // Broadcast our own Y.Doc updates to others (skip remote-origin updates and when applying fallback content)
     const onYUpdate = (update: Uint8Array, origin: unknown) => {
@@ -703,7 +714,16 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
     return () => {
       ydoc.off("update", onYUpdate)
       channel.untrack()
-      channel.unsubscribe()
+      // Synchronously remove from the realtime client's channel list so that
+      // the next supabase.channel() call creates a fresh (unsubscribed) channel
+      // rather than returning the still-subscribed existing one (React Strict Mode issue)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rt = (supabase as any).realtime as { channels: unknown[]; _schedulePendingDisconnect?: () => void } | undefined
+      if (rt) {
+        rt.channels = rt.channels.filter((c: unknown) => c !== channel)
+        if (rt.channels.length === 0) rt._schedulePendingDisconnect?.()
+      }
+      channel.unsubscribe().catch(() => {})
       channelRef.current = null
       ydoc.destroy()
     }
@@ -776,19 +796,29 @@ export function MeetingNoteEditor({
     const supabase = createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ch = supabase.channel(`db-note-${noteId}`) as any
-    ch.on("postgres_changes", { event: "UPDATE", schema: "public", table: "meeting_notes", filter: `id=eq.${noteId}` },
-      (payload: { new: { body?: string } }) => {
-        const newBody = payload.new?.body
-        const ed = editorRef.current
-        if (!newBody || !ed) return
-        if (Date.now() - lastLocalEditRef.current < 2000) return // user actively typing
-        if (newBody === ed.getHTML()) return // already up to date
-        isApplyingRemote.current = true
-        ed.commands.setContent(newBody)
-        isApplyingRemote.current = false
-      },
-    ).subscribe()
-    return () => { supabase.removeChannel(ch) }
+    try {
+      ch.on("postgres_changes", { event: "UPDATE", schema: "public", table: "meeting_notes", filter: `id=eq.${noteId}` },
+        (payload: { new: { body?: string } }) => {
+          const newBody = payload.new?.body
+          const ed = editorRef.current
+          if (!newBody || !ed) return
+          if (Date.now() - lastLocalEditRef.current < 2000) return // user actively typing
+          if (newBody === ed.getHTML()) return // already up to date
+          isApplyingRemote.current = true
+          ed.commands.setContent(newBody)
+          isApplyingRemote.current = false
+        },
+      ).subscribe()
+    } catch {
+      // Channel already subscribed (React Strict Mode double-invoke) — skip gracefully
+    }
+    return () => {
+      // Synchronously remove from realtime channels list before async unsubscribe
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rt = (supabase as any).realtime as { channels: unknown[] } | undefined
+      if (rt) rt.channels = rt.channels.filter((c: unknown) => c !== ch)
+      ch.unsubscribe?.().catch?.(() => {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId])
 
@@ -1535,6 +1565,9 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const isActiveTeamPresident = (activeUserTeam?.roleName ?? "").toLowerCase().includes("president")
   const canOpenTeamSettings = isAdmin || isActiveTeamPresident
 
+  const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
+  const isDGLPresident = isDGLTeam && isActiveTeamPresident
+
   return (
     <div className="pb-2 md:pb-0">
       {/* Desktop Topbar */}
@@ -1646,6 +1679,15 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
           />
+        ) : isDGLTeam && activeTeamId ? (
+          <div className="px-14 py-7">
+            <SmallGroupLeadersTab
+              teamId={activeTeamId}
+              ministryId={ministryId}
+              userId={userId}
+              isPresident={isDGLPresident}
+            />
+          </div>
         ) : (
           <div className="px-14 py-7">
             {(() => {
@@ -1689,6 +1731,13 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
+          />
+        ) : isDGLTeam && activeTeamId ? (
+          <SmallGroupLeadersTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            isPresident={isDGLPresident}
           />
         ) : (
           <>
@@ -7314,6 +7363,726 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
         </div>
 
       </div>
+    </div>
+  )
+}
+
+// ── SmallGroupLeadersTab ──────────────────────────────────────────────────────
+
+const DGL_SLOT_LABELS: Record<DGLSlot, string> = {
+  wednesday_pm: "Wed PM",
+  friday_sg: "Fri SG",
+  sunday_service: "Sun Service",
+}
+
+const DGL_ROLE_LABELS: Record<DGLRole, string> = {
+  leading_pm: "Lead PM",
+  pm_praise: "PM Praise",
+  cooking: "Cooking",
+  friday_praise: "Fri Praise",
+  congregational_prayer: "Cong. Prayer",
+  dishes: "Dishes",
+}
+
+type SGGroup = {
+  id: string
+  name: string
+  type: "brothers" | "sisters"
+  leader_id: string | null
+  paired_group_id: string | null
+}
+
+type SGMember = {
+  id: string
+  group_id: string
+  user_id: string
+  meal_taken: boolean
+  meal_semester: string
+  name: string
+}
+
+type DGLAssignmentRow = {
+  id: string
+  user_id: string
+  week_date: string
+  slot: DGLSlot
+  role: DGLRole
+  semester: string
+  published: boolean
+  user_name: string
+}
+
+function SmallGroupLeadersTab({
+  teamId,
+  ministryId,
+  userId,
+  isPresident,
+}: {
+  teamId: string
+  ministryId: string
+  userId: string
+  isPresident: boolean
+}) {
+  const supabase = createClient()
+  const [activeSubTab, setActiveSubTab] = useState<"home" | "schedule">("home")
+  const [loading, setLoading] = useState(true)
+  const semester = useMemo(() => getSemesterLabel(), [])
+  const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
+
+  // Home
+  const [myUpcoming, setMyUpcoming] = useState<DGLAssignmentRow[]>([])
+  const [myGroups, setMyGroups] = useState<SGGroup[]>([])
+  const [groupMembers, setGroupMembers] = useState<Map<string, SGMember[]>>(new Map())
+  const [pairedGroups, setPairedGroups] = useState<Map<string, SGGroup>>(new Map())
+  const [pairedMembers, setPairedMembers] = useState<Map<string, SGMember[]>>(new Map())
+
+  // Schedule - my availability
+  const [busySet, setBusySet] = useState<Set<string>>(new Set())
+  const [savingSlot, setSavingSlot] = useState<string | null>(null)
+
+  // Rotation assigner (president only)
+  const [existingAssignments, setExistingAssignments] = useState<DGLAssignmentRow[]>([])
+  const [proposedAssignments, setProposedAssignments] = useState<ProposedAssignment[]>([])
+  const [flagged, setFlagged] = useState<{ week_date: string; slot: DGLSlot; reason: string }[]>([])
+  const [rotationPhase, setRotationPhase] = useState<"idle" | "generated" | "saved" | "published">("idle")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [rotErr, setRotErr] = useState<string | null>(null)
+
+  useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function init() {
+    setLoading(true)
+    await Promise.all([loadHome(), loadSchedule()])
+    setLoading(false)
+  }
+
+  async function loadHome() {
+    const today = new Date().toISOString().split("T")[0]
+
+    const { data: aData } = await supabase
+      .from("dgl_assignments")
+      .select("*")
+      .eq("team_id", teamId)
+      .eq("user_id", userId)
+      .eq("published", true)
+      .gte("week_date", today)
+      .order("week_date", { ascending: true })
+      .limit(8)
+    setMyUpcoming((aData ?? []) as DGLAssignmentRow[])
+
+    const { data: gData } = await supabase
+      .from("small_groups")
+      .select("*")
+      .eq("team_id", teamId)
+      .eq("leader_id", userId)
+    const groups = (gData ?? []) as SGGroup[]
+    setMyGroups(groups)
+
+    if (groups.length === 0) return
+
+    const gIds = groups.map(g => g.id)
+    const { data: mData } = await supabase
+      .from("small_group_members")
+      .select("id, group_id, user_id, meal_taken, meal_semester")
+      .in("group_id", gIds)
+    const mRows = (mData ?? []) as Omit<SGMember, "name">[]
+
+    const uids = mRows.map(m => m.user_id)
+    let pMap = new Map<string, string>()
+    if (uids.length > 0) {
+      const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
+      pMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+    }
+
+    const byGroup = new Map<string, SGMember[]>()
+    for (const m of mRows) {
+      if (!byGroup.has(m.group_id)) byGroup.set(m.group_id, [])
+      byGroup.get(m.group_id)!.push({ ...m, name: pMap.get(m.user_id) ?? "Unknown" })
+    }
+    setGroupMembers(byGroup)
+
+    const pairedIds = groups.map(g => g.paired_group_id).filter(Boolean) as string[]
+    if (pairedIds.length === 0) return
+
+    const { data: pgData } = await supabase.from("small_groups").select("*").in("id", pairedIds)
+    const pgMap = new Map<string, SGGroup>()
+    for (const pg of (pgData ?? []) as SGGroup[]) pgMap.set(pg.id, pg)
+    setPairedGroups(pgMap)
+
+    const { data: pmData } = await supabase
+      .from("small_group_members")
+      .select("id, group_id, user_id, meal_taken, meal_semester")
+      .in("group_id", pairedIds)
+    const pmRows = (pmData ?? []) as Omit<SGMember, "name">[]
+
+    const puids = pmRows.map(m => m.user_id)
+    let ppMap = new Map<string, string>()
+    if (puids.length > 0) {
+      const { data: ppData } = await supabase.from("profiles").select("id, name").in("id", puids)
+      ppMap = new Map((ppData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+    }
+
+    const pmByGroup = new Map<string, SGMember[]>()
+    for (const m of pmRows) {
+      if (!pmByGroup.has(m.group_id)) pmByGroup.set(m.group_id, [])
+      pmByGroup.get(m.group_id)!.push({ ...m, name: ppMap.get(m.user_id) ?? "Unknown" })
+    }
+    setPairedMembers(pmByGroup)
+  }
+
+  async function loadSchedule() {
+    const { data: avData } = await supabase
+      .from("dgl_availability")
+      .select("week_date, slot, is_busy")
+      .eq("team_id", teamId)
+      .eq("user_id", userId)
+      .eq("semester", semester)
+    const bs = new Set<string>(
+      (avData ?? [])
+        .filter((r: { is_busy: boolean }) => r.is_busy)
+        .map((r: { week_date: string; slot: string }) => `${r.week_date}::${r.slot}`)
+    )
+    setBusySet(bs)
+
+    if (isPresident) await loadExistingAssignments()
+  }
+
+  async function loadExistingAssignments() {
+    const { data } = await supabase
+      .from("dgl_assignments")
+      .select("id, user_id, week_date, slot, role, semester, published")
+      .eq("team_id", teamId)
+      .eq("semester", semester)
+      .order("week_date", { ascending: true })
+    if (!data) return
+
+    const uids = [...new Set(data.map((r: { user_id: string }) => r.user_id))]
+    let nameMap = new Map<string, string>()
+    if (uids.length > 0) {
+      const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
+      nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+    }
+
+    const rows: DGLAssignmentRow[] = data.map((r: {
+      id: string; user_id: string; week_date: string; slot: DGLSlot; role: DGLRole; semester: string; published: boolean
+    }) => ({ ...r, user_name: nameMap.get(r.user_id) ?? r.user_id }))
+
+    setExistingAssignments(rows)
+    const hasPublished = rows.some(r => r.published)
+    setRotationPhase(rows.length === 0 ? "idle" : hasPublished ? "published" : "saved")
+  }
+
+  async function toggleBusy(weekDate: string, slot: DGLSlot) {
+    const key = `${weekDate}::${slot}`
+    const wasBusy = busySet.has(key)
+    setSavingSlot(key)
+
+    const next = new Set(busySet)
+    if (wasBusy) next.delete(key); else next.add(key)
+    setBusySet(next)
+
+    const { error } = await supabase
+      .from("dgl_availability")
+      .upsert(
+        { user_id: userId, team_id: teamId, week_date: weekDate, slot, is_busy: !wasBusy, semester },
+        { onConflict: "user_id,week_date,slot" }
+      )
+    if (error) setBusySet(busySet)
+    setSavingSlot(null)
+  }
+
+  async function toggleMeal(member: SGMember) {
+    setGroupMembers(prev => {
+      const next = new Map(prev)
+      const updated = next.get(member.group_id)?.map(m =>
+        m.id === member.id ? { ...m, meal_taken: !m.meal_taken } : m
+      )
+      if (updated) next.set(member.group_id, updated)
+      return next
+    })
+    await supabase
+      .from("small_group_members")
+      .update({ meal_taken: !member.meal_taken, meal_semester: semester })
+      .eq("id", member.id)
+  }
+
+  async function handleGenerate() {
+    setIsGenerating(true)
+    setRotErr(null)
+    const result = await generateDGLRotationAction({
+      teamId, ministryId, semester,
+      weeks: semesterWeeks.map(d => d.toISOString().split("T")[0]),
+    })
+    setIsGenerating(false)
+    if (result.error) { setRotErr(result.error); return }
+    setProposedAssignments(result.assignments)
+    setFlagged(result.flaggedWeeks)
+    setRotationPhase("generated")
+  }
+
+  async function handleSave() {
+    setIsSaving(true)
+    setRotErr(null)
+    const result = await saveDGLRotationAction({
+      teamId, ministryId, semester,
+      assignments: proposedAssignments.map(a => ({
+        user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+      })),
+    })
+    setIsSaving(false)
+    if (result.error) { setRotErr(result.error); return }
+    setProposedAssignments([])
+    setFlagged([])
+    await loadExistingAssignments()
+  }
+
+  async function handlePublish(publish: boolean) {
+    setIsPublishing(true)
+    await publishDGLRotationAction({ teamId, semester, publish })
+    await loadExistingAssignments()
+    setIsPublishing(false)
+  }
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Spinner /></div>
+
+  const weekDateStrings = semesterWeeks.map(d => d.toISOString().split("T")[0])
+  const [semSeason, semYear] = semester.split("_")
+  const semesterLabel = `${semSeason.charAt(0).toUpperCase()}${semSeason.slice(1)} ${semYear}`
+  const flaggedKeys = new Set(flagged.map(f => `${f.week_date}::${f.slot}`))
+
+  return (
+    <div>
+      {/* Sub-tab switcher */}
+      <div className="flex gap-1 mb-6 bg-[#F3F0F7] rounded-xl p-1">
+        {(["home", "schedule"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setActiveSubTab(t)}
+            style={{
+              flex: 1, padding: "8px 0", borderRadius: 10, border: "none",
+              fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              background: activeSubTab === t ? "#3E1540" : "transparent",
+              color: activeSubTab === t ? "#F6F4EF" : "#5A5466",
+              transition: "all 0.15s",
+            }}
+          >
+            {t === "home" ? "Home" : "Schedule"}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Home Tab ──────────────────────────────────────────────────────── */}
+      {activeSubTab === "home" && (
+        <div className="flex flex-col gap-6">
+
+          {/* My Assignments */}
+          <div>
+            <PlanSectionHeader>My Assignments</PlanSectionHeader>
+            {myUpcoming.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                <p className="text-[13px] text-[#8A8497]">No upcoming assignments this semester.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {myUpcoming.map(a => {
+                  const d = new Date(a.week_date + "T12:00:00")
+                  return (
+                    <div key={a.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#F3F0F7] flex flex-col items-center justify-center flex-shrink-0">
+                        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", color: "#8A8497", textTransform: "uppercase" as const }}>
+                          {d.toLocaleDateString("en-US", { weekday: "short" })}
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: "#3E1540", lineHeight: 1 }}>{d.getDate()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-[#13101A] truncate">{DGL_ROLE_LABELS[a.role]}</p>
+                        <p className="text-[12px] text-[#8A8497]">
+                          {DGL_SLOT_LABELS[a.slot]} · {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* My Small Groups */}
+          {myGroups.map(group => {
+            const members = groupMembers.get(group.id) ?? []
+            const pairedGroup = group.paired_group_id ? pairedGroups.get(group.paired_group_id) : undefined
+            const pairedMs = group.paired_group_id ? (pairedMembers.get(group.paired_group_id) ?? []) : []
+            const mealCount = members.filter(m => m.meal_taken && m.meal_semester === semester).length
+            return (
+              <div key={group.id}>
+                <PlanSectionHeader>My Small Group</PlanSectionHeader>
+                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                  <div className="px-4 pt-4 pb-3 border-b border-[#F3F0F7] flex items-center justify-between">
+                    <div>
+                      <p className="text-[14px] font-semibold text-[#13101A]">{group.name}</p>
+                      <p style={{ fontSize: 11, color: "#8A8497", textTransform: "capitalize" as const }}>
+                        {group.type} · {members.length} member{members.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 9px",
+                      background: mealCount === members.length && members.length > 0 ? "#EDE5F0" : "#F4F1E8",
+                      color: "#3E1540", letterSpacing: "0.03em", textTransform: "uppercase" as const,
+                    }}>
+                      {mealCount}/{members.length} meals
+                    </span>
+                  </div>
+                  {members.length === 0 ? (
+                    <div className="px-4 py-5 text-center">
+                      <p className="text-[13px] text-[#8A8497]">No members yet.</p>
+                    </div>
+                  ) : members.map((m, i) => {
+                    const mealDone = m.meal_taken && m.meal_semester === semester
+                    return (
+                      <div key={m.id} className={`flex items-center gap-3 px-4 py-3 ${i < members.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
+                          style={{ background: getAvatarColor(m.user_id), color: "white" }}
+                        >
+                          {getInitials(m.name)}
+                        </div>
+                        <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
+                        <button
+                          onClick={() => toggleMeal(m)}
+                          style={{
+                            padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                            border: mealDone ? "none" : "1.5px solid #ECE8DE",
+                            background: mealDone ? "#EDE5F0" : "transparent",
+                            fontSize: 11, fontWeight: 600,
+                            color: mealDone ? "#3E1540" : "#8A8497",
+                            letterSpacing: "0.03em", textTransform: "uppercase" as const,
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {mealDone ? "Meal ✓" : "Meal"}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {pairedGroup && (
+                  <div className="mt-3">
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>
+                      Paired — {pairedGroup.name}
+                    </p>
+                    <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                      {pairedMs.length === 0 ? (
+                        <div className="px-4 py-5 text-center">
+                          <p className="text-[13px] text-[#8A8497]">No members yet.</p>
+                        </div>
+                      ) : pairedMs.map((m, i) => (
+                        <div key={m.id} className={`flex items-center gap-3 px-4 py-3 ${i < pairedMs.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
+                            style={{ background: getAvatarColor(m.user_id), color: "white" }}
+                          >
+                            {getInitials(m.name)}
+                          </div>
+                          <p className="text-[13px] text-[#13101A]">{m.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {myGroups.length === 0 && (
+            <EmptyState
+              icon={<Users className="w-6 h-6" />}
+              title="No small group assigned yet."
+              subtitle="Your team president will assign you to a group."
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Schedule Tab ──────────────────────────────────────────────────── */}
+      {activeSubTab === "schedule" && (
+        <div className="flex flex-col gap-6">
+
+          {/* Availability Grid */}
+          <div>
+            <PlanSectionHeader>My Availability — {semesterLabel}</PlanSectionHeader>
+            <p className="text-[12px] text-[#8A8497] mb-3">
+              Mark slots when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span>. Leave empty if you can serve.
+            </p>
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-x-auto">
+              <div style={{ minWidth: 280 }}>
+                <div className="grid grid-cols-4 border-b border-[#ECE8DE]">
+                  <div className="px-3 py-2.5" />
+                  {SLOTS.map(slot => (
+                    <div key={slot} className="px-2 py-2.5 text-center" style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                      {DGL_SLOT_LABELS[slot]}
+                    </div>
+                  ))}
+                </div>
+                {weekDateStrings.length === 0 ? (
+                  <div className="px-4 py-8 text-center"><p className="text-[13px] text-[#8A8497]">No active semester.</p></div>
+                ) : weekDateStrings.map((wd, i) => {
+                  const d = new Date(wd + "T12:00:00")
+                  return (
+                    <div key={wd} className={`grid grid-cols-4 ${i < weekDateStrings.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
+                      <div className="px-3 py-2.5 flex items-center">
+                        <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>
+                          {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+                      {SLOTS.map(slot => {
+                        const key = `${wd}::${slot}`
+                        const isBusy = busySet.has(key)
+                        const isSavingThis = savingSlot === key
+                        return (
+                          <div key={slot} className="flex items-center justify-center py-2">
+                            <button
+                              onClick={() => toggleBusy(wd, slot)}
+                              disabled={isSavingThis}
+                              style={{
+                                width: 28, height: 28, borderRadius: 8,
+                                border: isBusy ? "none" : "1.5px solid #D4CEDF",
+                                background: isBusy ? "#3E1540" : "transparent",
+                                cursor: isSavingThis ? "not-allowed" : "pointer",
+                                opacity: isSavingThis ? 0.5 : 1,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              {isBusy && <X style={{ width: 12, height: 12, color: "#F6F4EF" }} />}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <p className="text-[11px] text-[#8A8497] mt-2">Filled = busy. Changes save automatically.</p>
+          </div>
+
+          {/* Rotation Assigner (president only) */}
+          {isPresident && (
+            <div>
+              <PlanSectionHeader>Rotation Assigner</PlanSectionHeader>
+
+              {rotErr && (
+                <div className="mb-3 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                  {rotErr}
+                </div>
+              )}
+
+              {rotationPhase === "idle" && (
+                <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">No rotation yet</p>
+                  <p className="text-[13px] text-[#8A8497] mb-5">
+                    Generate a fair rotation from DGL availability for {semesterLabel}.
+                  </p>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    style={{
+                      padding: "10px 22px", background: "#3E1540", color: "#F6F4EF",
+                      border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500,
+                      fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer",
+                      opacity: isGenerating ? 0.6 : 1,
+                      display: "inline-flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    {isGenerating
+                      ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</>
+                      : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
+                  </button>
+                </div>
+              )}
+
+              {(rotationPhase === "saved" || rotationPhase === "published") && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "4px 10px",
+                      background: rotationPhase === "published" ? "#EDE5F0" : "#F4F1E8",
+                      color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const,
+                    }}>
+                      {rotationPhase === "published" ? "Published" : "Draft"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                        style={{
+                          padding: "7px 14px", background: "transparent", color: "#5A5466",
+                          border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13,
+                          fontWeight: 500, fontFamily: "inherit",
+                          cursor: isGenerating ? "not-allowed" : "pointer",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        <Shuffle style={{ width: 12, height: 12 }} /> Re-generate
+                      </button>
+                      <button
+                        onClick={() => handlePublish(rotationPhase !== "published")}
+                        disabled={isPublishing}
+                        style={{
+                          padding: "7px 14px",
+                          background: rotationPhase === "published" ? "#F3F0F7" : "#3E1540",
+                          color: rotationPhase === "published" ? "#5A5466" : "#F6F4EF",
+                          border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500,
+                          fontFamily: "inherit",
+                          cursor: isPublishing ? "not-allowed" : "pointer",
+                          opacity: isPublishing ? 0.6 : 1,
+                        }}
+                      >
+                        {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
+                      </button>
+                    </div>
+                  </div>
+                  <DGLAssignmentTable assignments={existingAssignments} flaggedKeys={new Set()} />
+                </div>
+              )}
+
+              {rotationPhase === "generated" && (
+                <div>
+                  {flagged.length > 0 && (
+                    <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
+                        {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
+                      </p>
+                      {flagged.map((f, fi) => (
+                        <p key={fi} style={{ fontSize: 12, color: "#92400E" }}>
+                          {new Date(f.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {DGL_SLOT_LABELS[f.slot]} — {f.reason}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  <DGLAssignmentTable
+                    assignments={proposedAssignments.map(a => ({
+                      id: `${a.week_date}::${a.slot}::${a.role}`,
+                      user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+                      semester, published: false, user_name: a.user_name,
+                    }))}
+                    flaggedKeys={flaggedKeys}
+                  />
+                  <div className="flex items-center justify-between mt-4">
+                    <button
+                      onClick={() => {
+                        setProposedAssignments([])
+                        setFlagged([])
+                        setRotationPhase(
+                          existingAssignments.length === 0 ? "idle"
+                            : existingAssignments.some(r => r.published) ? "published"
+                            : "saved"
+                        )
+                      }}
+                      style={{
+                        padding: "9px 18px", background: "transparent", color: "#5A5466",
+                        border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13,
+                        fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+                      }}
+                    >
+                      Discard
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      style={{
+                        padding: "9px 20px", background: "#3E1540", color: "#F6F4EF",
+                        border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500,
+                        fontFamily: "inherit",
+                        cursor: isSaving ? "not-allowed" : "pointer",
+                        opacity: isSaving ? 0.6 : 1,
+                        display: "flex", alignItems: "center", gap: 8,
+                      }}
+                    >
+                      {isSaving
+                        ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</>
+                        : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DGLAssignmentTable({
+  assignments,
+  flaggedKeys,
+}: {
+  assignments: DGLAssignmentRow[]
+  flaggedKeys: Set<string>
+}) {
+  const byWeek = new Map<string, DGLAssignmentRow[]>()
+  for (const a of assignments) {
+    if (!byWeek.has(a.week_date)) byWeek.set(a.week_date, [])
+    byWeek.get(a.week_date)!.push(a)
+  }
+  const weeks = [...byWeek.keys()].sort()
+
+  if (weeks.length === 0) return (
+    <p className="text-[13px] text-[#8A8497] text-center py-6">No assignments generated.</p>
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      {weeks.map(wd => {
+        const weekRows = byWeek.get(wd) ?? []
+        const d = new Date(wd + "T12:00:00")
+        const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
+        return (
+          <div key={wd} className={`bg-white rounded-2xl border overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)] ${hasFlagged ? "border-[#FDE68A]" : "border-[#ECE8DE]"}`}>
+            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#F3F0F7] bg-[#FDFBF7]"}`}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "#5A5466" }}>{dateStr}</span>
+              {hasFlagged && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                  Needs Review
+                </span>
+              )}
+            </div>
+            {SLOTS.map((slot, si) => {
+              const [role1, role2] = SLOT_ROLES[slot]
+              const r1 = weekRows.find(a => a.slot === slot && a.role === role1)
+              const r2 = weekRows.find(a => a.slot === slot && a.role === role2)
+              const isFlagged = flaggedKeys.has(`${wd}::${slot}`)
+              return (
+                <div key={slot} className={`px-4 py-2.5 ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 4 }}>
+                    {DGL_SLOT_LABELS[slot]}
+                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    {([
+                      [r1, role1] as [DGLAssignmentRow | undefined, DGLRole],
+                      [r2, role2] as [DGLAssignmentRow | undefined, DGLRole],
+                    ]).map(([r, role]) => (
+                      <div key={role} className="flex items-center gap-2">
+                        <span style={{ fontSize: 11, color: "#8A8497", minWidth: 84 }}>{DGL_ROLE_LABELS[role]}</span>
+                        {r ? (
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
     </div>
   )
 }
