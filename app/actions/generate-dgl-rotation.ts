@@ -26,15 +26,27 @@ export async function generateDGLRotationAction(
 ): Promise<GenerateRotationResult> {
   const admin = createAdminClient()
 
-  // 1. Fetch all DGLs on the team (two-step: team_members → profiles)
-  const { data: memberRows, error: mErr } = await admin
-    .from("team_members")
+  // 1. Fetch confirmed roster for this team+semester (not all team_members)
+  const { data: rosterStatus } = await admin
+    .from("dgl_roster_status")
+    .select("confirmed")
+    .eq("team_id", params.teamId)
+    .eq("semester", params.semester)
+    .maybeSingle()
+
+  if (!rosterStatus?.confirmed) {
+    return { assignments: [], flaggedWeeks: [], error: "Confirm the DGL roster on the Home tab before generating assignments." }
+  }
+
+  const { data: rosterRows, error: rErr } = await admin
+    .from("dgl_roster")
     .select("user_id")
     .eq("team_id", params.teamId)
-  if (mErr || !memberRows) return { assignments: [], flaggedWeeks: [], error: "Failed to fetch team members." }
+    .eq("semester", params.semester)
+  if (rErr || !rosterRows) return { assignments: [], flaggedWeeks: [], error: "Failed to fetch roster." }
 
-  const memberIds = memberRows.map((r: { user_id: string }) => r.user_id)
-  if (memberIds.length === 0) return { assignments: [], flaggedWeeks: [], error: "No DGLs on this team." }
+  const memberIds = rosterRows.map((r: { user_id: string }) => r.user_id)
+  if (memberIds.length === 0) return { assignments: [], flaggedWeeks: [], error: "No DGLs in the roster for this semester." }
 
   const { data: profileRows } = await admin
     .from("profiles")
@@ -44,18 +56,25 @@ export async function generateDGLRotationAction(
     (profileRows ?? []).map((p: { id: string; name: string }) => [p.id, p.name])
   )
 
-  // 2. Fetch availability for this team + semester
+  // 2. Fetch semester-wide day-of-week availability
+  // slot values: "wednesday" | "friday" | "sunday" — map to rotation slots
+  const AVAIL_TO_ROTATION_SLOT: Record<string, DGLSlot> = {
+    wednesday: "wednesday_pm",
+    friday: "friday_sg",
+    sunday: "sunday_service",
+  }
+
   const { data: availRows } = await admin
     .from("dgl_availability")
-    .select("user_id, week_date, slot, is_busy")
+    .select("user_id, slot, is_busy")
     .eq("team_id", params.teamId)
     .eq("semester", params.semester)
 
-  // Build busy set: key = `${user_id}::${week_date}::${slot}`
-  const busySet = new Set<string>(
+  // Build busy set: key = `${user_id}::${rotationSlot}` (semester-wide, not per-week)
+  const busyDays = new Set<string>(
     (availRows ?? [])
       .filter((r: { is_busy: boolean }) => r.is_busy)
-      .map((r: { user_id: string; week_date: string; slot: string }) => `${r.user_id}::${r.week_date}::${r.slot}`)
+      .map((r: { user_id: string; slot: string }) => `${r.user_id}::${AVAIL_TO_ROTATION_SLOT[r.slot] ?? r.slot}`)
   )
 
   // 3. Run assignment algorithm
@@ -75,9 +94,9 @@ export async function generateDGLRotationAction(
     for (const slot of SLOTS) {
       const [role1, role2] = SLOT_ROLES[slot]
 
-      // Filter: available (not busy) + hasn't hit max 1 per role this semester
+      // Filter: available for this day-of-week (semester-wide) + hasn't hit max
       const available = memberIds.filter(uid => {
-        const isBusy = busySet.has(`${uid}::${weekDate}::${slot}`)
+        const isBusy = busyDays.has(`${uid}::${slot}`)
         return !isBusy
       })
 

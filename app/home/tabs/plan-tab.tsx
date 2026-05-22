@@ -26,6 +26,7 @@ import {
 import { SLOT_ROLES, SLOTS } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
+import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -7552,6 +7553,15 @@ type DGLAssignmentRow = {
   user_name: string
 }
 
+// Availability slot type (semester-wide day-of-week)
+type DGLAvailSlot = "wednesday" | "friday" | "sunday"
+const AVAIL_SLOTS: DGLAvailSlot[] = ["wednesday", "friday", "sunday"]
+const AVAIL_SLOT_LABELS: Record<DGLAvailSlot, string> = {
+  wednesday: "Wed PM",
+  friday: "Fri SG",
+  sunday: "Sunday",
+}
+
 function SmallGroupLeadersTab({
   teamId,
   ministryId,
@@ -7569,16 +7579,31 @@ function SmallGroupLeadersTab({
   const semester = useMemo(() => getSemesterLabel(), [])
   const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
 
-  // Home
+  // Home — assignments + small groups
   const [myUpcoming, setMyUpcoming] = useState<DGLAssignmentRow[]>([])
   const [myGroups, setMyGroups] = useState<SGGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Map<string, SGMember[]>>(new Map())
   const [pairedGroups, setPairedGroups] = useState<Map<string, SGGroup>>(new Map())
   const [pairedMembers, setPairedMembers] = useState<Map<string, SGMember[]>>(new Map())
 
-  // Schedule - my availability
+  // Roster (Home tab — president only)
+  const [rosterStatus, setRosterStatus] = useState<RosterStatus | null>(null)
+  const [rosterMembers, setRosterMembers] = useState<RosterMember[]>([])
+  const [rosterAddMode, setRosterAddMode] = useState(false)
+  const [editingRoster, setEditingRoster] = useState(false)
+  const [pendingRosterIds, setPendingRosterIds] = useState<Set<string>>(new Set())
+  const [ministryMemberList, setMinistryMemberList] = useState<{ id: string; name: string }[]>([])
+  const [memberSearch, setMemberSearch] = useState("")
+  const [confirmingRoster, setConfirmingRoster] = useState(false)
+  const [rosterError, setRosterError] = useState<string | null>(null)
+  const [renewalLoading, setRenewalLoading] = useState(false)
+
+  // Schedule — semester-wide availability
+  const [rosterConfirmedForSchedule, setRosterConfirmedForSchedule] = useState(false)
   const [busySet, setBusySet] = useState<Set<string>>(new Set())
   const [savingSlot, setSavingSlot] = useState<string | null>(null)
+  const [allBusyMap, setAllBusyMap] = useState<Map<string, Set<string>>>(new Map())
+  const [scheduleRosterMembers, setScheduleRosterMembers] = useState<{ user_id: string; name: string }[]>([])
 
   // Rotation assigner (president only)
   const [existingAssignments, setExistingAssignments] = useState<DGLAssignmentRow[]>([])
@@ -7635,71 +7660,141 @@ function SmallGroupLeadersTab({
     const groups = (gData ?? []) as SGGroup[]
     setMyGroups(groups)
 
-    if (groups.length === 0) return
+    if (groups.length > 0) {
+      const gIds = groups.map(g => g.id)
+      const { data: mData } = await supabase
+        .from("small_group_members")
+        .select("id, group_id, user_id, meal_taken, meal_semester")
+        .in("group_id", gIds)
+      const mRows = (mData ?? []) as Omit<SGMember, "name">[]
+      const uids = mRows.map(m => m.user_id)
+      let pMap = new Map<string, string>()
+      if (uids.length > 0) {
+        const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
+        pMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+      }
+      const byGroup = new Map<string, SGMember[]>()
+      for (const m of mRows) {
+        if (!byGroup.has(m.group_id)) byGroup.set(m.group_id, [])
+        byGroup.get(m.group_id)!.push({ ...m, name: pMap.get(m.user_id) ?? "Unknown" })
+      }
+      setGroupMembers(byGroup)
 
-    const gIds = groups.map(g => g.id)
-    const { data: mData } = await supabase
-      .from("small_group_members")
-      .select("id, group_id, user_id, meal_taken, meal_semester")
-      .in("group_id", gIds)
-    const mRows = (mData ?? []) as Omit<SGMember, "name">[]
-
-    const uids = mRows.map(m => m.user_id)
-    let pMap = new Map<string, string>()
-    if (uids.length > 0) {
-      const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
-      pMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+      const pairedIds = groups.map(g => g.paired_group_id).filter(Boolean) as string[]
+      if (pairedIds.length > 0) {
+        const { data: pgData } = await supabase.from("small_groups").select("*").in("id", pairedIds)
+        const pgMap = new Map<string, SGGroup>()
+        for (const pg of (pgData ?? []) as SGGroup[]) pgMap.set(pg.id, pg)
+        setPairedGroups(pgMap)
+        const { data: pmData } = await supabase
+          .from("small_group_members")
+          .select("id, group_id, user_id, meal_taken, meal_semester")
+          .in("group_id", pairedIds)
+        const pmRows = (pmData ?? []) as Omit<SGMember, "name">[]
+        const puids = pmRows.map(m => m.user_id)
+        let ppMap = new Map<string, string>()
+        if (puids.length > 0) {
+          const { data: ppData } = await supabase.from("profiles").select("id, name").in("id", puids)
+          ppMap = new Map((ppData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+        }
+        const pmByGroup = new Map<string, SGMember[]>()
+        for (const m of pmRows) {
+          if (!pmByGroup.has(m.group_id)) pmByGroup.set(m.group_id, [])
+          pmByGroup.get(m.group_id)!.push({ ...m, name: ppMap.get(m.user_id) ?? "Unknown" })
+        }
+        setPairedMembers(pmByGroup)
+      }
     }
 
-    const byGroup = new Map<string, SGMember[]>()
-    for (const m of mRows) {
-      if (!byGroup.has(m.group_id)) byGroup.set(m.group_id, [])
-      byGroup.get(m.group_id)!.push({ ...m, name: pMap.get(m.user_id) ?? "Unknown" })
+    // Load roster status + members (president sees roster section)
+    await loadRosterForHome()
+
+    // Load ministry members for the picker (president needs to add DGLs)
+    if (isPresident) {
+      const { data: pData } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .eq("ministry_id", ministryId)
+        .not("name", "is", null)
+        .order("name")
+      setMinistryMemberList((pData ?? []) as { id: string; name: string }[])
     }
-    setGroupMembers(byGroup)
+  }
 
-    const pairedIds = groups.map(g => g.paired_group_id).filter(Boolean) as string[]
-    if (pairedIds.length === 0) return
+  async function loadRosterForHome() {
+    const { data: statusRow } = await supabase
+      .from("dgl_roster_status")
+      .select("confirmed, confirmed_at, confirmed_by, needs_roster_renewal")
+      .eq("team_id", teamId)
+      .eq("semester", semester)
+      .maybeSingle()
 
-    const { data: pgData } = await supabase.from("small_groups").select("*").in("id", pairedIds)
-    const pgMap = new Map<string, SGGroup>()
-    for (const pg of (pgData ?? []) as SGGroup[]) pgMap.set(pg.id, pg)
-    setPairedGroups(pgMap)
+    setRosterStatus(statusRow as RosterStatus | null)
+    if (!statusRow?.confirmed) { setRosterMembers([]); return }
 
-    const { data: pmData } = await supabase
-      .from("small_group_members")
-      .select("id, group_id, user_id, meal_taken, meal_semester")
-      .in("group_id", pairedIds)
-    const pmRows = (pmData ?? []) as Omit<SGMember, "name">[]
+    const { data: rosterRows } = await supabase
+      .from("dgl_roster")
+      .select("user_id, confirmed_at")
+      .eq("team_id", teamId)
+      .eq("semester", semester)
 
-    const puids = pmRows.map(m => m.user_id)
-    let ppMap = new Map<string, string>()
-    if (puids.length > 0) {
-      const { data: ppData } = await supabase.from("profiles").select("id, name").in("id", puids)
-      ppMap = new Map((ppData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
-    }
+    if (!rosterRows || rosterRows.length === 0) { setRosterMembers([]); return }
 
-    const pmByGroup = new Map<string, SGMember[]>()
-    for (const m of pmRows) {
-      if (!pmByGroup.has(m.group_id)) pmByGroup.set(m.group_id, [])
-      pmByGroup.get(m.group_id)!.push({ ...m, name: ppMap.get(m.user_id) ?? "Unknown" })
-    }
-    setPairedMembers(pmByGroup)
+    const uids = (rosterRows as { user_id: string; confirmed_at: string | null }[]).map(r => r.user_id)
+    const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
+    const nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+    setRosterMembers(
+      (rosterRows as { user_id: string; confirmed_at: string | null }[]).map(r => ({
+        user_id: r.user_id,
+        name: nameMap.get(r.user_id) ?? "Unknown",
+        confirmed_at: r.confirmed_at,
+      }))
+    )
   }
 
   async function loadSchedule() {
+    // Check roster status first — no grid shown if not confirmed
+    const { data: statusRow } = await supabase
+      .from("dgl_roster_status")
+      .select("confirmed")
+      .eq("team_id", teamId)
+      .eq("semester", semester)
+      .maybeSingle()
+
+    const confirmed = !!statusRow?.confirmed
+    setRosterConfirmedForSchedule(confirmed)
+    if (!confirmed) return
+
+    // Load all roster member IDs + names
+    const { data: rosterRows } = await supabase
+      .from("dgl_roster")
+      .select("user_id")
+      .eq("team_id", teamId)
+      .eq("semester", semester)
+    const uids = (rosterRows ?? []).map((r: { user_id: string }) => r.user_id)
+    if (uids.length > 0) {
+      const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
+      const nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+      setScheduleRosterMembers(uids.map(uid => ({ user_id: uid, name: nameMap.get(uid) ?? "Unknown" })))
+    }
+
+    // Load ALL availability (semester-wide, all roster members)
     const { data: avData } = await supabase
       .from("dgl_availability")
-      .select("week_date, slot, is_busy")
+      .select("user_id, slot, is_busy")
       .eq("team_id", teamId)
-      .eq("user_id", userId)
       .eq("semester", semester)
-    const bs = new Set<string>(
-      (avData ?? [])
-        .filter((r: { is_busy: boolean }) => r.is_busy)
-        .map((r: { week_date: string; slot: string }) => `${r.week_date}::${r.slot}`)
-    )
-    setBusySet(bs)
+
+    const newMap = new Map<string, Set<string>>()
+    const myBusy = new Set<string>()
+    for (const r of (avData ?? []) as { user_id: string; slot: string; is_busy: boolean }[]) {
+      if (!r.is_busy) continue
+      if (!newMap.has(r.user_id)) newMap.set(r.user_id, new Set())
+      newMap.get(r.user_id)!.add(r.slot)
+      if (r.user_id === userId) myBusy.add(r.slot)
+    }
+    setAllBusyMap(newMap)
+    setBusySet(myBusy)
 
     if (isPresident) await loadExistingAssignments()
   }
@@ -7729,23 +7824,62 @@ function SmallGroupLeadersTab({
     setRotationPhase(rows.length === 0 ? "idle" : hasPublished ? "published" : "saved")
   }
 
-  async function toggleBusy(weekDate: string, slot: DGLSlot) {
-    const key = `${weekDate}::${slot}`
-    const wasBusy = busySet.has(key)
-    setSavingSlot(key)
+  async function toggleBusy(slot: DGLAvailSlot) {
+    const wasBusy = busySet.has(slot)
+    setSavingSlot(slot)
 
-    const next = new Set(busySet)
-    if (wasBusy) next.delete(key); else next.add(key)
-    setBusySet(next)
+    // Optimistic update
+    setBusySet(prev => { const n = new Set(prev); wasBusy ? n.delete(slot) : n.add(slot); return n })
+    setAllBusyMap(prev => {
+      const n = new Map(prev)
+      const s = new Set(n.get(userId) ?? [])
+      wasBusy ? s.delete(slot) : s.add(slot)
+      n.set(userId, s)
+      return n
+    })
 
     const { error } = await supabase
       .from("dgl_availability")
       .upsert(
-        { user_id: userId, team_id: teamId, week_date: weekDate, slot, is_busy: !wasBusy, semester },
-        { onConflict: "user_id,week_date,slot" }
+        { user_id: userId, team_id: teamId, slot, is_busy: !wasBusy, semester },
+        { onConflict: "user_id,team_id,slot,semester" }
       )
-    if (error) setBusySet(busySet)
+    if (error) {
+      // Revert on failure
+      setBusySet(prev => { const n = new Set(prev); wasBusy ? n.add(slot) : n.delete(slot); return n })
+      setAllBusyMap(prev => {
+        const n = new Map(prev)
+        const s = new Set(n.get(userId) ?? [])
+        wasBusy ? s.add(slot) : s.delete(slot)
+        n.set(userId, s)
+        return n
+      })
+    }
     setSavingSlot(null)
+  }
+
+  async function handleConfirmRoster() {
+    setConfirmingRoster(true)
+    setRosterError(null)
+    try {
+      const result = await confirmDGLRosterAction(
+        teamId, ministryId, Array.from(pendingRosterIds), semester, userId
+      )
+      if (result.error) { setRosterError(result.error); return }
+      setPendingRosterIds(new Set())
+      setRosterAddMode(false)
+      setEditingRoster(false)
+      await Promise.all([loadRosterForHome(), loadSchedule()])
+    } finally {
+      setConfirmingRoster(false)
+    }
+  }
+
+  async function handleRosterRenewal(action: "keep" | "fresh") {
+    setRenewalLoading(true)
+    await handleRosterRenewalAction(teamId, ministryId, semester, action, userId)
+    setRenewalLoading(false)
+    await loadRosterForHome()
   }
 
   async function toggleMeal(member: SGMember) {
@@ -7835,6 +7969,32 @@ function SmallGroupLeadersTab({
       {activeSubTab === "home" && (
         <div className="flex flex-col gap-6">
 
+          {/* June 1 renewal banner (president only) */}
+          {isPresident && rosterStatus?.needs_roster_renewal && (
+            <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 16, padding: "16px 18px" }}>
+              <p className="text-[14px] font-semibold text-[#92400E] mb-1">New semester — update your DGL roster?</p>
+              <p className="text-[13px] text-[#92400E] mb-4">
+                It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRosterRenewal("keep")}
+                  disabled={renewalLoading}
+                  style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                >
+                  Keep roster
+                </button>
+                <button
+                  onClick={() => handleRosterRenewal("fresh")}
+                  disabled={renewalLoading}
+                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                >
+                  Start fresh
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* My Assignments */}
           <div>
             <PlanSectionHeader>My Assignments</PlanSectionHeader>
@@ -7866,6 +8026,108 @@ function SmallGroupLeadersTab({
               </div>
             )}
           </div>
+
+          {/* SMALL GROUP LEADER ROSTER (president only) */}
+          {isPresident && (
+            <div>
+              <PlanSectionHeader>Small Group Leader Roster</PlanSectionHeader>
+
+              {rosterError && (
+                <div className="mb-2 px-3 py-2 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                  {rosterError}
+                </div>
+              )}
+
+              {/* Empty state — no roster yet */}
+              {!rosterStatus?.confirmed && !rosterAddMode && (
+                <button
+                  onClick={() => setRosterAddMode(true)}
+                  className="w-full"
+                  style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 16, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
+                >
+                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">No roster yet</p>
+                  <p className="text-[13px] text-[#8A8497] mb-3">Add DGLs to the {semesterLabel} roster.</p>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#3E1540" }}>+ Add DGLs</span>
+                </button>
+              )}
+
+              {/* Add / Edit mode — member picker */}
+              {(rosterAddMode || editingRoster) && (
+                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                  <div className="px-4 pt-4 pb-3 border-b border-[#F3F0F7]">
+                    <input
+                      type="text"
+                      placeholder="Search members…"
+                      value={memberSearch}
+                      onChange={e => setMemberSearch(e.target.value)}
+                      style={{ width: "100%", border: "1.5px solid #ECE8DE", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FAFAFA" }}
+                    />
+                  </div>
+                  <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                    {ministryMemberList
+                      .filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()))
+                      .map((m, i, arr) => {
+                        const selected = pendingRosterIds.has(m.id)
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => setPendingRosterIds(prev => { const n = new Set(prev); selected ? n.delete(m.id) : n.add(m.id); return n })}
+                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}
+                            style={{ background: selected ? "#F9F4FA" : "white" }}
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.id), color: "white" }}>
+                              {getInitials(m.name)}
+                            </div>
+                            <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
+                            {selected && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
+                          </div>
+                        )
+                      })}
+                  </div>
+                  <div className="flex gap-2 px-4 py-3 border-t border-[#F3F0F7]">
+                    <button
+                      onClick={() => { setRosterAddMode(false); setEditingRoster(false); setPendingRosterIds(new Set()); setMemberSearch("") }}
+                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmRoster}
+                      disabled={confirmingRoster || pendingRosterIds.size === 0}
+                      style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
+                    >
+                      {confirmingRoster ? "Confirming…" : `Confirm (${pendingRosterIds.size})`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmed roster list */}
+              {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
+                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#F3F0F7]">
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                      {rosterMembers.length} DGL{rosterMembers.length !== 1 ? "s" : ""} · {semesterLabel}
+                    </span>
+                    <button
+                      onClick={() => { setPendingRosterIds(new Set(rosterMembers.map(m => m.user_id))); setEditingRoster(true) }}
+                      style={{ fontSize: 12, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  {rosterMembers.map((m, i) => (
+                    <div key={m.user_id} className={`flex items-center gap-3 px-4 py-3 ${i < rosterMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>
+                        {getInitials(m.name)}
+                      </div>
+                      <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* My Small Groups */}
           {myGroups.map(group => {
@@ -7998,48 +8260,72 @@ function SmallGroupLeadersTab({
           {/* Availability Grid */}
           <div>
             <PlanSectionHeader>My Availability — {semesterLabel}</PlanSectionHeader>
-            <p className="text-[12px] text-[#8A8497] mb-3">
-              Mark slots when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span>. Leave empty if you can serve.
-            </p>
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-x-auto">
-              <div style={{ minWidth: 280 }}>
-                <div className="grid grid-cols-4 border-b border-[#ECE8DE]">
-                  <div className="px-3 py-2.5" />
-                  {SLOTS.map(slot => (
-                    <div key={slot} className="px-2 py-2.5 text-center" style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
-                      {DGL_SLOT_LABELS[slot]}
-                    </div>
-                  ))}
-                </div>
-                {weekDateStrings.length === 0 ? (
-                  <div className="px-4 py-8 text-center"><p className="text-[13px] text-[#8A8497]">No active semester.</p></div>
-                ) : weekDateStrings.map((wd, i) => {
-                  const d = new Date(wd + "T12:00:00")
-                  return (
-                    <div key={wd} className={`grid grid-cols-4 ${i < weekDateStrings.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
-                      <div className="px-3 py-2.5 flex items-center">
-                        <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>
-                          {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
+
+            {!rosterConfirmedForSchedule ? (
+              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster not confirmed</p>
+                <p className="text-[13px] text-[#8A8497]">
+                  The president needs to confirm the DGL roster before availability can be set.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-[12px] text-[#8A8497] mb-3">
+                  Mark days when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span> this semester. Leave empty if you can serve.
+                </p>
+                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                  <div className="grid border-b border-[#ECE8DE]" style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
+                    <div className="px-4 py-2.5" />
+                    {AVAIL_SLOTS.map(slot => (
+                      <div key={slot} className="py-2.5 text-center" style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                        {AVAIL_SLOT_LABELS[slot]}
                       </div>
-                      {SLOTS.map(slot => {
-                        const key = `${wd}::${slot}`
-                        const isBusy = busySet.has(key)
-                        const isSavingThis = savingSlot === key
+                    ))}
+                  </div>
+                  {isPresident ? (
+                    scheduleRosterMembers.map((member, i) => (
+                      <div key={member.user_id} className={`grid ${i < scheduleRosterMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`} style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
+                        <div className="px-4 py-2.5 flex items-center">
+                          <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>{member.name.split(" ")[0]}</span>
+                        </div>
+                        {AVAIL_SLOTS.map(slot => {
+                          const isBusy = (allBusyMap.get(member.user_id) ?? new Set()).has(slot)
+                          const isMe = member.user_id === userId
+                          const isSavingThis = isMe && savingSlot === slot
+                          return (
+                            <div key={slot} className="flex items-center justify-center py-2.5">
+                              {isMe ? (
+                                <button
+                                  onClick={() => toggleBusy(slot as DGLAvailSlot)}
+                                  disabled={isSavingThis}
+                                  style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                                >
+                                  {isBusy && <X style={{ width: 12, height: 12, color: "#F6F4EF" }} />}
+                                </button>
+                              ) : (
+                                <div style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #ECE8DE", background: isBusy ? "#ECE8DE" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  {isBusy && <X style={{ width: 12, height: 12, color: "#8A8497" }} />}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="grid" style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
+                      <div className="px-4 py-2.5 flex items-center">
+                        <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>You</span>
+                      </div>
+                      {AVAIL_SLOTS.map(slot => {
+                        const isBusy = busySet.has(slot)
+                        const isSavingThis = savingSlot === slot
                         return (
-                          <div key={slot} className="flex items-center justify-center py-2">
+                          <div key={slot} className="flex items-center justify-center py-2.5">
                             <button
-                              onClick={() => toggleBusy(wd, slot)}
+                              onClick={() => toggleBusy(slot as DGLAvailSlot)}
                               disabled={isSavingThis}
-                              style={{
-                                width: 28, height: 28, borderRadius: 8,
-                                border: isBusy ? "none" : "1.5px solid #D4CEDF",
-                                background: isBusy ? "#3E1540" : "transparent",
-                                cursor: isSavingThis ? "not-allowed" : "pointer",
-                                opacity: isSavingThis ? 0.5 : 1,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                transition: "all 0.15s",
-                              }}
+                              style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                             >
                               {isBusy && <X style={{ width: 12, height: 12, color: "#F6F4EF" }} />}
                             </button>
@@ -8047,11 +8333,11 @@ function SmallGroupLeadersTab({
                         )
                       })}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-            <p className="text-[11px] text-[#8A8497] mt-2">Filled = busy. Changes save automatically.</p>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#8A8497] mt-2">Filled = busy. Changes save automatically.</p>
+              </>
+            )}
           </div>
 
           {/* Rotation Assigner (president only) */}
@@ -8059,140 +8345,112 @@ function SmallGroupLeadersTab({
             <div>
               <PlanSectionHeader>Rotation Assigner</PlanSectionHeader>
 
-              {rotErr && (
-                <div className="mb-3 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
-                  {rotErr}
-                </div>
-              )}
-
-              {rotationPhase === "idle" && (
+              {!rosterConfirmedForSchedule ? (
                 <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
-                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">No rotation yet</p>
-                  <p className="text-[13px] text-[#8A8497] mb-5">
-                    Generate a fair rotation from DGL availability for {semesterLabel}.
+                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster required</p>
+                  <p className="text-[13px] text-[#8A8497]">
+                    Confirm the DGL roster on the Home tab first to generate a rotation.
                   </p>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                    style={{
-                      padding: "10px 22px", background: "#3E1540", color: "#F6F4EF",
-                      border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500,
-                      fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer",
-                      opacity: isGenerating ? 0.6 : 1,
-                      display: "inline-flex", alignItems: "center", gap: 8,
-                    }}
-                  >
-                    {isGenerating
-                      ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</>
-                      : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
-                  </button>
                 </div>
-              )}
+              ) : (
+                <>
+                  {rotErr && (
+                    <div className="mb-3 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                      {rotErr}
+                    </div>
+                  )}
 
-              {(rotationPhase === "saved" || rotationPhase === "published") && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "4px 10px",
-                      background: rotationPhase === "published" ? "#EDE5F0" : "#F4F1E8",
-                      color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const,
-                    }}>
-                      {rotationPhase === "published" ? "Published" : "Draft"}
-                    </span>
-                    <div className="flex items-center gap-2">
+                  {rotationPhase === "idle" && (
+                    <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                      <p className="text-[14px] font-semibold text-[#13101A] mb-1">No rotation yet</p>
+                      <p className="text-[13px] text-[#8A8497] mb-5">
+                        Generate a fair rotation from DGL availability for {semesterLabel}.
+                      </p>
                       <button
                         onClick={handleGenerate}
                         disabled={isGenerating}
-                        style={{
-                          padding: "7px 14px", background: "transparent", color: "#5A5466",
-                          border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13,
-                          fontWeight: 500, fontFamily: "inherit",
-                          cursor: isGenerating ? "not-allowed" : "pointer",
-                          display: "flex", alignItems: "center", gap: 6,
-                        }}
+                        style={{ padding: "10px 22px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
                       >
-                        <Shuffle style={{ width: 12, height: 12 }} /> Re-generate
+                        {isGenerating
+                          ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</>
+                          : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </button>
-                      <button
-                        onClick={() => handlePublish(rotationPhase !== "published")}
-                        disabled={isPublishing}
-                        style={{
-                          padding: "7px 14px",
-                          background: rotationPhase === "published" ? "#F3F0F7" : "#3E1540",
-                          color: rotationPhase === "published" ? "#5A5466" : "#F6F4EF",
-                          border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500,
-                          fontFamily: "inherit",
-                          cursor: isPublishing ? "not-allowed" : "pointer",
-                          opacity: isPublishing ? 0.6 : 1,
-                        }}
-                      >
-                        {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
-                      </button>
-                    </div>
-                  </div>
-                  <DGLAssignmentTable assignments={existingAssignments} flaggedKeys={new Set()} />
-                </div>
-              )}
-
-              {rotationPhase === "generated" && (
-                <div>
-                  {flagged.length > 0 && (
-                    <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
-                      <p style={{ fontSize: 12, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
-                        {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
-                      </p>
-                      {flagged.map((f, fi) => (
-                        <p key={fi} style={{ fontSize: 12, color: "#92400E" }}>
-                          {new Date(f.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {DGL_SLOT_LABELS[f.slot]} — {f.reason}
-                        </p>
-                      ))}
                     </div>
                   )}
-                  <DGLAssignmentTable
-                    assignments={proposedAssignments.map(a => ({
-                      id: `${a.week_date}::${a.slot}::${a.role}`,
-                      user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
-                      semester, published: false, user_name: a.user_name,
-                    }))}
-                    flaggedKeys={flaggedKeys}
-                  />
-                  <div className="flex items-center justify-between mt-4">
-                    <button
-                      onClick={() => {
-                        setProposedAssignments([])
-                        setFlagged([])
-                        setRotationPhase(
-                          existingAssignments.length === 0 ? "idle"
-                            : existingAssignments.some(r => r.published) ? "published"
-                            : "saved"
-                        )
-                      }}
-                      style={{
-                        padding: "9px 18px", background: "transparent", color: "#5A5466",
-                        border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13,
-                        fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
-                      }}
-                    >
-                      Discard
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      style={{
-                        padding: "9px 20px", background: "#3E1540", color: "#F6F4EF",
-                        border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500,
-                        fontFamily: "inherit",
-                        cursor: isSaving ? "not-allowed" : "pointer",
-                        opacity: isSaving ? 0.6 : 1,
-                        display: "flex", alignItems: "center", gap: 8,
-                      }}
-                    >
-                      {isSaving
-                        ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</>
-                        : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
-                    </button>
-                  </div>
-                </div>
+
+                  {(rotationPhase === "saved" || rotationPhase === "published") && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "4px 10px", background: rotationPhase === "published" ? "#EDE5F0" : "#F4F1E8", color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                          {rotationPhase === "published" ? "Published" : "Draft"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleGenerate}
+                            disabled={isGenerating}
+                            style={{ padding: "7px 14px", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                          >
+                            <Shuffle style={{ width: 12, height: 12 }} /> Re-generate
+                          </button>
+                          <button
+                            onClick={() => handlePublish(rotationPhase !== "published")}
+                            disabled={isPublishing}
+                            style={{ padding: "7px 14px", background: rotationPhase === "published" ? "#F3F0F7" : "#3E1540", color: rotationPhase === "published" ? "#5A5466" : "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}
+                          >
+                            {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
+                          </button>
+                        </div>
+                      </div>
+                      <DGLAssignmentTable assignments={existingAssignments} flaggedKeys={new Set()} />
+                    </div>
+                  )}
+
+                  {rotationPhase === "generated" && (
+                    <div>
+                      {flagged.length > 0 && (
+                        <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
+                          <p style={{ fontSize: 12, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
+                            {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
+                          </p>
+                          {flagged.map((f, fi) => (
+                            <p key={fi} style={{ fontSize: 12, color: "#92400E" }}>
+                              {new Date(f.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {DGL_SLOT_LABELS[f.slot]} — {f.reason}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <DGLAssignmentTable
+                        assignments={proposedAssignments.map(a => ({
+                          id: `${a.week_date}::${a.slot}::${a.role}`,
+                          user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+                          semester, published: false, user_name: a.user_name,
+                        }))}
+                        flaggedKeys={flaggedKeys}
+                      />
+                      <div className="flex items-center justify-between mt-4">
+                        <button
+                          onClick={() => {
+                            setProposedAssignments([])
+                            setFlagged([])
+                            setRotationPhase(existingAssignments.length === 0 ? "idle" : existingAssignments.some(r => r.published) ? "published" : "saved")
+                          }}
+                          style={{ padding: "9px 18px", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
+                        >
+                          Discard
+                        </button>
+                        <button
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          style={{ padding: "9px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                        >
+                          {isSaving
+                            ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</>
+                            : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
