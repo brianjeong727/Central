@@ -1,34 +1,10 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase-admin"
+import { SLOT_ROLES, SLOTS } from "./dgl-constants"
+import type { DGLSlot, DGLRole, ProposedAssignment } from "./dgl-constants"
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export type DGLSlot = "wednesday_pm" | "friday_sg" | "sunday_service"
-export type DGLRole =
-  | "leading_pm"
-  | "pm_praise"
-  | "cooking"
-  | "friday_praise"
-  | "congregational_prayer"
-  | "dishes"
-
-export const SLOT_ROLES: Record<DGLSlot, [DGLRole, DGLRole]> = {
-  wednesday_pm:    ["leading_pm", "pm_praise"],
-  friday_sg:       ["cooking", "friday_praise"],
-  sunday_service:  ["congregational_prayer", "dishes"],
-}
-
-export const SLOTS: DGLSlot[] = ["wednesday_pm", "friday_sg", "sunday_service"]
-
-export type ProposedAssignment = {
-  week_date: string  // ISO date
-  slot: DGLSlot
-  role: DGLRole
-  user_id: string
-  user_name: string
-  needs_review: boolean
-}
+export type { DGLSlot, DGLRole, ProposedAssignment }
 
 export type GenerateRotationParams = {
   teamId: string

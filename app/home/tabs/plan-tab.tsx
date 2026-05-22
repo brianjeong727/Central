@@ -21,9 +21,9 @@ import { createClient } from "@/lib/supabase"
 import { generateGroupsAction, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/app/actions/generate-groups"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
-  SLOT_ROLES, SLOTS,
   type DGLSlot, type DGLRole, type ProposedAssignment,
 } from "@/app/actions/generate-dgl-rotation"
+import { SLOT_ROLES, SLOTS } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks } from "@/app/actions/dgl-utils"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
