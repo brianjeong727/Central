@@ -7524,14 +7524,14 @@ function SmallGroupLeadersTab({
 
   // Group chats confirmation (president only)
   const [confirmGroupsLoading, setConfirmGroupsLoading] = useState(false)
-  const [confirmGroupsResult, setConfirmGroupsResult] = useState<{ created: number; updated: number } | null>(null)
+  const [confirmGroupsResult, setConfirmGroupsResult] = useState<{ created: number; updated: number; error?: string } | null>(null)
 
   async function handleConfirmGroupChats() {
     setConfirmGroupsLoading(true)
     setConfirmGroupsResult(null)
     try {
       const result = await confirmSmallGroupChatsAction(teamId, ministryId)
-      if (!result.error) setConfirmGroupsResult({ created: result.created, updated: result.updated })
+      setConfirmGroupsResult({ created: result.created, updated: result.updated, error: result.error })
     } finally {
       setConfirmGroupsLoading(false)
     }
@@ -7910,9 +7910,11 @@ function SmallGroupLeadersTab({
                   {confirmGroupsLoading ? "Creating chats…" : "Confirm Groups & Create Chats"}
                 </button>
                 {confirmGroupsResult && (
-                  <p className="text-[13px] text-[#5A5466] mt-3 text-center">
-                    {confirmGroupsResult.created} chat{confirmGroupsResult.created !== 1 ? "s" : ""} created
-                    {confirmGroupsResult.updated > 0 ? `, ${confirmGroupsResult.updated} updated` : ""}.
+                  <p className={`text-[13px] mt-3 text-center ${confirmGroupsResult.error ? "text-red-500" : "text-[#5A5466]"}`}>
+                    {confirmGroupsResult.error
+                      ? confirmGroupsResult.error
+                      : `${confirmGroupsResult.created} chat${confirmGroupsResult.created !== 1 ? "s" : ""} created${confirmGroupsResult.updated > 0 ? `, ${confirmGroupsResult.updated} updated` : ""}.`
+                    }
                   </p>
                 )}
               </div>

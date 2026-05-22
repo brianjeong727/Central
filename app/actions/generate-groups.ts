@@ -50,7 +50,10 @@ export async function generateGroupsAction(
         .select("user_id, profiles(id, name, graduation_year, role)")
         .eq("announcement_id", params.sourceId)
       pool = ((data ?? []) as Record<string, unknown>[])
-        .map((r) => r.profiles)
+        .map((r) => {
+          const p = r.profiles
+          return Array.isArray(p) ? p[0] : p
+        })
         .filter(Boolean) as PoolPerson[]
     } else if (params.sourceType === "form" && params.sourceId) {
       // form_responses.user_id → auth.users, not profiles — must do two-step lookup
@@ -80,9 +83,12 @@ export async function generateGroupsAction(
   const numGroups = Math.min(Math.max(1, params.numGroups), pool.length)
 
   // ── 2. Run algorithm ─────────────────────────────────────────────────────────
-  const groups = runAlgorithm(pool, { ...params, numGroups })
-
-  return { groups }
+  try {
+    const groups = runAlgorithm(pool, { ...params, numGroups })
+    return { groups }
+  } catch {
+    return { groups: [], error: "Failed to generate groups." }
+  }
 }
 
 // ── Algorithm ────────────────────────────────────────────────────────────────
