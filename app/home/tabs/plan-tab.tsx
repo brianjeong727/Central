@@ -1250,21 +1250,18 @@ export function StudentOrgTeamHome({
   return (
     <div>
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
-      <div style={{ paddingLeft: 56, borderBottom: "1px solid #E8E2D2", display: "flex", gap: 32 }}>
-        {(["General", "Plan", "Roster", "Resources", "Groups"] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTeamTabAndUrl(t)}
-            style={{
-              padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--font-inter)",
-              color: teamTab === t ? "#2D0F2E" : "#8A8497",
-              fontWeight: teamTab === t ? 600 : 400,
-              borderBottom: teamTab === t ? "2px solid #3E1540" : "2px solid transparent",
-              marginBottom: -1, background: "none", border: "none",
-              cursor: "pointer",
-            }}
-          >{t}</button>
-        ))}
+      <div style={{ paddingLeft: 56 }}>
+        <PlanSubTabStrip
+          tabs={[
+            { key: "General", label: "General" },
+            { key: "Plan", label: "Plan" },
+            { key: "Roster", label: "Roster" },
+            { key: "Resources", label: "Resources" },
+            { key: "Groups", label: "Groups" },
+          ]}
+          active={teamTab}
+          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Roster" | "Resources" | "Groups")}
+        />
       </div>
 
       {/* ── Tab content ── */}
@@ -1815,6 +1812,47 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   )
 }
 
+// ── PlanSubTabStrip ────────────────────────────────────────────────────────────
+// Single canonical tab strip used by every team page in the Plan tab.
+// Implements §4.2 exactly: underline only, no pills, no segmented backgrounds.
+function PlanSubTabStrip({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly { key: string; label: string }[]
+  active: string
+  onChange: (key: string) => void
+}) {
+  return (
+    <div style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
+      {tabs.map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          style={{
+            padding: "12px 0 14px",
+            fontSize: 15,
+            fontFamily: "var(--font-inter)",
+            fontWeight: active === key ? 600 : 400,
+            color: active === key ? "#2D0F2E" : "#8A8497",
+            border: "none",
+            borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
+            marginBottom: -1,
+            background: "none",
+            cursor: "pointer",
+            whiteSpace: "nowrap" as const,
+            outline: "none",
+            flexShrink: 0,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── PraiseTeamTab ─────────────────────────────────────────────────────────────
 
 const WORSHIP_ROLE_OPTIONS = ["Vocals", "Keys", "Guitar", "Bass", "Drums", "Other"]
@@ -1908,12 +1946,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
   const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
-  const subTabStyle = (active: boolean): React.CSSProperties => ({
-    padding: "12px 16px", fontSize: 14, fontFamily: "var(--font-inter)", fontWeight: active ? 600 : 400,
-    color: active ? "#3E1540" : "#8A8497", boxShadow: active ? "inset 0 -2px 0 0 #3E1540" : "none",
-    background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, outline: "none",
-  })
-
   async function loadSchedule() {
     const gen = ++loadScheduleGenRef.current
     setScheduleLoading(true)
@@ -2429,11 +2461,17 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
       })()}
 
       {/* Sub-tabs */}
-      <div style={{ borderBottom: "1px solid #ECE8DE", marginBottom: 24, display: "flex", overflowX: "auto", scrollbarWidth: "none" }}>
-        <button style={subTabStyle(subTab === "schedule")} onClick={() => setSubTab("schedule")}>Schedule</button>
-        <button style={subTabStyle(subTab === "setlist")} onClick={() => setSubTab("setlist")}>Set List</button>
-        <button style={subTabStyle(subTab === "slides")} onClick={() => setSubTab("slides")}>Slides</button>
-        <button style={subTabStyle(subTab === "availability")} onClick={() => setSubTab("availability")}>Availability</button>
+      <div style={{ marginBottom: 24 }}>
+        <PlanSubTabStrip
+          tabs={[
+            { key: "schedule", label: "Schedule" },
+            { key: "setlist", label: "Set List" },
+            { key: "slides", label: "Slides" },
+            { key: "availability", label: "Availability" },
+          ]}
+          active={subTab}
+          onChange={t => setSubTab(t as "schedule" | "setlist" | "slides" | "availability")}
+        />
       </div>
 
       {/* ── Schedule ── */}
@@ -7655,22 +7693,15 @@ function SmallGroupLeadersTab({
   return (
     <div>
       {/* Sub-tab switcher */}
-      <div className="flex gap-1 mb-6 bg-[#F3F0F7] rounded-xl p-1">
-        {(["home", "schedule"] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setActiveSubTab(t)}
-            style={{
-              flex: 1, padding: "8px 0", borderRadius: 10, border: "none",
-              fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer",
-              background: activeSubTab === t ? "#3E1540" : "transparent",
-              color: activeSubTab === t ? "#F6F4EF" : "#5A5466",
-              transition: "all 0.15s",
-            }}
-          >
-            {t === "home" ? "Home" : "Schedule"}
-          </button>
-        ))}
+      <div style={{ marginBottom: 24 }}>
+        <PlanSubTabStrip
+          tabs={[
+            { key: "home", label: "Home" },
+            { key: "schedule", label: "Schedule" },
+          ]}
+          active={activeSubTab}
+          onChange={t => setActiveSubTab(t as "home" | "schedule")}
+        />
       </div>
 
       {/* ── Home Tab ──────────────────────────────────────────────────────── */}
