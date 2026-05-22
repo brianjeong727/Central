@@ -17,7 +17,11 @@ Before writing any UI code, editing any component, or reviewing any page:
 1. **Load `skills/design-system/SKILL.md`** — mandatory before touching any UI file
 2. **Load `skills/design-system/design-system.md`** — the full design contract
 
-This is not optional. Every UI decision must be verified against the design system before shipping.
+Before starting any feature, fix, or change:
+
+3. **Load `skills/testing/SKILL.md`** — mandatory on every task, not just when asked
+
+This is not optional. Every UI decision must be verified against the design system. Every feature must pass the testing checklist before being marked done.
 
 ---
 
