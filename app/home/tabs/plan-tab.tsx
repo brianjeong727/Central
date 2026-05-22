@@ -2072,8 +2072,11 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, status: status as WorshipWeek["status"] } : w))
     if (status === "confirmed") {
       const week = weeks.find(w => w.id === weekId)
-      if (week && week.roles.length > 0 && !week.chat_group_id) {
-        createPraiseTeamChatAction(weekId, ministryId)
+      if (week && !week.chat_group_id) {
+        const result = await createPraiseTeamChatAction(weekId, ministryId)
+        if (result.groupId) {
+          setWeeks(prev => prev.map(w => w.id === weekId ? { ...w, chat_group_id: result.groupId } : w))
+        }
       }
     }
   }
@@ -5270,65 +5273,72 @@ function GroupGeneratorWizard({
   async function handleGenerate() {
     setGenerating(true)
     setGenError(null)
-    const prevPairings = smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : []
-    const { groups: result, error } = await generateGroupsAction({
-      ministryId,
-      sourceType,
-      sourceId: sourceId || undefined,
-      numGroups,
-      balanceByYear,
-      separateVisitors: separateVisitors && hasVisitors,
-      smallGroupMode,
-      prevPairings,
-      naming,
-    })
-    if (error || result.length === 0) {
-      setGenError(error ?? "No groups generated.")
+    try {
+      const prevPairings = smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : []
+      const { groups: result, error } = await generateGroupsAction({
+        ministryId,
+        sourceType,
+        sourceId: sourceId || undefined,
+        numGroups,
+        balanceByYear,
+        separateVisitors: separateVisitors && hasVisitors,
+        smallGroupMode,
+        prevPairings,
+        naming,
+      })
+      if (error || result.length === 0) {
+        setGenError(error ?? "No groups generated.")
+        return
+      }
+      setGroups(result)
+      if (!sessionName) setSessionName(`Group Set — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`)
+      setStep(3)
+    } catch {
+      setGenError("Generation failed. Please try again.")
+    } finally {
       setGenerating(false)
-      return
     }
-    setGroups(result)
-    if (!sessionName) setSessionName(`Group Set — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`)
-    setStep(3)
-    setGenerating(false)
   }
 
   async function handleSave() {
     if (!sessionName.trim()) return
     setSaving(true)
-    const { data: sessionData, error: sessionErr } = await supabase
-      .from("group_sessions")
-      .insert({
-        team_id: teamId,
-        ministry_id: ministryId,
-        name: sessionName.trim(),
-        source_type: sourceType,
-        source_id: sourceId || null,
-        config: { numGroups, balanceByYear, separateVisitors, smallGroupMode, naming },
-        created_by: userId,
-      })
-      .select("id")
-      .single()
-
-    if (sessionErr || !sessionData) { setSaving(false); return }
-
-    for (let i = 0; i < groups.length; i++) {
-      const g = groups[i]
-      const { data: groupData } = await supabase
-        .from("generated_groups")
-        .insert({ session_id: sessionData.id, name: g.name, order_index: i })
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase
+        .from("group_sessions")
+        .insert({
+          team_id: teamId,
+          ministry_id: ministryId,
+          name: sessionName.trim(),
+          source_type: sourceType,
+          source_id: sourceId || null,
+          config: { numGroups, balanceByYear, separateVisitors, smallGroupMode, naming },
+          created_by: userId,
+        })
         .select("id")
         .single()
-      if (!groupData) continue
-      if (g.members.length > 0) {
-        await supabase.from("generated_group_members").insert(
-          g.members.map(m => ({ group_id: groupData.id, user_id: m.id }))
-        )
-      }
-    }
 
-    setSaving(false)
-    onSaved()
+      if (sessionErr || !sessionData) return
+
+      for (let i = 0; i < groups.length; i++) {
+        const g = groups[i]
+        const { data: groupData } = await supabase
+          .from("generated_groups")
+          .insert({ session_id: sessionData.id, name: g.name, order_index: i })
+          .select("id")
+          .single()
+        if (!groupData) continue
+        if (g.members.length > 0) {
+          await supabase.from("generated_group_members").insert(
+            g.members.map(m => ({ group_id: groupData.id, user_id: m.id }))
+          )
+        }
+      }
+
+      onSaved()
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Drag-and-drop handlers
@@ -7519,9 +7529,12 @@ function SmallGroupLeadersTab({
   async function handleConfirmGroupChats() {
     setConfirmGroupsLoading(true)
     setConfirmGroupsResult(null)
-    const result = await confirmSmallGroupChatsAction(teamId, ministryId)
-    setConfirmGroupsLoading(false)
-    if (!result.error) setConfirmGroupsResult({ created: result.created, updated: result.updated })
+    try {
+      const result = await confirmSmallGroupChatsAction(teamId, ministryId)
+      if (!result.error) setConfirmGroupsResult({ created: result.created, updated: result.updated })
+    } finally {
+      setConfirmGroupsLoading(false)
+    }
   }
 
   useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -7685,31 +7698,41 @@ function SmallGroupLeadersTab({
   async function handleGenerate() {
     setIsGenerating(true)
     setRotErr(null)
-    const result = await generateDGLRotationAction({
-      teamId, ministryId, semester,
-      weeks: semesterWeeks.map(d => d.toISOString().split("T")[0]),
-    })
-    setIsGenerating(false)
-    if (result.error) { setRotErr(result.error); return }
-    setProposedAssignments(result.assignments)
-    setFlagged(result.flaggedWeeks)
-    setRotationPhase("generated")
+    try {
+      const result = await generateDGLRotationAction({
+        teamId, ministryId, semester,
+        weeks: semesterWeeks.map(d => d.toISOString().split("T")[0]),
+      })
+      if (result.error) { setRotErr(result.error); return }
+      setProposedAssignments(result.assignments)
+      setFlagged(result.flaggedWeeks)
+      setRotationPhase("generated")
+    } catch {
+      setRotErr("Generation failed. Please try again.")
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   async function handleSave() {
     setIsSaving(true)
     setRotErr(null)
-    const result = await saveDGLRotationAction({
-      teamId, ministryId, semester,
-      assignments: proposedAssignments.map(a => ({
-        user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
-      })),
-    })
-    setIsSaving(false)
-    if (result.error) { setRotErr(result.error); return }
-    setProposedAssignments([])
-    setFlagged([])
-    await loadExistingAssignments()
+    try {
+      const result = await saveDGLRotationAction({
+        teamId, ministryId, semester,
+        assignments: proposedAssignments.map(a => ({
+          user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+        })),
+      })
+      if (result.error) { setRotErr(result.error); return }
+      setProposedAssignments([])
+      setFlagged([])
+      await loadExistingAssignments()
+    } catch {
+      setRotErr("Save failed. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   async function handlePublish(publish: boolean) {

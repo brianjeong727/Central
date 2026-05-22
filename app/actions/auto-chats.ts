@@ -195,6 +195,7 @@ export async function confirmSmallGroupChatsAction(
   teamId: string,
   ministryId: string,
 ): Promise<{ created: number; updated: number; error?: string }> {
+  try {
   const admin = createAdminClient()
 
   // Check automation setting
@@ -338,6 +339,9 @@ export async function confirmSmallGroupChatsAction(
   }
 
   return { created, updated }
+  } catch (e) {
+    return { created: 0, updated: 0, error: e instanceof Error ? e.message : "Unexpected error creating group chats." }
+  }
 }
 
 // ── respondToGradCheck ────────────────────────────────────────────────────────

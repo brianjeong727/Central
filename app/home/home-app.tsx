@@ -111,17 +111,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const loadRecentChats = useCallback(async () => {
     const { data: groups } = await supabase
       .from("group_members")
-      .select("groups(id, name, type), last_read_at")
+      .select("groups(id, name, type, ministry_id), last_read_at")
       .eq("user_id", userId)
 
     if (!groups) return
 
-    type RawGroup = { groups: { id: string; name: string; type: string } | { id: string; name: string; type: string }[] | null; last_read_at: string | null }
+    type RawGroup = { groups: { id: string; name: string; type: string; ministry_id: string | null } | { id: string; name: string; type: string; ministry_id: string | null }[] | null; last_read_at: string | null }
     const groupList = (groups as RawGroup[])
       .map((m) => {
         if (!m.groups) return null
         const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-        if (!g) return null
+        if (!g || g.ministry_id !== ministryId) return null
         return { ...g, lastReadAt: m.last_read_at }
       })
       .filter(Boolean) as { id: string; name: string; type: string; lastReadAt: string | null }[]
@@ -300,14 +300,20 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const recountTotalUnread = useCallback(async () => {
     const { data } = await supabase
       .from("group_members")
-      .select("group_id, last_read_at")
+      .select("group_id, last_read_at, groups(ministry_id)")
       .eq("user_id", userId)
 
     if (!data || data.length === 0) { setTotalChatsUnread(0); return }
 
+    type GmRow = { group_id: string; last_read_at: string | null; groups: { ministry_id: string } | { ministry_id: string }[] | null }
+    const filtered = (data as GmRow[]).filter(m => {
+      const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+      return g?.ministry_id === ministryId
+    })
+
     let total = 0
     await Promise.all(
-      data.map(async ({ group_id, last_read_at }: { group_id: string; last_read_at: string | null }) => {
+      filtered.map(async ({ group_id, last_read_at }) => {
         let q = supabase
           .from("messages")
           .select("*", { count: "exact", head: true })
@@ -320,7 +326,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     )
     setTotalChatsUnread(total)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId])
 
   // On desktop, auto-select the most recent chat when arriving at the chats tab
   useEffect(() => {

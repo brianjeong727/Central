@@ -2001,11 +2001,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     async function load() {
       const { data } = await supabase
         .from("group_members")
-        .select("groups(id, name, type, archived), last_read_at")
+        .select("groups(id, name, type, archived, ministry_id), last_read_at")
         .eq("user_id", userId)
 
       type RawMember = {
-        groups: { id: string; name: string; type: string; archived: boolean | null } | { id: string; name: string; type: string; archived: boolean | null }[] | null
+        groups: { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null } | { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null }[] | null
         last_read_at: string | null
       }
 
@@ -2013,7 +2013,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         .map((m: RawMember) => {
           if (!m.groups) return null
           const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-          if (!g) return null
+          if (!g || g.ministry_id !== ministryId) return null
           return {
             id: g.id,
             name: g.name,
