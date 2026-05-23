@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Check, ChevronDown, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
+import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -126,7 +126,7 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
 
   if (done) {
     return (
-      <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[296px] animate-modal-in">
+      <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[296px]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
           <Check className="w-8 h-8 text-[#3E1540]" />
         </div>
@@ -134,12 +134,12 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
           <p className="text-[16px] font-bold text-[#13101A]">Response submitted!</p>
           <p className="text-[13px] text-[#8A8497] mt-1">Thank you for filling out the form.</p>
         </div>
-      </div>
+      </AnimateIn>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       <div className="flex-shrink-0 border-b border-[#E8E2D2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
           <div>
@@ -254,7 +254,7 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
           </div>
         </>
       )}
-    </div>
+    </AnimateIn>
   )
 }
 
@@ -347,7 +347,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
   })
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       <div className="flex-shrink-0 border-b border-[#E8E2D2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-5 md:px-10">
           <div>
@@ -462,7 +462,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
           )}
         </div>
       )}
-    </div>
+    </AnimateIn>
   )
 }
 

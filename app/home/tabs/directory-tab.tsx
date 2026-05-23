@@ -5,7 +5,7 @@ import { Search, ArrowLeft, MessageCircle, Heart, ChevronRight, Users } from "lu
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState } from "../components/shared"
+import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { DirectoryMember } from "../types"
@@ -459,7 +459,7 @@ export function MemberSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[60] bg-white flex flex-col">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
 
         {/* Header */}
@@ -554,6 +554,6 @@ export function MemberSheet({
           </div>
         )}
       </div>
-    </div>
+    </AnimateIn>
   )
 }

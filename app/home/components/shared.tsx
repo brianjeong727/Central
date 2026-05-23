@@ -1,5 +1,7 @@
 "use client"
 
+import { useState, useEffect } from "react"
+
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
 export const MONO_STYLE: React.CSSProperties = {
@@ -34,6 +36,51 @@ export function Spinner() {
   return (
     <div className="flex items-center justify-center py-12">
       <div className="w-6 h-6 rounded-full border-2 border-[#3E1540]/20 border-t-[#3E1540] animate-spin" />
+    </div>
+  )
+}
+
+// Reliable overlay entrance — uses rAF instead of CSS animation to
+// guarantee the invisible state renders before the transition starts.
+export function AnimateIn({
+  children,
+  className = "",
+  style,
+  animate = true,
+}: {
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+  animate?: boolean
+}) {
+  const [visible, setVisible] = useState(!animate)
+
+  useEffect(() => {
+    if (!animate) return
+    let id2: number
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => setVisible(true))
+    })
+    return () => {
+      cancelAnimationFrame(id1)
+      cancelAnimationFrame(id2)
+    }
+  }, [animate])
+
+  const animStyle: React.CSSProperties | undefined = animate
+    ? {
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: visible
+          ? "opacity 300ms cubic-bezier(0.23,1,0.32,1), transform 300ms cubic-bezier(0.23,1,0.32,1)"
+          : "none",
+        ...style,
+      }
+    : (style ?? undefined)
+
+  return (
+    <div className={className} style={animStyle}>
+      {children}
     </div>
   )
 }

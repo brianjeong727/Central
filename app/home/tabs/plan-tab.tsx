@@ -29,7 +29,7 @@ import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, t
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type {
@@ -5478,8 +5478,8 @@ function GroupGeneratorWizard({
   const stepIdx = step - 1
 
   return (
-    <div
-      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col animate-modal-in"
+    <AnimateIn
+      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col"
       style={{ left: 0 }}
     >
       {/* Header */}
@@ -5848,7 +5848,7 @@ function GroupGeneratorWizard({
           )}
         </div>
       </div>
-    </div>
+    </AnimateIn>
   )
 }
 
@@ -6022,7 +6022,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
   const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
@@ -6303,7 +6303,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
           </div>
         )}
       </div>
-    </div>
+    </AnimateIn>
   )
 }
 
@@ -6683,7 +6683,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
@@ -7188,7 +7188,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       )}
 
-    </div>
+    </AnimateIn>
   )
 }
 

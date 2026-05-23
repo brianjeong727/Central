@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE } from "../components/shared"
+import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { FormFillView } from "./forms-tab"
@@ -186,7 +186,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
@@ -518,7 +518,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           </div>
         </aside>
       </form>
-    </div>
+    </AnimateIn>
   )
 }
 
@@ -1066,7 +1066,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
   const showAttendeeList = announcement.is_event && announcement.rsvp_attendees.length > 0 && (isLeaderOrAdmin || announcement.show_attendees)
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px] animate-modal-in">
+    <AnimateIn className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
         <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"><ArrowLeft className="w-4 h-4 text-[#3E1540]" /></button>
@@ -1098,7 +1098,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
           </div>
         )}
       </div>
-    </div>
+    </AnimateIn>
   )
 }
 

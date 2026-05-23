@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Spinner, EmptyState } from "../components/shared"
+import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
 import data from "@emoji-mart/data"
@@ -1497,7 +1497,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   return (
     <>
-    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in"}>
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
@@ -1964,7 +1964,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         />
       )}
     </div>
-    </div>
+    </AnimateIn>
 
     {showSettings && (
       <ChatSettings
