@@ -7615,6 +7615,21 @@ function SmallGroupLeadersTab({
 
   useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Realtime: refresh home assignments when president publishes
+  useEffect(() => {
+    const channel = supabase
+      .channel(`dgl-assignments-${userId}-${teamId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "dgl_assignments",
+        filter: `user_id=eq.${userId}`,
+      }, () => { void loadHome() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId, userId])
+
   async function init() {
     setLoading(true)
     await Promise.all([loadHome(), loadSchedule()])
@@ -7622,17 +7637,14 @@ function SmallGroupLeadersTab({
   }
 
   async function loadHome() {
-    const today = new Date().toISOString().split("T")[0]
-
     const { data: aData } = await supabase
       .from("dgl_assignments")
       .select("*")
       .eq("team_id", teamId)
       .eq("user_id", userId)
       .eq("published", true)
-      .gte("week_date", today)
+      .eq("semester", semester)
       .order("week_date", { ascending: true })
-      .limit(8)
     setMyUpcoming((aData ?? []) as DGLAssignmentRow[])
 
     const { data: gData } = await supabase
@@ -7987,12 +7999,13 @@ function SmallGroupLeadersTab({
             <PlanSectionHeader>My Assignments</PlanSectionHeader>
             {myUpcoming.length === 0 ? (
               <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
-                <p className="text-[13px] text-[#8A8497]">No upcoming assignments this semester.</p>
+                <p className="text-[13px] text-[#8A8497]">Your schedule hasn&apos;t been published yet.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {myUpcoming.map(a => {
                   const d = new Date(a.week_date + "T12:00:00")
+                  const isPraiseSlot = a.slot === "wednesday_pm" || a.slot === "friday_sg"
                   return (
                     <div key={a.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[#F3F0F7] flex flex-col items-center justify-center flex-shrink-0">
@@ -8007,6 +8020,14 @@ function SmallGroupLeadersTab({
                           {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                       </div>
+                      {isPraiseSlot && (
+                        <button
+                          onClick={() => setActiveSubTab("schedule")}
+                          style={{ padding: "6px 12px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
+                        >
+                          Prepare →
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -8414,7 +8435,22 @@ function SmallGroupLeadersTab({
                           </button>
                         </div>
                       </div>
-                      <DGLAssignmentTable assignments={existingAssignments} flaggedKeys={new Set()} />
+                      <DGLAssignmentTable
+                        assignments={existingAssignments}
+                        flaggedKeys={new Set()}
+                        rosterMembers={scheduleRosterMembers}
+                        onSwap={(wd, slot, uid, name) => {
+                          setExistingAssignments(prev => prev.map(a =>
+                            a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
+                          ))
+                          if (rotationPhase === "published") {
+                            const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
+                            if (row) {
+                              void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
+                            }
+                          }
+                        }}
+                      />
                     </div>
                   )}
 
@@ -8439,6 +8475,12 @@ function SmallGroupLeadersTab({
                           semester, published: false, user_name: a.user_name,
                         }))}
                         flaggedKeys={flaggedKeys}
+                        rosterMembers={scheduleRosterMembers}
+                        onSwap={(wd, slot, uid, name) => {
+                          setProposedAssignments(prev => prev.map(a =>
+                            a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
+                          ))
+                        }}
                       />
                       <div className="flex items-center justify-between mt-4">
                         <button
@@ -8476,10 +8518,17 @@ function SmallGroupLeadersTab({
 function DGLAssignmentTable({
   assignments,
   flaggedKeys,
+  onSwap,
+  rosterMembers,
 }: {
   assignments: DGLAssignmentRow[]
   flaggedKeys: Set<string>
+  onSwap?: (weekDate: string, slot: DGLSlot, newUserId: string, newUserName: string) => void
+  rosterMembers?: { user_id: string; name: string }[]
 }) {
+  const [editingCell, setEditingCell] = useState<{ weekDate: string; slot: DGLSlot } | null>(null)
+  const [hoveredCell, setHoveredCell] = useState<{ weekDate: string; slot: DGLSlot } | null>(null)
+
   const byWeek = new Map<string, DGLAssignmentRow[]>()
   for (const a of assignments) {
     if (!byWeek.has(a.week_date)) byWeek.set(a.week_date, [])
@@ -8511,15 +8560,47 @@ function DGLAssignmentTable({
             {SLOTS.map((slot, si) => {
               const r = weekRows.find(a => a.slot === slot)
               const isFlagged = flaggedKeys.has(`${wd}::${slot}`)
+              const isEditing = editingCell?.weekDate === wd && editingCell?.slot === slot
+              const isHovered = hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
                 <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
-                  {r ? (
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
+                  {isEditing && rosterMembers && rosterMembers.length > 0 ? (
+                    <select
+                      autoFocus
+                      defaultValue={r?.user_id ?? ""}
+                      onChange={e => {
+                        const selected = rosterMembers.find(m => m.user_id === e.target.value)
+                        if (selected && onSwap) onSwap(wd, slot, selected.user_id, selected.name)
+                        setEditingCell(null)
+                      }}
+                      onBlur={() => setEditingCell(null)}
+                      style={{ fontSize: 13, border: "1.5px solid #D4CEDF", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "white", color: "#13101A", maxWidth: 160 }}
+                    >
+                      <option value="" disabled>Select…</option>
+                      {rosterMembers.map(m => (
+                        <option key={m.user_id} value={m.user_id}>{m.name}</option>
+                      ))}
+                    </select>
                   ) : (
-                    <span style={{ fontSize: 13, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
+                    <div
+                      className="flex items-center gap-1"
+                      style={{ cursor: onSwap ? "pointer" : "default" }}
+                      onMouseEnter={() => onSwap ? setHoveredCell({ weekDate: wd, slot }) : undefined}
+                      onMouseLeave={() => setHoveredCell(null)}
+                      onClick={() => onSwap ? setEditingCell({ weekDate: wd, slot }) : undefined}
+                    >
+                      {r ? (
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
+                      )}
+                      {onSwap && isHovered && (
+                        <Pencil style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />
+                      )}
+                    </div>
                   )}
                 </div>
               )
