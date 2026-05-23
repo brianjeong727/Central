@@ -22,7 +22,7 @@ import { runAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing } 
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
 } from "@/app/actions/generate-dgl-rotation"
-import { SLOT_ROLES, SLOTS, type DGLSlot, type DGLRole, type ProposedAssignment } from "@/app/actions/dgl-constants"
+import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
@@ -7515,15 +7515,6 @@ const DGL_SLOT_LABELS: Record<DGLSlot, string> = {
   sunday_service: "Sun Service",
 }
 
-const DGL_ROLE_LABELS: Record<DGLRole, string> = {
-  leading_pm: "Lead PM",
-  pm_praise: "PM Praise",
-  cooking: "Cooking",
-  friday_praise: "Fri Praise",
-  congregational_prayer: "Cong. Prayer",
-  dishes: "Dishes",
-}
-
 type SGGroup = {
   id: string
   name: string
@@ -7546,7 +7537,6 @@ type DGLAssignmentRow = {
   user_id: string
   week_date: string
   slot: DGLSlot
-  role: DGLRole
   semester: string
   published: boolean
   user_name: string
@@ -7796,7 +7786,7 @@ function SmallGroupLeadersTab({
   async function loadExistingAssignments() {
     const { data } = await supabase
       .from("dgl_assignments")
-      .select("id, user_id, week_date, slot, role, semester, published")
+      .select("id, user_id, week_date, slot, semester, published")
       .eq("team_id", teamId)
       .eq("semester", semester)
       .order("week_date", { ascending: true })
@@ -7810,7 +7800,7 @@ function SmallGroupLeadersTab({
     }
 
     const rows: DGLAssignmentRow[] = data.map((r: {
-      id: string; user_id: string; week_date: string; slot: DGLSlot; role: DGLRole; semester: string; published: boolean
+      id: string; user_id: string; week_date: string; slot: DGLSlot; semester: string; published: boolean
     }) => ({ ...r, user_name: nameMap.get(r.user_id) ?? r.user_id }))
 
     setExistingAssignments(rows)
@@ -7920,7 +7910,7 @@ function SmallGroupLeadersTab({
       const result = await saveDGLRotationAction({
         teamId, ministryId, semester,
         assignments: proposedAssignments.map(a => ({
-          user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+          user_id: a.user_id, week_date: a.week_date, slot: a.slot,
         })),
       })
       if (result.error) { setRotErr(result.error); return }
@@ -8012,9 +8002,9 @@ function SmallGroupLeadersTab({
                         <span style={{ fontSize: 15, fontWeight: 700, color: "#3E1540", lineHeight: 1 }}>{d.getDate()}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold text-[#13101A] truncate">{DGL_ROLE_LABELS[a.role]}</p>
+                        <p className="text-[14px] font-semibold text-[#13101A] truncate">{DGL_SLOT_LABELS[a.slot]}</p>
                         <p className="text-[12px] text-[#8A8497]">
-                          {DGL_SLOT_LABELS[a.slot]} · {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                       </div>
                     </div>
@@ -8444,8 +8434,8 @@ function SmallGroupLeadersTab({
                       )}
                       <DGLAssignmentTable
                         assignments={proposedAssignments.map(a => ({
-                          id: `${a.week_date}::${a.slot}::${a.role}`,
-                          user_id: a.user_id, week_date: a.week_date, slot: a.slot, role: a.role,
+                          id: `${a.week_date}::${a.slot}`,
+                          user_id: a.user_id, week_date: a.week_date, slot: a.slot,
                           semester, published: false, user_name: a.user_name,
                         }))}
                         flaggedKeys={flaggedKeys}
@@ -8519,30 +8509,18 @@ function DGLAssignmentTable({
               )}
             </div>
             {SLOTS.map((slot, si) => {
-              const [role1, role2] = SLOT_ROLES[slot]
-              const r1 = weekRows.find(a => a.slot === slot && a.role === role1)
-              const r2 = weekRows.find(a => a.slot === slot && a.role === role2)
+              const r = weekRows.find(a => a.slot === slot)
               const isFlagged = flaggedKeys.has(`${wd}::${slot}`)
               return (
-                <div key={slot} className={`px-4 py-2.5 ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 4 }}>
+                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
-                  </p>
-                  <div className="flex flex-col gap-0.5">
-                    {([
-                      [r1, role1] as [DGLAssignmentRow | undefined, DGLRole],
-                      [r2, role2] as [DGLAssignmentRow | undefined, DGLRole],
-                    ]).map(([r, role]) => (
-                      <div key={role} className="flex items-center gap-2">
-                        <span style={{ fontSize: 11, color: "#8A8497", minWidth: 84 }}>{DGL_ROLE_LABELS[role]}</span>
-                        {r ? (
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
-                        ) : (
-                          <span style={{ fontSize: 12, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  </span>
+                  {r ? (
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
+                  ) : (
+                    <span style={{ fontSize: 13, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
+                  )}
                 </div>
               )
             })}

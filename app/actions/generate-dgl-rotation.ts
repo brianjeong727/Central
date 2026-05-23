@@ -1,8 +1,8 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { SLOT_ROLES, SLOTS } from "./dgl-constants"
-import type { DGLSlot, DGLRole, ProposedAssignment } from "./dgl-constants"
+import { SLOTS } from "./dgl-constants"
+import type { DGLSlot, ProposedAssignment } from "./dgl-constants"
 
 export type GenerateRotationParams = {
   teamId: string
@@ -83,51 +83,41 @@ export async function generateDGLRotationAction(
         .map((r: { user_id: string; week_date: string; slot: string }) => `${r.user_id}::${r.week_date}::${r.slot}`)
     )
 
-    // 3. Run assignment algorithm
+    // 3. Run assignment algorithm — 1 person per slot per week
     const assignments: ProposedAssignment[] = []
     const flaggedWeeks: GenerateRotationResult["flaggedWeeks"] = []
 
-    // Role counts track how many times each DGL has done each role — used for soft preference only.
-    // There is NO hard cap: DGLs repeat roles when needed (17 weeks, ~10 DGLs means everyone repeats).
-    const roleCounts = new Map<string, Map<DGLRole, number>>()
-    for (const uid of memberIds) roleCounts.set(uid, new Map())
+    // slotCounts[uid][slot] = times this person has been assigned to this slot.
+    // Used for soft preference only — no hard cap, repeats are fine.
+    const slotCounts = new Map<string, Map<DGLSlot, number>>()
+    for (const uid of memberIds) slotCounts.set(uid, new Map())
 
-    // Total assignment counts drive fairness (fewest-assigned gets priority).
+    // totalCounts drives fairness (fewest-assigned gets priority).
     const totalCounts = new Map<string, number>(memberIds.map(id => [id, 0]))
 
     for (const weekDate of params.weeks) {
       for (const slot of SLOTS) {
-        const [role1, role2] = SLOT_ROLES[slot]
         const specificDate = dateForSlot(weekDate, slot)
         const availSlot = SLOT_TO_AVAIL[slot].availSlot
 
         // Absence of a record = available. Only is_busy=true means unavailable.
         const available = memberIds.filter(uid => !busySet.has(`${uid}::${specificDate}::${availSlot}`))
 
-        // Flag only when genuinely short-staffed, not when everyone has repeated a role.
-        const needsReview = available.length < 2
-        if (needsReview) {
-          flaggedWeeks.push({
-            week_date: weekDate,
-            slot,
-            reason: available.length === 0 ? "No available DGLs." : "Only 1 DGL available — need 2.",
-          })
+        // Flag only when zero DGLs are available for this slot.
+        if (available.length === 0) {
+          flaggedWeeks.push({ week_date: weekDate, slot, reason: "No available DGLs." })
         }
 
-        // Pick two DIFFERENT people: primary sort = fewest times in this role (soft), secondary = total fairness.
-        const picked1 = pickFairestWithRolePref(available, totalCounts, roleCounts, role1, [])
-        const picked2 = pickFairestWithRolePref(available, totalCounts, roleCounts, role2, picked1 ? [picked1] : [])
-
-        for (const [picked, role] of [[picked1, role1], [picked2, role2]] as [string | null, DGLRole][]) {
-          if (!picked) continue
+        const picked = pickFairest(available, totalCounts, slotCounts, slot)
+        if (picked) {
           assignments.push({
-            week_date: weekDate, slot, role,
+            week_date: weekDate, slot,
             user_id: picked,
             user_name: profiles.get(picked) ?? picked,
-            needs_review: needsReview,
+            needs_review: available.length === 0,
           })
-          const rc = roleCounts.get(picked)!
-          rc.set(role, (rc.get(role) ?? 0) + 1)
+          const sc = slotCounts.get(picked)!
+          sc.set(slot, (sc.get(slot) ?? 0) + 1)
           totalCounts.set(picked, (totalCounts.get(picked) ?? 0) + 1)
         }
       }
@@ -139,21 +129,20 @@ export async function generateDGLRotationAction(
   }
 }
 
-// Sort by fewest times in this specific role (soft preference for variety),
-// then by fewest total assignments (fairness). No hard cap on repeats.
-function pickFairestWithRolePref(
+// Primary sort: fewest times in this specific slot (avoid back-to-back same slot).
+// Secondary: fewest total assignments (fairness). No hard cap on repeats.
+function pickFairest(
   candidates: string[],
   totalCounts: Map<string, number>,
-  roleCounts: Map<string, Map<DGLRole, number>>,
-  role: DGLRole,
-  exclude: string[],
+  slotCounts: Map<string, Map<DGLSlot, number>>,
+  slot: DGLSlot,
 ): string | null {
-  const pool = candidates.filter(c => !exclude.includes(c))
-  if (pool.length === 0) return null
+  if (candidates.length === 0) return null
+  const pool = [...candidates]
   pool.sort((a, b) => {
-    const aRole = roleCounts.get(a)?.get(role) ?? 0
-    const bRole = roleCounts.get(b)?.get(role) ?? 0
-    if (aRole !== bRole) return aRole - bRole
+    const aSlot = slotCounts.get(a)?.get(slot) ?? 0
+    const bSlot = slotCounts.get(b)?.get(slot) ?? 0
+    if (aSlot !== bSlot) return aSlot - bSlot
     return (totalCounts.get(a) ?? 0) - (totalCounts.get(b) ?? 0)
   })
   return pool[0]
@@ -185,7 +174,6 @@ export async function saveDGLRotationAction(params: {
     user_id: a.user_id,
     week_date: a.week_date,
     slot: a.slot,
-    role: a.role,
     semester: params.semester,
     published: false,
   }))
