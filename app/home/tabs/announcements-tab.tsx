@@ -1066,8 +1066,8 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
   const showAttendeeList = announcement.is_event && announcement.rsvp_attendees.length > 0 && (isLeaderOrAdmin || announcement.show_attendees)
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none animate-modal-in">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px] animate-modal-in">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
         <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"><ArrowLeft className="w-4 h-4 text-[#3E1540]" /></button>
           <span className="text-[15px] font-semibold text-[#13101A]">Announcement</span>

@@ -459,8 +459,8 @@ export function MemberSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white animate-modal-in">
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-modal-in">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
 
         {/* Header */}
         <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">

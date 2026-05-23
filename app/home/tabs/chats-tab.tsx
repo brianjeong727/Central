@@ -1497,8 +1497,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   return (
     <>
-    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
-    <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none animate-modal-in"}>
+    <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in"}>
+    <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[#FBF8F2] border-b border-[#E8E2D2]`}>

@@ -58,6 +58,7 @@ export default function LandingPage() {
   const [authUser, setAuthUser] = useState<boolean | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [ministryCount, setMinistryCount] = useState<number>(1)
+  const [heroVisible, setHeroVisible] = useState(false)
 
   useEffect(() => {
     function onScroll() {
@@ -66,6 +67,11 @@ export default function LandingPage() {
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => setHeroVisible(true), 80)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
@@ -107,7 +113,8 @@ export default function LandingPage() {
           {/* Brand */}
           <Link
             href="/"
-            style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: navColor, fontFamily: SERIF, fontSize: 22, transition: "color 180ms ease", flexShrink: 0 }}
+            className="cl-brand-link"
+            style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: navColor, fontFamily: SERIF, fontSize: 22, transition: "color 180ms ease, opacity 150ms ease", flexShrink: 0 }}
           >
             <RingCrossLogo size={28} color={scrolled ? C.plum : C.ivory} />
             Central
@@ -116,7 +123,7 @@ export default function LandingPage() {
           {/* Center links */}
           <div className="cl-nav-links" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 28 }}>
             {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
-              <a key={label} href={href} style={{ fontSize: 13, color: navMuted, textDecoration: "none" }}>
+              <a key={label} href={href} className="cl-nav-link" style={{ fontSize: 13, color: navMuted, textDecoration: "none" }}>
                 {label}
               </a>
             ))}
@@ -128,12 +135,14 @@ export default function LandingPage() {
               <>
                 <a
                   href={ministryCount > 1 ? "/pick-ministry" : "/home"}
+                  className="cl-nav-cta-outline"
                   style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, textDecoration: "none", border: scrolled ? `1px solid ${C.border}` : "1px solid rgba(246,244,239,0.5)", color: navColor, background: "transparent", fontFamily: SANS }}
                 >
                   Open app
                 </a>
                 <button
                   onClick={handleSignOut}
+                  className="cl-nav-sign-out"
                   style={{ background: "transparent", border: 0, color: navMuted, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}
                 >
                   Sign out
@@ -143,12 +152,14 @@ export default function LandingPage() {
               <>
                 <a
                   href="/login"
+                  className="cl-nav-signin"
                   style={{ height: 36, padding: "0 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, textDecoration: "none", border: "none", background: "transparent", color: navColor, fontFamily: SANS }}
                 >
                   Sign in
                 </a>
                 <button
                   onClick={() => router.push("/onboarding")}
+                  className="cl-nav-get-started"
                   style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.plum}` : `1px solid ${C.ivory}`, background: scrolled ? C.plum : C.ivory, color: scrolled ? C.ivory : C.plum, cursor: "pointer", fontFamily: SANS }}
                 >
                   Get started
@@ -174,54 +185,63 @@ export default function LandingPage() {
           style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 180, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.55) 55%, #FBF8F2 100%)", zIndex: 1 }}
         />
 
-        {/* Same centered container as nav and platform sections */}
         <div className="cl-hero-container" style={{ position: "relative", zIndex: 2, maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
-        {/* Left-constrained content within the container — keeps chapel untouched */}
-        <div
-          className="cl-hero-body"
-          style={{ padding: "148px 0 96px", maxWidth: 460 }}
-        >
-          <p style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.72)" }}>
-            For college ministry leaders
-          </p>
-          <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400 }}>
-            Know who&apos;s connected<br />and what needs{" "}
-            <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>follow-up.</span>
-          </h1>
-          <p
-            className="cl-hero-sub"
-            style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.ivory, marginTop: 24, maxWidth: 380, lineHeight: 1.5 }}
+          <div
+            className="cl-hero-body"
+            style={{ padding: "148px 0 96px", maxWidth: 460 }}
           >
-            Replace scattered chats, announcement threads, RSVP lists, and planning docs with one calm weekly workspace.
-          </p>
-          <div style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap" }}>
-            <button
-              onClick={() => router.push("/onboarding")}
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
+            <p
+              className={`cl-hero-eyebrow${heroVisible ? " cl-anim-in" : ""}`}
+              style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.72)" }}
             >
-              Register your ministry
-            </button>
-            <a
-              href="/ministries"
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              For college ministry leaders
+            </p>
+            <h1
+              className={`cl-hero-title${heroVisible ? " cl-anim-in" : ""}`}
+              style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400, "--anim-delay": "0.12s" } as React.CSSProperties}
             >
-              Find an existing one
-            </a>
+              Know who&apos;s connected<br />and what needs{" "}
+              <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>follow-up.</span>
+            </h1>
+            <p
+              className={`cl-hero-sub${heroVisible ? " cl-anim-in" : ""}`}
+              style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.ivory, marginTop: 24, maxWidth: 380, lineHeight: 1.5, "--anim-delay": "0.24s" } as React.CSSProperties}
+            >
+              Replace scattered chats, announcement threads, RSVP lists, and planning docs with one calm weekly workspace.
+            </p>
+            <div
+              className={`cl-hero-ctas${heroVisible ? " cl-anim-in" : ""}`}
+              style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap", "--anim-delay": "0.36s" } as React.CSSProperties}
+            >
+              <button
+                onClick={() => router.push("/onboarding")}
+                className="cl-btn-hero-primary"
+                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
+              >
+                Register your ministry
+              </button>
+              <a
+                href="/ministries"
+                className="cl-btn-hero-secondary"
+                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              >
+                Find an existing one
+              </a>
+            </div>
           </div>
-        </div>
 
-        {/* Verse — pinned upper-right, sits in the plum sky of the image */}
-        <div
-          className="cl-verse-anchor"
-          style={{ position: "absolute", right: 56, top: 130, maxWidth: 240, textAlign: "right", zIndex: 2 }}
-        >
-          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14.5, color: C.ivory, lineHeight: 1.5, margin: 0 }}>
-            &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
-          </p>
-          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.68)", margin: "12px 0 0" }}>
-            Matthew 18 : 20
-          </p>
-        </div>
+          {/* Verse — pinned upper-right, sits in the plum sky of the image */}
+          <div
+            className="cl-verse-anchor"
+            style={{ position: "absolute", right: 56, top: 130, maxWidth: 240, textAlign: "right", zIndex: 2 }}
+          >
+            <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14.5, color: C.ivory, lineHeight: 1.5, margin: 0 }}>
+              &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
+            </p>
+            <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.68)", margin: "12px 0 0" }}>
+              Matthew 18 : 20
+            </p>
+          </div>
         </div>
       </section>
 
@@ -242,7 +262,7 @@ export default function LandingPage() {
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: C.border, marginTop: 56, border: `1px solid ${C.border}`, borderRadius: 18, overflow: "hidden" }}
         >
           {FEATURES.map(({ num, title, body }) => (
-            <div key={num} style={{ background: C.surface, padding: "40px 36px", minHeight: 220 }}>
+            <div key={num} className="cl-feat-card" style={{ background: C.surface, padding: "40px 36px", minHeight: 220 }}>
               <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.muted }}>{num}</div>
               <h4 style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1.1, fontWeight: 400, margin: "14px 0 10px", color: C.ink }}>{title}</h4>
               <p style={{ color: C.body, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{body}</p>
@@ -265,6 +285,7 @@ export default function LandingPage() {
             {RHYTHM.map(({ day, what, who }, i) => (
               <div
                 key={day}
+                className="cl-rhythm-item"
                 style={{ padding: "32px 24px", borderRight: i < RHYTHM.length - 1 ? `1px solid ${C.border}` : "none" }}
               >
                 <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.muted }}>{day}</div>
@@ -293,13 +314,15 @@ export default function LandingPage() {
           <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => router.push("/onboarding")}
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
+              className="cl-btn-cta-primary"
+              style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
             >
               Start with Central
             </button>
             <a
               href="/login"
-              style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.35)", background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              className="cl-btn-cta-secondary"
+              style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: "1px solid rgba(246,244,239,0.35)", background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
               Sign in
             </a>
@@ -317,7 +340,7 @@ export default function LandingPage() {
             </div>
             <div className="cl-footer-links" style={{ display: "flex", gap: 28, fontSize: 13, color: C.body, flexWrap: "wrap" }}>
               {[["Log in", "/login"], ["Find ministry", "/ministries"], ["Platform", "#platform"], ["Rhythm", "#rhythm"]].map(([label, href]) => (
-                <a key={label} href={href} style={{ textDecoration: "none", color: "inherit" }}>{label}</a>
+                <a key={label} href={href} className="cl-footer-link" style={{ textDecoration: "none", color: "inherit" }}>{label}</a>
               ))}
             </div>
           </div>
@@ -329,7 +352,7 @@ export default function LandingPage() {
       </footer>
 
       <style>{`
-        /* Gold underline on italic "rhythm" in hero */
+        /* ── Underline on hero italic ── */
         .cl-rhythm-italic {
           position: relative;
         }
@@ -344,6 +367,115 @@ export default function LandingPage() {
           border-radius: 2px;
         }
 
+        /* ── Hero entrance animation ── */
+        .cl-hero-eyebrow,
+        .cl-hero-title,
+        .cl-hero-sub,
+        .cl-hero-ctas {
+          opacity: 0;
+          transform: translateY(18px);
+          transition: none;
+        }
+        .cl-hero-eyebrow.cl-anim-in,
+        .cl-hero-title.cl-anim-in,
+        .cl-hero-sub.cl-anim-in,
+        .cl-hero-ctas.cl-anim-in {
+          opacity: 1;
+          transform: translateY(0);
+          transition: opacity 0.65s cubic-bezier(0.23, 1, 0.32, 1) var(--anim-delay, 0s),
+                      transform 0.65s cubic-bezier(0.23, 1, 0.32, 1) var(--anim-delay, 0s);
+        }
+        .cl-hero-eyebrow { --anim-delay: 0s; }
+
+        /* ── Nav interactive states ── */
+        .cl-brand-link:hover { opacity: 0.75; }
+        .cl-nav-link {
+          transition: color 150ms ease, opacity 150ms ease;
+          position: relative;
+        }
+        .cl-nav-link:hover { opacity: 1; color: #F6F4EF !important; }
+        .cl-nav-get-started {
+          transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+        }
+        .cl-nav-get-started:hover {
+          transform: scale(1.03);
+          box-shadow: 0 4px 14px rgba(62,21,64,0.25);
+        }
+        .cl-nav-get-started:active { transform: scale(0.97); }
+        .cl-nav-cta-outline {
+          transition: background 150ms ease, color 150ms ease;
+        }
+        .cl-nav-cta-outline:hover { background: rgba(62,21,64,0.06) !important; }
+        .cl-nav-signin {
+          transition: opacity 150ms ease;
+        }
+        .cl-nav-signin:hover { opacity: 0.65; }
+        .cl-nav-sign-out { transition: opacity 150ms ease; }
+        .cl-nav-sign-out:hover { opacity: 0.65; }
+
+        /* ── Hero CTA buttons ── */
+        .cl-btn-hero-primary {
+          transition: transform 150ms ease, box-shadow 150ms ease;
+        }
+        .cl-btn-hero-primary:hover {
+          transform: scale(1.04);
+          box-shadow: 0 6px 20px rgba(246,244,239,0.3);
+        }
+        .cl-btn-hero-primary:active { transform: scale(0.97); }
+        .cl-btn-hero-secondary {
+          transition: transform 150ms ease, background 150ms ease;
+        }
+        .cl-btn-hero-secondary:hover {
+          transform: scale(1.03);
+          background: rgba(36,9,32,0.95) !important;
+        }
+        .cl-btn-hero-secondary:active { transform: scale(0.97); }
+
+        /* ── Feature cards ── */
+        .cl-feat-card {
+          transition: background 200ms ease, transform 200ms ease;
+          cursor: default;
+          position: relative;
+        }
+        .cl-feat-card:hover {
+          background: #F7F4EE !important;
+          z-index: 1;
+        }
+
+        /* ── Rhythm strip items ── */
+        .cl-rhythm-item {
+          transition: background 150ms ease;
+          cursor: default;
+        }
+        .cl-rhythm-item:hover {
+          background: rgba(62,21,64,0.04);
+        }
+
+        /* ── CTA section buttons ── */
+        .cl-btn-cta-primary {
+          transition: transform 150ms ease, box-shadow 150ms ease;
+        }
+        .cl-btn-cta-primary:hover {
+          transform: scale(1.04);
+          box-shadow: 0 8px 28px rgba(246,244,239,0.35);
+        }
+        .cl-btn-cta-primary:active { transform: scale(0.97); }
+        .cl-btn-cta-secondary {
+          transition: transform 150ms ease, background 150ms ease;
+        }
+        .cl-btn-cta-secondary:hover {
+          transform: scale(1.03);
+          background: rgba(20,8,18,0.95) !important;
+        }
+        .cl-btn-cta-secondary:active { transform: scale(0.97); }
+
+        /* ── Footer links ── */
+        .cl-footer-link {
+          transition: color 150ms ease;
+        }
+        .cl-footer-link:hover { color: #3E1540 !important; }
+
+        /* ── Responsive ── */
         @media (max-width: 900px) {
           .cl-nav-links { display: none !important; }
           .cl-hero { min-height: 520px !important; }

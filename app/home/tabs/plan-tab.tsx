@@ -7299,7 +7299,7 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
       style={{ background: "rgba(20,16,26,0.32)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="animate-modal-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+      <div className="animate-dialog-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
 
         {/* Modal header */}
         <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
