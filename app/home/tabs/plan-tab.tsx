@@ -5535,6 +5535,7 @@ function GroupGeneratorWizard({
           semester,
           groups: sgGroups.map(g => ({
             leader_id: g.leader_id,
+            leader_gender: g.leader_gender,
             name: g.name,
             members: g.members.map(m => ({ id: m.id })),
           })),

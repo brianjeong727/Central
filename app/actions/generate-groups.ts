@@ -80,6 +80,7 @@ export async function confirmSmallGroupsAction(params: {
   semester: string
   groups: Array<{
     leader_id: string
+    leader_gender: string | null
     name: string
     members: Array<{ id: string }>
   }>
@@ -105,9 +106,10 @@ export async function confirmSmallGroupsAction(params: {
           .update({ name: g.name })
           .eq("id", groupId)
       } else {
+        const groupType = g.leader_gender === "female" ? "sisters" : "brothers"
         const { data: created, error: createErr } = await admin
           .from("small_groups")
-          .insert({ team_id: params.teamId, ministry_id: params.ministryId, name: g.name, leader_id: g.leader_id, type: "small" })
+          .insert({ team_id: params.teamId, ministry_id: params.ministryId, name: g.name, leader_id: g.leader_id, type: groupType })
           .select("id")
           .single()
         if (createErr || !created) return { error: `Failed to create small group: ${createErr?.message}` }
