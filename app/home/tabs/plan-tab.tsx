@@ -4511,7 +4511,7 @@ export function EventPlanWorkspace({
       </div>}
 
       {/* Underline section tabs */}
-      <div style={{ padding: inline ? "0" : "0 24px", marginTop: 22, marginBottom: 24 }}>
+      <div style={{ padding: inline ? "0" : "0 24px", marginTop: hideHero ? 0 : 22, marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
@@ -4520,7 +4520,7 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Content */}
-      <div style={{ padding: inline ? "0 0 80px" : "0 24px 80px" }}>
+      <div style={{ padding: inline ? "24px 0 80px" : "24px 24px 80px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
         ) : (
