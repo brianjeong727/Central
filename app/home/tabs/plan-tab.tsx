@@ -25,7 +25,7 @@ import {
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction, updateSmallGroupMembersAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
@@ -7846,6 +7846,7 @@ type SGGroup = {
   type: "brothers" | "sisters"
   leader_id: string | null
   paired_group_id: string | null
+  chat_group_id: string | null
 }
 
 type SGMember = {
@@ -7893,6 +7894,18 @@ function SmallGroupLeadersTab({
   const [groupMembers, setGroupMembers] = useState<Map<string, SGMember[]>>(new Map())
   const [pairedGroups, setPairedGroups] = useState<Map<string, SGGroup>>(new Map())
   const [pairedMembers, setPairedMembers] = useState<Map<string, SGMember[]>>(new Map())
+
+  // Edit members for my group
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [pendingAddMemberIds, setPendingAddMemberIds] = useState<Set<string>>(new Set())
+  const [pendingRemoveMemberIds, setPendingRemoveMemberIds] = useState<Set<string>>(new Set())
+  const [confirmRemoveSgMemberId, setConfirmRemoveSgMemberId] = useState<string | null>(null)
+  const [editMemberSearch, setEditMemberSearch] = useState("")
+  const [showSgAddPicker, setShowSgAddPicker] = useState(false)
+  const [sgAddPickerSearch, setSgAddPickerSearch] = useState("")
+  const [allMembersForPicker, setAllMembersForPicker] = useState<{ id: string; name: string }[]>([])
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   // Roster (Home tab — president only)
   const [rosterStatus, setRosterStatus] = useState<RosterStatus | null>(null)
@@ -7979,7 +7992,7 @@ function SmallGroupLeadersTab({
 
     const { data: gData } = await supabase
       .from("small_groups")
-      .select("*")
+      .select("id, name, type, leader_id, paired_group_id, chat_group_id")
       .eq("team_id", teamId)
       .eq("leader_id", userId)
     const groups = (gData ?? []) as SGGroup[]
@@ -8034,16 +8047,16 @@ function SmallGroupLeadersTab({
     // Load roster status + members (president sees roster section)
     await loadRosterForHome()
 
-    // Load ministry members for the picker (president needs to add DGLs)
-    if (isPresident) {
-      const { data: pData } = await supabase
-        .from("profiles")
-        .select("id, name")
-        .eq("ministry_id", ministryId)
-        .not("name", "is", null)
-        .order("name")
-      setMinistryMemberList((pData ?? []) as { id: string; name: string }[])
-    }
+    // Load ministry members for pickers (president for DGL roster, any DGL for member editing)
+    const { data: pData } = await supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("ministry_id", ministryId)
+      .not("name", "is", null)
+      .order("name")
+    const allMembers = (pData ?? []) as { id: string; name: string }[]
+    setAllMembersForPicker(allMembers)
+    if (isPresident) setMinistryMemberList(allMembers)
   }
 
   async function loadRosterForHome() {
@@ -8224,6 +8237,28 @@ function SmallGroupLeadersTab({
       .from("small_group_members")
       .update({ meal_taken: !member.meal_taken, meal_semester: semester })
       .eq("id", member.id)
+  }
+
+  async function handleSgEditSave(groupId: string) {
+    setEditSaving(true)
+    setEditError(null)
+    const addUserIds = Array.from(pendingAddMemberIds)
+    const removeUserIds = Array.from(pendingRemoveMemberIds)
+    const result = await updateSmallGroupMembersAction({ smallGroupId: groupId, addUserIds, removeUserIds })
+    if (result.error) {
+      setEditError(result.error)
+      setEditSaving(false)
+      return
+    }
+    setEditingGroupId(null)
+    setPendingAddMemberIds(new Set())
+    setPendingRemoveMemberIds(new Set())
+    setConfirmRemoveSgMemberId(null)
+    setEditMemberSearch("")
+    setShowSgAddPicker(false)
+    setSgAddPickerSearch("")
+    await loadHome()
+    setEditSaving(false)
   }
 
   async function handleGenerate() {
@@ -8476,6 +8511,15 @@ function SmallGroupLeadersTab({
             const pairedGroup = group.paired_group_id ? pairedGroups.get(group.paired_group_id) : undefined
             const pairedMs = group.paired_group_id ? (pairedMembers.get(group.paired_group_id) ?? []) : []
             const mealCount = members.filter(m => m.meal_taken && m.meal_semester === semester).length
+            const isEditing = editingGroupId === group.id
+
+            // Members that can be added (exclude current + pending add + pending remove)
+            const existingUserIds = new Set(members.map(m => m.user_id))
+            const addableMembers = allMembersForPicker.filter(p =>
+              !existingUserIds.has(p.id) &&
+              !pendingAddMemberIds.has(p.id)
+            ).filter(p => p.name.toLowerCase().includes(sgAddPickerSearch.toLowerCase()))
+
             return (
               <div key={group.id}>
                 <PlanSectionHeader>My Small Group</PlanSectionHeader>
@@ -8487,47 +8531,225 @@ function SmallGroupLeadersTab({
                         {group.type} · {members.length} member{members.length !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "3px 9px",
-                      background: mealCount === members.length && members.length > 0 ? "#EDE5F0" : "#F4F1E8",
-                      color: "#3E1540", letterSpacing: "0.03em", textTransform: "uppercase" as const,
-                    }}>
-                      {mealCount}/{members.length} meals
-                    </span>
+                    {isEditing ? (
+                      <button
+                        onClick={() => {
+                          setEditingGroupId(null)
+                          setPendingAddMemberIds(new Set())
+                          setPendingRemoveMemberIds(new Set())
+                          setConfirmRemoveSgMemberId(null)
+                          setShowSgAddPicker(false)
+                          setSgAddPickerSearch("")
+                          setEditError(null)
+                        }}
+                        style={{ fontSize: 12, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setEditingGroupId(group.id); setEditError(null) }}
+                        style={{ fontSize: 12, fontWeight: 600, color: "#3E1540", background: "none", border: "none", cursor: "pointer" }}
+                      >
+                        Edit
+                      </button>
+                    )}
                   </div>
-                  {members.length === 0 ? (
+
+                  {/* Member rows */}
+                  {members.length === 0 && !pendingAddMemberIds.size ? (
                     <div className="px-4 py-5 text-center">
                       <p className="text-[13px] text-[#8A8497]">No members yet.</p>
                     </div>
-                  ) : members.map((m, i) => {
-                    const mealDone = m.meal_taken && m.meal_semester === semester
-                    return (
-                      <div key={m.id} className={`flex items-center gap-3 px-4 py-3 ${i < members.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
-                          style={{ background: getAvatarColor(m.user_id), color: "white" }}
-                        >
-                          {getInitials(m.name)}
+                  ) : (
+                    <>
+                      {members.map((m, i) => {
+                        const mealDone = m.meal_taken && m.meal_semester === semester
+                        const isPendingRemove = pendingRemoveMemberIds.has(m.user_id)
+                        const isConfirming = confirmRemoveSgMemberId === m.user_id
+                        const isLast = i === members.length - 1 && pendingAddMemberIds.size === 0
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex items-center gap-3 px-4 py-3 ${!isLast ? "border-b border-[#F8F6F1]" : ""}`}
+                            style={{ background: isPendingRemove ? "#FDF8F8" : isConfirming ? "#FDF8F8" : "white" }}
+                          >
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
+                              style={{ background: getAvatarColor(m.user_id), color: "white" }}
+                            >
+                              {getInitials(m.name)}
+                            </div>
+                            <p className={`flex-1 text-[13px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
+                            {isEditing ? (
+                              isPendingRemove ? (
+                                <button
+                                  onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })}
+                                  style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
+                                >
+                                  Undo
+                                </button>
+                              ) : isConfirming ? (
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button
+                                    onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }}
+                                    style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
+                                  >
+                                    Remove
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmRemoveSgMemberId(null)}
+                                    style={{ fontSize: 11, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
+                                  >
+                                    Keep
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmRemoveSgMemberId(m.user_id)}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}
+                                >
+                                  <X style={{ width: 13, height: 13 }} />
+                                </button>
+                              )
+                            ) : (
+                              <button
+                                onClick={() => toggleMeal(m)}
+                                style={{
+                                  padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                                  border: mealDone ? "none" : "1.5px solid #ECE8DE",
+                                  background: mealDone ? "#EDE5F0" : "transparent",
+                                  fontSize: 11, fontWeight: 600,
+                                  color: mealDone ? "#3E1540" : "#8A8497",
+                                  letterSpacing: "0.03em", textTransform: "uppercase" as const,
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                {mealDone ? "Meal ✓" : "Meal"}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {/* Pending-add rows */}
+                      {isEditing && Array.from(pendingAddMemberIds).map((uid, i) => {
+                        const person = allMembersForPicker.find(p => p.id === uid)
+                        if (!person) return null
+                        return (
+                          <div
+                            key={uid}
+                            className={`flex items-center gap-3 px-4 py-3 border-b border-[#F8F6F1]`}
+                            style={{ background: "rgba(62,21,64,0.03)" }}
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(uid), color: "white" }}>
+                              {getInitials(person.name)}
+                            </div>
+                            <p className="flex-1 text-[13px] text-[#13101A]">{person.name}</p>
+                            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
+                            <button
+                              onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}
+                            >
+                              <X style={{ width: 13, height: 13 }} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+
+                  {/* Add member button + inline picker */}
+                  {isEditing && (
+                    <div className="border-t border-[#F3F0F7]">
+                      {showSgAddPicker ? (
+                        <div className="p-3">
+                          <input
+                            type="text"
+                            placeholder="Search members…"
+                            value={sgAddPickerSearch}
+                            onChange={e => setSgAddPickerSearch(e.target.value)}
+                            autoFocus
+                            style={{ width: "100%", border: "1.5px solid #ECE8DE", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FAFAFA", marginBottom: 6 }}
+                          />
+                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid #ECE8DE", background: "white" }}>
+                            {addableMembers.length === 0 ? (
+                              <div className="px-4 py-4 text-center">
+                                <p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p>
+                              </div>
+                            ) : addableMembers.map((p, i) => (
+                              <div
+                                key={p.id}
+                                onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }}
+                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F9F4FA] ${i < addableMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}
+                              >
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(p.id), color: "white" }}>
+                                  {getInitials(p.name)}
+                                </div>
+                                <p style={{ fontSize: 13, color: "#13101A" }}>{p.name}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => { setShowSgAddPicker(false); setSgAddPickerSearch("") }}
+                            style={{ marginTop: 6, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                          >
+                            Cancel
+                          </button>
                         </div>
-                        <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
+                      ) : (
                         <button
-                          onClick={() => toggleMeal(m)}
-                          style={{
-                            padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                            border: mealDone ? "none" : "1.5px solid #ECE8DE",
-                            background: mealDone ? "#EDE5F0" : "transparent",
-                            fontSize: 11, fontWeight: 600,
-                            color: mealDone ? "#3E1540" : "#8A8497",
-                            letterSpacing: "0.03em", textTransform: "uppercase" as const,
-                            transition: "all 0.15s",
-                          }}
+                          onClick={() => setShowSgAddPicker(true)}
+                          style={{ width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", color: "#3E1540", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)" }}
                         >
-                          {mealDone ? "Meal ✓" : "Meal"}
+                          <Plus style={{ width: 13, height: 13 }} /> Add member
                         </button>
-                      </div>
-                    )
-                  })}
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Edit action footer */}
+                {isEditing && (
+                  <div style={{ marginTop: 10 }}>
+                    {editError && (
+                      <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>
+                        {editError}
+                      </div>
+                    )}
+                    <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 8, lineHeight: 1.5 }}>
+                      Changes sync to your group chat and will reflect immediately.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingGroupId(null)
+                          setPendingAddMemberIds(new Set())
+                          setPendingRemoveMemberIds(new Set())
+                          setConfirmRemoveSgMemberId(null)
+                          setShowSgAddPicker(false)
+                          setSgAddPickerSearch("")
+                          setEditError(null)
+                        }}
+                        style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSgEditSave(group.id)}
+                        disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)}
+                        style={{
+                          flex: 1, padding: "9px 0", background: "#3E1540", color: "#F6F4EF", border: "none",
+                          borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer",
+                          opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1,
+                          fontFamily: "inherit"
+                        }}
+                      >
+                        {editSaving ? "Saving…" : "Save changes"}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {pairedGroup && (
                   <div className="mt-3">

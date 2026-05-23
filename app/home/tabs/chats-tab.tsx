@@ -5,6 +5,7 @@ import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
+import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
@@ -330,8 +331,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   async function handleSaveChanges() {
     setSaving(true)
-    if (pendingRemoveIds.size > 0) {
-      await Promise.all([...pendingRemoveIds].map(id =>
+    const addUserIds = pendingAddMembers.map(m => m.user_id)
+    const removeUserIds = [...pendingRemoveIds]
+    if (removeUserIds.length > 0) {
+      await Promise.all(removeUserIds.map(id =>
         supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", id)
       ))
       setMembers(prev => prev.filter(m => !pendingRemoveIds.has(m.user_id)))
@@ -345,6 +348,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     await supabase.from("group_members").update({ muted, pinned }).eq("group_id", groupId).eq("user_id", userId)
     setSavedMuted(muted)
     setSavedPinned(pinned)
+    // Sync member changes back to any linked small group
+    if (addUserIds.length > 0 || removeUserIds.length > 0) {
+      await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds, removeUserIds })
+    }
     setSaving(false)
   }
 
@@ -671,6 +678,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </div>
               )
             })()}
+            {isChurch && canManage && (
+              <p style={{ fontSize: 11, color: "#8A8497", marginTop: 10, lineHeight: 1.5 }}>
+                Member changes sync to the small group home page if this chat is linked to a group.
+              </p>
+            )}
           </div>
 
           {/* Preferences + Manage */}
@@ -872,6 +884,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </div>
             )}
           </div>
+          {isChurch && canManage && (
+            <div className="px-5 pb-2">
+              <p style={{ fontSize: 11, color: "#8A8497", lineHeight: 1.5 }}>
+                Member changes sync to the small group home page if this chat is linked to a group.
+              </p>
+            </div>
+          )}
           {canManage && (
             <div className="px-5 pb-4">
               <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>

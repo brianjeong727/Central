@@ -1,6 +1,7 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase-admin"
+import { getSemesterLabel } from "@/app/actions/dgl-utils"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ export async function confirmSmallGroupChatsAction(
     return name.split(" ")[0]
   }
 
-  async function upsertChat(chatName: string, memberIds: string[]): Promise<"created" | "updated" | "error"> {
+  async function upsertChat(chatName: string, memberIds: string[]): Promise<{ result: "created" | "updated" | "error"; groupId: string | null }> {
     const { data: existing } = await admin
       .from("groups")
       .select("id")
@@ -319,14 +320,14 @@ export async function confirmSmallGroupChatsAction(
           memberIds.map(uid => ({ group_id: groupId, user_id: uid })),
           { onConflict: "group_id,user_id", ignoreDuplicates: true }
         )
-      return "updated"
+      return { result: "updated", groupId }
     } else {
       const { data: group, error } = await admin
         .from("groups")
         .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
         .select("id")
         .single()
-      if (error || !group) return "error"
+      if (error || !group) return { result: "error", groupId: null }
       groupId = group.id
       await admin
         .from("group_members")
@@ -334,7 +335,7 @@ export async function confirmSmallGroupChatsAction(
           memberIds.map(uid => ({ group_id: groupId, user_id: uid })),
           { onConflict: "group_id,user_id", ignoreDuplicates: true }
         )
-      return "created"
+      return { result: "created", groupId }
     }
   }
 
@@ -350,9 +351,14 @@ export async function confirmSmallGroupChatsAction(
     // Individual group chat
     const chatName = `${firstName(leaderName)}'s Group`
     const members = Array.from(new Set([sg.leader_id, ...(membersByGroup.get(sg.id) ?? []), ...adminIds]))
-    const result = await upsertChat(chatName, members)
+    const { result, groupId: chatGroupId } = await upsertChat(chatName, members)
     if (result === "created") created++
     else if (result === "updated") updated++
+
+    // Save chat_group_id back to small_groups for bidirectional sync
+    if (chatGroupId) {
+      await admin.from("small_groups").update({ chat_group_id: chatGroupId }).eq("id", sg.id)
+    }
 
     // Paired group chat (process each pair only once)
     if (!sg.paired_group_id) continue
@@ -373,7 +379,7 @@ export async function confirmSmallGroupChatsAction(
       ...(membersByGroup.get(sg.paired_group_id) ?? []),
       ...adminIds,
     ]))
-    const pairedResult = await upsertChat(pairedChatName, pairedMembers)
+    const { result: pairedResult } = await upsertChat(pairedChatName, pairedMembers)
     if (pairedResult === "created") created++
     else if (pairedResult === "updated") updated++
   }
@@ -441,6 +447,124 @@ export async function respondToGradCheck(
 
     return { error: error?.message }
   }
+}
+
+// ── updateSmallGroupMembersAction ─────────────────────────────────────────────
+// Updates small_group_members for a DGL's group, then syncs adds/removes to the
+// linked group chat (if chat_group_id is set on the small_groups row).
+
+export async function updateSmallGroupMembersAction(params: {
+  smallGroupId: string
+  addUserIds: string[]
+  removeUserIds: string[]
+}): Promise<{ error?: string }> {
+  const admin = createAdminClient()
+  const semester = getSemesterLabel()
+
+  // Fetch the small group to get chat_group_id
+  const { data: sg, error: sgErr } = await admin
+    .from("small_groups")
+    .select("id, chat_group_id")
+    .eq("id", params.smallGroupId)
+    .single()
+
+  if (sgErr || !sg) return { error: "Small group not found." }
+
+  // Remove members from small_group_members
+  if (params.removeUserIds.length > 0) {
+    const { error } = await admin
+      .from("small_group_members")
+      .delete()
+      .eq("group_id", params.smallGroupId)
+      .in("user_id", params.removeUserIds)
+    if (error) return { error: `Failed to remove members: ${error.message}` }
+  }
+
+  // Add members to small_group_members
+  if (params.addUserIds.length > 0) {
+    const { error } = await admin
+      .from("small_group_members")
+      .upsert(
+        params.addUserIds.map(uid => ({
+          group_id: params.smallGroupId,
+          user_id: uid,
+          meal_taken: false,
+          meal_semester: semester,
+        })),
+        { onConflict: "group_id,user_id", ignoreDuplicates: true }
+      )
+    if (error) return { error: `Failed to add members: ${error.message}` }
+  }
+
+  // Sync to linked group chat
+  if (sg.chat_group_id) {
+    if (params.removeUserIds.length > 0) {
+      await admin
+        .from("group_members")
+        .delete()
+        .eq("group_id", sg.chat_group_id)
+        .in("user_id", params.removeUserIds)
+    }
+    if (params.addUserIds.length > 0) {
+      await admin
+        .from("group_members")
+        .upsert(
+          params.addUserIds.map(uid => ({ group_id: sg.chat_group_id, user_id: uid })),
+          { onConflict: "group_id,user_id", ignoreDuplicates: true }
+        )
+    }
+  }
+
+  return {}
+}
+
+// ── syncSmallGroupFromChatAction ──────────────────────────────────────────────
+// Called when ChatSettings saves member changes on a church chat.
+// Finds the linked small_group by chat_group_id, then syncs the same
+// adds/removes to small_group_members.
+
+export async function syncSmallGroupFromChatAction(params: {
+  chatGroupId: string
+  addUserIds: string[]
+  removeUserIds: string[]
+}): Promise<{ skipped?: boolean; error?: string }> {
+  if (params.addUserIds.length === 0 && params.removeUserIds.length === 0) return { skipped: true }
+
+  const admin = createAdminClient()
+  const semester = getSemesterLabel()
+
+  // Find a small group linked to this chat
+  const { data: sg } = await admin
+    .from("small_groups")
+    .select("id")
+    .eq("chat_group_id", params.chatGroupId)
+    .maybeSingle()
+
+  if (!sg) return { skipped: true }
+
+  if (params.removeUserIds.length > 0) {
+    await admin
+      .from("small_group_members")
+      .delete()
+      .eq("group_id", sg.id)
+      .in("user_id", params.removeUserIds)
+  }
+
+  if (params.addUserIds.length > 0) {
+    await admin
+      .from("small_group_members")
+      .upsert(
+        params.addUserIds.map(uid => ({
+          group_id: sg.id,
+          user_id: uid,
+          meal_taken: false,
+          meal_semester: semester,
+        })),
+        { onConflict: "group_id,user_id", ignoreDuplicates: true }
+      )
+  }
+
+  return {}
 }
 
 // ── updateAutomationSettings ──────────────────────────────────────────────────
