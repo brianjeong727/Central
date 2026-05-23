@@ -8297,7 +8297,10 @@ function SmallGroupLeadersTab({
             ) : (
               <div className="flex flex-col gap-2">
                 {myUpcoming.map(a => {
-                  const d = new Date(a.week_date + "T12:00:00")
+                  const sunday = new Date(a.week_date + "T12:00:00")
+                  const slotOffset: Record<string, number> = { sunday_service: 0, wednesday_pm: 3, friday_sg: 5 }
+                  const d = new Date(sunday)
+                  d.setDate(sunday.getDate() + (slotOffset[a.slot] ?? 0))
                   const isPraiseSlot = a.slot === "wednesday_pm" || a.slot === "friday_sg"
                   return (
                     <div key={a.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] flex items-center gap-3">
