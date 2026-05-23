@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
@@ -40,8 +40,12 @@ export function Spinner() {
   )
 }
 
-// Reliable overlay entrance — uses rAF instead of CSS animation to
-// guarantee the invisible state renders before the transition starts.
+// Reliable overlay entrance.
+// Two bugs kill CSS keyframe/transition animations on React-mounted elements:
+//   1. `transition` set simultaneously with value change → browser skips it
+//   2. No forced reflow → browser never registers the "from" state
+// Fix: always define transition, use offsetHeight to force layout registration,
+// then a single RAF to schedule the value change on the next paint cycle.
 export function AnimateIn({
   children,
   className = "",
@@ -54,32 +58,38 @@ export function AnimateIn({
   animate?: boolean
 }) {
   const [visible, setVisible] = useState(!animate)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!animate) return
-    let id2: number
-    const id1 = requestAnimationFrame(() => {
-      id2 = requestAnimationFrame(() => setVisible(true))
-    })
-    return () => {
-      cancelAnimationFrame(id1)
-      cancelAnimationFrame(id2)
-    }
+    const el = ref.current
+    if (!el) return
+    // Force the browser to register the initial opacity:0 / translateY state
+    // before we schedule the change. Without this, browsers may coalesce
+    // the initial render + the state update into a single paint.
+    void el.offsetHeight
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
   }, [animate])
 
-  const animStyle: React.CSSProperties | undefined = animate
-    ? {
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(20px)",
-        transition: visible
-          ? "opacity 300ms cubic-bezier(0.23,1,0.32,1), transform 300ms cubic-bezier(0.23,1,0.32,1)"
-          : "none",
-        ...style,
-      }
-    : (style ?? undefined)
-
   return (
-    <div className={className} style={animStyle}>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        ...(animate
+          ? {
+              opacity: visible ? 1 : 0,
+              transform: visible ? "translateY(0)" : "translateY(28px)",
+              // Transition must ALWAYS be defined (never conditional) so it is
+              // already in place when the value changes on the next RAF tick.
+              transition:
+                "opacity 350ms cubic-bezier(0.23,1,0.32,1), transform 350ms cubic-bezier(0.23,1,0.32,1)",
+            }
+          : {}),
+        ...style,
+      }}
+    >
       {children}
     </div>
   )
