@@ -22,7 +22,7 @@ import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGr
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
 } from "@/app/actions/generate-dgl-rotation"
-import { confirmSmallGroupsAction } from "@/app/actions/generate-groups"
+import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction } from "@/app/actions/auto-chats"
@@ -4901,6 +4901,7 @@ function GroupsTab({
   const [loading, setLoading] = useState(true)
   const [showWizard, setShowWizard] = useState(false)
   const [viewSession, setViewSession] = useState<GroupSessionRecord | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const mono: React.CSSProperties = {
@@ -4956,10 +4957,15 @@ function GroupsTab({
 
   useEffect(() => { loadSessions() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleDelete(sessionId: string) {
-    setDeletingId(sessionId)
-    await supabase.from("group_sessions").delete().eq("id", sessionId)
-    setSessions(prev => prev.filter(s => s.id !== sessionId))
+  async function handleDelete(session: GroupSessionRecord) {
+    setConfirmDeleteId(null)
+    setDeletingId(session.id)
+    // If this was a confirmed SG-mode session, wipe the small group assignments too
+    if (session.config.smallGroupMode === true && teamId) {
+      await deleteSmallGroupAssignmentsAction(teamId)
+    }
+    await supabase.from("group_sessions").delete().eq("id", session.id)
+    setSessions(prev => prev.filter(s => s.id !== session.id))
     setDeletingId(null)
   }
 
@@ -5018,31 +5024,62 @@ function GroupsTab({
           {sessions.map(session => (
             <div
               key={session.id}
-              style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "18px 22px", display: "flex", alignItems: "center", gap: 16 }}
+              style={{ background: "#FBF8F2", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "#E8E2D2"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{session.name}</p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: "4px 0 0" }}>
-                  {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setViewSession(session)}
-                  style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  View
-                </button>
-                {canEdit && (
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{session.name}</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", margin: "4px 0 0" }}>
+                    {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    {session.config.smallGroupMode === true && (
+                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "#F0EDE8", fontSize: 10, fontWeight: 600, color: "#5A5466", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
+                    )}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button
-                    onClick={() => handleDelete(session.id)}
-                    disabled={deletingId === session.id}
-                    style={{ padding: "6px 14px", border: "1px solid #9F3030", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                    onClick={() => setViewSession(session)}
+                    style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                   >
-                    {deletingId === session.id ? "…" : "Delete"}
+                    View
                   </button>
-                )}
+                  {canEdit && confirmDeleteId !== session.id && (
+                    <button
+                      onClick={() => setConfirmDeleteId(session.id)}
+                      disabled={deletingId === session.id}
+                      style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                    >
+                      {deletingId === session.id ? "Deleting…" : "Delete"}
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Inline confirmation row */}
+              {confirmDeleteId === session.id && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0EDE8", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#9F3030", margin: 0 }}>Delete this grouping?</p>
+                    {session.config.smallGroupMode === true && (
+                      <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleDelete(session)}
+                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "#9F3030", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

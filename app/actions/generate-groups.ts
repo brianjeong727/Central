@@ -137,3 +137,16 @@ export async function confirmSmallGroupsAction(params: {
     return { error: `Unexpected error: ${e instanceof Error ? e.message : String(e)}` }
   }
 }
+
+// Deletes all small_groups rows for a team, cascading to small_group_members.
+// Called when the president deletes a confirmed SG-mode session.
+export async function deleteSmallGroupAssignmentsAction(teamId: string): Promise<{ error?: string }> {
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.from("small_groups").delete().eq("team_id", teamId)
+    if (error) return { error: error.message }
+    return {}
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
+}
