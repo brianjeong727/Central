@@ -16,7 +16,8 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTa
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
-  const [chatName, setChatName] = useState("")
+  const [customName, setCustomName] = useState("")
+  const [showNameEdit, setShowNameEdit] = useState(false)
   const [search, setSearch] = useState("")
   const [allMembers, setAllMembers] = useState<{ id: string; name: string; graduation_year: number | null; role: string; avatar_url: string | null }[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -42,6 +43,17 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   )
   const selectedMembers = allMembers.filter((m) => selectedIds.has(m.id))
 
+  // Auto-generated name from selected members (first names only, truncated at 3)
+  const defaultName = useMemo(() => {
+    const firstNames = selectedMembers.map((m) => m.name.split(" ")[0])
+    if (firstNames.length === 0) return ""
+    if (firstNames.length <= 3) return firstNames.join(", ")
+    return `${firstNames.slice(0, 3).join(", ")} +${firstNames.length - 3}`
+  }, [selectedMembers])
+
+  // Effective name: custom override if typed, otherwise auto-generated
+  const effectiveName = customName.trim() || defaultName
+
   function toggleMember(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -52,7 +64,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   }
 
   async function handleCreate() {
-    const name = chatName.trim()
+    const name = effectiveName.trim()
     if (!name) { setError("Please enter a chat name."); return }
 
     setCreating(true)
@@ -74,6 +86,10 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
     onCreated({ id: group.id, name: group.name })
   }
 
+  const isDM = selectedIds.size === 1
+  const isGroup = selectedIds.size >= 2
+  const noMembers = selectedIds.size === 0
+
   return (
     <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
       <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
@@ -88,14 +104,16 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               <X className="w-4 h-4 text-[#13101A]" />
             </button>
             <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "#8A8497" }}>
-              {groupType === "church" ? "Church Chat" : "Group Chat"}
+              {groupType === "church" ? "Church Chat" : "New Chat"}
             </span>
           </div>
           <div className="px-5 pb-5">
             <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>
               {groupType === "church" ? "New Church Chat" : "New Chat"}
             </h1>
-            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>Name your space and invite members to join.</p>
+            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>
+              {isDM ? `Starting a conversation with ${selectedMembers[0]?.name.split(" ")[0]}.` : "Select people to start a conversation."}
+            </p>
           </div>
         </div>
 
@@ -107,18 +125,52 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
             </div>
           )}
 
-          {/* Chat name */}
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
-            <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-2">Chat Name</label>
-            <input
-              type="text"
-              value={chatName}
-              onChange={(e) => setChatName(e.target.value)}
-              placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-              className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
-              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
-            />
-          </div>
+          {/* Chat name — adapts to selection state */}
+          {noMembers && (
+            // No members selected: show traditional name input (needed for church chats)
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-2">Chat Name</label>
+              <input
+                type="text"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
+                className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
+              />
+            </div>
+          )}
+
+          {isGroup && (
+            // 2+ members: show auto-name with optional edit link
+            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Chat Name</label>
+                <button
+                  type="button"
+                  onClick={() => { setShowNameEdit((v) => !v); if (!showNameEdit) setCustomName("") }}
+                  className="text-[11px] font-semibold text-[#8A8497] hover:text-[#3E1540] transition-colors"
+                >
+                  {showNameEdit ? "Use default" : "Edit name"}
+                </button>
+              </div>
+              {showNameEdit ? (
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder={defaultName}
+                  autoFocus
+                  className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
+                />
+              ) : (
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4", color: "#13101A", margin: 0 }}>
+                  {effectiveName}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Member search */}
           <div className="flex flex-col gap-3">
@@ -139,7 +191,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               />
             </div>
 
-            {/* Selected chips — lives here so the member list stays in place */}
+            {/* Selected chips */}
             {selectedMembers.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {selectedMembers.map((m) => (
@@ -200,10 +252,10 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
           <button
             onClick={handleCreate}
-            disabled={creating || !chatName.trim()}
+            disabled={creating || !effectiveName.trim()}
             className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
           >
-            {creating ? "Creating…" : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
+            {creating ? "Creating…" : isDM ? `Message ${selectedMembers[0]?.name.split(" ")[0]}` : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
           </button>
         </div>
 
