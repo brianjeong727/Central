@@ -1251,7 +1251,7 @@ export function StudentOrgTeamHome({
   return (
     <div>
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
-      <div style={{ paddingLeft: 56 }}>
+      <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={[
             { key: "General", label: "General" },
@@ -1266,7 +1266,7 @@ export function StudentOrgTeamHome({
       </div>
 
       {/* ── Tab content ── */}
-      <div style={{ padding: "30px 56px 60px" }}>
+      <div style={{ padding: "30px 0 60px" }}>
 
         {/* GENERAL — calendar + sidebar + meeting notes */}
         {teamTab === "General" && (
@@ -1663,20 +1663,22 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             />
           </div>
         ) : isStudentOrgBoard ? (
-          <StudentOrgTeamHome
-            teamId={activeTeamId}
-            teamName={activeTeamName}
-            teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
-            ministryId={ministryId}
-            userId={userId}
-            userName={userName}
-            userRole={studentOrgRole}
-            isAdmin={isAdmin}
-            canEdit={canEditStudentOrg}
-            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-            planningEvent={studentOrgPlanningEvent}
-            onPlanningEventChange={setStudentOrgPlanningEvent}
-          />
+          <div className="px-14 py-7">
+            <StudentOrgTeamHome
+              teamId={activeTeamId}
+              teamName={activeTeamName}
+              teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
+              ministryId={ministryId}
+              userId={userId}
+              userName={userName}
+              userRole={studentOrgRole}
+              isAdmin={isAdmin}
+              canEdit={canEditStudentOrg}
+              onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
+              planningEvent={studentOrgPlanningEvent}
+              onPlanningEventChange={setStudentOrgPlanningEvent}
+            />
+          </div>
         ) : isDGLTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <SmallGroupLeadersTab
@@ -4463,7 +4465,7 @@ export function EventPlanWorkspace({
       className={inline ? "" : "md:left-[296px]"}
     >
       {/* Plum hero header — hidden when the parent already renders a calm header (hideHero) */}
-      {!hideHero && <div style={{ padding: inline ? "18px 56px 0" : "0 24px", paddingTop: 18 }}>
+      {!hideHero && <div style={{ padding: inline ? "18px 0 0" : "0 24px", paddingTop: 18 }}>
         <div style={{
           position: "relative",
           borderRadius: 18,
@@ -4508,33 +4510,16 @@ export function EventPlanWorkspace({
       </div>}
 
       {/* Underline section tabs */}
-      <div style={{ borderBottom: "1px solid #E8E2D2", zIndex: inline ? undefined : 10, padding: inline ? "0 56px" : "0 24px", marginTop: 22 }}>
-        <div style={{ display: "flex", gap: 32 }}>
-          {sections.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setActiveSection(s.key)}
-              style={{
-                padding: "12px 0 14px",
-                border: "none",
-                borderBottom: activeSection === s.key ? "2px solid #3E1540" : "2px solid transparent",
-                cursor: "pointer",
-                fontSize: 15,
-                fontWeight: activeSection === s.key ? 600 : 400,
-                color: activeSection === s.key ? "#2D0F2E" : "#8A8497",
-                background: "transparent",
-                marginBottom: -1,
-                fontFamily: "var(--font-inter)",
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+      <div style={{ padding: inline ? "0" : "0 24px", marginTop: 22 }}>
+        <PlanSubTabStrip
+          tabs={sections}
+          active={activeSection}
+          onChange={s => setActiveSection(s as 'overview' | 'checklist' | 'roles' | 'notes')}
+        />
       </div>
 
       {/* Content */}
-      <div style={{ padding: inline ? "36px 56px 80px" : "24px 24px 80px" }}>
+      <div style={{ padding: inline ? "36px 0 80px" : "24px 24px 80px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
         ) : (
