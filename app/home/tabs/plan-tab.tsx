@@ -4460,7 +4460,7 @@ export function EventPlanWorkspace({
   return (
     <div
       style={inline
-        ? { background: "#FBF8F2", minHeight: "100%" }
+        ? {}
         : { position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }
       }
       className={inline ? "" : "md:left-[296px]"}
