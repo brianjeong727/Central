@@ -84,7 +84,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
     }
 
     // System message — first thing anyone sees in the chat
-    await supabase.from("messages").insert({ group_id: group.id, sender_id: null, content: `${userName.split(" ")[0]} created this chat`, message_type: "system" })
+    await supabase.from("messages").insert({ group_id: group.id, sender_id: userId, content: `${userName.split(" ")[0]} created this chat`, message_type: "system" })
 
     onCreated({ id: group.id, name: group.name })
   }
@@ -349,7 +349,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     if (!error) {
       setDisplayGroupName(trimmed)
       onNameChange(trimmed)
-      await supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `Chat renamed to "${trimmed}"`, message_type: "system" })
+      await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `Chat renamed to "${trimmed}"`, message_type: "system" })
     }
     setSaving(false)
     setRenaming(false)
@@ -398,14 +398,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       setMembers(prev => prev.filter(m => !pendingRemoveIds.has(m.user_id)))
       setPendingRemoveIds(new Set())
       await Promise.all(removedNames.map(name =>
-        supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${actorFirstName} removed ${name}`, message_type: "system" })
+        supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${actorFirstName} removed ${name}`, message_type: "system" })
       ))
     }
     if (pendingAddMembers.length > 0) {
       await supabase.from("group_members").insert(pendingAddMembers.map(m => ({ group_id: groupId, user_id: m.user_id })))
       setMembers(prev => [...prev, ...pendingAddMembers])
       await Promise.all(pendingAddMembers.map(m =>
-        supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${actorFirstName} added ${m.name.split(" ")[0]}`, message_type: "system" })
+        supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${actorFirstName} added ${m.name.split(" ")[0]}`, message_type: "system" })
       ))
       setPendingAddMembers([])
     }
@@ -429,7 +429,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleLeave() {
-    await supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${userName.split(" ")[0]} left`, message_type: "system" })
+    await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} left`, message_type: "system" })
     await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userId)
     onClose()
   }
@@ -1270,7 +1270,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           if (raw.message_type === "system") {
             setMessages((prev) => {
               if (prev.find(m => m.id === raw.id)) return prev
-              return [...prev, { id: raw.id, group_id: raw.group_id, sender_id: null, content: raw.content, created_at: raw.created_at, sender_name: "", sender_avatar_url: null, reply_to_id: null, reply_to_content: null, reply_to_sender: null, message_type: "system" }]
+              return [...prev, { id: raw.id, group_id: raw.group_id, sender_id: raw.sender_id, content: raw.content, created_at: raw.created_at, sender_name: "", sender_avatar_url: null, reply_to_id: null, reply_to_content: null, reply_to_sender: null, message_type: "system" }]
             })
             return
           }
