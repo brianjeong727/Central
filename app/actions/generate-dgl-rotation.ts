@@ -87,54 +87,41 @@ export async function generateDGLRotationAction(
     const assignments: ProposedAssignment[] = []
     const flaggedWeeks: GenerateRotationResult["flaggedWeeks"] = []
 
-    // Track per-role assignment count this semester (max 1 per DGL per role)
+    // Role counts track how many times each DGL has done each role — used for soft preference only.
+    // There is NO hard cap: DGLs repeat roles when needed (17 weeks, ~10 DGLs means everyone repeats).
     const roleCounts = new Map<string, Map<DGLRole, number>>()
-    for (const uid of memberIds) {
-      roleCounts.set(uid, new Map())
-    }
+    for (const uid of memberIds) roleCounts.set(uid, new Map())
 
-    // Track total assignment counts for fairness
+    // Total assignment counts drive fairness (fewest-assigned gets priority).
     const totalCounts = new Map<string, number>(memberIds.map(id => [id, 0]))
 
     for (const weekDate of params.weeks) {
       for (const slot of SLOTS) {
         const [role1, role2] = SLOT_ROLES[slot]
-
-        // For this (weekDate, rotationSlot), find the specific calendar date + avail slot
         const specificDate = dateForSlot(weekDate, slot)
         const availSlot = SLOT_TO_AVAIL[slot].availSlot
 
-        // Filter: not marked busy for this specific date
+        // Absence of a record = available. Only is_busy=true means unavailable.
         const available = memberIds.filter(uid => !busySet.has(`${uid}::${specificDate}::${availSlot}`))
 
-        // Assign role1 — filter out anyone who already has this role this semester
-        const availForRole1 = available.filter(uid => (roleCounts.get(uid)?.get(role1) ?? 0) < 1)
-        const picked1 = pickFairest(availForRole1, totalCounts)
-
-        const availForRole2 = available.filter(
-          uid => uid !== picked1 && (roleCounts.get(uid)?.get(role2) ?? 0) < 1
-        )
-        const picked2 = pickFairest(availForRole2, totalCounts, picked1 ? [picked1] : [])
-
-        const needsReview = !picked1 || !picked2
-
+        // Flag only when genuinely short-staffed, not when everyone has repeated a role.
+        const needsReview = available.length < 2
         if (needsReview) {
           flaggedWeeks.push({
             week_date: weekDate,
             slot,
-            reason:
-              !picked1 && !picked2
-                ? "No available DGLs for either role."
-                : `Only ${picked1 ? 1 : 0} DGL available — need 2.`,
+            reason: available.length === 0 ? "No available DGLs." : "Only 1 DGL available — need 2.",
           })
         }
+
+        // Pick two DIFFERENT people: primary sort = fewest times in this role (soft), secondary = total fairness.
+        const picked1 = pickFairestWithRolePref(available, totalCounts, roleCounts, role1, [])
+        const picked2 = pickFairestWithRolePref(available, totalCounts, roleCounts, role2, picked1 ? [picked1] : [])
 
         for (const [picked, role] of [[picked1, role1], [picked2, role2]] as [string | null, DGLRole][]) {
           if (!picked) continue
           assignments.push({
-            week_date: weekDate,
-            slot,
-            role,
+            week_date: weekDate, slot, role,
             user_id: picked,
             user_name: profiles.get(picked) ?? picked,
             needs_review: needsReview,
@@ -152,15 +139,23 @@ export async function generateDGLRotationAction(
   }
 }
 
-// Pick the available DGL with the fewest total assignments so far (fairness)
-function pickFairest(
+// Sort by fewest times in this specific role (soft preference for variety),
+// then by fewest total assignments (fairness). No hard cap on repeats.
+function pickFairestWithRolePref(
   candidates: string[],
   totalCounts: Map<string, number>,
-  exclude: string[] = [],
+  roleCounts: Map<string, Map<DGLRole, number>>,
+  role: DGLRole,
+  exclude: string[],
 ): string | null {
   const pool = candidates.filter(c => !exclude.includes(c))
   if (pool.length === 0) return null
-  pool.sort((a, b) => (totalCounts.get(a) ?? 0) - (totalCounts.get(b) ?? 0))
+  pool.sort((a, b) => {
+    const aRole = roleCounts.get(a)?.get(role) ?? 0
+    const bRole = roleCounts.get(b)?.get(role) ?? 0
+    if (aRole !== bRole) return aRole - bRole
+    return (totalCounts.get(a) ?? 0) - (totalCounts.get(b) ?? 0)
+  })
   return pool[0]
 }
 
