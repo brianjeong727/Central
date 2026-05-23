@@ -261,7 +261,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
               {/* Hero event card */}
               {heroAnn ? (
                 <div
-                  className="relative overflow-hidden rounded-2xl text-[#F6F4EF] flex flex-col"
+                  className="relative overflow-hidden rounded-2xl text-[#F6F4EF] flex flex-col hover:shadow-[0_3px_12px_rgba(19,16,26,0.12)] transition-shadow duration-150"
                   style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "32px 32px 28px", minHeight: "320px" }}
                 >
                   <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
@@ -335,7 +335,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                     <button
                       key={c.id}
                       onClick={() => onOpenChat(c.id, c.groupName)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F4F1E8] transition-colors"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F4F1E8] active:scale-[0.99] transition-[transform,background-color] duration-100"
                       style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}
                     >
                       <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", color: "#F6F4EF", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: 600 }}>
@@ -356,7 +356,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                     </button>
                   ))
                 )}
-                <button onClick={onSeeChats} className="px-4 py-3 mt-auto border-t border-[#E5E0D2] text-[12px] text-[#8A8497] hover:text-[#13101A] text-left transition-colors">
+                <button onClick={onSeeChats} className="px-4 py-3 mt-auto border-t border-[#E5E0D2] text-[12px] text-[#8A8497] hover:text-[#13101A] active:opacity-70 text-left transition-[color,opacity] duration-150">
                   See all chats →
                 </button>
               </div>
@@ -373,7 +373,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                 </div>
                 <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                   {forYouItems.map((a) => (
-                    <div key={a.id} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 flex flex-col">
+                    <div key={a.id} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 flex flex-col hover:bg-[#F7F4EF] transition-colors duration-150">
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 6, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#5A5466", whiteSpace: "nowrap" }}>
                           {a.is_pinned ? "📌 Pinned" : a.is_event ? "Event" : "Post"}
@@ -469,7 +469,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                         <button
                           onClick={handleHomeRsvp}
                           disabled={rsvping}
-                          className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}
+                          className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97]"}`}
                         >
                           {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                         </button>
@@ -509,7 +509,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                   </div>
                   <div className="flex flex-col gap-3">
                     {forYouItems.map((a) => (
-                      <div key={a.id} className="rounded-2xl bg-white border border-[#E5E0D2] px-4 py-4 shadow-[0_1px_4px_rgba(19,16,26,0.04)]">
+                      <div key={a.id} className="rounded-2xl bg-white border border-[#E5E0D2] px-4 py-4 shadow-[0_1px_4px_rgba(19,16,26,0.04)] hover:bg-[#F7F4EF] transition-colors duration-150">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <span style={{ fontSize: "10px", letterSpacing: "0.8px", color: "#8A8497", textTransform: "uppercase", fontWeight: 500 }}>

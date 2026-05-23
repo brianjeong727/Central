@@ -186,7 +186,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px] animate-modal-in">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
@@ -266,7 +266,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           </div>
         </form>
         <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
-          <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-[#F6F4EF] font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide">
+          <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide">
             {submitting ? "Posting…" : isEditing ? "Save Changes" : "Post Announcement"}
           </button>
         </div>
@@ -313,7 +313,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               Cancel
             </button>
             <div className="flex-1" />
-            <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-60 text-[#F6F4EF] font-semibold transition-colors text-[13px]">
+            <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
               {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
             </button>
           </div>
@@ -954,7 +954,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               /* Editorial 2-col cards */
               <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 {filteredDesktop.map((ann) => (
-                  <article key={ann.id} className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
+                  <article key={ann.id} className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden hover:shadow-[0_2px_8px_rgba(19,16,26,0.06)] transition-shadow duration-200">
                     <div style={{ padding: "26px 28px 22px" }}>
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
@@ -1010,7 +1010,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         <button
           onClick={() => setShowCreate(true)}
           style={{ position: "fixed", bottom: "6.5rem", right: "max(calc(50% - 195px + 16px), 16px)" }}
-          className="md:hidden w-12 h-12 bg-[#3E1540] rounded-2xl flex items-center justify-center z-40 hover:bg-[#2D0F2E] active:scale-95 transition-all"
+          className="md:hidden w-12 h-12 bg-[#3E1540] rounded-2xl flex items-center justify-center z-40 hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
           aria-label="New announcement"
         >
           <Plus className="w-6 h-6 text-[#F6F4EF]" />
@@ -1067,7 +1067,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none animate-modal-in">
         <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"><ArrowLeft className="w-4 h-4 text-[#3E1540]" /></button>
           <span className="text-[15px] font-semibold text-[#13101A]">Announcement</span>
@@ -1092,7 +1092,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
         </div>
         {announcement.is_event && (
           <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4 pb-20">
-            <button onClick={handleRsvp} disabled={rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] hover:bg-[#3E1540]/15 active:scale-[0.99]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF] active:scale-[0.99]"}`}>
+            <button onClick={handleRsvp} disabled={rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] hover:bg-[#3E1540]/15 active:scale-[0.97]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF] active:scale-[0.97]"}`}>
               {announcement.user_has_rsvped ? <span className="flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />You&apos;re going — tap to undo</span> : "RSVP"}
             </button>
           </div>
@@ -1181,7 +1181,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.98]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.98]"}`}>
+                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1215,7 +1215,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
                 <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[#F6F4EF] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-60">{deleting ? "Deleting…" : "Delete"}</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>
           )}
@@ -1266,7 +1266,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           {announcement.is_event && (
             <div className="pt-3 border-t border-[#EFEAE0]">
               <div className="flex items-center gap-3">
-                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.98]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.98]"}`}>
+                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.97]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.97]"}`}>
                   {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
                 </button>
                 {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
@@ -1300,7 +1300,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             <p className="text-[12px] text-[#8A8497] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
               <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[#E5E0D2] text-[13px] font-semibold text-[#5A5466] hover:bg-[#F4F1E8] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-60">{deleting ? "Deleting…" : "Delete"}</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         )}

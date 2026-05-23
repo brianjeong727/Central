@@ -529,23 +529,25 @@ export default function OnboardingPage() {
 
             {step < STEPS ? (
               <button type="button" onClick={next} disabled={step === 1 && !step1Valid}
+                className="active:scale-[0.97]"
                 style={{
                   padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
                   border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
                   cursor: step === 1 && !step1Valid ? "not-allowed" : "pointer",
                   opacity: step === 1 && !step1Valid ? 0.45 : 1,
-                  transition: "opacity 0.15s",
+                  transition: "opacity 0.15s, transform 0.15s",
                 }}>
                 Continue
               </button>
             ) : (
               <button type="button" onClick={handleSubmit} disabled={submitting}
+                className="active:scale-[0.97]"
                 style={{
                   padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
                   border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
                   cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.6 : 1,
-                  transition: "opacity 0.15s",
+                  opacity: submitting ? 0.5 : 1,
+                  transition: "opacity 0.15s, transform 0.15s",
                 }}>
                 {submitting ? "Submitting…" : "Submit application"}
               </button>

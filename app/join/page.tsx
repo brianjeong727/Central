@@ -172,7 +172,7 @@ function JoinContent() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or university…"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-all"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
                 autoComplete="off"
               />
             </div>
@@ -215,7 +215,7 @@ function JoinContent() {
                       <button
                         key={m.id}
                         onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }}
-                        className="flex items-center gap-4 rounded-2xl border transition-all text-left w-full"
+                        className="flex items-center gap-4 rounded-2xl border transition-all text-left w-full active:scale-[0.99]"
                         style={{
                           padding: "18px 20px",
                           borderColor: isSelected ? "#3E1540" : "#E8E2D2",
@@ -261,7 +261,7 @@ function JoinContent() {
               <button
                 onClick={handleBrowseJoin}
                 disabled={!selected || confirming || !!switching}
-                className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-40 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] transition-colors text-[14px]"
+                className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
               >
                 {switching ? "Switching…" : confirming ? "Joining…" : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →` : selected ? `Join ${selected.name} →` : "Select a ministry"}
               </button>
@@ -299,7 +299,7 @@ function JoinContent() {
                 placeholder="ENTER CODE"
                 autoComplete="off"
                 autoCapitalize="characters"
-                className="w-full px-4 py-4 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[18px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/50 transition-all text-center"
+                className="w-full px-4 py-4 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[18px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all text-center"
                 style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}
               />
               <p className="text-[11px] text-[#8A8497] text-center mt-2">Codes are usually 6–8 characters</p>
@@ -308,7 +308,7 @@ function JoinContent() {
             <button
               type="submit"
               disabled={joining || inviteCode.trim().length < 4}
-              className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-40 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] transition-colors text-[14px]"
+              className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
             >
               {joining ? "Joining…" : "Join ministry"}
             </button>

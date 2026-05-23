@@ -690,7 +690,7 @@ export function ProfileTab({
                   <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">
                     <X className="w-3.5 h-3.5" />Cancel
                   </button>
-                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50">
                     <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
                   </button>
                 </>
@@ -874,7 +874,7 @@ export function ProfileTab({
                     <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors">
                       <X className="w-3.5 h-3.5 text-[#5A5466]" />
                     </button>
-                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] transition-colors disabled:opacity-60">
+                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50">
                       <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
                     </button>
                   </>

@@ -130,6 +130,33 @@
   }
 }
 
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Modal entrance — scale + fade */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+.animate-modal-in { animation: modal-in 250ms var(--ease-out) both; }
+
+/* Backdrop fade */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-backdrop-in { animation: backdrop-in 200ms ease-out both; }
+
+/* Subtle list-item entrance */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.animate-fade-up { animation: fade-up 200ms var(--ease-out) both; }
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }

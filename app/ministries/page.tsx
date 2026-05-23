@@ -180,7 +180,7 @@ function MinistriesContent() {
             {!loadingMine && (
               <div className="flex flex-col gap-3">
                 {myMinistries.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3.5 bg-white rounded-xl border border-[#ECE8DE] px-[18px] py-4">
+                  <div key={m.id} className="flex items-center gap-3.5 bg-white rounded-xl border border-[#ECE8DE] px-[18px] py-4 hover:bg-[#F9F7F2] transition-colors duration-100">
                     <div className="w-10 h-10 rounded-[10px] bg-[#F4F1E8] flex items-center justify-center flex-shrink-0">
                       <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#3E1540", fontWeight: 400 }}>
                         {getInitials(m.name)}
@@ -193,7 +193,7 @@ function MinistriesContent() {
                     <button
                       onClick={() => handleGoToMinistry(m.id)}
                       disabled={switchingId === m.id}
-                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-60 transition-colors"
+                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150"
                     >
                       {switchingId === m.id ? "Opening…" : "Go to ministry"}
                     </button>
@@ -242,7 +242,7 @@ function MinistriesContent() {
             {!browsingPublic && browseable.length > 0 && (
               <div className="flex flex-col gap-2">
                 {browseable.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3.5 bg-white rounded-xl border border-[#ECE8DE] px-[18px] py-4">
+                  <div key={m.id} className="flex items-center gap-3.5 bg-white rounded-xl border border-[#ECE8DE] px-[18px] py-4 hover:bg-[#F9F7F2] transition-colors duration-100">
                     <div className="w-10 h-10 rounded-[10px] bg-[#F4F1E8] flex items-center justify-center flex-shrink-0">
                       <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#3E1540", fontWeight: 400 }}>
                         {getInitials(m.name)}
@@ -255,7 +255,7 @@ function MinistriesContent() {
                     <button
                       onClick={() => handleJoin(m)}
                       disabled={joiningId === m.id}
-                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 transition-colors"
+                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150"
                     >
                       {joiningId === m.id ? "Joining…" : "Join"}
                     </button>
@@ -296,7 +296,7 @@ function MinistriesContent() {
             <button
               type="submit"
               disabled={joiningCode || inviteCode.trim().length < 4}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-40 text-[#F6F4EF] font-bold py-3.5 rounded-[10px] transition-colors text-[14px]"
+              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold py-3.5 rounded-[10px] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
             >
               {joiningCode ? "Joining…" : "Join ministry"}
             </button>

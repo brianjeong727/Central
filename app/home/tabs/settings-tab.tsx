@@ -229,7 +229,7 @@ export function SettingsTab({
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 400, letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>
             {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
           </p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(28px, 4vw, 44px)", color: "#13101A", fontWeight: 400, margin: 0, letterSpacing: "-0.01em" }}>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(34px, 4vw, 52px)", color: "#13101A", fontWeight: 400, margin: 0, letterSpacing: "-0.01em" }}>
             Church Settings
           </h1>
         </div>
@@ -431,7 +431,7 @@ export function SettingsTab({
                     <button
                       onClick={copyInviteCode}
                       disabled={!inviteCode}
-                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] disabled:opacity-40 transition-colors flex-shrink-0"
+                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
                       {copied ? "Copied" : "Copy"}
@@ -447,7 +447,7 @@ export function SettingsTab({
                         </p>
                         <div className="flex gap-2">
                           <button onClick={() => setShowRegenerateConfirm(false)} className="px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[11px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-1.5 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[11px] font-semibold hover:bg-[#13101A] disabled:opacity-60 transition-colors">
+                          <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-1.5 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[11px] font-semibold hover:bg-[#13101A] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150">
                             {regenerating ? "Regenerating…" : "Yes, regenerate"}
                           </button>
                         </div>
@@ -517,7 +517,7 @@ export function SettingsTab({
                     <button
                       onClick={handleArchive}
                       disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}
-                      className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold disabled:opacity-40 transition-colors"
+                      className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold disabled:opacity-50 active:scale-[0.97] transition-[transform,opacity] duration-150"
                       style={{ border: "1px solid #9F3030", color: "#9F3030", background: "transparent" }}
                     >
                       {archiving ? "Archiving…" : "Archive ministry"}

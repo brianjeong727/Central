@@ -202,7 +202,7 @@ export function LinkForm({
         <button
           onClick={onSave}
           disabled={saving || !form.title.trim() || !form.url.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
         >
           <Check className="w-3.5 h-3.5" />
           {saving ? "Saving…" : isNew ? "Add Link" : "Save"}
@@ -379,7 +379,7 @@ export function StudentOrgRoleTabContent({
               <button
                 onClick={saveDescription}
                 disabled={savingDesc}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" />
                 {savingDesc ? "Saving…" : "Save"}
@@ -5479,7 +5479,7 @@ function GroupGeneratorWizard({
 
   return (
     <div
-      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col"
+      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col animate-modal-in"
       style={{ left: 0 }}
     >
       {/* Header */}
@@ -6022,7 +6022,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
   const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none animate-modal-in">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
@@ -6683,7 +6683,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 
   return (
-    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
+    <div className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none animate-modal-in">
 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
@@ -7295,11 +7295,11 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center"
+      className="fixed inset-0 z-[80] flex items-center justify-center animate-backdrop-in"
       style={{ background: "rgba(20,16,26,0.32)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+      <div className="animate-modal-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
 
         {/* Modal header */}
         <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

@@ -200,7 +200,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           <button
             onClick={handleCreate}
             disabled={creating || !chatName.trim()}
-            className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide"
+            className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
           >
             {creating ? "Creating…" : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
           </button>
@@ -1498,7 +1498,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   return (
     <>
     <div className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
-    <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
+    <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none animate-modal-in"}>
 
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
@@ -1942,7 +1942,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               <button
                 onClick={handleSend}
                 disabled={!inputText.trim() || sending}
-                className="flex-shrink-0 flex items-center justify-center disabled:opacity-40 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
+                className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
                 style={{ width: 34, height: 34, borderRadius: 10 }}
               >
                 <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />

@@ -37,7 +37,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 transition-all ${compact ? "px-1 py-1" : "px-2 py-1"} ${
+              className={`flex flex-col items-center justify-center gap-0.5 transition-[color,transform] duration-150 active:scale-[0.92] ${compact ? "px-1 py-1" : "px-2 py-1"} ${
                 isActive ? "text-[#3E1540]" : "text-[#C4C4C4] hover:text-[#9CA3AF]"
               }`}
             >

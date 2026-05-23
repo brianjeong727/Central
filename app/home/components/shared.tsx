@@ -48,7 +48,7 @@ export function EmptyState({
   subtitle: string
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-fade-up">
       <div className="w-14 h-14 rounded-2xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[#8A8497]">
         {icon}
       </div>

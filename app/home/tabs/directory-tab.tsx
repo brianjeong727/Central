@@ -89,7 +89,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
                 <button
                   key={member.id}
                   onClick={() => selectMember(member)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[#ECE8DE]/60"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-[#ECE8DE]/60 active:bg-[#ECE8DE] transition-colors duration-100"
                   style={{
                     borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
                     background: isActive ? "rgba(62,21,64,0.06)" : undefined,
@@ -460,7 +460,7 @@ export function MemberSheet({
 
   return (
     <div className="fixed inset-0 z-[60] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
+      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white animate-modal-in">
 
         {/* Header */}
         <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
@@ -547,7 +547,7 @@ export function MemberSheet({
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-semibold py-4 rounded-xl transition-colors text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)] active:scale-[0.98]"
+              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)]"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>

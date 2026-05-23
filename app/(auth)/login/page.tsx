@@ -92,7 +92,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-[#ECE8DE] bg-white hover:bg-[#FBF8F2] transition-colors text-[14px] font-medium text-[#13101A] mb-4"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-[#ECE8DE] bg-white hover:bg-[#EDE8E0] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] font-medium text-[#13101A] mb-4"
           >
             <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
               <path d="M43.6 20.5H42V20.4H24v7.2h11.3C33.9 31.6 29.4 34.4 24 34.4c-5.7 0-10.4-4.7-10.4-10.4S18.3 13.6 24 13.6c2.7 0 5.2 1 7.1 2.7l5.1-5.1C33.1 8.5 28.8 6.8 24 6.8 13.8 6.8 5.6 15 5.6 25.2S13.8 43.6 24 43.6c10.2 0 18.4-8.2 18.4-18.4 0-1.2-.1-2.4-.3-3.7z" fill="#FFC107"/>
@@ -146,7 +146,7 @@ function LoginContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px] mt-1"
+              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] mt-1"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>
