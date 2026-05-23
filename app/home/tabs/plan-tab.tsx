@@ -1524,15 +1524,21 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allTeams, userTeams, activeTeamId, didAutoOpen])
 
-  // Clear view=settings from URL when the user switches to a different team.
+  // Clear sub-page URL params when the user switches to a different team.
   const teamSwitchRef = useRef(false)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!teamSwitchRef.current) { teamSwitchRef.current = true; return }
     setOpenTeam(null)
     setStudentOrgPlanningEvent(null)
-    replaceParam("view", null)
-    replaceParam("sotab", null)
+    // Atomic clear: remove all team-specific sub-page params in one replace call
+    const params = new URLSearchParams(window.location.search)
+    params.delete("view")
+    params.delete("sotab")
+    params.delete("ptab")
+    params.delete("sgltab")
+    params.delete("evtab")
+    router.replace(`/home?${params.toString()}`, { scroll: false })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
 
@@ -1913,7 +1919,18 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
 
 export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManageSchedule }: { teamId: string; ministryId: string; userId: string; canManage: boolean; canManageSchedule: boolean }) {
   const supabase = createClient()
-  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "availability">("schedule")
+  const router = useRouter()
+  const validPTabs = ["schedule", "setlist", "slides", "availability"] as const
+  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "availability">(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ptab") : null
+    return (validPTabs as readonly string[]).includes(p ?? "") ? p as "schedule" | "setlist" | "slides" | "availability" : "schedule"
+  })
+  function setSubTabAndUrl(t: "schedule" | "setlist" | "slides" | "availability") {
+    setSubTab(t)
+    const sp = new URLSearchParams(window.location.search)
+    sp.set("ptab", t)
+    router.replace(`/home?${sp.toString()}`, { scroll: false })
+  }
 
   // Schedule state
   const [weeks, setWeeks] = useState<WorshipWeek[]>([])
@@ -2533,7 +2550,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
             { key: "availability", label: "Availability" },
           ]}
           active={subTab}
-          onChange={t => setSubTab(t as "schedule" | "setlist" | "slides" | "availability")}
+          onChange={t => setSubTabAndUrl(t as "schedule" | "setlist" | "slides" | "availability")}
         />
       </div>
 
@@ -4115,6 +4132,7 @@ export function EventPlanWorkspace({
   hideHero?: boolean
 }) {
   const supabase = createClient()
+  const router = useRouter()
   const cfg = CATEGORY_CONFIG[calendarEvent.category]
 
   // Core data state
@@ -4124,7 +4142,17 @@ export function EventPlanWorkspace({
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeSection, setActiveSection] = useState<'overview' | 'checklist' | 'roles' | 'notes'>('overview')
+  const validEvTabs = ["overview", "checklist", "roles", "notes"] as const
+  const [activeSection, setActiveSection] = useState<'overview' | 'checklist' | 'roles' | 'notes'>(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
+    return (validEvTabs as readonly string[]).includes(p ?? "") ? p as 'overview' | 'checklist' | 'roles' | 'notes' : 'overview'
+  })
+  function setActiveSectionAndUrl(s: 'overview' | 'checklist' | 'roles' | 'notes') {
+    setActiveSection(s)
+    const sp = new URLSearchParams(window.location.search)
+    sp.set("evtab", s)
+    router.replace(`/home?${sp.toString()}`, { scroll: false })
+  }
 
   // Overview edit state
   const [turnout, setTurnout] = useState("")
@@ -4515,7 +4543,7 @@ export function EventPlanWorkspace({
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
-          onChange={s => setActiveSection(s as 'overview' | 'checklist' | 'roles' | 'notes')}
+          onChange={s => setActiveSectionAndUrl(s as 'overview' | 'checklist' | 'roles' | 'notes')}
         />
       </div>
 
@@ -7882,7 +7910,17 @@ function SmallGroupLeadersTab({
   isPresident: boolean
 }) {
   const supabase = createClient()
-  const [activeSubTab, setActiveSubTab] = useState<"home" | "schedule">("home")
+  const router = useRouter()
+  const [activeSubTab, setActiveSubTab] = useState<"home" | "schedule">(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
+    return (p === "home" || p === "schedule") ? p : "home"
+  })
+  function setActiveSubTabAndUrl(t: "home" | "schedule") {
+    setActiveSubTab(t)
+    const sp = new URLSearchParams(window.location.search)
+    sp.set("sgltab", t)
+    router.replace(`/home?${sp.toString()}`, { scroll: false })
+  }
   const [loading, setLoading] = useState(true)
   const semester = useMemo(() => getSemesterLabel(), [])
   const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
@@ -8325,7 +8363,7 @@ function SmallGroupLeadersTab({
             { key: "schedule", label: "Schedule" },
           ]}
           active={activeSubTab}
-          onChange={t => setActiveSubTab(t as "home" | "schedule")}
+          onChange={t => setActiveSubTabAndUrl(t as "home" | "schedule")}
         />
       </div>
 
@@ -8390,7 +8428,7 @@ function SmallGroupLeadersTab({
                       </div>
                       {isPraiseSlot && (
                         <button
-                          onClick={() => setActiveSubTab("schedule")}
+                          onClick={() => setActiveSubTabAndUrl("schedule")}
                           style={{ padding: "6px 12px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
                         >
                           Prepare →

@@ -355,7 +355,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
 
   function handleSidebarTabChange(tab: Tab) {
     setGlobalOpenChat(null)
-    setActiveTab(tab)
+    setActiveTabState(tab)
+    // Atomic URL update: set new tab and clear sub-page overlay params so they
+    // don't auto-reopen when the user returns to the plan tab later.
+    const params = new URLSearchParams(window.location.search)
+    params.set("tab", tab)
+    params.delete("view")
+    router.replace(`/home?${params.toString()}`, { scroll: false })
   }
 
   async function handleLogout() {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -2112,7 +2113,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
 export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
   const supabase = createClient()
-  const [subTab, setSubTab] = useState<"church" | "my">("church")
+  const router = useRouter()
+  const [subTab, setSubTab] = useState<"church" | "my">(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
+    return (p === "church" || p === "my") ? p : "church"
+  })
   const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
   const [archivedChurchChats, setArchivedChurchChats] = useState<ChatGroup[]>([])
   const [myChats, setMyChats] = useState<ChatGroup[]>([])
@@ -2269,7 +2274,13 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => { setSubTab(t); setSearch("") }}
+            onClick={() => {
+              setSubTab(t)
+              setSearch("")
+              const sp = new URLSearchParams(window.location.search)
+              sp.set("chats", t)
+              router.replace(`?${sp.toString()}`, { scroll: false })
+            }}
             className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all
               md:py-1.5 md:px-2 md:rounded-lg md:text-left md:flex-none
               ${subTab === t

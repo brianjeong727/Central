@@ -221,6 +221,7 @@ Four tiers — visitor, member, leader, admin. DB stores mixed casing; always ch
 8. **SECURITY DEFINER helpers:** use `auth_ministry_id()` and `auth_is_admin_or_leader()` in RLS policies — never query `profiles` directly inside other table policies
 9. **RSVP is a toggle:** one row per (user, announcement). Insert on first click, delete on second. Never allow duplicate RSVPs.
 10. **Middleware is `proxy.ts`:** never recreate `middleware.ts` — it was intentionally deleted
+11. **URL state for tabs:** Every tabbed view must sync active tab to URL query params. Implement at the same time as building tabs — never skip this. Lazy-init state from `new URLSearchParams(window.location.search).get("key")` and write via `router.replace`. Never call `replaceParam` multiple times in sequence — they race on `window.location.search`; do one atomic replace instead. See `tasks/lessons.md` §URL State Persistence for the full param map and patterns.
 
 ---
 

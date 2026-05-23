@@ -11,3 +11,40 @@
 - Every `"use server"` action must have a top-level `try/catch`. Without it, any unhandled DB error or exception causes Next.js to return a cryptic `500 Internal Server Error` ("An error occurred in the Server Components render") with no visible cause in the UI or standard logs. The fix: wrap the whole body in try/catch and return `{ error: e.message }` so the client can surface a real message.
 - Every client-side call to a server action needs a `catch` block, not just `try/finally`. `finally` runs but does not catch — if the action boundary itself throws (network error, serialization failure, unhandled server exception), the error propagates as an unhandled Promise rejection and the UI shows nothing. Pattern: `try { ... } catch (e) { setError(e.message) } finally { setLoading(false) }`.
 - Always check the return value of Supabase delete/insert/update and return the error with a descriptive message (not just "Failed to save"). Vague errors make production debugging impossible.
+
+## URL State Persistence
+Date: 2026-05-23
+
+Rule: Every tabbed view must sync its active tab to the URL as a query parameter. This is not optional and should be implemented at the same time as the tabs themselves — never added manually later.
+
+**Pattern:**
+```typescript
+// 1. Lazy init from URL on mount
+const [tab, setTab] = useState<TabType>(() => {
+  const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mytab") : null
+  return validTabs.includes(p ?? "") ? p as TabType : "default"
+})
+// 2. Setter that writes state + URL together
+function setTabAndUrl(t: TabType) {
+  setTab(t)
+  const sp = new URLSearchParams(window.location.search)
+  sp.set("mytab", t)
+  router.replace(`/home?${sp.toString()}`, { scroll: false })
+}
+```
+
+**URL params in use (as of 2026-05-23):**
+- `?tab=` — top-level sidebar tab (home/announcements/chats/plan/etc.)
+- `?team=` — active team ID in Plan tab
+- `?chats=` — ChatsTab sub-tab (church/my)
+- `?sotab=` — Student Org Board team tabs (General/Plan/Roster/Resources/Groups)
+- `?ptab=` — PraiseTeam sub-tabs (schedule/setlist/slides/availability)
+- `?evtab=` — EventPlanWorkspace sections (overview/checklist/roles/notes)
+- `?sgltab=` — SmallGroupLeadersTab tabs (home/schedule)
+- `?section=` — Profile section (spiritual-profile/journal)
+- `?member=` — Directory member
+- `?view=` — Plan tab sub-page overlay (settings)
+
+**Sidebar navigation must atomically clear `view` param:** `handleSidebarTabChange` clears `view=settings` and sets `tab` in one `router.replace` call. Two separate `replaceParam` calls race on `window.location.search` — the second overwrites the first's deletion.
+
+**Team switch must clear all team-specific sub-params atomically:** On team change, clear `view`, `sotab`, `ptab`, `sgltab`, `evtab` in a single `router.replace` — same race condition applies to sequential calls.
