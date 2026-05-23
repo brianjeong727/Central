@@ -172,7 +172,7 @@ export async function createPraiseTeamChatAction(
     .select("user_id")
     .eq("week_id", weekId)
 
-  if (!roleRows || roleRows.length === 0) return { groupId: null, skipped: true }
+  if ((!roleRows || roleRows.length === 0) && !week.leader_id) return { groupId: null, skipped: true }
 
   // Format chat name: "Praise Team · June 1"
   const d = new Date(week.week_date + "T00:00:00Z")
@@ -204,7 +204,7 @@ export async function createPraiseTeamChatAction(
   // Collect all member ids (roles + leader + admins), deduplicated
   const adminIds = await getMinistryAdminIds(admin, ministryId)
   const memberIds = Array.from(new Set([
-    ...roleRows.map((r: { user_id: string }) => r.user_id),
+    ...(roleRows ?? []).map((r: { user_id: string }) => r.user_id),
     ...(week.leader_id ? [week.leader_id] : []),
     ...adminIds,
   ]))
