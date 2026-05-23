@@ -179,15 +179,16 @@ export default function LandingPage() {
           aria-hidden
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
-        {/* Directional scrim — makes left-side text legible without killing the chapel */}
+        {/* Warm plum veil — brand color tint so the image feels intentional, not gloomy.
+            Opacity stays low; text shadows do the real contrast work per-letter. */}
         <div
           aria-hidden
-          style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg, rgba(14,5,12,0.82) 0%, rgba(14,5,12,0.6) 30%, rgba(14,5,12,0.28) 58%, transparent 80%)", zIndex: 1 }}
+          style={{ position: "absolute", inset: 0, background: "linear-gradient(110deg, rgba(62,21,64,0.52) 0%, rgba(62,21,64,0.26) 42%, rgba(62,21,64,0.07) 68%, transparent 88%)", zIndex: 1 }}
         />
-        {/* Paper fade dissolves image into page at bottom */}
+        {/* Warm amber bottom dissolve into the page */}
         <div
           aria-hidden
-          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 200, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.65) 55%, #FBF8F2 100%)", zIndex: 1 }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 220, background: "linear-gradient(180deg, transparent 0%, rgba(251,245,234,0.5) 50%, #FBF8F2 100%)", zIndex: 1 }}
         />
 
         <div className="cl-hero-container" style={{ position: "relative", zIndex: 2, maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
@@ -391,6 +392,11 @@ export default function LandingPage() {
                       transform 0.65s cubic-bezier(0.23, 1, 0.32, 1) var(--anim-delay, 0s);
         }
         .cl-hero-eyebrow { --anim-delay: 0s; }
+
+        /* ── Hero text shadows — contrast without darkening the image ── */
+        .cl-hero-eyebrow { text-shadow: 0 1px 4px rgba(20,5,18,0.3); }
+        .cl-hero-title   { text-shadow: 0 2px 8px rgba(20,5,18,0.4), 0 8px 32px rgba(20,5,18,0.22); }
+        .cl-hero-sub     { text-shadow: 0 1px 4px rgba(20,5,18,0.32), 0 4px 16px rgba(20,5,18,0.18); }
 
         /* ── Nav interactive states ── */
         .cl-brand-link:hover { opacity: 0.75; }
