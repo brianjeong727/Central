@@ -21,7 +21,32 @@ Before starting any feature, fix, or change:
 
 3. **Load `skills/testing/SKILL.md`** — mandatory on every task, not just when asked
 
+Before writing any animation, micro-interaction, hover state, or transition:
+
+4. **Load `~/.claude/skills/emil-design-eng/SKILL.md`** — animation decision framework, easing curves, press states, popover origins, performance guardrails. Answers "should this animate?", "what easing?", "how fast?".
+
+Before designing new UI components or doing any visual review/polish pass:
+
+5. **Load `~/.claude/skills/taste/taste-skill/SKILL.md`** — bias-correction rules for layout, typography, interactive states, materiality, and empty states. See project overrides below before applying.
+
+**Additional skills available on demand** (not auto-loaded — invoke explicitly when needed):
+- `~/.claude/skills/impeccable/SKILL.md` — deep brand+product design system; requires PRODUCT.md/DESIGN.md in project root
+- `~/.claude/skills/taste/redesign-skill/SKILL.md` — full component redesigns
+- `~/.claude/skills/taste/minimalist-skill/SKILL.md` — stripping components to essentials
+- `~/.claude/skills/taste/soft-skill/SKILL.md` — soft/warm aesthetic polish
+
 This is not optional. Every UI decision must be verified against the design system. Every feature must pass the testing checklist before being marked done.
+
+### Project overrides for global design skills
+
+The global skills have rules that conflict with Central's **intentional** design decisions. These project rules win:
+
+| Global skill rule | Central override |
+|---|---|
+| `taste-skill` bans emojis entirely | Emojis **are used** for team icons (`🏛️`, `🎵`, etc.) — ban applies only to decorative prose/button-label use |
+| `taste-skill` "Lila Ban" — no purple/AI aesthetics | Central's brand **is** regal plum (`#3E1540`, `#2D0F2E`) — the ban does not apply |
+| `taste-skill` recommends Geist/Satoshi fonts | Central uses **Inter** (body) + **Instrument Serif** (display) — do not swap |
+| `taste-skill` Tailwind v3 guards | Central runs **Tailwind v4** — ignore v3-specific warnings |
 
 ---
 
@@ -222,3 +247,6 @@ Four tiers — visitor, member, leader, admin. DB stores mixed casing; always ch
 - **Scrollable pages:** `pb-28` to clear the bottom nav
 
 ---
+
+## Database Migrations
+Never create migration files in the `supabase/` folder and ask the user to run them manually. The Supabase MCP is connected — always run migrations directly against the database using the MCP. When a schema change is needed, execute it immediately as part of the task. After running, verify the tables and policies were created correctly by querying the database before moving on.
