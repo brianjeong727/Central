@@ -1,5 +1,7 @@
 // Semester utility functions — client-safe (no "use server")
 
+export type DGLAvailSlot = "wednesday" | "friday" | "sunday"
+
 export function getSemesterLabel(date: Date = new Date()): string {
   const month = date.getMonth() + 1
   const year = date.getFullYear()
@@ -52,4 +54,26 @@ function lastWeekdayOfMonth(year: number, month: number, weekday: number): Date 
   const d = new Date(year, month + 1, 0)
   while (d.getDay() !== weekday) d.setDate(d.getDate() - 1)
   return new Date(d)
+}
+
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// Returns every Wed, Fri, Sun in the semester in chronological order.
+// Each Sunday from getSemesterWeeks anchors a triple: Wed (−4d), Fri (−2d), Sun.
+export function getSemesterDates(semesterLabel: string): { date: string; slot: DGLAvailSlot }[] {
+  const sundays = getSemesterWeeks(semesterLabel)
+  const results: { date: string; slot: DGLAvailSlot }[] = []
+  for (const sunday of sundays) {
+    const wed = new Date(sunday); wed.setDate(wed.getDate() - 4)
+    const fri = new Date(sunday); fri.setDate(fri.getDate() - 2)
+    results.push({ date: toLocalDateStr(wed), slot: "wednesday" })
+    results.push({ date: toLocalDateStr(fri), slot: "friday" })
+    results.push({ date: toLocalDateStr(sunday), slot: "sunday" })
+  }
+  return results
 }

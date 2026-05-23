@@ -24,7 +24,7 @@ import {
   type DGLSlot, type DGLRole, type ProposedAssignment,
 } from "@/app/actions/generate-dgl-rotation"
 import { SLOT_ROLES, SLOTS } from "@/app/actions/dgl-constants"
-import { getSemesterLabel, getSemesterWeeks } from "@/app/actions/dgl-utils"
+import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import * as Y from "yjs"
@@ -7553,14 +7553,7 @@ type DGLAssignmentRow = {
   user_name: string
 }
 
-// Availability slot type (semester-wide day-of-week)
-type DGLAvailSlot = "wednesday" | "friday" | "sunday"
-const AVAIL_SLOTS: DGLAvailSlot[] = ["wednesday", "friday", "sunday"]
-const AVAIL_SLOT_LABELS: Record<DGLAvailSlot, string> = {
-  wednesday: "Wed PM",
-  friday: "Fri SG",
-  sunday: "Sunday",
-}
+const SLOT_ABBR: Record<DGLAvailSlot, string> = { wednesday: "WED", friday: "FRI", sunday: "SUN" }
 
 function SmallGroupLeadersTab({
   teamId,
@@ -7578,6 +7571,7 @@ function SmallGroupLeadersTab({
   const [loading, setLoading] = useState(true)
   const semester = useMemo(() => getSemesterLabel(), [])
   const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
+  const semesterDates = useMemo(() => getSemesterDates(semester), [semester])
 
   // Home — assignments + small groups
   const [myUpcoming, setMyUpcoming] = useState<DGLAssignmentRow[]>([])
@@ -7778,20 +7772,21 @@ function SmallGroupLeadersTab({
       setScheduleRosterMembers(uids.map(uid => ({ user_id: uid, name: nameMap.get(uid) ?? "Unknown" })))
     }
 
-    // Load ALL availability (semester-wide, all roster members)
+    // Load ALL availability (date-specific, all roster members)
     const { data: avData } = await supabase
       .from("dgl_availability")
-      .select("user_id, slot, is_busy")
+      .select("user_id, week_date, slot, is_busy")
       .eq("team_id", teamId)
       .eq("semester", semester)
 
     const newMap = new Map<string, Set<string>>()
     const myBusy = new Set<string>()
-    for (const r of (avData ?? []) as { user_id: string; slot: string; is_busy: boolean }[]) {
+    for (const r of (avData ?? []) as { user_id: string; week_date: string; slot: string; is_busy: boolean }[]) {
       if (!r.is_busy) continue
+      const key = `${r.week_date}::${r.slot}`
       if (!newMap.has(r.user_id)) newMap.set(r.user_id, new Set())
-      newMap.get(r.user_id)!.add(r.slot)
-      if (r.user_id === userId) myBusy.add(r.slot)
+      newMap.get(r.user_id)!.add(key)
+      if (r.user_id === userId) myBusy.add(key)
     }
     setAllBusyMap(newMap)
     setBusySet(myBusy)
@@ -7824,16 +7819,17 @@ function SmallGroupLeadersTab({
     setRotationPhase(rows.length === 0 ? "idle" : hasPublished ? "published" : "saved")
   }
 
-  async function toggleBusy(slot: DGLAvailSlot) {
-    const wasBusy = busySet.has(slot)
-    setSavingSlot(slot)
+  async function toggleBusy(date: string, slot: DGLAvailSlot) {
+    const key = `${date}::${slot}`
+    const wasBusy = busySet.has(key)
+    setSavingSlot(key)
 
     // Optimistic update
-    setBusySet(prev => { const n = new Set(prev); wasBusy ? n.delete(slot) : n.add(slot); return n })
+    setBusySet(prev => { const n = new Set(prev); wasBusy ? n.delete(key) : n.add(key); return n })
     setAllBusyMap(prev => {
       const n = new Map(prev)
       const s = new Set(n.get(userId) ?? [])
-      wasBusy ? s.delete(slot) : s.add(slot)
+      wasBusy ? s.delete(key) : s.add(key)
       n.set(userId, s)
       return n
     })
@@ -7841,16 +7837,16 @@ function SmallGroupLeadersTab({
     const { error } = await supabase
       .from("dgl_availability")
       .upsert(
-        { user_id: userId, team_id: teamId, slot, is_busy: !wasBusy, semester },
-        { onConflict: "user_id,team_id,slot,semester" }
+        { user_id: userId, team_id: teamId, week_date: date, slot, is_busy: !wasBusy, semester },
+        { onConflict: "user_id,team_id,week_date,slot" }
       )
     if (error) {
       // Revert on failure
-      setBusySet(prev => { const n = new Set(prev); wasBusy ? n.add(slot) : n.delete(slot); return n })
+      setBusySet(prev => { const n = new Set(prev); wasBusy ? n.add(key) : n.delete(key); return n })
       setAllBusyMap(prev => {
         const n = new Map(prev)
         const s = new Set(n.get(userId) ?? [])
-        wasBusy ? s.add(slot) : s.delete(slot)
+        wasBusy ? s.add(key) : s.delete(key)
         n.set(userId, s)
         return n
       })
@@ -8270,76 +8266,100 @@ function SmallGroupLeadersTab({
                   The president needs to confirm the DGL roster before availability can be set.
                 </p>
               </div>
-            ) : (
-              <>
-                <p className="text-[12px] text-[#8A8497] mb-3">
-                  Mark days when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span> this semester. Leave empty if you can serve.
-                </p>
-                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
-                  <div className="grid border-b border-[#ECE8DE]" style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
-                    <div className="px-4 py-2.5" />
-                    {AVAIL_SLOTS.map(slot => (
-                      <div key={slot} className="py-2.5 text-center" style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
-                        {AVAIL_SLOT_LABELS[slot]}
-                      </div>
-                    ))}
-                  </div>
-                  {isPresident ? (
-                    scheduleRosterMembers.map((member, i) => (
-                      <div key={member.user_id} className={`grid ${i < scheduleRosterMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`} style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
-                        <div className="px-4 py-2.5 flex items-center">
-                          <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>{member.name.split(" ")[0]}</span>
-                        </div>
-                        {AVAIL_SLOTS.map(slot => {
-                          const isBusy = (allBusyMap.get(member.user_id) ?? new Set()).has(slot)
-                          const isMe = member.user_id === userId
-                          const isSavingThis = isMe && savingSlot === slot
-                          return (
-                            <div key={slot} className="flex items-center justify-center py-2.5">
-                              {isMe ? (
-                                <button
-                                  onClick={() => toggleBusy(slot as DGLAvailSlot)}
-                                  disabled={isSavingThis}
-                                  style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-                                >
-                                  {isBusy && <X style={{ width: 12, height: 12, color: "#F6F4EF" }} />}
-                                </button>
-                              ) : (
-                                <div style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #ECE8DE", background: isBusy ? "#ECE8DE" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  {isBusy && <X style={{ width: 12, height: 12, color: "#8A8497" }} />}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="grid" style={{ gridTemplateColumns: "1fr repeat(3, 60px)" }}>
-                      <div className="px-4 py-2.5 flex items-center">
-                        <span style={{ fontSize: 12, color: "#5A5466", fontWeight: 500 }}>You</span>
-                      </div>
-                      {AVAIL_SLOTS.map(slot => {
-                        const isBusy = busySet.has(slot)
-                        const isSavingThis = savingSlot === slot
-                        return (
-                          <div key={slot} className="flex items-center justify-center py-2.5">
-                            <button
-                              onClick={() => toggleBusy(slot as DGLAvailSlot)}
-                              disabled={isSavingThis}
-                              style={{ width: 28, height: 28, borderRadius: 8, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-                            >
-                              {isBusy && <X style={{ width: 12, height: 12, color: "#F6F4EF" }} />}
-                            </button>
-                          </div>
-                        )
-                      })}
+            ) : (() => {
+              const today = new Date().toISOString().split("T")[0]
+              // Group semesterDates by month for eyebrow headers
+              const monthGroups: { label: string; dates: { date: string; slot: DGLAvailSlot }[] }[] = []
+              for (const entry of semesterDates) {
+                const d = new Date(entry.date + "T12:00:00")
+                const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase()
+                const last = monthGroups[monthGroups.length - 1]
+                if (!last || last.label !== label) monthGroups.push({ label, dates: [entry] })
+                else last.dates.push(entry)
+              }
+              const nameColW = 76
+              const datColW = 44
+              const displayMembers = isPresident
+                ? scheduleRosterMembers
+                : scheduleRosterMembers.filter(m => m.user_id === userId)
+              return (
+                <>
+                  <p className="text-[12px] text-[#8A8497] mb-3">
+                    Check dates when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span>. Changes save automatically.
+                  </p>
+                  <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table style={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: nameColW + semesterDates.length * datColW }}>
+                        <thead>
+                          {/* Month eyebrow row */}
+                          <tr>
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FDFCF8", zIndex: 2, borderBottom: "1px solid #ECE8DE" }} />
+                            {monthGroups.map(group => (
+                              <th
+                                key={group.label}
+                                colSpan={group.dates.length}
+                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid #ECE8DE", borderLeft: "1px solid #ECE8DE", background: "#FDFCF8", textAlign: "left", whiteSpace: "nowrap" }}
+                              >
+                                {group.label}
+                              </th>
+                            ))}
+                          </tr>
+                          {/* Date header row */}
+                          <tr>
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FDFCF8", zIndex: 2, borderBottom: "1px solid #ECE8DE", borderRight: "1px solid #ECE8DE" }} />
+                            {semesterDates.map(({ date, slot }) => {
+                              const [, m, d] = date.split("-")
+                              const isPast = date < today
+                              return (
+                                <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid #ECE8DE", textAlign: "center" }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: isPast ? "#C5C0CC" : "#5A5466", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "#8A8497" }}>{parseInt(m)}/{parseInt(d)}</div>
+                                </th>
+                              )
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayMembers.map((member, i) => (
+                            <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #F8F6F1" : undefined }}>
+                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FFFFFF", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "#5A5466", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid #ECE8DE" }}>
+                                {member.name.split(" ")[0]}
+                              </td>
+                              {semesterDates.map(({ date, slot }) => {
+                                const key = `${date}::${slot}`
+                                const isBusy = (allBusyMap.get(member.user_id) ?? new Set()).has(key)
+                                const isPast = date < today
+                                const isMe = member.user_id === userId
+                                const canEdit = isMe && !isPast
+                                const isSavingThis = isMe && savingSlot === key
+                                return (
+                                  <td key={key} style={{ width: datColW, minWidth: datColW, padding: "5px 2px", textAlign: "center" }}>
+                                    {canEdit ? (
+                                      <button
+                                        onClick={() => toggleBusy(date, slot)}
+                                        disabled={isSavingThis}
+                                        style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                                      >
+                                        {isBusy && <X style={{ width: 10, height: 10, color: "#F6F4EF" }} />}
+                                      </button>
+                                    ) : (
+                                      <div style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #ECE8DE", background: isBusy ? (isPast ? "#D4CEDF" : "#ECE8DE") : "transparent", opacity: isPast ? 0.5 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                        {isBusy && <X style={{ width: 10, height: 10, color: "#8A8497" }} />}
+                                      </div>
+                                    )}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
-                <p className="text-[11px] text-[#8A8497] mt-2">Filled = busy. Changes save automatically.</p>
-              </>
-            )}
+                  </div>
+                  <p className="text-[11px] text-[#8A8497] mt-2">Checked = unavailable. Changes save automatically.</p>
+                </>
+              )
+            })()}
           </div>
 
           {/* Rotation Assigner (president only) */}
