@@ -4511,7 +4511,7 @@ export function EventPlanWorkspace({
       </div>}
 
       {/* Underline section tabs */}
-      <div style={{ padding: "0 40px", marginTop: hideHero ? 0 : 22, marginBottom: 24 }}>
+      <div style={{ marginTop: hideHero ? 0 : 22, marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}

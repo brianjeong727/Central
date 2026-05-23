@@ -166,6 +166,13 @@ padding: 30px 36px 32px
 
 **Do not:** use pill tabs, segmented background tabs, or boxed tabs. Always underline.
 
+#### Critical implementation rule
+There is exactly **one** tab strip component in this codebase: `PlanSubTabStrip` in `app/home/tabs/plan-tab.tsx`. Every tab strip — team pages, event plan pages, profile pages, anywhere — must use this same component. Never inline tab styles or create a new tab implementation. If you need a tab strip, import and use the existing shared component.
+
+The wrapper `<div>` around `PlanSubTabStrip` must have **zero horizontal padding**. The `border-bottom: 1px solid #E8E2D2` inside the component must run edge-to-edge within its parent container. Horizontal breathing room belongs on the **content div below**, not on the tab strip wrapper. Adding horizontal padding to the tab strip wrapper breaks the border alignment and makes the strip look different from every other tab strip in the app.
+
+This rule exists because tab styling has broken multiple times due to duplicate implementations drifting apart and wrapper padding being applied to the wrong element.
+
 ### 4.3 Buttons
 
 | Variant | Padding | BG | Color | Border | Radius |
