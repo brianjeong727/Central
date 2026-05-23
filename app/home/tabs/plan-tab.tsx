@@ -1856,6 +1856,26 @@ function PlanSubTabStrip({
 
 // ── PraiseTeamTab ─────────────────────────────────────────────────────────────
 
+function getUpcomingSundays(n = 26): { date: string; label: string }[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const d = new Date(today)
+  const dayOfWeek = d.getDay()
+  if (dayOfWeek !== 0) d.setDate(d.getDate() + (7 - dayOfWeek))
+  const sundays: { date: string; label: string }[] = []
+  for (let i = 0; i < n; i++) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const dd = String(d.getDate()).padStart(2, "0")
+    sundays.push({
+      date: `${y}-${m}-${dd}`,
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    })
+    d.setDate(d.getDate() + 7)
+  }
+  return sundays
+}
+
 const WORSHIP_ROLE_OPTIONS = ["Vocals", "Keys", "Guitar", "Bass", "Drums", "Other"]
 
 export function worshipWeekDateLabel(dateStr: string) {
@@ -1903,6 +1923,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const [newLeaderError, setNewLeaderError] = useState(false)
   const [newLeaderId, setNewLeaderId] = useState("")
   const [addingWeek, setAddingWeek] = useState(false)
+  const [addWeekError, setAddWeekError] = useState<string | null>(null)
 
   // Add member to week form
   const [addMemberToWeekId, setAddMemberToWeekId] = useState<string | null>(null)
@@ -1954,8 +1975,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
       .from("worship_weeks")
       .select("id, week_date, leader_id, status, auto_archive_date, chat_group_id, profiles!leader_id(name)")
       .eq("team_id", teamId)
-      .gte("week_date", monthStart)
-      .lte("week_date", monthEnd)
       .order("week_date")
 
     if (gen !== loadScheduleGenRef.current) return
@@ -2042,9 +2061,22 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     if (!newDate) return
     if (!newLeaderId) { setNewLeaderError(true); return }
     setNewLeaderError(false)
+    setAddWeekError(null)
     setAddingWeek(true)
+    const { data: existing } = await supabase
+      .from("worship_weeks")
+      .select("id")
+      .eq("team_id", teamId)
+      .eq("week_date", newDate)
+      .maybeSingle()
+    if (existing) {
+      setAddWeekError("A week for this date already exists.")
+      setAddingWeek(false)
+      return
+    }
     const { error } = await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newDate, leader_id: newLeaderId, status: "draft" })
-    if (!error) { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); await loadSchedule() }
+    if (!error) { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); setAddWeekError(null); await loadSchedule() }
+    else { setAddWeekError("Failed to add week. Please try again.") }
     setAddingWeek(false)
   }
 
@@ -2401,7 +2433,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
   const visibleWeeks = weeks
   const worshipLeaders = teamMembers.filter(m => m.role_name === "Worship Leader")
   const weekDates = weeks.map(w => w.week_date)
-  const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  const monthLabel = "Schedule"
 
   return (
     <div>
@@ -2524,9 +2556,35 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New worship week</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
-                  <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date — Sundays only</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 148, overflowY: "auto", padding: "10px", background: "white", border: "1px solid #ECE8DE", borderRadius: 10 }}>
+                    {getUpcomingSundays(26).map(({ date, label }) => {
+                      const isSelected = newDate === date
+                      const alreadyExists = weekDates.includes(date)
+                      return (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() => { if (!alreadyExists) { setNewDate(date); setAddWeekError(null) } }}
+                          style={{
+                            padding: "5px 11px", borderRadius: 20,
+                            border: isSelected ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
+                            background: isSelected ? "#3E1540" : alreadyExists ? "#F4F1EA" : "white",
+                            color: isSelected ? "#F6F4EF" : alreadyExists ? "#C5C0CC" : "#13101A",
+                            fontSize: 12, fontWeight: isSelected ? 600 : 400,
+                            cursor: alreadyExists ? "default" : "pointer",
+                            fontFamily: "inherit",
+                            opacity: alreadyExists ? 0.55 : 1,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {addWeekError && (
+                    <p style={{ fontSize: 12, color: "#DC2626", marginTop: 5 }}>{addWeekError}</p>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "#DC2626" : "#5A5466", marginBottom: 4 }}>
@@ -2543,7 +2601,7 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                     style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
                     {addingWeek ? "Adding…" : "Add"}
                   </button>
-                  <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId("") }}
+                  <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); setAddWeekError(null) }}
                     style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
                     Cancel
                   </button>
