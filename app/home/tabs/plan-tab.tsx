@@ -25,7 +25,7 @@ import {
 import { confirmSmallGroupsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
@@ -7886,21 +7886,6 @@ function SmallGroupLeadersTab({
   const [isPublishing, setIsPublishing] = useState(false)
   const [rotErr, setRotErr] = useState<string | null>(null)
 
-  // Group chats confirmation (president only)
-  const [confirmGroupsLoading, setConfirmGroupsLoading] = useState(false)
-  const [confirmGroupsResult, setConfirmGroupsResult] = useState<{ created: number; updated: number; error?: string } | null>(null)
-
-  async function handleConfirmGroupChats() {
-    setConfirmGroupsLoading(true)
-    setConfirmGroupsResult(null)
-    try {
-      const result = await confirmSmallGroupChatsAction(teamId, ministryId)
-      setConfirmGroupsResult({ created: result.created, updated: result.updated, error: result.error })
-    } finally {
-      setConfirmGroupsLoading(false)
-    }
-  }
-
   useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: refresh home assignments when president publishes
@@ -7915,6 +7900,26 @@ function SmallGroupLeadersTab({
       }, () => { void loadHome() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId, userId])
+
+  // Realtime: refresh member list when president confirms small groups
+  // 150ms debounce so small_group_members writes finish before we read
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const channel = supabase
+      .channel(`sg-leader-${userId}-${teamId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "small_groups",
+        filter: `leader_id=eq.${userId}`,
+      }, () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => { void loadHome() }, 150)
+      })
+      .subscribe()
+    return () => { clearTimeout(timer); supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId, userId])
 
@@ -8520,32 +8525,6 @@ function SmallGroupLeadersTab({
             />
           )}
 
-          {/* Group Chats (president only) */}
-          {isPresident && (
-            <div>
-              <PlanSectionHeader>Group Chats</PlanSectionHeader>
-              <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] p-5">
-                <p className="text-[13px] text-[#5A5466] mb-4">
-                  Create church chats for each small group and paired group based on current assignments.
-                </p>
-                <button
-                  onClick={handleConfirmGroupChats}
-                  disabled={confirmGroupsLoading}
-                  style={{ width: "100%", background: "#3E1540", color: "white", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-inter)", border: "none", borderRadius: 10, padding: "10px 0", cursor: confirmGroupsLoading ? "not-allowed" : "pointer", opacity: confirmGroupsLoading ? 0.7 : 1 }}
-                >
-                  {confirmGroupsLoading ? "Creating chats…" : "Confirm Groups & Create Chats"}
-                </button>
-                {confirmGroupsResult && (
-                  <p className={`text-[13px] mt-3 text-center ${confirmGroupsResult.error ? "text-red-500" : "text-[#5A5466]"}`}>
-                    {confirmGroupsResult.error
-                      ? confirmGroupsResult.error
-                      : `${confirmGroupsResult.created} chat${confirmGroupsResult.created !== 1 ? "s" : ""} created${confirmGroupsResult.updated > 0 ? `, ${confirmGroupsResult.updated} updated` : ""}.`
-                    }
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
