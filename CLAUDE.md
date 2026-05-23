@@ -30,6 +30,7 @@ Before designing new UI components or doing any visual review/polish pass:
 5. **Load `~/.claude/skills/taste/taste-skill/SKILL.md`** — bias-correction rules for layout, typography, interactive states, materiality, and empty states. See project overrides below before applying.
 
 **Additional skills available on demand** (not auto-loaded — invoke explicitly when needed):
+- `~/.claude/skills/ui-ux-pro-max/SKILL.md` — pre-delivery UX review checklist; 99 rules across accessibility, touch, performance, navigation, forms, animation (all sourced from Apple HIG + Material Design). Use §1 Accessibility, §2 Touch & Interaction, §3 Performance, and §9 Navigation Patterns most. **Skip** the Python `search.py` CLI (not set up for this project) and **skip** the `--stack react-native` section (Central is Next.js, not React Native).
 - `~/.claude/skills/impeccable/SKILL.md` — deep brand+product design system; requires PRODUCT.md/DESIGN.md in project root
 - `~/.claude/skills/taste/redesign-skill/SKILL.md` — full component redesigns
 - `~/.claude/skills/taste/minimalist-skill/SKILL.md` — stripping components to essentials
@@ -43,7 +44,7 @@ The global skills have rules that conflict with Central's **intentional** design
 
 | Global skill rule | Central override |
 |---|---|
-| `taste-skill` bans emojis entirely | Emojis **are used** for team icons (`🏛️`, `🎵`, etc.) — ban applies only to decorative prose/button-label use |
+| `taste-skill` / `ui-ux-pro-max` ban emojis entirely | Emojis **are used** for team icons (`🏛️`, `🎵`, etc.) — ban applies only to decorative prose/button-label use |
 | `taste-skill` "Lila Ban" — no purple/AI aesthetics | Central's brand **is** regal plum (`#3E1540`, `#2D0F2E`) — the ban does not apply |
 | `taste-skill` recommends Geist/Satoshi fonts | Central uses **Inter** (body) + **Instrument Serif** (display) — do not swap |
 | `taste-skill` Tailwind v3 guards | Central runs **Tailwind v4** — ignore v3-specific warnings |
