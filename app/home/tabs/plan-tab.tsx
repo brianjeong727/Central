@@ -8321,7 +8321,7 @@ function SmallGroupLeadersTab({
                                 const isBusy = (allBusyMap.get(member.user_id) ?? new Set()).has(key)
                                 const isPast = date < today
                                 const isMe = member.user_id === userId
-                                const canEdit = isMe && !isPast
+                                const canEdit = isMe  // own row is always editable; others are read-only
                                 const isSavingThis = isMe && savingSlot === key
                                 return (
                                   <td key={key} style={{ width: datColW, minWidth: datColW, padding: "5px 2px", textAlign: "center" }}>
