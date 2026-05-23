@@ -5,6 +5,21 @@ export type PoolPerson = {
   name: string
   graduation_year: number | null
   role: string
+  gender?: string | null
+}
+
+export type DGLLeader = {
+  user_id: string
+  user_name: string
+  gender: string | null
+}
+
+export type SGGeneratedGroup = {
+  name: string
+  leader_id: string
+  leader_name: string
+  leader_gender: string | null
+  members: PoolPerson[]
 }
 
 export type GeneratedGroup = {
@@ -170,4 +185,80 @@ export function runAlgorithm(
   }
 
   return groups.map((members, i) => ({ name: groupNames[i], members }))
+}
+
+// Distributes pool members across DGL groups, matching gender within each pool.
+// Members with no gender go to the smaller gender sub-pool.
+export function runSmallGroupAlgorithm(
+  dgls: DGLLeader[],
+  pool: PoolPerson[],
+  opts: { balanceByYear: boolean; separateVisitors: boolean; prevPairings?: PrevPairing[] },
+): SGGeneratedGroup[] {
+  const maleDGLs = dgls.filter(d => d.gender === "male")
+  const femaleDGLs = dgls.filter(d => d.gender === "female")
+  const unknownDGLs = dgls.filter(d => !d.gender)
+
+  const augMale = [...maleDGLs]
+  const augFemale = [...femaleDGLs]
+  for (const d of unknownDGLs) {
+    if (augMale.length <= augFemale.length) augMale.push(d)
+    else augFemale.push(d)
+  }
+
+  const malePool = pool.filter(p => p.gender === "male")
+  const femalePool = pool.filter(p => p.gender === "female")
+  const unknownPool = pool.filter(p => !p.gender)
+
+  const augMalePool = [...malePool]
+  const augFemalePool = [...femalePool]
+  for (const p of unknownPool) {
+    if (augMalePool.length <= augFemalePool.length) augMalePool.push(p)
+    else augFemalePool.push(p)
+  }
+
+  const result: SGGeneratedGroup[] = []
+
+  const distribute = (dglList: DGLLeader[], memberPool: PoolPerson[]) => {
+    if (dglList.length === 0) return
+    if (memberPool.length === 0) {
+      for (const dgl of dglList) {
+        result.push({
+          name: `${dgl.user_name.split(" ")[0]}'s Group`,
+          leader_id: dgl.user_id,
+          leader_name: dgl.user_name,
+          leader_gender: dgl.gender,
+          members: [],
+        })
+      }
+      return
+    }
+
+    const numGroups = Math.min(dglList.length, memberPool.length)
+    const genericGroups = runAlgorithm(memberPool, {
+      ministryId: "",
+      sourceType: "everyone",
+      numGroups,
+      balanceByYear: opts.balanceByYear,
+      separateVisitors: opts.separateVisitors,
+      smallGroupMode: false,
+      prevPairings: opts.prevPairings,
+      naming: "numeric",
+    })
+
+    for (let i = 0; i < dglList.length; i++) {
+      const dgl = dglList[i]
+      result.push({
+        name: `${dgl.user_name.split(" ")[0]}'s Group`,
+        leader_id: dgl.user_id,
+        leader_name: dgl.user_name,
+        leader_gender: dgl.gender,
+        members: genericGroups[i]?.members ?? [],
+      })
+    }
+  }
+
+  distribute(augMale, augMalePool)
+  distribute(augFemale, augFemalePool)
+
+  return result
 }

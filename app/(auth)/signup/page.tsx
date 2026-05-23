@@ -16,6 +16,11 @@ const GRADES = [
   { value: "young_adult", label: "Young Adult" },
 ] as const
 
+const GENDERS = [
+  { value: "male",   label: "Male" },
+  { value: "female", label: "Female" },
+] as const
+
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
     <path d="M43.6 20.5H42V20.4H24v7.2h11.3C33.9 31.6 29.4 34.4 24 34.4c-5.7 0-10.4-4.7-10.4-10.4S18.3 13.6 24 13.6c2.7 0 5.2 1 7.1 2.7l5.1-5.1C33.1 8.5 28.8 6.8 24 6.8 13.8 6.8 5.6 15 5.6 25.2S13.8 43.6 24 43.6c10.2 0 18.4-8.2 18.4-18.4 0-1.2-.1-2.4-.3-3.7z" fill="#FFC107"/>
@@ -32,6 +37,7 @@ function SignupContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [grade, setGrade] = useState<string>("")
+  const [gender, setGender] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -43,7 +49,7 @@ function SignupContent() {
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, grade } },
+      options: { data: { name, grade, gender } },
     })
     if (signUpError) {
       setError(signUpError.message)
@@ -153,6 +159,32 @@ function SignupContent() {
                   placeholder="Brian Jeong" required autoComplete="name" className={inputClass} />
               </div>
 
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Gender</label>
+                <div style={{ display: "flex", gap: 7 }}>
+                  {GENDERS.map(({ value, label }) => {
+                    const active = gender === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setGender(value)}
+                        style={{
+                          padding: "6px 20px", fontSize: 13, fontWeight: active ? 600 : 400,
+                          fontFamily: "var(--font-inter)", borderRadius: 999,
+                          border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
+                          background: active ? "#3E1540" : "#FBF8F2",
+                          color: active ? "#F6F4EF" : "#5A5466",
+                          cursor: "pointer", transition: "all 0.15s",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Email</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -193,7 +225,7 @@ function SignupContent() {
 
               <button
                 type="submit"
-                disabled={loading || !grade}
+                disabled={loading || !grade || !gender}
                 className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
                 style={{ marginTop: 4 }}
               >

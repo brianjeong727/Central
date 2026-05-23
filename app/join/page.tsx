@@ -4,6 +4,12 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner } from "@/app/home/components/shared"
+import { createClient } from "@/lib/supabase"
+
+const GENDERS = [
+  { value: "male",   label: "Male" },
+  { value: "female", label: "Female" },
+] as const
 
 const SIZE_LABELS: Record<string, string> = {
   small: "Under 50",
@@ -56,12 +62,30 @@ function JoinContent() {
   const [myMinistryIds, setMyMinistryIds] = useState<Set<string>>(new Set())
   const [switching, setSwitching] = useState<string | null>(null)
 
-  // Clear consumed sessionStorage handoff + load user's existing memberships
+  // Gender collection — shown before join if profile has no gender set
+  const [needsGender, setNeedsGender] = useState(false)
+  const [gender, setGender] = useState<string>("")
+  const [savingGender, setSavingGender] = useState(false)
+  const [genderError, setGenderError] = useState<string | null>(null)
+  // Pending action to run after gender is saved
+  const [pendingAction, setPendingAction] = useState<"code" | "browse" | null>(null)
+
+  // Clear consumed sessionStorage handoff + load user's existing memberships + check gender
   useEffect(() => {
     sessionStorage.removeItem("pending_invite_code")
     sessionStorage.removeItem("pending_browse_ministry")
     getUserMinistries().then(({ data }) => {
       if (data) setMyMinistryIds(new Set(data.map((m) => m.id)))
+    })
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("gender")
+        .eq("id", user.id)
+        .single()
+      if (profile && !profile.gender) setNeedsGender(true)
     })
   }, [])
 
@@ -80,9 +104,7 @@ function JoinContent() {
     return () => clearTimeout(t)
   }, [tab, search, fetchMinistries])
 
-  async function handleCodeJoin(e: React.FormEvent) {
-    e.preventDefault()
-    if (!inviteCode.trim()) return
+  async function doCodeJoin() {
     setJoining(true)
     setCodeError(null)
     try {
@@ -95,7 +117,14 @@ function JoinContent() {
     }
   }
 
-  async function handleBrowseJoin() {
+  async function handleCodeJoin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inviteCode.trim()) return
+    if (needsGender) { setPendingAction("code"); return }
+    doCodeJoin()
+  }
+
+  async function doBrowseJoin() {
     if (!selected) return
     if (myMinistryIds.has(selected.id)) {
       setSwitching(selected.id)
@@ -111,7 +140,83 @@ function JoinContent() {
     window.location.assign("/home")
   }
 
+  async function handleBrowseJoin() {
+    if (!selected) return
+    if (needsGender) { setPendingAction("browse"); return }
+    doBrowseJoin()
+  }
+
+  async function handleSaveGender() {
+    if (!gender) return
+    setSavingGender(true)
+    setGenderError(null)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setGenderError("Not signed in."); setSavingGender(false); return }
+    const { error } = await supabase.from("profiles").update({ gender }).eq("id", user.id)
+    if (error) { setGenderError("Failed to save. Try again."); setSavingGender(false); return }
+    setNeedsGender(false)
+    setSavingGender(false)
+    if (pendingAction === "code") { setPendingAction(null); doCodeJoin() }
+    else if (pendingAction === "browse") { setPendingAction(null); doBrowseJoin() }
+    else setPendingAction(null)
+  }
+
   return (
+    <>
+    {needsGender && pendingAction !== null && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>One more thing</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>What&apos;s your gender?</h2>
+          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>This helps us place you in the right small group.</p>
+          {genderError && (
+            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{genderError}</div>
+          )}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            {GENDERS.map(({ value, label }) => {
+              const active = gender === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGender(value)}
+                  style={{
+                    flex: 1, padding: "10px 0", fontSize: 14, fontWeight: active ? 600 : 400,
+                    borderRadius: 12,
+                    border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
+                    background: active ? "#3E1540" : "#FBF8F2",
+                    color: active ? "#F6F4EF" : "#5A5466",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            onClick={handleSaveGender}
+            disabled={!gender || savingGender}
+            style={{
+              width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600,
+              fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none",
+              cursor: gender && !savingGender ? "pointer" : "not-allowed",
+              opacity: !gender || savingGender ? 0.5 : 1, transition: "opacity 0.15s",
+            }}
+          >
+            {savingGender ? "Saving…" : "Continue"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPendingAction(null)}
+            style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
     <div className="flex flex-col bg-[#FBF8F2]" style={{ height: "100svh" }}>
 
       {/* ── Plum header strip ── */}
@@ -336,6 +441,7 @@ function JoinContent() {
         )}
       </div>
     </div>
+    </>
   )
 }
 

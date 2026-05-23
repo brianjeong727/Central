@@ -2,8 +2,9 @@
 
 import { createAdminClient } from "@/lib/supabase-admin"
 import { runAlgorithm } from "@/lib/group-algorithm"
-export type { PoolPerson, GeneratedGroup, PrevPairing, GenerateGroupsParams } from "@/lib/group-algorithm"
-import type { PoolPerson, GenerateGroupsParams } from "@/lib/group-algorithm"
+import { confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
+export type { PoolPerson, GeneratedGroup, PrevPairing, GenerateGroupsParams, DGLLeader, SGGeneratedGroup } from "@/lib/group-algorithm"
+import type { PoolPerson, GenerateGroupsParams, SGGeneratedGroup } from "@/lib/group-algorithm"
 
 export async function generateGroupsAction(
   params: GenerateGroupsParams,
@@ -69,5 +70,68 @@ export async function generateGroupsAction(
     return { groups }
   } catch {
     return { groups: [], error: "Failed to generate groups." }
+  }
+}
+
+// Writes SG mode results to small_groups + small_group_members, then triggers chat creation.
+export async function confirmSmallGroupsAction(params: {
+  teamId: string
+  ministryId: string
+  semester: string
+  groups: Array<{
+    leader_id: string
+    name: string
+    members: Array<{ id: string }>
+  }>
+}): Promise<{ error?: string; chatResult?: { created: number; updated: number } }> {
+  try {
+    const admin = createAdminClient()
+
+    for (const g of params.groups) {
+      // Find or create the small_groups row for this leader
+      const { data: existing } = await admin
+        .from("small_groups")
+        .select("id")
+        .eq("team_id", params.teamId)
+        .eq("leader_id", g.leader_id)
+        .maybeSingle()
+
+      let groupId: string
+
+      if (existing) {
+        groupId = existing.id
+        await admin
+          .from("small_groups")
+          .update({ name: g.name })
+          .eq("id", groupId)
+      } else {
+        const { data: created, error: createErr } = await admin
+          .from("small_groups")
+          .insert({ team_id: params.teamId, ministry_id: params.ministryId, name: g.name, leader_id: g.leader_id, type: "small" })
+          .select("id")
+          .single()
+        if (createErr || !created) return { error: `Failed to create small group: ${createErr?.message}` }
+        groupId = created.id
+      }
+
+      // Replace members
+      await admin.from("small_group_members").delete().eq("group_id", groupId)
+
+      if (g.members.length > 0) {
+        const rows = g.members.map(m => ({
+          group_id: groupId,
+          user_id: m.id,
+          meal_taken: false,
+          meal_semester: params.semester,
+        }))
+        const { error: insertErr } = await admin.from("small_group_members").insert(rows)
+        if (insertErr) return { error: `Failed to assign members: ${insertErr.message}` }
+      }
+    }
+
+    const chatResult = await confirmSmallGroupChatsAction(params.teamId, params.ministryId)
+    return { chatResult: { created: chatResult.created, updated: chatResult.updated } }
+  } catch (e) {
+    return { error: `Unexpected error: ${e instanceof Error ? e.message : String(e)}` }
   }
 }

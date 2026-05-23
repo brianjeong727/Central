@@ -142,6 +142,18 @@ await page.waitForFunction(() => !document.querySelector('.wizard-indicator'))
 
 ---
 
+## Vercel deployment lag
+
+After pushing to `origin/main`, changes take **~75 seconds** to go live on `joincentral.app`. Do not test on the production domain until the deploy finishes.
+
+**How to know it's live:**
+- Watch the Vercel dashboard, OR
+- Wait 90 seconds after the `git push` confirms, THEN open the domain
+
+**Never tell the user "it's live" or "test it on joincentral.app" immediately after a push.** Always say: "Deploy takes ~75 seconds — check joincentral.app after it finishes."
+
+---
+
 ## Definition of done
 
 A feature is not done until:
@@ -155,5 +167,6 @@ A feature is not done until:
 - [ ] Realtime channels cleaned up correctly (if applicable)
 - [ ] Layout verified at 390px width
 - [ ] `npm run build` passes with no type errors
+- [ ] If testing on joincentral.app: waited for deploy to finish (~75s after push)
 
 If any item is unchecked, the task is not complete.

@@ -18,10 +18,11 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
-import { runAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/lib/group-algorithm"
+import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
 } from "@/app/actions/generate-dgl-rotation"
+import { confirmSmallGroupsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
@@ -5223,6 +5224,16 @@ function GroupGeneratorWizard({
   // Drag state
   const [dragSource, setDragSource] = useState<{ groupIdx: number; memberIdx: number } | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+  const [dragError, setDragError] = useState<string | null>(null)
+
+  // SG mode integration — DGL roster data
+  const [sglTeamId, setSglTeamId] = useState<string | null>(null)
+  const [sglRosterConfirmed, setSglRosterConfirmed] = useState(false)
+  const [sgDGLs, setSgDGLs] = useState<DGLLeader[]>([])
+  const [sgGroups, setSgGroups] = useState<SGGeneratedGroup[]>([])
+  const [confirmingSG, setConfirmingSG] = useState(false)
+  const [sgConfirmResult, setSgConfirmResult] = useState<string | null>(null)
+  const semester = useMemo(() => getSemesterLabel(), [])
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
@@ -5322,6 +5333,51 @@ function GroupGeneratorWizard({
     fetchCount()
   }, [sourceType, sourceId, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load SGL team + roster status on mount
+  useEffect(() => {
+    async function loadSGL() {
+      const { data: teamRow } = await supabase
+        .from("teams")
+        .select("id")
+        .eq("ministry_id", ministryId)
+        .ilike("name", "%small group leader%")
+        .maybeSingle()
+      if (!teamRow) return
+      setSglTeamId(teamRow.id)
+
+      const { data: statusRow } = await supabase
+        .from("dgl_roster_status")
+        .select("confirmed")
+        .eq("team_id", teamRow.id)
+        .eq("semester", getSemesterLabel())
+        .maybeSingle()
+      const confirmed = !!statusRow?.confirmed
+      setSglRosterConfirmed(confirmed)
+      if (!confirmed) return
+
+      const { data: rosterRows } = await supabase
+        .from("dgl_roster")
+        .select("user_id")
+        .eq("team_id", teamRow.id)
+        .eq("semester", getSemesterLabel())
+      const memberIds = (rosterRows ?? []).map((r: { user_id: string }) => r.user_id)
+      if (memberIds.length === 0) return
+
+      const { data: profileRows } = await supabase
+        .from("profiles")
+        .select("id, name, gender")
+        .in("id", memberIds)
+      setSgDGLs(
+        (profileRows ?? []).map((p: { id: string; name: string; gender: string | null }) => ({
+          user_id: p.id,
+          user_name: p.name,
+          gender: p.gender,
+        }))
+      )
+    }
+    loadSGL()
+  }, [ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function parsePrevCSV(text: string): PrevPairing[] {
     const lines = text.trim().split(/\r?\n/).slice(1) // skip header
     return lines.flatMap(line => {
@@ -5341,7 +5397,7 @@ function GroupGeneratorWizard({
       if (sourceType === "everyone") {
         const { data, error } = await supabase
           .from("profiles")
-          .select("id, name, graduation_year, role")
+          .select("id, name, graduation_year, role, gender")
           .eq("ministry_id", ministryId)
           .not("name", "is", null)
         if (error) throw new Error("Failed to fetch members.")
@@ -5349,7 +5405,7 @@ function GroupGeneratorWizard({
       } else if (sourceType === "announcement" && sourceId) {
         const { data, error } = await supabase
           .from("rsvps")
-          .select("user_id, profiles(id, name, graduation_year, role)")
+          .select("user_id, profiles(id, name, graduation_year, role, gender)")
           .eq("announcement_id", sourceId)
         if (error) throw new Error("Failed to fetch RSVP list.")
         pool = ((data ?? []) as Record<string, unknown>[])
@@ -5371,7 +5427,7 @@ function GroupGeneratorWizard({
         if (userIds.length > 0) {
           const { data, error } = await supabase
             .from("profiles")
-            .select("id, name, graduation_year, role")
+            .select("id, name, graduation_year, role, gender")
             .in("id", userIds)
           if (error) throw new Error("Failed to fetch profiles.")
           pool = (data ?? []) as PoolPerson[]
@@ -5383,9 +5439,27 @@ function GroupGeneratorWizard({
         return
       }
 
+      // Exclude DGLs from the pool in SG mode
+      const isSGMode = smallGroupMode && sgDGLs.length > 0 && sglRosterConfirmed
+      const dglIds = new Set(sgDGLs.map(d => d.user_id))
+      const memberPool = isSGMode ? pool.filter(p => !dglIds.has(p.id)) : pool
+
+      if (isSGMode) {
+        const result = runSmallGroupAlgorithm(sgDGLs, memberPool, {
+          balanceByYear,
+          separateVisitors: separateVisitors && hasVisitors,
+        })
+        if (result.length === 0) { setGenError("No groups generated."); return }
+        setSgGroups(result)
+        setGroups([])
+        if (!sessionName) setSessionName(`Small Groups — ${semester}`)
+        setStep(3)
+        return
+      }
+
       const prevPairings = smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : []
-      const resolvedNumGroups = Math.min(Math.max(1, numGroups), pool.length)
-      const result = runAlgorithm(pool, {
+      const resolvedNumGroups = Math.min(Math.max(1, numGroups), memberPool.length)
+      const result = runAlgorithm(memberPool, {
         ministryId,
         sourceType,
         sourceId: sourceId || undefined,
@@ -5402,6 +5476,7 @@ function GroupGeneratorWizard({
         return
       }
       setGroups(result)
+      setSgGroups([])
       if (!sessionName) setSessionName(`Group Set — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`)
       setStep(3)
     } catch (e) {
@@ -5415,6 +5490,8 @@ function GroupGeneratorWizard({
     if (!sessionName.trim()) return
     setSaving(true)
     try {
+      const isSGMode = sgGroups.length > 0
+
       const { data: sessionData, error: sessionErr } = await supabase
         .from("group_sessions")
         .insert({
@@ -5431,8 +5508,12 @@ function GroupGeneratorWizard({
 
       if (sessionErr || !sessionData) return
 
-      for (let i = 0; i < groups.length; i++) {
-        const g = groups[i]
+      const groupsToSave = isSGMode
+        ? sgGroups.map(g => ({ name: g.name, members: g.members }))
+        : groups
+
+      for (let i = 0; i < groupsToSave.length; i++) {
+        const g = groupsToSave[i]
         const { data: groupData } = await supabase
           .from("generated_groups")
           .insert({ session_id: sessionData.id, name: g.name, order_index: i })
@@ -5444,6 +5525,27 @@ function GroupGeneratorWizard({
             g.members.map(m => ({ group_id: groupData.id, user_id: m.id }))
           )
         }
+      }
+
+      if (isSGMode && sglTeamId) {
+        setConfirmingSG(true)
+        const r = await confirmSmallGroupsAction({
+          teamId: sglTeamId,
+          ministryId,
+          semester,
+          groups: sgGroups.map(g => ({
+            leader_id: g.leader_id,
+            name: g.name,
+            members: g.members.map(m => ({ id: m.id })),
+          })),
+        })
+        setConfirmingSG(false)
+        if (r.error) {
+          setSgConfirmResult(`Saved, but chat creation failed: ${r.error}`)
+        } else {
+          setSgConfirmResult(`Groups confirmed. ${r.chatResult?.created ?? 0} small group chats created, ${r.chatResult?.updated ?? 0} updated.`)
+        }
+        return
       }
 
       onSaved()
@@ -5460,15 +5562,35 @@ function GroupGeneratorWizard({
   function handleDrop(targetGroupIdx: number) {
     if (!dragSource) return
     if (dragSource.groupIdx === targetGroupIdx) { setDragSource(null); setDragOver(null); return }
-    const newGroups = groups.map(g => ({ ...g, members: [...g.members] }))
-    const [moved] = newGroups[dragSource.groupIdx].members.splice(dragSource.memberIdx, 1)
-    newGroups[targetGroupIdx].members.push(moved)
-    setGroups(newGroups)
+
+    // In SG mode, block cross-gender drags
+    if (sgGroups.length > 0) {
+      const srcGender = sgGroups[dragSource.groupIdx]?.leader_gender
+      const tgtGender = sgGroups[targetGroupIdx]?.leader_gender
+      if (srcGender && tgtGender && srcGender !== tgtGender) {
+        setDragSource(null); setDragOver(null)
+        setDragError("Gender groups must be kept separate.")
+        setTimeout(() => setDragError(null), 3000)
+        return
+      }
+      const newSgGroups = sgGroups.map(g => ({ ...g, members: [...g.members] }))
+      const [moved] = newSgGroups[dragSource.groupIdx].members.splice(dragSource.memberIdx, 1)
+      newSgGroups[targetGroupIdx].members.push(moved)
+      setSgGroups(newSgGroups)
+    } else {
+      const newGroups = groups.map(g => ({ ...g, members: [...g.members] }))
+      const [moved] = newGroups[dragSource.groupIdx].members.splice(dragSource.memberIdx, 1)
+      newGroups[targetGroupIdx].members.push(moved)
+      setGroups(newGroups)
+    }
+
     setDragSource(null)
     setDragOver(null)
   }
 
-  const estGroupSize = poolCount != null && numGroups > 0
+  const isSGModeActive = smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0
+
+  const estGroupSize = poolCount != null && numGroups > 0 && !isSGModeActive
     ? Math.ceil(poolCount / numGroups)
     : null
 
@@ -5624,25 +5746,37 @@ function GroupGeneratorWizard({
         {/* ── Step 2: Configure ── */}
         {step === 2 && (
           <div style={{ maxWidth: 520 }}>
-            {/* Num groups */}
-            <div style={{ marginBottom: 28 }}>
-              <label style={{ ...mono, display: "block", marginBottom: 8 }}>Number of groups</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <input
-                  type="number"
-                  min={1}
-                  max={poolCount ?? 100}
-                  value={numGroups}
-                  onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
-                  style={{ width: 80, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", fontFamily: "inherit" }}
-                />
-                {estGroupSize !== null && (
-                  <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
-                    ~{estGroupSize} {estGroupSize === 1 ? "person" : "people"} per group
-                  </p>
-                )}
+            {/* Num groups — replaced by DGL count in SG mode */}
+            {!(smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0) && (
+              <div style={{ marginBottom: 28 }}>
+                <label style={{ ...mono, display: "block", marginBottom: 8 }}>Number of groups</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={poolCount ?? 100}
+                    value={numGroups}
+                    onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                    style={{ width: 80, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", fontFamily: "inherit" }}
+                  />
+                  {estGroupSize !== null && (
+                    <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
+                      ~{estGroupSize} {estGroupSize === 1 ? "person" : "people"} per group
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* SG mode DGL count display */}
+            {smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0 && (
+              <div style={{ marginBottom: 28, padding: "14px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>
+                  {sgDGLs.length} group{sgDGLs.length !== 1 ? "s" : ""} — one per DGL on the {semester} roster
+                </p>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Gender matching is applied automatically.</p>
+              </div>
+            )}
 
             {/* Divider */}
             <div style={{ height: 1, background: "#E8E2D2", margin: "0 0 24px" }} />
@@ -5664,16 +5798,28 @@ function GroupGeneratorWizard({
                   desc="Visitors are distributed evenly rather than grouped together."
                 />
               )}
-              <GgToggle
-                checked={smallGroupMode}
-                onChange={setSmallGroupMode}
-                label="Small group mode"
-                desc="Penalizes re-grouping people who were together last time."
-              />
+              {sglTeamId !== null && (
+                <GgToggle
+                  checked={smallGroupMode}
+                  onChange={setSmallGroupMode}
+                  label="Small group mode"
+                  desc="Assigns members to DGL groups by gender and year balance."
+                  disabled={!sglRosterConfirmed}
+                  tooltip="Confirm the DGL roster in Small Group Leaders first"
+                />
+              )}
+              {sglTeamId === null && (
+                <GgToggle
+                  checked={smallGroupMode}
+                  onChange={setSmallGroupMode}
+                  label="Small group mode"
+                  desc="Penalizes re-grouping people who were together last time."
+                />
+              )}
             </div>
 
-            {/* CSV upload for small group mode */}
-            {smallGroupMode && (
+            {/* CSV upload — only for non-DGL small group mode */}
+            {smallGroupMode && !(sglRosterConfirmed && sgDGLs.length > 0) && (
               <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 12 }}>
                 <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
                 <p style={{ fontSize: 12, color: "#5A5466", margin: "0 0 10px" }}>
@@ -5689,31 +5835,34 @@ function GroupGeneratorWizard({
               </div>
             )}
 
-            {/* Divider */}
-            <div style={{ height: 1, background: "#E8E2D2", margin: "24px 0" }} />
-
-            {/* Naming */}
-            <p style={{ ...mono, marginBottom: 12 }}>Group naming</p>
-            <div style={{ display: "flex", gap: 10 }}>
-              {([
-                { value: "numeric", label: "Group 1, 2, 3…" },
-                { value: "alpha", label: "Group A, B, C…" },
-              ] as const).map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setNaming(opt.value)}
-                  style={{
-                    padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    border: "1px solid " + (naming === opt.value ? "#3E1540" : "#E2DDCF"),
-                    background: naming === opt.value ? "#3E1540" : "transparent",
-                    color: naming === opt.value ? "#FBF8F2" : "#5A5466",
-                    cursor: "pointer", fontFamily: "inherit",
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            {/* Naming — hidden in SG mode */}
+            {!(smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0) && (
+              <>
+                {/* Divider */}
+                <div style={{ height: 1, background: "#E8E2D2", margin: "24px 0" }} />
+                <p style={{ ...mono, marginBottom: 12 }}>Group naming</p>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {([
+                    { value: "numeric", label: "Group 1, 2, 3…" },
+                    { value: "alpha", label: "Group A, B, C…" },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setNaming(opt.value)}
+                      style={{
+                        padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                        border: "1px solid " + (naming === opt.value ? "#3E1540" : "#E2DDCF"),
+                        background: naming === opt.value ? "#3E1540" : "transparent",
+                        color: naming === opt.value ? "#FBF8F2" : "#5A5466",
+                        cursor: "pointer", fontFamily: "inherit",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {genError && (
               <div style={{ marginTop: 18, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 8 }}>
@@ -5738,61 +5887,149 @@ function GroupGeneratorWizard({
               />
             </div>
 
-            <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
-              {groups.length} groups · {groups.reduce((s, g) => s + g.members.length, 0)} people. Drag members between groups to adjust.
-            </p>
+            {/* Success message after SG confirm */}
+            {sgConfirmResult && (
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
+                <p style={{ fontSize: 13, color: "#3E1540", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
+                <button onClick={onSaved} style={{ fontSize: 12, color: "#3E1540", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 600 }}>Done →</button>
+              </div>
+            )}
 
-            {/* Groups grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-              {groups.map((g, gIdx) => (
-                <div
-                  key={gIdx}
-                  onDragOver={e => { e.preventDefault(); setDragOver(gIdx) }}
-                  onDragLeave={() => setDragOver(null)}
-                  onDrop={() => handleDrop(gIdx)}
-                  style={{
-                    background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "#3E1540" : "#E8E2D2"),
-                    borderRadius: 14, padding: "16px 18px", minHeight: 80,
-                    transition: "border-color 0.1s",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
-                    <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {g.members.map((m, mIdx) => (
-                      <div
-                        key={m.id}
-                        draggable
-                        onDragStart={() => handleDragStart(gIdx, mIdx)}
-                        onDragEnd={() => { setDragSource(null); setDragOver(null) }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                          border: "1px solid #E8E2D2", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
-                          cursor: "grab",
-                        }}
-                      >
-                        <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
-                        <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
-                            {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+            {/* Cross-gender drag error */}
+            {dragError && (
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 8 }}>
+                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{dragError}</p>
+              </div>
+            )}
+
+            {/* SG mode groups */}
+            {sgGroups.length > 0 ? (
+              <>
+                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
+                  {sgGroups.length} groups · {sgGroups.reduce((s, g) => s + g.members.length, 0)} members. Drag within same gender to adjust.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                  {sgGroups.map((g, gIdx) => (
+                    <div
+                      key={gIdx}
+                      onDragOver={e => { e.preventDefault(); setDragOver(gIdx) }}
+                      onDragLeave={() => setDragOver(null)}
+                      onDrop={() => handleDrop(gIdx)}
+                      style={{
+                        background: "#FBF8F2",
+                        border: "1px solid " + (dragOver === gIdx ? "#3E1540" : g.leader_gender === "male" ? "#B8D4F0" : g.leader_gender === "female" ? "#F0B8D4" : "#E8E2D2"),
+                        borderRadius: 14, padding: "16px 18px", minHeight: 80,
+                        transition: "border-color 0.1s",
+                      }}
+                    >
+                      {/* Leader header */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
+                          <span style={{
+                            fontSize: 10, padding: "2px 8px", borderRadius: 999, fontWeight: 500,
+                            background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "#F0EDE8",
+                            color: g.leader_gender === "male" ? "#2D5FA3" : g.leader_gender === "female" ? "#A32D5F" : "#8A8497",
+                          }}>
+                            {g.leader_gender === "male" ? "Brothers" : g.leader_gender === "female" ? "Sisters" : "Group"}
                           </span>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
-                          <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
-                            {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
-                            {m.graduation_year && m.role ? " · " : ""}
-                            {m.role}
-                          </p>
-                        </div>
+                        <p style={{ fontSize: 11, color: "#8A8497", margin: "2px 0 0" }}>DGL: {g.leader_name} · {g.members.length} members</p>
                       </div>
-                    ))}
-                  </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {g.members.map((m, mIdx) => (
+                          <div
+                            key={m.id}
+                            draggable
+                            onDragStart={() => handleDragStart(gIdx, mIdx)}
+                            onDragEnd={() => { setDragSource(null); setDragOver(null) }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
+                              border: "1px solid #E8E2D2", borderRadius: 8,
+                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                              cursor: "grab",
+                            }}
+                          >
+                            <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
+                                {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                              <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
+                                {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
+                                {m.graduation_year && m.role ? " · " : ""}
+                                {m.role}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
+                  {groups.length} groups · {groups.reduce((s, g) => s + g.members.length, 0)} people. Drag members between groups to adjust.
+                </p>
+
+                {/* Standard groups grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                  {groups.map((g, gIdx) => (
+                    <div
+                      key={gIdx}
+                      onDragOver={e => { e.preventDefault(); setDragOver(gIdx) }}
+                      onDragLeave={() => setDragOver(null)}
+                      onDrop={() => handleDrop(gIdx)}
+                      style={{
+                        background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "#3E1540" : "#E8E2D2"),
+                        borderRadius: 14, padding: "16px 18px", minHeight: 80,
+                        transition: "border-color 0.1s",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
+                        <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {g.members.map((m, mIdx) => (
+                          <div
+                            key={m.id}
+                            draggable
+                            onDragStart={() => handleDragStart(gIdx, mIdx)}
+                            onDragEnd={() => { setDragSource(null); setDragOver(null) }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
+                              border: "1px solid #E8E2D2", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                              cursor: "grab",
+                            }}
+                          >
+                            <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
+                                {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                              <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
+                                {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
+                                {m.graduation_year && m.role ? " · " : ""}
+                                {m.role}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -5802,12 +6039,12 @@ function GroupGeneratorWizard({
         <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
           {step === 1 && (poolCount != null ? `${poolCount} people in pool` : "")}
           {step === 2 && "You can adjust individual assignments in the next step."}
-          {step === 3 && "Changes are not saved until you click Save."}
+          {step === 3 && !sgConfirmResult && "Changes are not saved until you click below."}
         </p>
         <div style={{ display: "flex", gap: 10 }}>
-          {step === 3 && (
+          {step === 3 && !sgConfirmResult && (
             <button
-              onClick={() => { setStep(2); setGroups([]) }}
+              onClick={() => { setStep(2); setGroups([]); setSgGroups([]) }}
               style={{ padding: "10px 18px", border: "1px solid #E2DDCF", borderRadius: 10, background: "transparent", color: "#5A5466", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
             >
               <Shuffle style={{ width: 13, height: 13 }} />
@@ -5830,20 +6067,20 @@ function GroupGeneratorWizard({
               {step === 1 ? "Next" : generating ? "Generating…" : "Generate"}
             </button>
           )}
-          {step === 3 && (
+          {step === 3 && !sgConfirmResult && (
             <button
               onClick={handleSave}
-              disabled={saving || !sessionName.trim()}
+              disabled={saving || confirmingSG || !sessionName.trim()}
               style={{
                 padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2",
                 borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
-                cursor: saving || !sessionName.trim() ? "not-allowed" : "pointer",
+                cursor: saving || confirmingSG || !sessionName.trim() ? "not-allowed" : "pointer",
                 opacity: !sessionName.trim() ? 0.5 : 1,
                 display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit",
               }}
             >
-              {saving ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : <Check style={{ width: 14, height: 14 }} />}
-              {saving ? "Saving…" : "Save grouping"}
+              {(saving || confirmingSG) ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : <Check style={{ width: 14, height: 14 }} />}
+              {saving ? "Saving…" : confirmingSG ? "Confirming…" : sgGroups.length > 0 ? "Confirm groups" : "Save grouping"}
             </button>
           )}
         </div>
@@ -5853,17 +6090,24 @@ function GroupGeneratorWizard({
 }
 
 // Shared toggle component for GroupGeneratorWizard
-function GgToggle({ checked, onChange, label, desc }: { checked: boolean; onChange: (v: boolean) => void; label: string; desc: string }) {
+function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+  desc: string
+  disabled?: boolean
+  tooltip?: string
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, opacity: disabled ? 0.5 : 1 }} title={disabled ? tooltip : undefined}>
       <button
         role="switch"
         aria-checked={checked}
-        onClick={() => onChange(!checked)}
+        onClick={() => !disabled && onChange(!checked)}
         style={{
           width: 36, height: 20, borderRadius: 999, flexShrink: 0,
           background: checked ? "#3E1540" : "#D6D0C0",
-          border: "none", cursor: "pointer", position: "relative", transition: "background 0.15s", marginTop: 2,
+          border: "none", cursor: disabled ? "not-allowed" : "pointer", position: "relative", transition: "background 0.15s", marginTop: 2,
         }}
       >
         <div style={{
@@ -5874,7 +6118,7 @@ function GgToggle({ checked, onChange, label, desc }: { checked: boolean; onChan
       </button>
       <div>
         <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", margin: 0 }}>{label}</p>
-        <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{desc}</p>
+        <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{disabled && tooltip ? tooltip : desc}</p>
       </div>
     </div>
   )
