@@ -138,7 +138,7 @@ export interface GroupMember {
 export interface Message {
   id: string
   group_id: string
-  sender_id: string
+  sender_id: string | null
   content: string
   created_at: string
   sender_name: string
@@ -147,6 +147,7 @@ export interface Message {
   reply_to_content: string | null
   reply_to_sender: string | null
   deleted?: boolean
+  message_type?: string
 }
 
 export interface Reaction {
@@ -222,6 +223,7 @@ export interface ChatSettingsProps {
   groupType: string
   groupArchived?: boolean
   userId: string
+  userName: string
   ministryId: string
   userRole: string
   onBack: () => void

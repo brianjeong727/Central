@@ -83,6 +83,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
       return
     }
 
+    // System message — first thing anyone sees in the chat
+    await supabase.from("messages").insert({ group_id: group.id, sender_id: null, content: `${userName.split(" ")[0]} created this chat`, message_type: "system" })
+
     onCreated({ id: group.id, name: group.name })
   }
 
@@ -264,7 +267,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   )
 }
 
-export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -346,6 +349,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     if (!error) {
       setDisplayGroupName(trimmed)
       onNameChange(trimmed)
+      await supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `Chat renamed to "${trimmed}"`, message_type: "system" })
     }
     setSaving(false)
     setRenaming(false)
@@ -383,18 +387,26 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   async function handleSaveChanges() {
     setSaving(true)
+    const actorFirstName = userName.split(" ")[0]
     const addUserIds = pendingAddMembers.map(m => m.user_id)
     const removeUserIds = [...pendingRemoveIds]
     if (removeUserIds.length > 0) {
+      const removedNames = removeUserIds.map(id => members.find(m => m.user_id === id)?.name.split(" ")[0] ?? "Someone")
       await Promise.all(removeUserIds.map(id =>
         supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", id)
       ))
       setMembers(prev => prev.filter(m => !pendingRemoveIds.has(m.user_id)))
       setPendingRemoveIds(new Set())
+      await Promise.all(removedNames.map(name =>
+        supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${actorFirstName} removed ${name}`, message_type: "system" })
+      ))
     }
     if (pendingAddMembers.length > 0) {
       await supabase.from("group_members").insert(pendingAddMembers.map(m => ({ group_id: groupId, user_id: m.user_id })))
       setMembers(prev => [...prev, ...pendingAddMembers])
+      await Promise.all(pendingAddMembers.map(m =>
+        supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${actorFirstName} added ${m.name.split(" ")[0]}`, message_type: "system" })
+      ))
       setPendingAddMembers([])
     }
     await supabase.from("group_members").update({ muted, pinned }).eq("group_id", groupId).eq("user_id", userId)
@@ -417,6 +429,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleLeave() {
+    await supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${userName.split(" ")[0]} left`, message_type: "system" })
     await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userId)
     onClose()
   }
@@ -1178,7 +1191,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1186,11 +1199,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       if (data) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const enriched: Message[] = data.map((m: any) => {
-          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          const name = p?.name ?? "Unknown"
+          const isSystem = m.message_type === "system"
+          const p = isSystem ? null : (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
+          const name = p?.name ?? (isSystem ? "" : "Unknown")
           const avatarUrl = p?.avatar_url ?? null
-          profilesCache.current[m.sender_id] = name
-          avatarCache.current[m.sender_id] = avatarUrl
+          if (m.sender_id) {
+            profilesCache.current[m.sender_id] = name
+            avatarCache.current[m.sender_id] = avatarUrl
+          }
 
           const replyRaw = m.reply_to ?? null
           const replyProfile = replyRaw?.profiles
@@ -1204,6 +1220,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             reply_to_id: m.reply_to_id ?? null,
             reply_to_content: replyRaw?.content ?? null,
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
+            message_type: m.message_type ?? "user",
           }
         })
         setMessages(enriched)
@@ -1247,15 +1264,25 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
         async (payload) => {
-          const raw = payload.new as { id: string; group_id: string; sender_id: string; content: string; created_at: string; reply_to_id: string | null }
-          // Skip own messages — handled optimistically
+          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string }
+
+          // System messages: just append directly for everyone
+          if (raw.message_type === "system") {
+            setMessages((prev) => {
+              if (prev.find(m => m.id === raw.id)) return prev
+              return [...prev, { id: raw.id, group_id: raw.group_id, sender_id: null, content: raw.content, created_at: raw.created_at, sender_name: "", sender_avatar_url: null, reply_to_id: null, reply_to_content: null, reply_to_sender: null, message_type: "system" }]
+            })
+            return
+          }
+
+          // Skip own user messages — handled optimistically
           if (raw.sender_id === userId) return
 
-          let senderName = profilesCache.current[raw.sender_id]
+          let senderName = profilesCache.current[raw.sender_id!]
           if (!senderName) {
             const { data: prof } = await supabase.from("profiles").select("name").eq("id", raw.sender_id).single()
             senderName = prof?.name ?? "Unknown"
-            profilesCache.current[raw.sender_id] = senderName
+            profilesCache.current[raw.sender_id!] = senderName
           }
 
           // Resolve reply content from local cache or a quick fetch
@@ -1283,10 +1310,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           setMessages((prev) => [...prev, {
             ...raw,
             sender_name: senderName,
-            sender_avatar_url: avatarCache.current[raw.sender_id] ?? null,
+            sender_avatar_url: raw.sender_id ? (avatarCache.current[raw.sender_id] ?? null) : null,
             reply_to_id: raw.reply_to_id ?? null,
             reply_to_content: replyToContent,
             reply_to_sender: replyToSender,
+            message_type: raw.message_type ?? "user",
           }])
 
           // Keep last_read_at current as messages arrive so the badge is
@@ -1696,6 +1724,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               const nextMsg = i < messages.length - 1 ? messages[i + 1] : null
 
               const sameMinute = (a: Message, b: Message) =>
+                a.message_type !== "system" && b.message_type !== "system" &&
                 a.sender_id === b.sender_id &&
                 Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
@@ -1724,6 +1753,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
               const rxGroups = groupedReactions(msg.id)
               const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
+
+              // System message — centered event note, no bubble
+              if (msg.message_type === "system") {
+                return (
+                  <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
+                    {showDateSep && (
+                      <div className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-[#E8E2D2]" />
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
+                          {formatDateLabel(msg.created_at)}
+                        </span>
+                        <div className="flex-1 h-px bg-[#E8E2D2]" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 my-2 px-1">
+                      <div className="flex-1 h-px bg-[#E8E2D2]/70" />
+                      <span style={{ fontSize: "12px", color: "#8A8497", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
+                        {msg.content}
+                      </span>
+                      <div className="flex-1 h-px bg-[#E8E2D2]/70" />
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                   {/* Date separator */}
@@ -2044,6 +2098,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         groupType={groupType}
         groupArchived={groupArchived}
         userId={userId}
+        userName={userName}
         ministryId={ministryId}
         userRole={userRole}
         onBack={() => setShowSettings(false)}
@@ -2107,6 +2162,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             .select("*", { count: "exact", head: true })
             .eq("group_id", group.id)
             .neq("sender_id", userId)
+            .eq("message_type", "user")
           if (_lastReadAt) countQuery = countQuery.gt("created_at", _lastReadAt)
 
           const [{ count }, { data: lastMsgData }] = await Promise.all([

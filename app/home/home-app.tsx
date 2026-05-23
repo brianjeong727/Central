@@ -137,11 +137,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
 
     const { data: msgs } = await supabase
       .from("messages")
-      .select("group_id, content, created_at, sender_id, profiles!sender_id(name)")
+      .select("group_id, content, created_at, sender_id, message_type, profiles!sender_id(name)")
       .in("group_id", groupIds)
       .order("created_at", { ascending: false })
 
-    type RawMsg = { group_id: string; content: string; created_at: string; sender_id: string; profiles: { name: string } | { name: string }[] | null }
+    type RawMsg = { group_id: string; content: string; created_at: string; sender_id: string | null; message_type: string; profiles: { name: string } | { name: string }[] | null }
     const lastMsgMap: Record<string, { content: string; senderName: string; time: string; ts: string }> = {}
     const unreadCountMap: Record<string, number> = {}
     for (const msg of ((msgs ?? []) as RawMsg[])) {
@@ -154,6 +154,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           ts: msg.created_at,
         }
       }
+      // System messages don't count as unread
+      if (msg.message_type === "system") continue
       const lra = lastReadMap[msg.group_id]
       if (msg.sender_id !== userId && (!lra || msg.created_at > lra)) {
         unreadCountMap[msg.group_id] = (unreadCountMap[msg.group_id] ?? 0) + 1
