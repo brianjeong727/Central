@@ -4,8 +4,6 @@ import { createAdminClient } from "@/lib/supabase-admin"
 import { SLOT_ROLES, SLOTS } from "./dgl-constants"
 import type { DGLSlot, DGLRole, ProposedAssignment } from "./dgl-constants"
 
-export type { DGLSlot, DGLRole, ProposedAssignment }
-
 export type GenerateRotationParams = {
   teamId: string
   ministryId: string
@@ -20,7 +18,7 @@ export type GenerateRotationResult = {
 }
 
 // Maps a rotation slot + its anchor Sunday to the specific date and avail slot key
-const SLOT_TO_AVAIL: Record<DGLSlot, { dayOffset: number; availSlot: string }> = {
+const SLOT_TO_AVAIL = {
   wednesday_pm:   { dayOffset: -4, availSlot: "wednesday" },
   friday_sg:      { dayOffset: -2, availSlot: "friday" },
   sunday_service: { dayOffset:  0, availSlot: "sunday" },

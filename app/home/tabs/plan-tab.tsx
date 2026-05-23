@@ -21,9 +21,8 @@ import { createClient } from "@/lib/supabase"
 import { runAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing } from "@/lib/group-algorithm"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
-  type DGLSlot, type DGLRole, type ProposedAssignment,
 } from "@/app/actions/generate-dgl-rotation"
-import { SLOT_ROLES, SLOTS } from "@/app/actions/dgl-constants"
+import { SLOT_ROLES, SLOTS, type DGLSlot, type DGLRole, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
