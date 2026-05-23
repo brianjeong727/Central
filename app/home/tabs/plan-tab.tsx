@@ -4624,7 +4624,7 @@ export function EventPlanWorkspace({
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
-              <div style={{ maxWidth: 820 }}>
+              <div>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                   <div>
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>To Prepare</p>
@@ -4705,7 +4705,7 @@ export function EventPlanWorkspace({
 
             {/* ── Roles & Leads ── */}
             {activeSection === 'roles' && (
-              <div style={{ maxWidth: 820 }}>
+              <div>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                   <div>
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>{"Who's Responsible"}</p>
