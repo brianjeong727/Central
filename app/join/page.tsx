@@ -114,25 +114,26 @@ function JoinContent() {
   return (
     <div className="flex flex-col bg-[#FBF8F2]" style={{ height: "100svh" }}>
 
-      {/* ── Editorial header ── */}
-      <div className="flex-shrink-0 px-6 pt-12 pb-0 max-w-[520px] mx-auto w-full">
-        {/* Logo + wordmark */}
-        <div className="flex items-center gap-2.5 mb-8">
-          <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
-          </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
-            Central
-          </span>
+      {/* ── Plum header strip ── */}
+      <div className="flex-shrink-0" style={{ background: "#3E1540", position: "relative", overflow: "hidden" }}>
+        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.08) 1px, transparent 1px)", backgroundSize: "20px 20px", pointerEvents: "none" }} />
+        <div className="max-w-[520px] mx-auto w-full px-6" style={{ padding: "28px 24px 32px", position: "relative" }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 22 }}>
+            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
+              <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
+              <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
+            </svg>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
+          </div>
+          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.45)", marginBottom: 8 }}>
+            Find your ministry
+          </p>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", color: "#F6F4EF", fontWeight: 400, lineHeight: 1.1, margin: 0 }}>
+            Choose a ministry.
+          </h1>
         </div>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 600, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase", marginBottom: 10 }}>
-          Find your ministry
-        </p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "40px", color: "#13101A", fontWeight: 400, lineHeight: 1.1, marginBottom: 0 }}>
-          Choose a ministry.
-        </h1>
       </div>
 
       {/* ── Tab bar ── */}

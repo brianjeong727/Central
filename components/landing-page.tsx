@@ -179,10 +179,15 @@ export default function LandingPage() {
           aria-hidden
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
+        {/* Directional scrim — makes left-side text legible without killing the chapel */}
+        <div
+          aria-hidden
+          style={{ position: "absolute", inset: 0, background: "linear-gradient(105deg, rgba(14,5,12,0.82) 0%, rgba(14,5,12,0.6) 30%, rgba(14,5,12,0.28) 58%, transparent 80%)", zIndex: 1 }}
+        />
         {/* Paper fade dissolves image into page at bottom */}
         <div
           aria-hidden
-          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 180, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.55) 55%, #FBF8F2 100%)", zIndex: 1 }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 200, background: "linear-gradient(180deg, rgba(251,248,242,0) 0%, rgba(251,248,242,0.65) 55%, #FBF8F2 100%)", zIndex: 1 }}
         />
 
         <div className="cl-hero-container" style={{ position: "relative", zIndex: 2, maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>

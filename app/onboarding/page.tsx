@@ -206,13 +206,13 @@ export default function OnboardingPage() {
           </div>
 
           {/* Eyebrow + heading + subtitle */}
-          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.45)", marginBottom: 12, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", marginBottom: 12, margin: "0 0 12px" }}>
             Register your ministry
           </p>
           <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 10px" }}>
             Set up your ministry workspace.
           </h1>
-          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.55)", lineHeight: 1.5, margin: "0 0 36px" }}>
+          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.7)", lineHeight: 1.5, margin: "0 0 36px" }}>
             It only takes a few minutes. We&apos;ll get your team ready to go.
           </p>
 
@@ -236,7 +236,7 @@ export default function OnboardingPage() {
                   </div>
                   <span style={{
                     fontSize: 10, letterSpacing: "0.04em", whiteSpace: "nowrap",
-                    color: i + 1 === step ? "rgba(246,244,239,0.9)" : "rgba(246,244,239,0.3)",
+                    color: i + 1 === step ? "rgba(246,244,239,0.95)" : i + 1 < step ? "rgba(246,244,239,0.55)" : "rgba(246,244,239,0.4)",
                     fontWeight: i + 1 === step ? 600 : 400,
                     transition: "color 0.2s",
                   }}>
@@ -273,24 +273,24 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Ministry name</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Ministry name</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Central Student Fellowship" className={inputClass} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>University</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>University</label>
                 <input type="text" value={university} onChange={(e) => setUniversity(e.target.value)}
                   placeholder="e.g. University of Pittsburgh" className={inputClass} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Location</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Location</label>
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Pittsburgh, PA" className={inputClass} />
               </div>
 
               {/* Size cards */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: "#5A5466" }}>Approximate size</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Approximate size</label>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                   {SIZE_OPTIONS.map((opt) => {
                     const selected = size === opt.value
@@ -517,24 +517,15 @@ export default function OnboardingPage() {
           )}
 
           {/* Navigation */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 36 }}>
-            {step > 1 ? (
-              <button type="button" onClick={back}
-                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>
-                ← Back
-              </button>
-            ) : (
-              <div />
-            )}
-
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 36 }}>
             {step < STEPS ? (
               <button type="button" onClick={next} disabled={step === 1 && !step1Valid}
                 className="active:scale-[0.97]"
                 style={{
-                  padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
-                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                  width: "100%", padding: "14px 0", background: "#3E1540", color: "#F6F4EF",
+                  border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600,
                   cursor: step === 1 && !step1Valid ? "not-allowed" : "pointer",
-                  opacity: step === 1 && !step1Valid ? 0.45 : 1,
+                  opacity: step === 1 && !step1Valid ? 0.5 : 1,
                   transition: "opacity 0.15s, transform 0.15s",
                 }}>
                 Continue
@@ -543,13 +534,19 @@ export default function OnboardingPage() {
               <button type="button" onClick={handleSubmit} disabled={submitting}
                 className="active:scale-[0.97]"
                 style={{
-                  padding: "12px 28px", background: "#3E1540", color: "#F6F4EF",
-                  border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                  width: "100%", padding: "14px 0", background: "#3E1540", color: "#F6F4EF",
+                  border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600,
                   cursor: submitting ? "not-allowed" : "pointer",
                   opacity: submitting ? 0.5 : 1,
                   transition: "opacity 0.15s, transform 0.15s",
                 }}>
                 {submitting ? "Submitting…" : "Submit application"}
+              </button>
+            )}
+            {step > 1 && (
+              <button type="button" onClick={back}
+                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "6px 0", fontWeight: 500, textAlign: "center" }}>
+                ← Back
               </button>
             )}
           </div>
