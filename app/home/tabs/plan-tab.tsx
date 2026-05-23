@@ -8279,8 +8279,10 @@ function SmallGroupLeadersTab({
               }
               const nameColW = 76
               const datColW = 44
+              // President sees all DGLs' rows read-only (not their own — they're not a DGL)
+              // Non-president DGL sees only their own row
               const displayMembers = isPresident
-                ? scheduleRosterMembers
+                ? scheduleRosterMembers.filter(m => m.user_id !== userId)
                 : scheduleRosterMembers.filter(m => m.user_id === userId)
               return (
                 <>
