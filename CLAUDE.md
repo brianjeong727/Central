@@ -10,6 +10,23 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ---
 
+## Workflow
+
+### Before every non-trivial task
+1. **Enter plan mode first** — for any task with 3+ steps, architectural decisions, or multiple files touched. Write the full plan before touching any code. Get approval before implementing.
+2. **Ask clarifying questions** — if the request is ambiguous about behavior, ownership, UI placement, or access control, use `AskUserQuestion` to resolve it before starting. Don't guess and implement the wrong thing.
+3. **Read files before editing** — always re-read a file immediately before editing it. The user may have committed changes since the last read; editing a stale version causes conflicts.
+
+### During implementation
+4. **One atomic URL param replace** — never call `replaceParam` (or `router.replace`) multiple times in sequence; they race on `window.location.search`. Build the full param set and do one replace.
+5. **"use server" files** — only `async` functions can be exported from `"use server"` files. Shared sync helpers (e.g. `currentFiscalYear()`) must be defined locally in each client file that needs them.
+
+### After every task
+6. **Run `npm run build`** — required before marking anything done. A passing build is mandatory.
+7. **Commit and push** — after every completed task, commit the relevant files and push to `origin/main`. Never leave completed work uncommitted.
+
+---
+
 ## Skills — Read These First
 
 Before writing any UI code, editing any component, or reviewing any page:
