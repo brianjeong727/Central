@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, Heart, BookUser } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList, Wallet, BookOpen } from "lucide-react"
 
 type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "profile" | "settings" | "forms"
 
@@ -14,9 +14,9 @@ interface BottomNavProps {
 const TABS_BASE = [
   { id: "home" as Tab,      label: "Home",      icon: Home },
   { id: "chats" as Tab,     label: "Chats",     icon: MessageCircle },
-  { id: "directory" as Tab, label: "Directory", icon: BookUser },
+  { id: "directory" as Tab, label: "Directory", icon: BookOpen },
   { id: "profile" as Tab,   label: "You",       icon: User },
-  { id: "giving" as Tab,    label: "Finance",   icon: Heart },
+  { id: "giving" as Tab,    label: "Finance",   icon: Wallet },
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
