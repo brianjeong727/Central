@@ -1693,6 +1693,14 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               ministryId={ministryId}
               userId={userId}
               isPresident={isDGLPresident}
+              praiseTeamId={
+                allTeams.find(t =>
+                  /\b(praise|worship)\b/i.test(t.name) ||
+                  userTeams.find(ut => ut.teamId === t.id)?.permissions.some(p =>
+                    ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p)
+                  )
+                )?.id ?? null
+              }
             />
           </div>
         ) : (
@@ -1745,6 +1753,14 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             ministryId={ministryId}
             userId={userId}
             isPresident={isDGLPresident}
+            praiseTeamId={
+              allTeams.find(t =>
+                /\b(praise|worship)\b/i.test(t.name) ||
+                userTeams.find(ut => ut.teamId === t.id)?.permissions.some(p =>
+                  ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p)
+                )
+              )?.id ?? null
+            }
           />
         ) : (
           <>
@@ -1931,6 +1947,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     sp.set("ptab", t)
     router.replace(`/home?${sp.toString()}`, { scroll: false })
   }
+
+  // If navigated from DGL "Prepare →", highlight a specific week
+  const [highlightWeek, setHighlightWeek] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    const w = new URLSearchParams(window.location.search).get("week")
+    return w ?? null
+  })
 
   // Schedule state
   const [weeks, setWeeks] = useState<WorshipWeek[]>([])
@@ -2648,8 +2671,9 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
                 const filteredMembers = teamMembers.filter(m =>
                   !alreadyAssigned.has(m.user_id) && m.name.toLowerCase().includes(addMemberSearch.toLowerCase())
                 )
+                const isHighlighted = highlightWeek === week.week_date
                 return (
-                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+                  <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "#FBF8F2", border: isHighlighted ? "2px solid #3E1540" : "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
 
                     {/* ── Date / status / delete row ── */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
@@ -7904,11 +7928,13 @@ function SmallGroupLeadersTab({
   ministryId,
   userId,
   isPresident,
+  praiseTeamId,
 }: {
   teamId: string
   ministryId: string
   userId: string
   isPresident: boolean
+  praiseTeamId?: string | null
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -8459,7 +8485,18 @@ function SmallGroupLeadersTab({
                       </div>
                       {isPraiseSlot && (
                         <button
-                          onClick={() => setActiveSubTabAndUrl("schedule")}
+                          onClick={() => {
+                            if (a.slot === "wednesday_pm" && praiseTeamId) {
+                              const sp = new URLSearchParams(window.location.search)
+                              sp.set("tab", "plan")
+                              sp.set("team", praiseTeamId)
+                              sp.set("ptab", "schedule")
+                              sp.set("week", a.week_date)
+                              router.replace(`/home?${sp.toString()}`, { scroll: false })
+                            } else {
+                              setActiveSubTabAndUrl("schedule")
+                            }
+                          }}
                           style={{ padding: "6px 12px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
                         >
                           Prepare →
