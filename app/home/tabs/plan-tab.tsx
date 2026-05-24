@@ -37,6 +37,7 @@ import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category, CreateStep,
+  EventType, EventExtraTab, EventNewFolk,
 } from "../types"
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -1172,7 +1173,7 @@ export function StudentOrgTeamHome({
   // Quick add
   const [quickTitle, setQuickTitle] = useState("")
   const [quickDate, setQuickDate] = useState("")
-  const [quickCategory, setQuickCategory] = useState<Category>("regular")
+  const [quickCategory, setQuickCategory] = useState<EventType>("social")
   const [creatingEvent, setCreatingEvent] = useState(false)
 
   // Roster
@@ -1182,8 +1183,8 @@ export function StudentOrgTeamHome({
     if (!ministryId) return
     setCalLoading(true)
     const q = supabase.from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
-      .eq("ministry_id", ministryId).order("start_date")
+      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+      .eq("ministry_id", ministryId).is("parent_event_id", null).order("start_date")
     const run = teamId ? q.or(`team_id.eq.${teamId},team_id.is.null`) : q
     run.then(({ data }) => { setCalEvents((data ?? []) as CalendarEvent[]); setCalLoading(false) })
     supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
@@ -1219,8 +1220,9 @@ export function StudentOrgTeamHome({
       end_date: new Date(quickDate + "T12:00:00").toISOString(),
       all_day: true,
       category: quickCategory,
+      event_type: quickCategory,
       created_by: userId,
-    }).select("id, title, description, location, start_date, end_date, all_day, category, created_by").single()
+    }).select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by").single()
     setCreatingEvent(false)
     if (newEv) {
       const sorted = [...calEvents, newEv as CalendarEvent].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
@@ -1244,6 +1246,7 @@ export function StudentOrgTeamHome({
         ministryId={ministryId}
         userId={userId}
         canEdit={canEdit}
+        teamId={teamId}
         onClose={() => onPlanningEventChange(null)}
       />
     )
@@ -1362,14 +1365,12 @@ export function StudentOrgTeamHome({
                       />
                       <select
                         value={quickCategory}
-                        onChange={e => setQuickCategory(e.target.value as Category)}
+                        onChange={e => setQuickCategory(e.target.value as EventType)}
                         style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 12, color: "#5A5466", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }}
                       >
-                        <option value="ministry">Ministry</option>
-                        <option value="social">Social</option>
-                        <option value="outreach">Outreach</option>
-                        <option value="welcoming">Welcoming</option>
-                        <option value="workshop">Workshop</option>
+                        {(Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).map(t => (
+                          <option key={t} value={t}>{EVENT_TYPE_CONFIGS[t].icon} {EVENT_TYPE_CONFIGS[t].label}</option>
+                        ))}
                       </select>
                     </div>
                     <button
@@ -1408,7 +1409,7 @@ export function StudentOrgTeamHome({
                   const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
                   return (
                     <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 99, background: CATEGORY_CONFIG[ev.category]?.dot ?? "#3E1540", flexShrink: 0 }} />
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: getEventConfig(ev).dot, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
                         <p style={{ fontSize: 13, color: "#8A8497", margin: "3px 0 0" }}>{dateStr}{ev.location ? ` · ${ev.location}` : ""}</p>
@@ -1748,7 +1749,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           const ev = studentOrgPlanningEvent
           const evStart = new Date(ev.start_date)
           const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-          const evCfg = CATEGORY_CONFIG[ev.category]
+          const evCfg = getEventConfig(ev)
           const evDesc = [ev.description, ev.location].filter(Boolean).join(" · ")
           return (
             <>
@@ -3520,6 +3521,144 @@ const CATEGORY_CONFIG = {
   service:   { label: "Service",   dot: "#3E1540", bg: "#F0EDE8", text: "#3E1540" },
   regular:   { label: "Regular",   dot: "#8A8497", bg: "#F3F0F7", text: "#5A5466" },
 } as const
+
+type EventTypeConfig = {
+  label: string; icon: string; dot: string; bg: string; text: string
+  budgetCategory: string | null; canHaveSubEvents: boolean; description: string
+  defaultPhases: { key: string; label: string; tasks: string[] }[]
+  defaultRoles: { name: string; notes: string }[]
+  extraTabs: EventExtraTab[]
+}
+
+const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
+  welcome_week: {
+    label: "Welcome Week", icon: "🎉", dot: "#3E1540", bg: "#EDE5F0", text: "#3E1540",
+    budgetCategory: "welcoming_week", canHaveSubEvents: true,
+    description: "Multi-day welcoming week for new students",
+    defaultPhases: [
+      { key: "pre_event", label: "4 Weeks Out", tasks: ["Reserve venues for all sub-events", "Create sign-up forms", "Design promotional graphics", "Coordinate with DGL team for dinners", "Coordinate with Praise Team for kickoff worship", "Draft budget allocation per sub-event"] },
+      { key: "day_of", label: "Week Of", tasks: ["Send reminder announcements", "Confirm all food orders", "Confirm all volunteers and roles", "Set up each venue", "Day-of point of contact for each event"] },
+      { key: "post_event", label: "Post-Week", tasks: ["Log new folks for follow-up", "Submit reimbursement forms", "Thank you messages to volunteers", "Debrief meeting notes"] },
+    ],
+    defaultRoles: [
+      { name: "Event Director", notes: "Owns the overall week — final decision maker" },
+      { name: "Logistics Lead", notes: "Venues, food, equipment across all sub-events" },
+      { name: "Marketing Lead", notes: "Flyers, social posts, announcement drafts" },
+      { name: "DGL Coordinator", notes: "Liaison with DGL team for group dinners" },
+      { name: "Praise Team Liaison", notes: "Coordinates worship for kickoff night" },
+      { name: "Greeter Lead", notes: "Welcome and first impressions at all events" },
+    ],
+    extraTabs: ["sub_events", "new_folks"],
+  },
+  coffeehouse: {
+    label: "Coffeehouse", icon: "☕", dot: "#9D7B4F", bg: "#FDF6EC", text: "#6B4C1E",
+    budgetCategory: "coffeehouse", canHaveSubEvents: false,
+    description: "Performance night — music, spoken word, comedy",
+    defaultPhases: [
+      { key: "pre_event", label: "Pre-Event", tasks: ["Book venue and reserve AV equipment", "Open performer sign-ups", "Design promotional graphics", "Arrange food and coffee", "Create run-of-show order", "Plan sound check schedule"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup AV and stage", "Run sound checks per performer", "Welcome guests", "MC briefing", "Clean up after"] },
+      { key: "post_event", label: "Post-Event", tasks: ["Submit reimbursement form", "Thank performers", "Post photos/recap"] },
+    ],
+    defaultRoles: [
+      { name: "MC", notes: "Hosts the night, introduces each act" },
+      { name: "Sound Tech", notes: "Manages PA, mic levels during sound check and performance" },
+      { name: "Stage Manager", notes: "Coordinates transitions between acts" },
+      { name: "Door Lead", notes: "Greets guests, manages headcount" },
+      { name: "Food Lead", notes: "Manages coffee, snacks setup and cleanup" },
+      { name: "Photographer", notes: "Photo and video coverage of the night" },
+    ],
+    extraTabs: ["acts"],
+  },
+  turkey_bowl: {
+    label: "Turkey Bowl", icon: "🏈", dot: "#5B7A6C", bg: "#EEF4F1", text: "#2D5445",
+    budgetCategory: "turkeybowl", canHaveSubEvents: false,
+    description: "Annual flag football game and cookout",
+    defaultPhases: [
+      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve field/location", "Announce teams and sign-up", "Coordinate food and cookout", "Get equipment (footballs, cones, first aid)"] },
+      { key: "day_of", label: "Day-of", tasks: ["Set up field", "Divide teams", "Run game(s)", "Cook food", "Clean up"] },
+      { key: "post_event", label: "Post-Event", tasks: ["Post photos and results", "Submit reimbursement form"] },
+    ],
+    defaultRoles: [
+      { name: "Commissioner", notes: "Runs the game — rules, refs, bracket" },
+      { name: "Team Captain A", notes: "Captain of Team A" },
+      { name: "Team Captain B", notes: "Captain of Team B" },
+      { name: "Grill Master", notes: "Manages cookout food" },
+      { name: "Photographer", notes: "Captures the day" },
+    ],
+    extraTabs: ["teams"],
+  },
+  retreat: {
+    label: "Retreat", icon: "⛺", dot: "#5A5466", bg: "#F4F1E8", text: "#3E1540",
+    budgetCategory: "retreat", canHaveSubEvents: false,
+    description: "Overnight or weekend trip",
+    defaultPhases: [
+      { key: "pre_event", label: "6 Weeks Out", tasks: ["Book retreat location", "Plan transportation (drivers, capacity)", "Create sign-up and payment form", "Draft retreat program and sessions", "Coordinate with Praise Team for worship sessions"] },
+      { key: "day_of", label: "2 Weeks Out", tasks: ["Confirm headcount and lodge assignments", "Finalize transportation roster", "Send packing list to attendees", "Purchase supplies and food"] },
+      { key: "post_event", label: "Post-Retreat", tasks: ["Submit reimbursement forms", "Debrief with leadership", "Follow up with new folks"] },
+    ],
+    defaultRoles: [
+      { name: "Retreat Director", notes: "Overall retreat lead and decision maker" },
+      { name: "Transportation Coordinator", notes: "Manages cars, drivers, and rider assignments" },
+      { name: "Program Director", notes: "Designs and leads retreat sessions and schedule" },
+      { name: "Worship Leader", notes: "Leads worship sessions during retreat" },
+      { name: "Logistics Lead", notes: "Food, supplies, lodging check-in" },
+    ],
+    extraTabs: ["transport", "program"],
+  },
+  appreciation_night: {
+    label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
+    budgetCategory: null, canHaveSubEvents: false,
+    description: "SAN or GAN — appreciation night for sisters or brothers",
+    defaultPhases: [
+      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve venue", "Plan program and performers/activities", "Arrange decorations and flowers", "Coordinate food", "Create invitation announcement"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup decorations and space", "Welcome guests", "Run program", "Serve food", "Clean up"] },
+      { key: "post_event", label: "Post-Event", tasks: ["Submit reimbursement form", "Post photos", "Thank volunteers"] },
+    ],
+    defaultRoles: [
+      { name: "Event Lead", notes: "Owns the night and the program" },
+      { name: "Decoration Lead", notes: "Sets the atmosphere — flowers, lighting, tables" },
+      { name: "Food Lead", notes: "Food and drinks setup and service" },
+      { name: "MC / Emcee", notes: "Hosts the program" },
+      { name: "Photographer", notes: "Captures memories" },
+    ],
+    extraTabs: [],
+  },
+  social: {
+    label: "Social", icon: "🎊", dot: "#8A8497", bg: "#FBF8F2", text: "#5A5466",
+    budgetCategory: null, canHaveSubEvents: false,
+    description: "Hangout, game night, dinner — any informal social event",
+    defaultPhases: [
+      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve location", "Coordinate food or activities", "Create announcement"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup", "Welcome guests", "Clean up"] },
+    ],
+    defaultRoles: [
+      { name: "Event Lead", notes: "" },
+      { name: "Food Coordinator", notes: "" },
+    ],
+    extraTabs: [],
+  },
+  ministry: {
+    label: "Ministry Event", icon: "🙏", dot: "#3E1540", bg: "#F3F0F7", text: "#5A5466",
+    budgetCategory: null, canHaveSubEvents: false,
+    description: "Prayer night, Bible study, outreach, service",
+    defaultPhases: [
+      { key: "pre_event", label: "Pre-Event", tasks: ["Prepare content/materials", "Create announcement", "Assign roles"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup space", "Run the event", "Clean up"] },
+    ],
+    defaultRoles: [
+      { name: "Facilitator", notes: "" },
+      { name: "Worship Lead", notes: "" },
+    ],
+    extraTabs: [],
+  },
+}
+
+function getEventConfig(ev: { event_type?: EventType; category?: string }): { label: string; dot: string; bg: string; text: string; icon?: string } {
+  if (ev.event_type && EVENT_TYPE_CONFIGS[ev.event_type]) return EVENT_TYPE_CONFIGS[ev.event_type]
+  const cat = (ev.category ?? "regular") as keyof typeof CATEGORY_CONFIG
+  return CATEGORY_CONFIG[cat] ?? CATEGORY_CONFIG.regular
+}
+
 export function MonthGrid({
   events,
   currentMonth,
@@ -3618,7 +3757,7 @@ export function MonthGrid({
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     {visible.map((ev) => {
-                      const cfg = CATEGORY_CONFIG[ev.category]
+                      const cfg = getEventConfig(ev)
                       return (
                         <button
                           key={ev.id}
@@ -3697,7 +3836,7 @@ export function TimelineView({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {groups[key].map((ev) => {
-                const cfg = CATEGORY_CONFIG[ev.category]
+                const cfg = getEventConfig(ev)
                 const startDate = new Date(ev.start_date)
                 const endDate = new Date(ev.end_date)
                 const dateStr = ev.all_day
@@ -3760,7 +3899,7 @@ export function EventDetailPopover({
   onDelete: (id: string) => void
   onPlan: (ev: CalendarEvent) => void
 }) {
-  const cfg = CATEGORY_CONFIG[event.category]
+  const cfg = getEventConfig(event)
   const startDate = new Date(event.start_date)
   const endDate = new Date(event.end_date)
 
@@ -3829,25 +3968,46 @@ export function AddEventModal({
   userId,
   onClose,
   onSaved,
+  parentEventId,
+  excludeTypes,
+  existing,
 }: {
   ministryId: string
   teamId: string | null
   userId: string
   onClose: () => void
   onSaved: (ev: CalendarEvent) => void
+  parentEventId?: string | null
+  excludeTypes?: EventType[]
+  existing?: CalendarEvent
 }) {
   const supabase = createClient()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [location, setLocation] = useState("")
-  const [startDateStr, setStartDateStr] = useState("")
-  const [startTimeStr, setStartTimeStr] = useState("09:00")
-  const [endDateStr, setEndDateStr] = useState("")
-  const [endTimeStr, setEndTimeStr] = useState("10:00")
-  const [allDay, setAllDay] = useState(false)
-  const [category, setCategory] = useState<Category>("regular")
+  const isEditing = !!existing
+
+  function parseDateStr(iso: string) {
+    return iso ? iso.split("T")[0] : ""
+  }
+  function parseTimeStr(iso: string) {
+    if (!iso) return "09:00"
+    const t = iso.split("T")[1]
+    if (!t) return "09:00"
+    return t.slice(0, 5)
+  }
+
+  const [eventType, setEventType] = useState<EventType>(existing?.event_type ?? "social")
+  const [title, setTitle] = useState(existing?.title ?? "")
+  const [description, setDescription] = useState(existing?.description ?? "")
+  const [location, setLocation] = useState(existing?.location ?? "")
+  const [startDateStr, setStartDateStr] = useState(existing ? parseDateStr(existing.start_date) : "")
+  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : "09:00")
+  const [endDateStr, setEndDateStr] = useState(existing ? parseDateStr(existing.end_date) : "")
+  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : "10:00")
+  const [allDay, setAllDay] = useState(existing?.all_day ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const availableTypes = (Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).filter(t => !excludeTypes?.includes(t))
+  const cfg = EVENT_TYPE_CONFIGS[eventType]
 
   async function handleSave() {
     if (!title.trim()) { setError("Title is required."); return }
@@ -3864,29 +4024,80 @@ export function AddEventModal({
     setSaving(true)
     setError(null)
     try {
-      const { data, error: dbErr } = await supabase
-        .from("calendar_events")
-        .insert({
-          ministry_id: ministryId,
-          team_id: teamId,
-          title: title.trim(),
-          description: description.trim() || null,
-          location: location.trim() || null,
-          start_date: startTs,
-          end_date: endTs,
-          all_day: allDay,
-          category,
-          created_by: userId,
-        })
-        .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
-        .single()
+      let evData: CalendarEvent | null = null
 
-      if (dbErr) {
-        setError(dbErr.message)
-        setSaving(false)
-        return
+      if (isEditing && existing) {
+        // Update existing event
+        const { data, error: upErr } = await supabase
+          .from("calendar_events")
+          .update({
+            title: title.trim(),
+            description: description.trim() || null,
+            location: location.trim() || null,
+            start_date: startTs,
+            end_date: endTs,
+            all_day: allDay,
+            category: eventType,
+            event_type: eventType,
+          })
+          .eq("id", existing.id)
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .single()
+        if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
+        evData = data as CalendarEvent
+      } else {
+        // Create new event
+        const { data, error: evErr } = await supabase
+          .from("calendar_events")
+          .insert({
+            ministry_id: ministryId,
+            team_id: teamId,
+            title: title.trim(),
+            description: description.trim() || null,
+            location: location.trim() || null,
+            start_date: startTs,
+            end_date: endTs,
+            all_day: allDay,
+            category: eventType,
+            event_type: eventType,
+            parent_event_id: parentEventId ?? null,
+            created_by: userId,
+          })
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .single()
+
+        if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
+        evData = data as CalendarEvent
+
+        // Auto-create event_plan and seed from template
+        const { data: planData } = await supabase
+          .from("event_plans")
+          .insert({ ministry_id: ministryId, calendar_event_id: evData.id, created_by: userId })
+          .select("id")
+          .single()
+
+        if (planData) {
+          const planId = (planData as { id: string }).id
+          const typeCfg = EVENT_TYPE_CONFIGS[eventType]
+
+          if (typeCfg.defaultRoles.length > 0) {
+            await supabase.from("event_roles").insert(
+              typeCfg.defaultRoles.map(r => ({ event_plan_id: planId, role_name: r.name, notes: r.notes || null, created_by: userId }))
+            )
+          }
+
+          const taskRows: { event_plan_id: string; title: string; phase: string; sort_order: number; completed: boolean; created_by: string }[] = []
+          let sortIdx = 0
+          for (const phase of typeCfg.defaultPhases) {
+            for (const taskTitle of phase.tasks) {
+              taskRows.push({ event_plan_id: planId, title: taskTitle, phase: phase.key, sort_order: sortIdx++, completed: false, created_by: userId })
+            }
+          }
+          if (taskRows.length > 0) await supabase.from("event_tasks").insert(taskRows)
+        }
       }
-      onSaved(data as CalendarEvent)
+
+      onSaved(evData!)
     } catch (e: unknown) {
       setError((e as { message?: string }).message ?? "Failed to save event.")
     } finally {
@@ -3895,41 +4106,67 @@ export function AddEventModal({
   }
 
   const inputStyle: React.CSSProperties = {
-    width: "100%",
-    background: "#FBF8F2",
-    border: "1px solid #E5E0D2",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 14,
-    color: "#13101A",
-    outline: "none",
-    boxSizing: "border-box",
+    width: "100%", background: "#FBF8F2", border: "1px solid #E5E0D2", borderRadius: 8,
+    padding: "8px 12px", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box",
   }
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 11,
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-    marginBottom: 4,
-    display: "block",
+    fontSize: 11, fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4, display: "block",
   }
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "#FBF8F2", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-      <div style={{ maxWidth: 560, width: "100%", margin: "0 auto", padding: "48px 24px 40px" }}>
+      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", padding: "48px 24px 60px" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", margin: 0 }}>
-            Add Event
+            {isEditing ? "Edit Event" : parentEventId ? "Add Sub-event" : "New Event"}
           </h2>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
             <X className="w-5 h-5 text-[#8A8497]" />
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* Event type picker — only shown when creating */}
+          {!isEditing && (
+            <div>
+              <label style={labelStyle}>Event type</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
+                {availableTypes.map(t => {
+                  const tcfg = EVENT_TYPE_CONFIGS[t]
+                  const selected = eventType === t
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setEventType(t)}
+                      style={{
+                        padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                        border: selected ? `2px solid ${tcfg.dot}` : "2px solid #E8E2D2",
+                        background: selected ? tcfg.bg : "#FBF8F2",
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                    >
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? tcfg.text : "#13101A" }}>{tcfg.label}</div>
+                      <div style={{ fontSize: 11, color: "#8A8497", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
+                    </button>
+                  )
+                })}
+              </div>
+              {/* Pre-seed preview */}
+              {(cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
+                <div style={{ marginTop: 12, padding: "12px 14px", background: "#F5F1E8", borderRadius: 10, fontSize: 12, color: "#5A5466" }}>
+                  <span style={{ fontWeight: 600, color: "#3E1540" }}>Pre-seeded: </span>
+                  {cfg.defaultRoles.map(r => r.name).join(", ")}
+                  {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
+                  {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks across {cfg.defaultPhases.length} phases
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label style={labelStyle}>Title *</label>
@@ -3939,12 +4176,7 @@ export function AddEventModal({
           {/* Description */}
           <div>
             <label style={labelStyle}>Description</label>
-            <textarea
-              style={{ ...inputStyle, resize: "vertical", minHeight: 80 }}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional details…"
-            />
+            <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
           </div>
 
           {/* Location */}
@@ -3955,13 +4187,7 @@ export function AddEventModal({
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input
-              type="checkbox"
-              id="allDay"
-              checked={allDay}
-              onChange={(e) => setAllDay(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: "#3E1540", cursor: "pointer" }}
-            />
+            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} style={{ width: 16, height: 16, accentColor: "#3E1540", cursor: "pointer" }} />
             <label htmlFor="allDay" style={{ fontSize: 14, color: "#5A5466", cursor: "pointer" }}>All day</label>
           </div>
 
@@ -3985,51 +4211,15 @@ export function AddEventModal({
             </div>
           </div>
 
-          {/* Category picker */}
-          <div>
-            <label style={labelStyle}>Category</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {(Object.keys(CATEGORY_CONFIG) as Category[]).map((cat) => {
-                const cfg = CATEGORY_CONFIG[cat]
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setCategory(cat)}
-                    style={{
-                      padding: "5px 14px",
-                      borderRadius: 9999,
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      border: category === cat ? `2px solid ${cfg.dot}` : "2px solid transparent",
-                      background: cfg.bg,
-                      color: cfg.text,
-                      transition: "border-color 0.15s",
-                    }}
-                  >
-                    {cfg.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           {error && <p style={{ fontSize: 13, color: "#C0392B" }}>{error}</p>}
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-            <button
-              onClick={onClose}
-              style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "#5A5466", cursor: "pointer" }}
-            >
+            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "#5A5466", cursor: "pointer" }}>
               Cancel
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
-            >
-              {saving ? "Saving…" : "Save event"}
+            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+              {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
             </button>
           </div>
         </div>
@@ -4065,7 +4255,7 @@ export function MinistryCalendar({
       setLoading(true)
       let query = supabase
         .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, created_by")
+        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
         .eq("ministry_id", ministryId)
         .order("start_date", { ascending: true })
 
@@ -4208,7 +4398,7 @@ export function MinistryCalendar({
             })
           ) : (
             events.map((ev) => {
-              const cfg = CATEGORY_CONFIG[ev.category]
+              const cfg = getEventConfig(ev)
               const isPlanned = plannedEventIds.has(ev.id)
               const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
               return (
@@ -4271,6 +4461,7 @@ export function MinistryCalendar({
           ministryId={ministryId}
           userId={userId}
           canEdit={canEdit}
+          teamId={teamId}
           onClose={() => setPlanningEvent(null)}
         />
       )}
@@ -4288,6 +4479,7 @@ export function EventPlanWorkspace({
   onClose,
   inline = false,
   hideHero = false,
+  teamId,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -4296,10 +4488,17 @@ export function EventPlanWorkspace({
   onClose: () => void
   inline?: boolean
   hideHero?: boolean
+  teamId?: string | null
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const cfg = CATEGORY_CONFIG[calendarEvent.category]
+  const cfg = getEventConfig(calendarEvent)
+  const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
+  const extraTabs = typeCfg.extraTabs
+
+  type ActiveSection = 'overview' | 'checklist' | 'roles' | 'notes' | EventExtraTab
+  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'notes']
+  const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
   const [plan, setPlan] = useState<EventPlan | null>(null)
@@ -4308,12 +4507,16 @@ export function EventPlanWorkspace({
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
-  const validEvTabs = ["overview", "checklist", "roles", "notes"] as const
-  const [activeSection, setActiveSection] = useState<'overview' | 'checklist' | 'roles' | 'notes'>(() => {
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [eventStatus, setEventStatus] = useState<'planning' | 'active' | 'complete'>(calendarEvent.status ?? 'planning')
+  const [showAddEventModal, setShowAddEventModal] = useState(false)
+  const [rsvpCount, setRsvpCount] = useState<number | null>(null)
+
+  const [activeSection, setActiveSection] = useState<ActiveSection>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
-    return (validEvTabs as readonly string[]).includes(p ?? "") ? p as 'overview' | 'checklist' | 'roles' | 'notes' : 'overview'
+    return (allValidTabs as string[]).includes(p ?? "") ? p as ActiveSection : 'overview'
   })
-  function setActiveSectionAndUrl(s: 'overview' | 'checklist' | 'roles' | 'notes') {
+  function setActiveSectionAndUrl(s: ActiveSection) {
     setActiveSection(s)
     const sp = new URLSearchParams(window.location.search)
     sp.set("evtab", s)
@@ -4330,7 +4533,9 @@ export function EventPlanWorkspace({
   const [newTaskTitle, setNewTaskTitle] = useState("")
   const [newTaskAssignee, setNewTaskAssignee] = useState("")
   const [newTaskDue, setNewTaskDue] = useState("")
+  const [newTaskPhase, setNewTaskPhase] = useState<EventTask["phase"]>("pre_event")
   const [addingTask, setAddingTask] = useState(false)
+  const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -4390,7 +4595,7 @@ export function EventPlanWorkspace({
         .from("event_tasks")
         .select("*, profiles!event_tasks_assigned_to_fkey(name)")
         .eq("event_plan_id", planId)
-        .order("created_at", { ascending: true })
+        .order("sort_order", { ascending: true })
 
       setTasks((tasksData ?? []).map((t: Record<string, unknown>) => ({
         id: t.id as string,
@@ -4400,6 +4605,8 @@ export function EventPlanWorkspace({
         assigned_name: (t.profiles as { name?: string } | null)?.name,
         due_date: t.due_date as string | null,
         completed: t.completed as boolean,
+        phase: (t.phase as string ?? "pre_event") as EventTask["phase"],
+        sort_order: (t.sort_order as number) ?? 0,
       })))
 
       // Fetch roles with assignee name
@@ -4434,19 +4641,36 @@ export function EventPlanWorkspace({
         created_at: n.created_at as string,
       })))
 
-      // Fetch ministry members for dropdowns
-      const { data: membersData } = await supabase
-        .from("profiles")
-        .select("id, name")
-        .eq("ministry_id", ministryId)
-        .order("name")
+      // Fetch assignee list: team roster if teamId given, else all ministry members
+      if (teamId) {
+        const { data: rosterData } = await supabase
+          .from("team_members")
+          .select("user_id, profiles(id, name)")
+          .eq("team_id", teamId)
+        setMembers((rosterData ?? []).map((r: Record<string, unknown>) => {
+          const p = r.profiles as { id?: string; name?: string } | null
+          return { id: p?.id ?? r.user_id as string, name: p?.name ?? "Unknown" }
+        }).filter(m => m.name !== "Unknown"))
+      } else {
+        const { data: membersData } = await supabase
+          .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+        setMembers(membersData ?? [])
+      }
 
-      setMembers(membersData ?? [])
+      // Fetch RSVP count if linked to an announcement
+      if ((calendarEvent as { linked_announcement_id?: string | null }).linked_announcement_id) {
+        const { count } = await supabase
+          .from("rsvps")
+          .select("*", { count: "exact", head: true })
+          .eq("announcement_id", (calendarEvent as { linked_announcement_id: string }).linked_announcement_id)
+        setRsvpCount(count ?? 0)
+      }
+
       setLoading(false)
     }
     init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarEvent.id, ministryId, userId])
+  }, [calendarEvent.id, ministryId, userId, teamId])
 
   async function handleSaveOverview() {
     if (!plan) return
@@ -4466,6 +4690,13 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
+  async function handleStatusChange(newStatus: 'planning' | 'active' | 'complete') {
+    setEventStatus(newStatus)
+    setSavingStatus(true)
+    await supabase.from("calendar_events").update({ status: newStatus }).eq("id", calendarEvent.id)
+    setSavingStatus(false)
+  }
+
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
@@ -4475,8 +4706,10 @@ export function EventPlanWorkspace({
       .eq("id", task.id)
   }
 
-  async function handleAddTask() {
+  async function handleAddTask(phaseOverride?: EventTask["phase"]) {
     if (!plan || !newTaskTitle.trim()) return
+    const phase = phaseOverride ?? newTaskPhase
+    const maxSort = tasks.filter(t => t.phase === phase).reduce((m, t) => Math.max(m, t.sort_order), -1)
     setAddingTask(true)
     const { data } = await supabase
       .from("event_tasks")
@@ -4486,6 +4719,8 @@ export function EventPlanWorkspace({
         assigned_to: newTaskAssignee || null,
         due_date: newTaskDue || null,
         completed: false,
+        phase,
+        sort_order: maxSort + 1,
         created_by: userId,
       })
       .select("*, profiles!event_tasks_assigned_to_fkey(name)")
@@ -4500,6 +4735,8 @@ export function EventPlanWorkspace({
         assigned_name: (d.profiles as { name?: string } | null)?.name,
         due_date: d.due_date as string | null,
         completed: d.completed as boolean,
+        phase: (d.phase as string ?? phase) as EventTask["phase"],
+        sort_order: (d.sort_order as number) ?? 0,
       }])
     }
     setNewTaskTitle("")
@@ -4594,14 +4831,35 @@ export function EventPlanWorkspace({
   }
 
   const incompleteTasks = tasks.filter((t) => !t.completed)
-  const completedTasks = tasks.filter((t) => t.completed)
 
-  const sections: { key: 'overview' | 'checklist' | 'roles' | 'notes'; label: string }[] = [
+  const EXTRA_TAB_LABELS: Record<EventExtraTab, string> = {
+    sub_events: "Sub-events", new_folks: "New Folks", acts: "Acts",
+    teams: "Teams", transport: "Transport", program: "Program",
+  }
+
+  const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
     { key: 'roles', label: 'Roles & Leads' },
     { key: 'notes', label: 'Notes' },
+    ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
+
+  // Phase config: use typeCfg phases if available, else defaults
+  const phaseConfig: { key: EventTask["phase"]; label: string }[] = typeCfg.defaultPhases.length > 0
+    ? typeCfg.defaultPhases.map(p => ({ key: p.key as EventTask["phase"], label: p.label }))
+    : [
+        { key: "pre_event", label: "Pre-Event" },
+        { key: "day_of", label: "Day-of" },
+        { key: "post_event", label: "Post-Event" },
+        { key: "followup", label: "Follow-up" },
+      ]
+
+  const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+    planning: { bg: "#F4F1E8", text: "#5A5466", border: "#E2DDCF" },
+    active:   { bg: "#EEF4F1", text: "#2D5445", border: "#BFD9CF" },
+    complete: { bg: "#EDE5F0", text: "#3E1540", border: "#C9B3CC" },
+  }
 
   const inputStyle: React.CSSProperties = {
     background: "#FBF8F2",
@@ -4677,10 +4935,13 @@ export function EventPlanWorkspace({
               {calendarEvent.title.charAt(0).toUpperCase()}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.65)", marginBottom: 0 }}>
-                {cfg.label.toUpperCase()} · {dateStr}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 18 }}>{typeCfg.icon}</span>
+                <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.65)" }}>
+                  {typeCfg.label.toUpperCase()} · {dateStr}
+                </span>
               </div>
-              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,4vw,56px)", lineHeight: 1, margin: "8px 0 0", letterSpacing: -0.6, color: "#FBF8F2", fontWeight: 400 }}>
+              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,4vw,56px)", lineHeight: 1, margin: "0 0 0", letterSpacing: -0.6, color: "#FBF8F2", fontWeight: 400 }}>
                 {calendarEvent.title}
               </h1>
               {(calendarEvent.description || calendarEvent.location) && (
@@ -4688,11 +4949,38 @@ export function EventPlanWorkspace({
                   {[calendarEvent.description, calendarEvent.location].filter(Boolean).join(" · ")}
                 </div>
               )}
+              {/* Status selector */}
+              <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                {(['planning', 'active', 'complete'] as const).map(s => {
+                  const sc = statusColors[s]
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => handleStatusChange(s)}
+                      disabled={savingStatus}
+                      style={{
+                        padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                        background: eventStatus === s ? sc.bg : "rgba(251,248,242,0.08)",
+                        color: eventStatus === s ? sc.text : "rgba(251,248,242,0.55)",
+                        border: eventStatus === s ? `1px solid ${sc.border}` : "1px solid transparent",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
-              <button style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                ✎ Edit event
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setShowAddEventModal(true)}
+                  style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  ✎ Edit event
+                </button>
+              )}
               <button
                 onClick={onClose}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.55)", fontSize: 13, fontFamily: "var(--font-inter)", padding: 0 }}
@@ -4709,7 +4997,7 @@ export function EventPlanWorkspace({
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
-          onChange={s => setActiveSectionAndUrl(s as 'overview' | 'checklist' | 'roles' | 'notes')}
+          onChange={s => setActiveSectionAndUrl(s as ActiveSection)}
         />
       </div>
 
@@ -4765,6 +5053,11 @@ export function EventPlanWorkspace({
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>guests</p>
+                    {rsvpCount !== null && (
+                      <p style={{ fontSize: 12, color: "#5A5466", marginTop: 6, paddingTop: 6, borderTop: "1px solid #E8E2D2" }}>
+                        <span style={{ fontWeight: 600, color: "#3E1540" }}>{rsvpCount}</span> RSVPed via announcement
+                      </p>
+                    )}
                   </div>
                   {/* Budget */}
                   <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
@@ -4782,6 +5075,14 @@ export function EventPlanWorkspace({
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated</p>
+                    {typeCfg.budgetCategory && (
+                      <button
+                        onClick={() => setActiveSectionAndUrl('overview')}
+                        style={{ marginTop: 8, fontSize: 12, color: "#3E1540", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
+                      >
+                        → View in Finance
+                      </button>
+                    )}
                   </div>
                   {/* Readiness */}
                   {(() => {
@@ -4819,7 +5120,7 @@ export function EventPlanWorkspace({
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
               <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
                   <div>
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>To Prepare</p>
                     <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Checklist</h2>
@@ -4827,73 +5128,107 @@ export function EventPlanWorkspace({
                   <span style={{ fontSize: 13, color: "#8A8497" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
                 </div>
 
-                {/* Inline add row — dashed border style */}
-                {canEdit && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28, padding: "14px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
-                    <span style={{ color: "#8A8497", display: "flex" }}>+</span>
-                    <input
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="Add a task…"
-                      style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "#13101A" }}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAddTask() }}
-                    />
-                    <select
-                      value={newTaskAssignee}
-                      onChange={(e) => setNewTaskAssignee(e.target.value)}
-                      style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                    >
-                      <option value="">Unassigned</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="date"
-                      value={newTaskDue}
-                      onChange={(e) => setNewTaskDue(e.target.value)}
-                      style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                    />
-                    <button
-                      onClick={handleAddTask}
-                      disabled={addingTask || !newTaskTitle.trim()}
-                      style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, cursor: addingTask || !newTaskTitle.trim() ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask || !newTaskTitle.trim() ? 0.5 : 1 }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                )}
-
-                {/* Task rows */}
-                <div style={{ marginTop: 22, display: "flex", flexDirection: "column" }}>
-                  {tasks.length === 0 && (
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "24px 0" }}>No tasks yet.</p>
-                  )}
-                  {tasks.map((task, i) => (
-                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 4px", borderBottom: i === tasks.length - 1 ? "none" : "1px solid #E8E2D2" }}>
+                {/* Phase-grouped task list */}
+                {phaseConfig.map((phase) => {
+                  const phaseTasks = tasks.filter(t => t.phase === phase.key)
+                  const phaseIncomplete = phaseTasks.filter(t => !t.completed).length
+                  const isCollapsed = collapsedPhases.has(phase.key)
+                  return (
+                    <div key={phase.key} style={{ marginBottom: 28 }}>
+                      {/* Phase header */}
                       <button
-                        onClick={() => handleToggleTask(task)}
-                        style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "#3E1540" : "#C4C0B0"), background: task.completed ? "#3E1540" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                        onClick={() => setCollapsedPhases(prev => {
+                          const next = new Set(prev)
+                          if (next.has(phase.key)) next.delete(phase.key)
+                          else next.add(phase.key)
+                          return next
+                        })}
+                        style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600 }}>{phase.label}</span>
+                        {phaseTasks.length > 0 && (
+                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "#5A5466" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
+                            {phaseIncomplete > 0 ? `${phaseIncomplete} remaining` : "All done"}
+                          </span>
+                        )}
+                        <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
                       </button>
-                      <span style={{ flex: 1, fontSize: 15, color: task.completed ? "#A09A8C" : "#13101A", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
-                      {task.assigned_name && (
-                        <span style={{ padding: "5px 12px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
-                      )}
-                      {task.due_date && (
-                        <span style={{ fontSize: 13, color: "#8A8497", width: 64, textAlign: "right", whiteSpace: "nowrap" }}>
-                          {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
-                      )}
-                      {canEdit && (
-                        <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                      <div style={{ borderTop: "1px solid #E8E2D2" }} />
+
+                      {!isCollapsed && (
+                        <>
+                          {phaseTasks.length === 0 && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this phase.</p>
+                          )}
+                          {phaseTasks.map((task, i) => (
+                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
+                              <button
+                                onClick={() => handleToggleTask(task)}
+                                style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "#3E1540" : "#C4C0B0"), background: task.completed ? "#3E1540" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                              >
+                                {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                              </button>
+                              <span style={{ flex: 1, fontSize: 14, color: task.completed ? "#A09A8C" : "#13101A", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+                              {task.assigned_name && (
+                                <span style={{ padding: "4px 10px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
+                              )}
+                              {task.due_date && (
+                                <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
+                                  {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                </span>
+                              )}
+                              {canEdit && (
+                                <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Inline add row per phase */}
+                          {canEdit && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
+                              <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
+                              <input
+                                value={phase.key === newTaskPhase ? newTaskTitle : ""}
+                                onChange={(e) => { setNewTaskPhase(phase.key); setNewTaskTitle(e.target.value) }}
+                                onFocus={() => setNewTaskPhase(phase.key)}
+                                placeholder={`Add to ${phase.label}…`}
+                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A" }}
+                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskPhase === phase.key) handleAddTask(phase.key) }}
+                              />
+                              {phase.key === newTaskPhase && newTaskTitle.trim() && (
+                                <>
+                                  <select
+                                    value={newTaskAssignee}
+                                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                  </select>
+                                  <input
+                                    type="date"
+                                    value={newTaskDue}
+                                    onChange={(e) => setNewTaskDue(e.target.value)}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                  />
+                                  <button
+                                    onClick={() => handleAddTask(phase.key)}
+                                    disabled={addingTask}
+                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
+                                  >
+                                    Add
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             )}
 
@@ -5063,9 +5398,740 @@ export function EventPlanWorkspace({
                 </aside>
               </div>
             )}
+
+            {/* ── Sub-events (Welcome Week) ── */}
+            {activeSection === 'sub_events' && plan && (
+              <SubEventsTab
+                parentEvent={calendarEvent}
+                ministryId={ministryId}
+                userId={userId}
+                canEdit={canEdit}
+              />
+            )}
+
+            {/* ── New Folks (Welcome Week) ── */}
+            {activeSection === 'new_folks' && plan && (
+              <NewFolksTab
+                planId={plan.id}
+                ministryId={ministryId}
+                canEdit={canEdit}
+              />
+            )}
+
+            {/* ── Acts Lineup (Coffeehouse) ── */}
+            {activeSection === 'acts' && plan && (
+              <ActsTab
+                plan={plan}
+                canEdit={canEdit}
+                onPlanChange={setPlan}
+              />
+            )}
+
+            {/* ── Teams (Turkey Bowl) ── */}
+            {activeSection === 'teams' && plan && (
+              <TeamsTab
+                plan={plan}
+                ministryId={ministryId}
+                members={members}
+                canEdit={canEdit}
+                onPlanChange={setPlan}
+              />
+            )}
+
+            {/* ── Transport (Retreat) ── */}
+            {activeSection === 'transport' && plan && (
+              <TransportTab
+                plan={plan}
+                ministryId={ministryId}
+                canEdit={canEdit}
+                onPlanChange={setPlan}
+              />
+            )}
+
+            {/* ── Program (Retreat) ── */}
+            {activeSection === 'program' && plan && (
+              <ProgramTab
+                plan={plan}
+                event={calendarEvent}
+                members={members}
+                canEdit={canEdit}
+                onPlanChange={setPlan}
+              />
+            )}
           </>
         )}
       </div>
+
+      {/* Edit event modal */}
+      {showAddEventModal && (
+        <AddEventModal
+          ministryId={ministryId}
+          teamId={null}
+          userId={userId}
+          existing={calendarEvent}
+          onClose={() => setShowAddEventModal(false)}
+          onSaved={(updated) => {
+            setShowAddEventModal(false)
+            onClose()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── SubEventsTab ──────────────────────────────────────────────────────────────
+
+function SubEventsTab({
+  parentEvent,
+  ministryId,
+  userId,
+  canEdit,
+}: {
+  parentEvent: CalendarEvent
+  ministryId: string
+  userId: string
+  canEdit: boolean
+}) {
+  const supabase = createClient()
+  const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [planningChild, setPlanningChild] = useState<CalendarEvent | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("calendar_events")
+        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+        .eq("parent_event_id", parentEvent.id)
+        .order("start_date", { ascending: true })
+      setSubEvents((data ?? []) as CalendarEvent[])
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentEvent.id])
+
+  if (planningChild) {
+    return (
+      <div>
+        <button onClick={() => setPlanningChild(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#5A5466", fontSize: 13, padding: "0 0 16px", display: "flex", alignItems: "center", gap: 6 }}>
+          ← Back to {parentEvent.title}
+        </button>
+        <EventPlanWorkspace
+          inline
+          hideHero
+          calendarEvent={planningChild}
+          ministryId={ministryId}
+          userId={userId}
+          canEdit={canEdit}
+          onClose={() => setPlanningChild(null)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Welcome Week</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Sub-events</h2>
+        </div>
+        {canEdit && (
+          <button onClick={() => setShowAdd(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+            + Add sub-event
+          </button>
+        )}
+      </div>
+
+      {loading && <p style={{ color: "#8A8497", fontSize: 13 }}>Loading…</p>}
+      {!loading && subEvents.length === 0 && (
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No sub-events yet. Add the individual events that make up Welcome Week.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {subEvents.map(ev => {
+          const evCfg = getEventConfig(ev)
+          const d = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+          return (
+            <button
+              key={ev.id}
+              onClick={() => setPlanningChild(ev)}
+              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid #E8E2D2", borderRadius: 12, background: "#FBF8F2", cursor: "pointer", textAlign: "left", width: "100%" }}
+            >
+              <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 15, fontWeight: 500, color: "#13101A", margin: 0 }}>{ev.title}</p>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{d}{ev.location ? ` · ${ev.location}` : ""}</p>
+              </div>
+              <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "#3E1540" : ev.status === "active" ? "#2D5445" : "#5A5466" }}>
+                {ev.status.charAt(0).toUpperCase() + ev.status.slice(1)}
+              </span>
+              <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {showAdd && (
+        <AddEventModal
+          ministryId={ministryId}
+          teamId={null}
+          userId={userId}
+          parentEventId={parentEvent.id}
+          excludeTypes={["welcome_week"]}
+          onClose={() => setShowAdd(false)}
+          onSaved={(ev) => {
+            setSubEvents(prev => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+            setShowAdd(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── NewFolksTab ───────────────────────────────────────────────────────────────
+
+function NewFolksTab({
+  planId,
+  ministryId,
+  canEdit,
+}: {
+  planId: string
+  ministryId: string
+  canEdit: boolean
+}) {
+  const supabase = createClient()
+  const [folks, setFolks] = useState<EventNewFolk[]>([])
+  const [dgls, setDgls] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState("")
+  const [newContact, setNewContact] = useState("")
+  const [newNotes, setNewNotes] = useState("")
+  const [adding, setAdding] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: folkData }, { data: dglData }] = await Promise.all([
+        supabase.from("event_new_folks").select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").eq("event_plan_id", planId).order("created_at", { ascending: true }),
+        supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name"),
+      ])
+      setFolks((folkData ?? []).map((f: Record<string, unknown>) => ({
+        id: f.id as string, event_plan_id: f.event_plan_id as string,
+        ministry_id: f.ministry_id as string, name: f.name as string,
+        contact: f.contact as string | null, notes: f.notes as string | null,
+        assigned_dgl_id: f.assigned_dgl_id as string | null,
+        assigned_dgl_name: (f.profiles as { name?: string } | null)?.name,
+        created_at: f.created_at as string,
+      })))
+      setDgls((dglData ?? []) as { id: string; name: string }[])
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId])
+
+  async function handleAdd() {
+    if (!newName.trim()) return
+    setAdding(true)
+    const { data } = await supabase.from("event_new_folks").insert({
+      event_plan_id: planId, ministry_id: ministryId,
+      name: newName.trim(), contact: newContact.trim() || null, notes: newNotes.trim() || null,
+    }).select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").single()
+    if (data) {
+      const d = data as Record<string, unknown>
+      setFolks(prev => [...prev, {
+        id: d.id as string, event_plan_id: planId, ministry_id: ministryId,
+        name: d.name as string, contact: d.contact as string | null,
+        notes: d.notes as string | null, assigned_dgl_id: null, created_at: d.created_at as string,
+      }])
+    }
+    setNewName(""); setNewContact(""); setNewNotes("")
+    setAdding(false)
+  }
+
+  async function handleAssignDGL(folkId: string, dglId: string) {
+    const dgl = dgls.find(d => d.id === dglId)
+    setFolks(prev => prev.map(f => f.id === folkId ? { ...f, assigned_dgl_id: dglId || null, assigned_dgl_name: dgl?.name } : f))
+    await supabase.from("event_new_folks").update({ assigned_dgl_id: dglId || null }).eq("id", folkId)
+  }
+
+  async function handleDelete(id: string) {
+    setFolks(prev => prev.filter(f => f.id !== id))
+    await supabase.from("event_new_folks").delete().eq("id", id)
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Follow Up</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>New Folks</h2>
+        </div>
+        <span style={{ fontSize: 13, color: "#8A8497" }}>{folks.length} people tracked</span>
+      </div>
+
+      {loading && <p style={{ color: "#8A8497", fontSize: 13 }}>Loading…</p>}
+
+      {/* Table header */}
+      {folks.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "0 4px 8px", borderBottom: "1px solid #E8E2D2" }}>
+          {["Name", "Contact", "Notes", "Assigned DGL", ""].map(h => (
+            <span key={h} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {!loading && folks.length === 0 && (
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "16px 0" }}>No new folks tracked yet. Add people you met during Welcome Week.</p>
+        )}
+        {folks.map(folk => (
+          <div key={folk.id} style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: "#13101A", fontWeight: 500 }}>{folk.name}</span>
+            <span style={{ fontSize: 13, color: "#5A5466" }}>{folk.contact ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+            <span style={{ fontSize: 13, color: "#5A5466" }}>{folk.notes ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+            <select
+              value={folk.assigned_dgl_id ?? ""}
+              onChange={(e) => canEdit && handleAssignDGL(folk.id, e.target.value)}
+              disabled={!canEdit}
+              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: folk.assigned_dgl_id ? "#2D0F2E" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
+            >
+              <option value="">Unassigned</option>
+              {dgls.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            {canEdit ? (
+              <button onClick={() => handleDelete(folk.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
+            ) : <span />}
+          </div>
+        ))}
+      </div>
+
+      {/* Add row */}
+      {canEdit && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A" }} />
+          <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466" }} />
+          <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466" }} />
+          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ActsTab ───────────────────────────────────────────────────────────────────
+
+type CoffeeAct = { id: string; performer: string; type: string; duration: string; sound_check: string }
+
+function ActsTab({
+  plan,
+  canEdit,
+  onPlanChange,
+}: {
+  plan: EventPlan
+  canEdit: boolean
+  onPlanChange: (p: EventPlan) => void
+}) {
+  const supabase = createClient()
+  const acts: CoffeeAct[] = (plan.type_data?.acts as CoffeeAct[] | undefined) ?? []
+
+  async function save(newActs: CoffeeAct[]) {
+    const { data } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, acts: newActs } }).eq("id", plan.id).select("*").single()
+    if (data) onPlanChange(data as EventPlan)
+  }
+
+  function addAct() {
+    const newActs: CoffeeAct[] = [...acts, { id: crypto.randomUUID(), performer: "", type: "Music", duration: "", sound_check: "" }]
+    save(newActs)
+  }
+
+  function updateAct(id: string, field: keyof CoffeeAct, value: string) {
+    const newActs = acts.map(a => a.id === id ? { ...a, [field]: value } : a)
+    save(newActs)
+  }
+
+  function deleteAct(id: string) {
+    save(acts.filter(a => a.id !== id))
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Performance Order</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Acts Lineup</h2>
+        </div>
+        {canEdit && (
+          <button onClick={addAct} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add act</button>
+        )}
+      </div>
+
+      {acts.length === 0 && (
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No acts yet. Add performers to build your lineup.</p>
+      )}
+
+      {acts.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid #E8E2D2" }}>
+          {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
+            <span key={i} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {acts.map((act, idx) => (
+          <div key={act.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#A09A8C", textAlign: "center" }}>{idx + 1}</span>
+            {canEdit ? (
+              <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", width: "100%" }} />
+            ) : (
+              <span style={{ fontSize: 14, color: "#13101A" }}>{act.performer || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+            )}
+            {canEdit ? (
+              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>
+                {["Music", "Spoken Word", "Comedy", "Dance", "Other"].map(t => <option key={t}>{t}</option>)}
+              </select>
+            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.type}</span>}
+            {canEdit ? (
+              <input value={act.duration} onChange={e => updateAct(act.id, "duration", e.target.value)} placeholder="8 min" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.duration || "—"}</span>}
+            {canEdit ? (
+              <input value={act.sound_check} onChange={e => updateAct(act.id, "sound_check", e.target.value)} placeholder="5:30 PM" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.sound_check || "—"}</span>}
+            {canEdit ? (
+              <button onClick={() => deleteAct(act.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
+            ) : <span />}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── TeamsTab ──────────────────────────────────────────────────────────────────
+
+type TurkeyTeam = { name: string; members: string[] }
+type TurkeyData = { teamA: TurkeyTeam; teamB: TurkeyTeam; commissioner: string }
+
+function TeamsTab({
+  plan,
+  ministryId,
+  members,
+  canEdit,
+  onPlanChange,
+}: {
+  plan: EventPlan
+  ministryId: string
+  members: { id: string; name: string }[]
+  canEdit: boolean
+  onPlanChange: (p: EventPlan) => void
+}) {
+  const supabase = createClient()
+  const defaultTeams: TurkeyData = { teamA: { name: "Team A", members: [] }, teamB: { name: "Team B", members: [] }, commissioner: "" }
+  const teamsData: TurkeyData = (plan.type_data?.turkey as TurkeyData | undefined) ?? defaultTeams
+
+  async function save(data: TurkeyData) {
+    const { data: updated } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, turkey: data } }).eq("id", plan.id).select("*").single()
+    if (updated) onPlanChange(updated as EventPlan)
+  }
+
+  function updateTeamName(team: "teamA" | "teamB", name: string) {
+    save({ ...teamsData, [team]: { ...teamsData[team], name } })
+  }
+
+  function addMember(team: "teamA" | "teamB", memberId: string) {
+    if (!memberId || teamsData[team].members.includes(memberId)) return
+    save({ ...teamsData, [team]: { ...teamsData[team], members: [...teamsData[team].members, memberId] } })
+  }
+
+  function removeMember(team: "teamA" | "teamB", memberId: string) {
+    save({ ...teamsData, [team]: { ...teamsData[team], members: teamsData[team].members.filter(m => m !== memberId) } })
+  }
+
+  const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
+    <div style={{ flex: 1, padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+      {canEdit ? (
+        <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
+      ) : (
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.3, marginBottom: 14 }}>{team.name}</p>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {team.members.map(uid => {
+          const m = members.find(m => m.id === uid)
+          return (
+            <div key={uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "#F1ECDE", borderRadius: 8 }}>
+              <span style={{ fontSize: 13, color: "#2D0F2E" }}>{m?.name ?? uid}</span>
+              {canEdit && <button onClick={() => removeMember(teamKey, uid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3 h-3" /></button>}
+            </div>
+          )
+        })}
+        {canEdit && (
+          <select onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "#8A8497", fontSize: 12, cursor: "pointer", marginTop: 4 }}>
+            <option value="">+ Add member…</option>
+            {members.filter(m => !teamsData.teamA.members.includes(m.id) && !teamsData.teamB.members.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Turkey Bowl</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Teams</h2>
+      </div>
+
+      <div style={{ display: "flex", gap: 20, marginBottom: 24 }} className="max-md:!flex-col">
+        {renderTeam("teamA", teamsData.teamA)}
+        {renderTeam("teamB", teamsData.teamB)}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 14, color: "#5A5466", whiteSpace: "nowrap" }}>Commissioner:</span>
+        {canEdit ? (
+          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, cursor: "pointer" }}>
+            <option value="">Unassigned</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        ) : (
+          <span style={{ fontSize: 14, color: "#2D0F2E" }}>{members.find(m => m.id === teamsData.commissioner)?.name ?? "—"}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── TransportTab ──────────────────────────────────────────────────────────────
+
+type CarEntry = { id: string; driver_id: string; vehicle: string; seats: number; rider_ids: string[] }
+
+function TransportTab({
+  plan,
+  ministryId,
+  canEdit,
+  onPlanChange,
+}: {
+  plan: EventPlan
+  ministryId: string
+  canEdit: boolean
+  onPlanChange: (p: EventPlan) => void
+}) {
+  const supabase = createClient()
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([])
+  const cars: CarEntry[] = (plan.type_data?.transport as CarEntry[] | undefined) ?? []
+
+  useEffect(() => {
+    supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name").then(({ data }) => setMembers(data ?? []))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministryId])
+
+  async function save(newCars: CarEntry[]) {
+    const { data } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, transport: newCars } }).eq("id", plan.id).select("*").single()
+    if (data) onPlanChange(data as EventPlan)
+  }
+
+  function addCar() {
+    save([...cars, { id: crypto.randomUUID(), driver_id: "", vehicle: "", seats: 4, rider_ids: [] }])
+  }
+
+  function updateCar(id: string, updates: Partial<CarEntry>) {
+    save(cars.map(c => c.id === id ? { ...c, ...updates } : c))
+  }
+
+  function addRider(carId: string, riderId: string) {
+    if (!riderId) return
+    const car = cars.find(c => c.id === carId)
+    if (!car || car.rider_ids.includes(riderId)) return
+    updateCar(carId, { rider_ids: [...car.rider_ids, riderId] })
+  }
+
+  function removeRider(carId: string, riderId: string) {
+    const car = cars.find(c => c.id === carId)
+    if (!car) return
+    updateCar(carId, { rider_ids: car.rider_ids.filter(r => r !== riderId) })
+  }
+
+  const totalSeats = cars.reduce((s, c) => s + c.seats, 0)
+  const totalRiders = cars.reduce((s, c) => s + c.rider_ids.length, 0)
+  const allRiderIds = cars.flatMap(c => c.rider_ids)
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Retreat Logistics</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Transport</h2>
+        </div>
+        {canEdit && <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>}
+      </div>
+
+      <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
+        <div style={{ padding: "10px 18px", background: "#F1ECDE", borderRadius: 10 }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: "#13101A", fontFamily: "var(--font-instrument-serif)" }}>{totalRiders}</span>
+          <span style={{ fontSize: 13, color: "#8A8497", marginLeft: 6 }}>confirmed / {totalSeats} seats</span>
+        </div>
+      </div>
+
+      {cars.length === 0 && (
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No cars added yet. Add drivers to organize carpooling.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {cars.map(car => {
+          const driver = members.find(m => m.id === car.driver_id)
+          const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
+          return (
+            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                {canEdit ? (
+                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                    <option value="">Driver…</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#2D0F2E" }}>{driver?.name ?? "No driver"}</span>
+                )}
+                {canEdit ? (
+                  <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "6px 10px" }} />
+                ) : (
+                  <span style={{ fontSize: 13, color: "#5A5466" }}>{car.vehicle || "—"}</span>
+                )}
+                {canEdit && (
+                  <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, padding: "6px 8px", textAlign: "center" }} />
+                )}
+                <span style={{ fontSize: 12, color: "#8A8497" }}>{car.rider_ids.length}/{car.seats} seats</span>
+                {canEdit && <button onClick={() => save(cars.filter(c => c.id !== car.id))} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#C4C4C4" }}><X className="w-3.5 h-3.5" /></button>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {car.rider_ids.map(rid => {
+                  const m = members.find(m => m.id === rid)
+                  return (
+                    <span key={rid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "#F1ECDE", borderRadius: 999, fontSize: 12, color: "#2D0F2E" }}>
+                      {m?.name ?? rid}
+                      {canEdit && <button onClick={() => removeRider(car.id, rid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#A09A8C", padding: 0, lineHeight: 1 }}>×</button>}
+                    </span>
+                  )
+                })}
+                {canEdit && car.rider_ids.length < car.seats && (
+                  <select onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ padding: "4px 10px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "#8A8497", fontSize: 12, cursor: "pointer" }}>
+                    <option value="">+ Add rider…</option>
+                    {availableRiders.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── ProgramTab ────────────────────────────────────────────────────────────────
+
+type ProgramSession = { id: string; time: string; title: string; leader_id: string; day_index: number }
+
+function ProgramTab({
+  plan,
+  event,
+  members,
+  canEdit,
+  onPlanChange,
+}: {
+  plan: EventPlan
+  event: CalendarEvent
+  members: { id: string; name: string }[]
+  canEdit: boolean
+  onPlanChange: (p: EventPlan) => void
+}) {
+  const supabase = createClient()
+  const sessions: ProgramSession[] = (plan.type_data?.program as ProgramSession[] | undefined) ?? []
+
+  // Generate day list from event start → end
+  const days: Date[] = []
+  const start = new Date(event.start_date)
+  const end = new Date(event.end_date)
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    days.push(new Date(d))
+  }
+  if (days.length === 0) days.push(start)
+
+  async function save(newSessions: ProgramSession[]) {
+    const { data } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, program: newSessions } }).eq("id", plan.id).select("*").single()
+    if (data) onPlanChange(data as EventPlan)
+  }
+
+  function addSession(dayIndex: number) {
+    save([...sessions, { id: crypto.randomUUID(), time: "", title: "", leader_id: "", day_index: dayIndex }])
+  }
+
+  function updateSession(id: string, updates: Partial<ProgramSession>) {
+    save(sessions.map(s => s.id === id ? { ...s, ...updates } : s))
+  }
+
+  function deleteSession(id: string) {
+    save(sessions.filter(s => s.id !== id))
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Retreat Schedule</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Program</h2>
+      </div>
+
+      {days.map((day, dayIdx) => {
+        const daySessions = sessions.filter(s => s.day_index === dayIdx).sort((a, b) => a.time.localeCompare(b.time))
+        const dayLabel = day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        return (
+          <div key={dayIdx} style={{ marginBottom: 36 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#5A5466", fontWeight: 600 }}>
+                Day {dayIdx + 1} — {dayLabel}
+              </p>
+              {canEdit && (
+                <button onClick={() => addSession(dayIdx)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 12, cursor: "pointer" }}>+ Add session</button>
+              )}
+            </div>
+            <div style={{ borderTop: "1px solid #E8E2D2" }} />
+
+            {daySessions.length === 0 && (
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "12px 4px" }}>No sessions yet.</p>
+            )}
+
+            {daySessions.map(session => (
+              <div key={session.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+                {canEdit ? (
+                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+                ) : (
+                  <span style={{ fontSize: 13, color: "#8A8497", fontWeight: 500 }}>{session.time || "—"}</span>
+                )}
+                {canEdit ? (
+                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", width: "100%" }} />
+                ) : (
+                  <span style={{ fontSize: 14, color: "#13101A" }}>{session.title || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+                )}
+                {canEdit ? (
+                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>
+                    <option value="">No leader</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#5A5466" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
+                )}
+                {canEdit ? (
+                  <button onClick={() => deleteSession(session.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
+                ) : <span />}
+              </div>
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

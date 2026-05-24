@@ -293,6 +293,10 @@ export interface Team {
   member_count: number
 }
 
+export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
+export type EventStatus = 'planning' | 'active' | 'complete'
+export type EventExtraTab = 'sub_events' | 'new_folks' | 'acts' | 'teams' | 'transport' | 'program'
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -301,7 +305,11 @@ export interface CalendarEvent {
   start_date: string
   end_date: string
   all_day: boolean
-  category: 'welcoming' | 'retreat' | 'social' | 'service' | 'regular'
+  category: string
+  event_type: EventType
+  parent_event_id: string | null
+  linked_announcement_id: string | null
+  status: EventStatus
   created_by: string
 }
 
@@ -311,6 +319,7 @@ export interface EventPlan {
   overview_notes: string | null
   expected_turnout: number | null
   budget_allocated: number | null
+  type_data: Record<string, unknown>
 }
 
 export interface EventTask {
@@ -321,6 +330,20 @@ export interface EventTask {
   assigned_name?: string
   due_date: string | null
   completed: boolean
+  phase: 'pre_event' | 'day_of' | 'post_event' | 'followup'
+  sort_order: number
+}
+
+export interface EventNewFolk {
+  id: string
+  event_plan_id: string
+  ministry_id: string
+  name: string
+  contact: string | null
+  notes: string | null
+  assigned_dgl_id: string | null
+  assigned_dgl_name?: string
+  created_at: string
 }
 
 export interface EventRole {
