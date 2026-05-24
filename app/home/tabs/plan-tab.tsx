@@ -1186,6 +1186,9 @@ export function StudentOrgTeamHome({
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
 
+  // Resources tab — which role's content to display
+  const [resourcesRole, setResourcesRole] = useState<string | null>(null)
+
   useEffect(() => {
     if (!ministryId) return
     setCalLoading(true)
@@ -1438,15 +1441,53 @@ export function StudentOrgTeamHome({
         )}
 
         {/* RESOURCES — role links/docs */}
-        {teamTab === "Resources" && (
-          <div>
-            <div style={{ marginBottom: 28 }}>
-              <p style={mono}>Team resources</p>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
+        {teamTab === "Resources" && (() => {
+          const userRosterRole = roster.find(m => m.user_id === userId)?.role ?? null
+          const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
+          const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
+          return (
+            <div>
+              <div style={{ marginBottom: 20 }}>
+                <p style={mono}>Team resources</p>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
+                  {userRosterRole && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                      {userRosterRole}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Role selector */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+                {resourcesRoles.map(role => (
+                  <button
+                    key={role}
+                    onClick={() => setResourcesRole(role)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 9999,
+                      border: "1.5px solid",
+                      borderColor: activeResourcesRole === role ? "#3E1540" : "#E8E2D2",
+                      background: activeResourcesRole === role ? "#3E1540" : "transparent",
+                      color: activeResourcesRole === role ? "#F6F4EF" : "#5A5466",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-inter)",
+                      transition: "border-color 150ms, background-color 150ms, color 150ms",
+                    }}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
+              <StudentOrgRoleTabContent teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canEdit} />
             </div>
-            <StudentOrgRoleTabContent teamId={teamId} roleName="General" userId={userId} canWrite={canEdit} />
-          </div>
-        )}
+          )
+        })()}
 
         {/* GROUPS — group generator */}
         {teamTab === "Groups" && (
