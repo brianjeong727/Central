@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, Users, ClipboardList, User, LogOut, Plus, ChevronRight, Heart } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -38,9 +38,9 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
     { id: "chats", icon: MessageCircle },
-    { id: "directory", icon: Users },
+    { id: "directory", icon: BookOpen },
     { id: "profile", icon: User },
-    { id: "giving", icon: Heart },
+    { id: "giving", icon: Wallet },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
   ]
 
