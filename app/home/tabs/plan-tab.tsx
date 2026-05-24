@@ -2025,16 +2025,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         />
       )}
 
-      {showEditEvent && studentOrgPlanningEvent && (
-        <AddEventModal
-          ministryId={ministryId}
-          teamId={null}
-          userId={userId}
-          existing={studentOrgPlanningEvent}
-          onClose={() => setShowEditEvent(false)}
-          onSaved={(updated) => { setStudentOrgPlanningEvent(updated); setShowEditEvent(false) }}
-        />
-      )}
     </div>
   )
 }

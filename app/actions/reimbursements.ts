@@ -42,34 +42,98 @@ export interface BudgetEntry {
   created_at: string
 }
 
-// Called from publishDGLRotationAction — admin client, no auth check needed
-export async function upsertDGDinnerForms(params: {
-  ministryId: string
-  forms: {
-    fridayDate: string
-    assignedDglIds: string[]
-    treasurerName: string
-    expensePurpose: string
-  }[]
-}): Promise<{ error?: string }> {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function fridayFromSunday(sundayStr: string): string {
+  const [y, m, d] = sundayStr.split("-").map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() - 2)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
+}
+
+function formatFridayLabel(fridayDate: string): string {
+  const [y, m, d] = fridayDate.split("-").map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+// ── Sync action ───────────────────────────────────────────────────────────────
+// Idempotent — safe to call on every page load. Creates missing DG dinner forms
+// from published friday_sg assignments. Called from:
+//  1. publishDGLRotationAction (on publish)
+//  2. getDGDinnerForms (so already-published rotations auto-populate forms)
+export async function syncDGDinnerFormsForMinistry(ministryId: string): Promise<{ error?: string }> {
   const admin = createAdminClient()
 
-  for (const f of params.forms) {
-    const { error } = await admin
-      .from("reimbursement_forms")
-      .upsert(
-        {
-          ministry_id: params.ministryId,
-          category: "dg_dinner",
-          friday_date: f.fridayDate,
-          assigned_dgl_ids: f.assignedDglIds,
-          treasurer_name: f.treasurerName,
-          expense_purpose: f.expensePurpose,
-          status: "not_started",
-        },
-        { onConflict: "ministry_id,friday_date", ignoreDuplicates: false }
-      )
-    if (error) return { error: error.message }
+  // 1. All teams in the ministry
+  const { data: teams } = await admin.from("teams").select("id").eq("ministry_id", ministryId)
+  const teamIds = (teams ?? []).map((t: { id: string }) => t.id)
+  if (teamIds.length === 0) return {}
+
+  // 2. Published friday_sg assignments (any team in this ministry)
+  const { data: assignments } = await admin
+    .from("dgl_assignments")
+    .select("user_id, week_date")
+    .in("team_id", teamIds)
+    .eq("slot", "friday_sg")
+    .eq("published", true)
+  if (!assignments?.length) return {}
+
+  // 3. Group by anchor Sunday → list of DGL IDs per week
+  const byWeek = new Map<string, string[]>()
+  for (const row of assignments as { user_id: string; week_date: string }[]) {
+    const list = byWeek.get(row.week_date) ?? []
+    list.push(row.user_id)
+    byWeek.set(row.week_date, list)
+  }
+
+  // 4. Compute actual Friday dates
+  const fridayEntries: { fridayDate: string; dglIds: string[] }[] = Array.from(byWeek.entries()).map(
+    ([sunday, dglIds]) => ({ fridayDate: fridayFromSunday(sunday), dglIds })
+  )
+
+  // 5. Existing DG dinner forms for this ministry
+  const { data: existingForms } = await admin
+    .from("reimbursement_forms")
+    .select("id, friday_date, status")
+    .eq("ministry_id", ministryId)
+    .eq("category", "dg_dinner")
+  const existingByDate = new Map<string, { id: string; status: string }>()
+  for (const f of (existingForms ?? []) as { id: string; friday_date: string; status: string }[]) {
+    if (f.friday_date) existingByDate.set(f.friday_date, { id: f.id, status: f.status })
+  }
+
+  // 6. Treasurer name (first person in any ministry team with can_view_finances)
+  let treasurerName = "Treasurer"
+  const { data: memberRows } = await admin
+    .from("team_members")
+    .select("user_id, team_roles!role_id(permissions)")
+    .in("team_id", teamIds)
+  let treasurerId: string | null = null
+  for (const row of (memberRows ?? []) as { user_id: string; team_roles: { permissions?: string[] } | null }[]) {
+    if ((row.team_roles?.permissions ?? []).includes("can_view_finances")) {
+      treasurerId = row.user_id; break
+    }
+  }
+  if (treasurerId) {
+    const { data: profile } = await admin.from("profiles").select("name").eq("id", treasurerId).single()
+    treasurerName = (profile as { name?: string } | null)?.name ?? "Treasurer"
+  }
+
+  // 7. Insert missing forms; update dgl pair on not_started forms if rotation changed
+  for (const { fridayDate, dglIds } of fridayEntries) {
+    const expensePurpose = `DG Dinner – ${formatFridayLabel(fridayDate)}`
+    const existing = existingByDate.get(fridayDate)
+    if (!existing) {
+      await admin.from("reimbursement_forms").insert({
+        ministry_id: ministryId, category: "dg_dinner", friday_date: fridayDate,
+        assigned_dgl_ids: dglIds, treasurer_name: treasurerName,
+        expense_purpose: expensePurpose, status: "not_started",
+      })
+    } else if (existing.status === "not_started") {
+      await admin.from("reimbursement_forms")
+        .update({ assigned_dgl_ids: dglIds, treasurer_name: treasurerName })
+        .eq("id", existing.id)
+    }
   }
   return {}
 }
@@ -77,6 +141,9 @@ export async function upsertDGDinnerForms(params: {
 export async function getDGDinnerForms(
   ministryId: string
 ): Promise<{ data: ReimbursementForm[]; error: string | null }> {
+  // Sync first — idempotent, creates any missing forms from published rotation
+  await syncDGDinnerFormsForMinistry(ministryId)
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("reimbursement_forms")
