@@ -1151,12 +1151,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources" | "Groups">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Plan", "Roster", "Resources", "Groups"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources" | "Groups"
+    return (["General", "Plan", "Roster", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources" | "Groups") {
+  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1260,9 +1260,10 @@ export function StudentOrgTeamHome({
             { key: "Roster", label: "Roster" },
             { key: "Resources", label: "Resources" },
             { key: "Groups", label: "Groups" },
+            { key: "Rotations", label: "Rotations" },
           ]}
           active={teamTab}
-          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Roster" | "Resources" | "Groups")}
+          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations")}
         />
       </div>
 
@@ -1475,7 +1476,148 @@ export function StudentOrgTeamHome({
             canEdit={canEdit}
           />
         )}
+
+        {teamTab === "Rotations" && teamId && (
+          <RotationsTab
+            teamId={teamId}
+            ministryId={ministryId}
+            userId={userId}
+            canEdit={canEdit || isAdmin}
+            roster={roster}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+// ── RotationsTab ──────────────────────────────────────────────────────────────
+type CCSFRotationType = "lockup" | "sunday_lunch_prayer"
+interface CCSFRotation {
+  id: string
+  rotation_type: CCSFRotationType
+  assigned_to: string | null
+  assigned_name?: string
+  week_date: string
+  notes: string | null
+}
+
+function RotationsTab({ teamId, ministryId, userId, canEdit, roster }: {
+  teamId: string; ministryId: string; userId: string; canEdit: boolean
+  roster: { id: string; user_id: string; name: string; role: string }[]
+}) {
+  const supabase = createClient()
+  const [rotations, setRotations] = useState<CCSFRotation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  const ROTATION_TYPES: { type: CCSFRotationType; label: string }[] = [
+    { type: "lockup", label: "Lock-up" },
+    { type: "sunday_lunch_prayer", label: "Sunday Lunch Prayer" },
+  ]
+
+  // Generate upcoming Sundays (next 8 weeks)
+  const upcomingSundays = useMemo(() => {
+    const sundays: string[] = []
+    const d = new Date()
+    d.setDate(d.getDate() - d.getDay()) // start from this Sunday
+    for (let i = 0; i < 8; i++) {
+      sundays.push(d.toISOString().split("T")[0])
+      d.setDate(d.getDate() + 7)
+    }
+    return sundays
+  }, [])
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase
+        .from("ccsf_rotations")
+        .select("id, rotation_type, assigned_to, week_date, notes")
+        .eq("team_id", teamId)
+        .eq("ministry_id", ministryId)
+        .in("week_date", upcomingSundays)
+      const profileIds = [...new Set((data ?? []).map((r: { assigned_to: string | null }) => r.assigned_to).filter(Boolean))] as string[]
+      let nameMap = new Map<string, string>()
+      if (profileIds.length > 0) {
+        const { data: pData } = await supabase.from("profiles").select("id, name").in("id", profileIds)
+        nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+      }
+      setRotations((data ?? []).map((r: CCSFRotation) => ({ ...r, assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) : undefined })))
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId, ministryId])
+
+  async function handleAssign(rotationType: CCSFRotationType, weekDate: string, userId: string | null) {
+    const key = `${rotationType}::${weekDate}`
+    setSaving(key)
+    const existing = rotations.find(r => r.rotation_type === rotationType && r.week_date === weekDate)
+    if (userId === null) {
+      if (existing) {
+        await supabase.from("ccsf_rotations").delete().eq("id", existing.id)
+        setRotations(prev => prev.filter(r => r.id !== existing.id))
+      }
+    } else {
+      const assignedName = roster.find(m => m.user_id === userId)?.name
+      if (existing) {
+        await supabase.from("ccsf_rotations").update({ assigned_to: userId }).eq("id", existing.id)
+        setRotations(prev => prev.map(r => r.id === existing.id ? { ...r, assigned_to: userId, assigned_name: assignedName } : r))
+      } else {
+        const { data } = await supabase.from("ccsf_rotations").insert({ team_id: teamId, ministry_id: ministryId, rotation_type: rotationType, assigned_to: userId, week_date: weekDate }).select().single()
+        if (data) setRotations(prev => [...prev, { ...data as CCSFRotation, assigned_name: assignedName }])
+      }
+    }
+    setSaving(null)
+  }
+
+  function getAssignment(rotationType: CCSFRotationType, weekDate: string) {
+    return rotations.find(r => r.rotation_type === rotationType && r.week_date === weekDate)
+  }
+
+  const todayStr = new Date().toISOString().split("T")[0]
+
+  if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+      {ROTATION_TYPES.map(({ type, label }) => (
+        <div key={type}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>{label}</p>
+          <div style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+            {upcomingSundays.map((weekDate, i) => {
+              const assignment = getAssignment(type, weekDate)
+              const key = `${type}::${weekDate}`
+              const isToday = weekDate === todayStr
+              const dateLabel = new Date(weekDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+              return (
+                <div key={weekDate} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderTop: i ? "1px solid #F0EBE0" : undefined, background: isToday ? "#F9F6FF" : undefined }}>
+                  <div style={{ width: 96, flexShrink: 0 }}>
+                    <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "#3E1540" : "#5A5466" }}>{dateLabel}</p>
+                    {isToday && <p style={{ fontSize: 10.5, color: "#8A8497", marginTop: 1 }}>This week</p>}
+                  </div>
+                  {canEdit ? (
+                    <select
+                      value={assignment?.assigned_to ?? ""}
+                      disabled={saving === key}
+                      onChange={e => handleAssign(type, weekDate, e.target.value || null)}
+                      style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "#13101A" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      <option value="">— Unassigned —</option>
+                      {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                    </select>
+                  ) : (
+                    <p style={{ flex: 1, fontSize: 13, color: assignment?.assigned_name ? "#13101A" : "#C4C4C4", fontStyle: assignment?.assigned_name ? "normal" : "italic" }}>
+                      {assignment?.assigned_name ?? "Unassigned"}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
