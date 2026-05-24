@@ -106,6 +106,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   }, [])
 
   const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
+  const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
+  const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
+
+  const validFinanceSections = ["give", "reimbursements", "budget"] as const
+  const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | null
+  const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget">(
+    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "give"
+  )
+
+  function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget") {
+    setFinanceSection(s)
+    replaceParam("finance", s === "give" ? null : s)
+  }
 
   // Fetch all user groups with their latest message + real unread counts, sorted by recency
   const loadRecentChats = useCallback(async () => {
@@ -401,6 +414,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
         onProfileSectionChange={handleProfileSectionChange}
+        financeSection={financeSection}
+        onFinanceSectionChange={handleFinanceSectionChange}
+        isTreasurer={isTreasurer}
+        isDGL={isDGL}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -522,8 +539,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
               <GivingTab
                 ministryId={ministryId}
                 userId={userId}
+                userName={initialProfile.name}
                 userRole={initialProfile.role}
                 isAdmin={isAdmin}
+                isTreasurer={isTreasurer}
+                isDGL={isDGL}
+                activeSection={financeSection}
+                onSectionChange={handleFinanceSectionChange}
               />
             </div>
           )}

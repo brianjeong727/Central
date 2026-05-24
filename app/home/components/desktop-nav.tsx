@@ -33,7 +33,7 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   )
 }
 
-export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange }: DesktopSidebarProps) {
+export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL }: DesktopSidebarProps) {
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
@@ -169,12 +169,19 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     if (activeTab === "giving") {
+      const financeSections: { label: string; section: "give" | "reimbursements" | "budget"; show: boolean }[] = [
+        { label: "Give", section: "give", show: true },
+        { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
+        { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
+      ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
-          <button style={subItemStyle(true)} onClick={() => onTabChange("giving")}>
-            <span style={{ flex: 1 }}>Finance</span>
-          </button>
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Finance</p>
+          {financeSections.filter(s => s.show).map(s => (
+            <button key={s.section} style={subItemStyle(financeSection === s.section)} onClick={() => onFinanceSectionChange(s.section)}>
+              <span style={{ flex: 1 }}>{s.label}</span>
+            </button>
+          ))}
         </div>
       )
     }
