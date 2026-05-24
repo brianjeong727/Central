@@ -173,7 +173,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
           <button style={subItemStyle(true)} onClick={() => onTabChange("giving")}>
-            <span style={{ flex: 1 }}>Give</span>
+            <span style={{ flex: 1 }}>Finance</span>
           </button>
         </div>
       )

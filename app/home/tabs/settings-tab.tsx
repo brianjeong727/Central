@@ -12,6 +12,8 @@ import {
   archiveMinistry,
 } from "@/app/actions/ministry"
 import { updateAutomationSettings } from "@/app/actions/auto-chats"
+import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
+import type { ReceiptLimit } from "@/app/actions/receipts"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { getInitials } from "../utils"
 
@@ -126,15 +128,24 @@ export function SettingsTab({
   const [savingSchool, setSavingSchool] = useState(false)
   const [schoolError, setSchoolError] = useState<string | null>(null)
 
+  // Receipt limits
+  const [receiptLimits, setReceiptLimits] = useState<ReceiptLimit[]>([])
+  const [addingLimit, setAddingLimit] = useState(false)
+  const [newLimitCategory, setNewLimitCategory] = useState("dg_dinner")
+  const [newLimitFund, setNewLimitFund] = useState("church")
+  const [newLimitAmount, setNewLimitAmount] = useState("")
+  const [savingLimit, setSavingLimit] = useState(false)
+
   // Loading
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }, { data: schoolRows }] = await Promise.all([
+      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes] = await Promise.all([
         supabase.from("ministries").select("name, university, size, invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
+        getReceiptLimits(ministryId),
       ])
 
       if (min) {
@@ -146,6 +157,7 @@ export function SettingsTab({
         }
       }
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
+      setReceiptLimits(limitsRes.data)
       setMembers(profiles ?? [])
       setLoading(false)
     }
@@ -246,6 +258,25 @@ export function SettingsTab({
   async function handleDeleteSchool(id: string) {
     const { error } = await supabase.from("ministry_schools").delete().eq("id", id).eq("ministry_id", ministryId)
     if (!error) setSchools(prev => prev.filter(s => s.id !== id))
+  }
+
+  async function handleAddLimit() {
+    const amount = parseFloat(newLimitAmount)
+    if (!amount || amount <= 0) return
+    setSavingLimit(true)
+    const { error } = await upsertReceiptLimit({ ministryId, category: newLimitCategory, fund: newLimitFund, maxAmount: amount })
+    if (!error) {
+      const { data: fresh } = await getReceiptLimits(ministryId)
+      setReceiptLimits(fresh)
+      setAddingLimit(false)
+      setNewLimitAmount("")
+    }
+    setSavingLimit(false)
+  }
+
+  async function handleDeleteLimit(id: string) {
+    const { error } = await deleteReceiptLimit(id)
+    if (!error) setReceiptLimits(prev => prev.filter(l => l.id !== id))
   }
 
   return (
@@ -466,6 +497,57 @@ export function SettingsTab({
                     ) : (
                       <div className="px-5 py-3 border-t border-[#F0EBE0]">
                         <button onClick={() => setAddingSchool(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add school</button>
+                      </div>
+                    )
+                  )}
+                </div>
+              </section>
+
+              {/* Receipt Limits */}
+              <section>
+                <p style={SECTION_LABEL} className="mb-3">Receipt limits</p>
+                <div style={CARD} className="divide-y divide-[#F0EBE0]">
+                  {receiptLimits.length === 0 && !addingLimit && (
+                    <div className="px-5 py-4">
+                      <p style={{ fontSize: 13, color: "#8A8497" }}>No limits set. Add a limit to flag over-budget receipts.</p>
+                    </div>
+                  )}
+                  {receiptLimits.map(l => {
+                    const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
+                    const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
+                    return (
+                      <div key={l.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{catLabel}</p>
+                          <p style={{ fontSize: 12, color: "#8A8497" }}>{fundLabel} fund</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#3E1540" }}>${Number(l.max_amount).toFixed(0)}</p>
+                          {isAdmin && <button onClick={() => handleDeleteLimit(l.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8497", padding: "2px 6px", borderRadius: 6, fontSize: 12 }}>Remove</button>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {isAdmin && (
+                    addingLimit ? (
+                      <div className="px-5 py-4 flex flex-col gap-3">
+                        <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 80px" }}>
+                          <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                            {[["dg_dinner","DG Dinner"],["welcoming_week","Welcoming Week"],["coffeehouse","Coffeehouse"],["turkeybowl","Turkey Bowl"],["supplies","Supplies"],["other","Other"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                          </select>
+                          <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                            {[["church","Church"],["cmu","CMU"],["pitt","Pitt"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                          </select>
+                          <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setAddingLimit(false); setNewLimitAmount("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-5 py-3 border-t border-[#F0EBE0]">
+                        <button onClick={() => setAddingLimit(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add limit</button>
                       </div>
                     )
                   )}

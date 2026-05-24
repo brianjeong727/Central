@@ -522,6 +522,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
               <GivingTab
                 ministryId={ministryId}
                 userId={userId}
+                userRole={initialProfile.role}
                 isAdmin={isAdmin}
               />
             </div>

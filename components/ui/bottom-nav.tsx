@@ -16,7 +16,7 @@ const TABS_BASE = [
   { id: "chats" as Tab,     label: "Chats",     icon: MessageCircle },
   { id: "directory" as Tab, label: "Directory", icon: BookUser },
   { id: "profile" as Tab,   label: "You",       icon: User },
-  { id: "giving" as Tab,    label: "Give",      icon: Heart },
+  { id: "giving" as Tab,    label: "Finance",   icon: Heart },
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
