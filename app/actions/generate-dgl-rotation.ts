@@ -265,6 +265,7 @@ export async function saveDGLRotationAction(params: {
 
 export async function publishDGLRotationAction(params: {
   teamId: string
+  ministryId: string
   semester: string
   publish: boolean
 }): Promise<{ error?: string }> {
@@ -275,6 +276,82 @@ export async function publishDGLRotationAction(params: {
     .eq("team_id", params.teamId)
     .eq("semester", params.semester)
   if (error) return { error: "Failed to update publish status." }
+
+  if (params.publish) {
+    await autoCreateDGDinnerForms(admin, params.teamId, params.ministryId, params.semester)
+  }
+
   return {}
+}
+
+// Computes Friday ISO date from an anchor Sunday string
+function fridayFromSunday(sundayStr: string): string {
+  const [y, m, d] = sundayStr.split("-").map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() - 2)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
+}
+
+function formatFridayLabel(fridayDate: string): string {
+  const [y, m, d] = fridayDate.split("-").map(Number)
+  const dt = new Date(y, m - 1, d)
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+async function autoCreateDGDinnerForms(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  teamId: string,
+  ministryId: string,
+  semester: string,
+) {
+  // 1. Fetch all published friday_sg assignments
+  const { data: assignments } = await admin
+    .from("dgl_assignments")
+    .select("user_id, week_date")
+    .eq("team_id", teamId)
+    .eq("semester", semester)
+    .eq("slot", "friday_sg")
+    .eq("published", true)
+
+  if (!assignments?.length) return
+
+  // 2. Group by week_date → get pair of DGL IDs per Sunday anchor
+  const byWeek = new Map<string, string[]>()
+  for (const row of assignments as { user_id: string; week_date: string }[]) {
+    const list = byWeek.get(row.week_date) ?? []
+    list.push(row.user_id)
+    byWeek.set(row.week_date, list)
+  }
+
+  // 3. Find Treasurer name for this ministry
+  const { data: treasurerRows } = await admin
+    .from("team_members")
+    .select("profiles!user_id(name), team_roles!role_id(permissions), teams!team_id(ministry_id)")
+    .eq("teams.ministry_id", ministryId)
+  let treasurerName = "Treasurer"
+  if (treasurerRows) {
+    for (const row of treasurerRows as Record<string, unknown>[]) {
+      const perms = (row.team_roles as { permissions?: string[] } | null)?.permissions ?? []
+      if (perms.includes("can_view_finances")) {
+        treasurerName = (row.profiles as { name?: string } | null)?.name ?? "Treasurer"
+        break
+      }
+    }
+  }
+
+  // 4. Upsert one form per Friday
+  const { upsertDGDinnerForms } = await import("./reimbursements")
+  const forms = Array.from(byWeek.entries()).map(([sundayDate, dglIds]) => {
+    const fridayDate = fridayFromSunday(sundayDate)
+    return {
+      fridayDate,
+      assignedDglIds: dglIds,
+      treasurerName,
+      expensePurpose: `DG Dinner – ${formatFridayLabel(fridayDate)}`,
+    }
+  })
+
+  await upsertDGDinnerForms({ ministryId, forms })
 }
 

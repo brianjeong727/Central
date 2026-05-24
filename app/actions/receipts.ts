@@ -42,11 +42,14 @@ export async function submitReceipt(params: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: "Not authenticated" }
 
+  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single()
+
   const { data, error } = await supabase
     .from("receipts")
     .insert({
       ministry_id: params.ministryId,
       submitted_by: user.id,
+      submitted_by_name: (profile as { name?: string } | null)?.name ?? null,
       event_name: params.eventName || null,
       category: params.category,
       fund: params.fund,

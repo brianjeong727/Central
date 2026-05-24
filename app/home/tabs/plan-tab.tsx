@@ -8539,7 +8539,7 @@ function SmallGroupLeadersTab({
 
   async function handlePublish(publish: boolean) {
     setIsPublishing(true)
-    await publishDGLRotationAction({ teamId, semester, publish })
+    await publishDGLRotationAction({ teamId, ministryId, semester, publish })
     await loadExistingAssignments()
     setIsPublishing(false)
   }
