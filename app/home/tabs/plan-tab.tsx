@@ -1152,12 +1152,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Plan", "Roster", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations"
+    return (["General", "Plan", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Resources" | "Groups" | "Rotations"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations") {
+  function setTeamTabAndUrl(tab: "General" | "Plan" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1260,13 +1260,12 @@ export function StudentOrgTeamHome({
           tabs={[
             { key: "General", label: "General" },
             { key: "Plan", label: "Plan" },
-            { key: "Roster", label: "Roster" },
             { key: "Resources", label: "Resources" },
             { key: "Groups", label: "Groups" },
             { key: "Rotations", label: "Rotations" },
           ]}
           active={teamTab}
-          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Roster" | "Resources" | "Groups" | "Rotations")}
+          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Resources" | "Groups" | "Rotations")}
         />
       </div>
 
@@ -1426,32 +1425,6 @@ export function StudentOrgTeamHome({
                     </div>
                   )
                 })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ROSTER — team member list */}
-        {teamTab === "Roster" && (
-          <div>
-            <div style={{ marginBottom: 28 }}>
-              <p style={mono}>Team members</p>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Roster</h2>
-            </div>
-            {roster.length === 0 ? (
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No members yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {roster.map((m, i) => (
-                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: i < roster.length - 1 ? "1px solid #F0EDE8" : undefined }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "#F6F4EF" }}>{m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}</span>
-                    </div>
-                    <p style={{ flex: 1, fontSize: 15, fontWeight: 500, color: "#13101A", margin: 0 }}>{m.name}</p>
-                    <span style={{ padding: "3px 12px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: 12, fontWeight: 500 }}>{m.role}</span>
-                    {m.user_id === userId && <span style={{ fontSize: 11, color: "#8A8497" }}>you</span>}
-                  </div>
-                ))}
               </div>
             )}
           </div>
