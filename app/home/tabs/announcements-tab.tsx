@@ -50,6 +50,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [savedAsDraft, setSavedAsDraft] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Form builder
@@ -100,11 +101,12 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, asDraft = false) {
     e.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
     setSubmitting(true)
     setError(null)
+    const status = asDraft ? "draft" : "published"
 
     let imageUrl: string | null = null
     if (imageFile) {
@@ -127,7 +129,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
@@ -135,7 +137,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
@@ -162,6 +164,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       await supabase.from("announcement_forms").delete().eq("id", existingFormId)
     }
 
+    setSavedAsDraft(asDraft)
     setSuccess(true)
     setTimeout(() => { onSuccess(resultAnn); onClose() }, isEditing ? 1000 : 1200)
   }
@@ -173,8 +176,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <CheckCircle2 className="w-8 h-8 text-[#3E1540]" />
         </div>
         <div className="text-center">
-          <p className="text-[16px] font-bold text-[#13101A]">{isEditing ? "Announcement updated!" : "Announcement posted!"}</p>
-          <p className="text-[13px] text-[#8A8497] mt-1">{isEditing ? "Your changes have been saved." : "Your announcement is now live."}</p>
+          <p className="text-[16px] font-bold text-[#13101A]">{isEditing ? "Announcement updated!" : savedAsDraft ? "Draft saved!" : "Announcement posted!"}</p>
+          <p className="text-[13px] text-[#8A8497] mt-1">{isEditing ? "Your changes have been saved." : savedAsDraft ? "Only leaders and admins can see this." : "Your announcement is now live."}</p>
         </div>
       </div>
     )
@@ -265,10 +268,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
           </div>
         </form>
-        <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
+        <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4 flex flex-col gap-2">
           <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide">
             {submitting ? "Posting…" : isEditing ? "Save Changes" : "Post Announcement"}
           </button>
+          {!isEditing && (
+            <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="w-full bg-transparent border border-[#E5E0D2] disabled:opacity-50 text-[#5A5466] font-semibold py-3 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
+              Save as Draft
+            </button>
+          )}
         </div>
       </div>
 
@@ -313,6 +321,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               Cancel
             </button>
             <div className="flex-1" />
+            {!isEditing && (
+              <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="mr-2 px-5 py-2.5 rounded-[10px] border border-[#E2DDCF] disabled:opacity-50 text-[#5A5466] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px] hover:bg-[#F1ECDE]">
+                Save draft
+              </button>
+            )}
             <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
               {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
             </button>
@@ -673,7 +686,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       const audienceFilter = userGradYear
         ? `audience.is.null,audience.eq.all,audience.eq.${userGradYear},audience.eq.group`
         : `audience.is.null,audience.eq.all,audience.eq.group`
-      annQuery = annQuery.or(audienceFilter)
+      annQuery = annQuery.or(audienceFilter).or("status.is.null,status.eq.published")
     }
 
     const { data: annData } = await annQuery
@@ -927,7 +940,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 {filteredDesktop.map((ann, i) => (
                   <div key={ann.id} style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}>
                     <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
-                      <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
+                        {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
+                      </div>
                       <div>
                         <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2 }}>{ann.title}</div>
                         <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
@@ -958,7 +974,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     <div style={{ padding: "26px 28px 22px" }}>
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
-                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309" }}>Draft</span>}
+                          <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
+                        </div>
                       </div>
                       <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
                       <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>

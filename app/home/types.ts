@@ -63,6 +63,7 @@ export interface Announcement {
   audience: string | null
   created_by: string | null
   show_attendees: boolean
+  status?: string
 }
 
 export interface RsvpAttendee {
