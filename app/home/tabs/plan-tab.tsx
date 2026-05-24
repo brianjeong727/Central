@@ -1763,6 +1763,11 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
                 {activeTeamName}
               </h1>
+              {isStudentOrgBoard && studentOrgRole && (
+                <span style={{ display: "inline-block", marginTop: 10, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#3E1540", background: "rgba(62,21,64,0.07)", borderRadius: 999, padding: "3px 10px" }}>
+                  {studentOrgRole}
+                </span>
+              )}
               <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
                 The week as it stands. Groups to prepare, people to thank.
               </p>
