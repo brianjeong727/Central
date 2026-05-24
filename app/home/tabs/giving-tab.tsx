@@ -17,6 +17,16 @@ import {
   submitReceiptForForm, getReceiptForForm, getUserSavedSignature,
   addBudgetEntry, getBudgetEntries, exportBudgetCSV,
 } from "@/app/actions/reimbursements"
+import {
+  getBudgetAllocations, getCategoryActuals, upsertBudgetAllocation,
+  type BudgetAllocation, type CategoryActual,
+} from "@/app/actions/budget-planning"
+
+function currentFiscalYear(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+}
 import type { Receipt as ReceiptType, ReceiptLimit } from "@/app/actions/receipts"
 import type { ReimbursementForm, ItemizedExpense, BudgetEntry } from "@/app/actions/reimbursements"
 
@@ -28,8 +38,8 @@ interface Props {
   isAdmin: boolean
   isTreasurer: boolean
   isDGL: boolean
-  activeSection: "give" | "reimbursements" | "budget"
-  onSectionChange: (s: "give" | "reimbursements" | "budget") => void
+  activeSection: "give" | "reimbursements" | "budget" | "allocation"
+  onSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
 }
 
 const CATEGORIES = [
@@ -875,13 +885,14 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     total: budgetEntries.filter(e => e.category === cat.value).reduce((sum, e) => sum + Number(e.amount), 0),
   })).filter(c => c.total > 0)
 
-  const visibleSections: { id: "give" | "reimbursements" | "budget"; label: string }[] = [
+  const visibleSections: { id: "give" | "reimbursements" | "budget" | "allocation"; label: string }[] = [
     { id: "give", label: "Give" },
     ...(canAccessReimbursements ? [{ id: "reimbursements" as const, label: "Reimbursements" }] : []),
     ...(canAccessBudget ? [{ id: "budget" as const, label: "Budget" }] : []),
+    ...(canAccessBudget ? [{ id: "allocation" as const, label: "Allocation" }] : []),
   ]
 
-  const sectionLabel = activeSection === "give" ? "Finance" : activeSection === "reimbursements" ? "Reimbursements" : "Budget"
+  const sectionLabel = activeSection === "give" ? "Finance" : activeSection === "reimbursements" ? "Reimbursements" : activeSection === "budget" ? "Budget" : "Allocation"
 
   return (
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
@@ -899,6 +910,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {activeSection === "give" && "Give directly and track ministry expenses in one place."}
             {activeSection === "reimbursements" && "Submit receipts and track reimbursement forms for ministry expenses."}
             {activeSection === "budget" && "Track all ministry expenses and approved reimbursements."}
+            {activeSection === "allocation" && "Set per-fund targets for each spending category and track progress toward them."}
           </p>
         </div>
 
@@ -1067,6 +1079,11 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
               </div>
             )}
 
+            {/* ── Allocation ── */}
+            {activeSection === "allocation" && canAccessBudget && (
+              <AllocationSection ministryId={ministryId} isTreasurer={isTreasurer} isAdmin={isAdmin} />
+            )}
+
             {/* ── Budget ── */}
             {activeSection === "budget" && canAccessBudget && (
               <div>
@@ -1152,6 +1169,388 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
           onClose={() => setShowSubmitReceiptModal(false)}
           onSubmitted={() => {}}
         />
+      )}
+    </div>
+  )
+}
+
+// ── AllocationSection ──────────────────────────────────────────────────────────
+
+function generateYearOptions(): string[] {
+  const fy = currentFiscalYear()
+  const [startYear] = fy.split("-").map(Number)
+  return [
+    `${startYear - 1}-${startYear}`,
+    `${startYear}-${startYear + 1}`,
+    `${startYear + 1}-${startYear + 2}`,
+  ]
+}
+
+function AllocationSection({
+  ministryId,
+  isTreasurer,
+  isAdmin,
+}: {
+  ministryId: string
+  isTreasurer: boolean
+  isAdmin: boolean
+}) {
+  const canEdit = isTreasurer || isAdmin
+  const [fiscalYear, setFiscalYear] = useState<string>(currentFiscalYear)
+  const [allocations, setAllocations] = useState<BudgetAllocation[]>([])
+  const [actuals, setActuals] = useState<CategoryActual[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
+  const [savingCell, setSavingCell] = useState<string | null>(null)
+
+  // Draft edits: key = `${category}::${fund}`, value = string input
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+
+  const yearOptions = generateYearOptions()
+  const isPastYear = fiscalYear !== currentFiscalYear()
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const [{ data: allocs }, { data: acts }] = await Promise.all([
+        getBudgetAllocations(ministryId, fiscalYear),
+        getCategoryActuals(ministryId, fiscalYear),
+      ])
+      setAllocations(allocs)
+      setActuals(acts)
+      setLoading(false)
+    }
+    load()
+  }, [ministryId, fiscalYear])
+
+  // Build lookup: category → fund → amount
+  function getAllocAmount(category: string, fund: string): number {
+    return allocations.find(a => a.category === category && a.fund === fund)?.allocated_amount ?? 0
+  }
+
+  function getAllocNotes(category: string): string {
+    return allocations.find(a => a.category === category)?.notes ?? ""
+  }
+
+  function getActual(category: string): number {
+    return actuals.find(a => a.category === category)?.total_spent ?? 0
+  }
+
+  function getDraftKey(category: string, fund: string) {
+    return `${category}::${fund}`
+  }
+
+  function getDraftValue(category: string, fund: string): string {
+    const key = getDraftKey(category, fund)
+    if (key in drafts) return drafts[key]
+    const amt = getAllocAmount(category, fund)
+    return amt > 0 ? String(amt) : ""
+  }
+
+  async function handleCellBlur(category: string, fund: string) {
+    const key = getDraftKey(category, fund)
+    if (!(key in drafts)) return
+    const raw = drafts[key].trim()
+    const amount = raw === "" ? 0 : parseFloat(raw)
+    if (isNaN(amount) || amount < 0) {
+      // Revert
+      setDrafts(prev => { const n = { ...prev }; delete n[key]; return n })
+      return
+    }
+    setSavingCell(key)
+    const { error } = await upsertBudgetAllocation({ ministryId, fiscalYear, category, fund, amount })
+    if (!error) {
+      setAllocations(prev => {
+        const existing = prev.find(a => a.category === category && a.fund === fund)
+        if (existing) return prev.map(a => a.category === category && a.fund === fund ? { ...a, allocated_amount: amount } : a)
+        return [...prev, { id: "", ministry_id: ministryId, fiscal_year: fiscalYear, category, fund, allocated_amount: amount, notes: null }]
+      })
+    }
+    setDrafts(prev => { const n = { ...prev }; delete n[key]; return n })
+    setSavingCell(null)
+  }
+
+  async function handleNotesBlur(category: string, notes: string) {
+    // Save notes to the first fund row for this category (or church by default)
+    const fund = allocations.find(a => a.category === category)?.fund ?? "church"
+    await upsertBudgetAllocation({ ministryId, fiscalYear, category, fund, amount: getAllocAmount(category, fund), notes })
+    setAllocations(prev => prev.map(a => a.category === category ? { ...a, notes } : a))
+  }
+
+  // Totals
+  const totalAllocated = CATEGORIES.reduce((sum, cat) => {
+    return sum + FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+  }, 0)
+  const totalSpent = CATEGORIES.reduce((sum, cat) => sum + getActual(cat.value), 0)
+  const totalRemaining = totalAllocated - totalSpent
+  const pct = totalAllocated > 0 ? Math.min(100, (totalSpent / totalAllocated) * 100) : 0
+  const overBudget = totalRemaining < 0
+
+  const monoLabel: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C",
+  }
+  const cellInput: React.CSSProperties = {
+    background: "transparent", border: "none", outline: "none",
+    fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A",
+    width: "100%", padding: 0,
+    borderBottom: "1px solid #3E1540",
+  }
+
+  return (
+    <div>
+      {/* Section header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
+        <div>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
+            Annual Budget · {fiscalYear}
+          </p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: -0.4 }}>
+            Annual Allocation
+          </h2>
+          <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8, lineHeight: 1.6 }}>
+            Set per-fund targets for each spending category and track progress toward them.
+          </p>
+        </div>
+        {/* Year selector */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {yearOptions.map(y => (
+              <button
+                key={y}
+                onClick={() => setFiscalYear(y)}
+                style={{
+                  padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  background: fiscalYear === y ? "#3E1540" : "#F1ECDE",
+                  color: fiscalYear === y ? "#FBF8F2" : "#5A5466",
+                  border: fiscalYear === y ? "none" : "1px solid #E2DDCF",
+                }}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+          {isPastYear && (
+            <span style={{ fontSize: 11, color: "#8A8497", fontStyle: "italic" }}>Past year — read only</span>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+      ) : (
+        <>
+          {/* Summary stat cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }} className="max-md:!grid-cols-1">
+            {[
+              { label: "Total Budgeted", value: totalAllocated, sub: "across all funds" },
+              { label: "Total Spent", value: totalSpent, sub: "this fiscal year" },
+              { label: "Remaining", value: totalRemaining, sub: overBudget ? "over budget" : "available", danger: overBudget },
+            ].map(card => (
+              <div
+                key={card.label}
+                style={{
+                  padding: 22, borderRadius: 14,
+                  background: card.danger ? "#FDF1F1" : "#FBF8F2",
+                  border: `1px solid ${card.danger ? "#E8C5C5" : "#E8E2D2"}`,
+                }}
+              >
+                <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>
+                  {card.label}
+                </p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, letterSpacing: -0.6, color: card.danger ? "#9F3030" : "#13101A", margin: "10px 0 0" }}>
+                  ${Math.abs(card.value).toFixed(2)}
+                </p>
+                <p style={{ fontSize: 13, color: card.danger ? "#9F3030" : "#8A8497", marginTop: 4 }}>
+                  {card.danger && card.value < 0 ? `$${Math.abs(card.value).toFixed(2)} over · ` : ""}{card.sub}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          {totalAllocated > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ height: 4, borderRadius: 99, background: "#E8E2D2", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: overBudget ? "#9F3030" : "#3E1540", transition: "width 0.3s" }} />
+              </div>
+              <p style={{ fontSize: 12, color: "#8A8497", marginTop: 6 }}>
+                {pct.toFixed(0)}% of budget used{overBudget ? " — over budget" : ""}
+              </p>
+            </div>
+          )}
+
+          {/* Past year banner */}
+          {isPastYear && (
+            <div style={{ padding: "10px 16px", background: "#F4F1E8", border: "1px solid #E2DDCF", borderRadius: 10, marginBottom: 20, fontSize: 13, color: "#5A5466" }}>
+              Viewing {fiscalYear} — read only. Switch to {currentFiscalYear()} to edit.
+            </div>
+          )}
+
+          {/* Allocation table */}
+          <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, overflow: "hidden" }}>
+            {/* Table header */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "10px 16px", borderBottom: "1px solid #E8E2D2", background: "#F8F4EA" }}>
+              {["Category", "Church", "CMU", "Pitt", "Total", "Spent", "Remaining", ""].map((h, i) => (
+                <span key={i} style={{ ...monoLabel, display: "block" }}>{h}</span>
+              ))}
+            </div>
+
+            {/* Category rows */}
+            {CATEGORIES.map((cat, catIdx) => {
+              const catTotal = FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+              const spent = getActual(cat.value)
+              const remaining = catTotal - spent
+              const rowOver = remaining < 0 && catTotal > 0
+              const notesExpanded = expandedNotes.has(cat.value)
+              const notes = getAllocNotes(cat.value)
+
+              return (
+                <div key={cat.value}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px",
+                      gap: 0,
+                      padding: "13px 16px",
+                      borderTop: catIdx > 0 ? "1px solid #F0EBE0" : "none",
+                      borderLeft: rowOver ? "3px solid #9F3030" : "3px solid transparent",
+                      alignItems: "center",
+                      background: rowOver ? "#FDF9F9" : "transparent",
+                    }}
+                  >
+                    {/* Category label */}
+                    <span style={{ fontSize: 14, color: "#13101A" }}>{cat.label}</span>
+
+                    {/* Fund cells */}
+                    {FUNDS.map(fund => {
+                      const cellKey = getDraftKey(cat.value, fund.value)
+                      const isSaving = savingCell === cellKey
+                      const draftVal = getDraftValue(cat.value, fund.value)
+                      const displayAmt = getAllocAmount(cat.value, fund.value)
+
+                      return (
+                        <div
+                          key={fund.value}
+                          style={{ padding: "2px 8px 2px 0" }}
+                          title={isPastYear ? undefined : `Click to edit ${fund.label} allocation for ${cat.label}`}
+                        >
+                          {canEdit && !isPastYear ? (
+                            <div style={{ position: "relative" }}>
+                              <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#A09A8C", pointerEvents: "none", lineHeight: 1 }}>
+                                {draftVal !== "" || (cellKey in drafts) ? "$" : ""}
+                              </span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={cellKey in drafts ? draftVal : (displayAmt > 0 ? String(displayAmt) : "")}
+                                onChange={e => setDrafts(prev => ({ ...prev, [cellKey]: e.target.value }))}
+                                onFocus={e => {
+                                  if (!(cellKey in drafts)) setDrafts(prev => ({ ...prev, [cellKey]: displayAmt > 0 ? String(displayAmt) : "" }))
+                                  e.target.select()
+                                }}
+                                onBlur={() => handleCellBlur(cat.value, fund.value)}
+                                placeholder="—"
+                                disabled={isSaving}
+                                style={{
+                                  ...cellInput,
+                                  paddingLeft: draftVal || displayAmt > 0 ? 14 : 0,
+                                  opacity: isSaving ? 0.5 : 1,
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 14, color: displayAmt > 0 ? "#13101A" : "#A09A8C" }}>
+                              {displayAmt > 0 ? `$${displayAmt.toFixed(2)}` : "—"}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    {/* Total */}
+                    <span style={{ fontSize: 14, color: "#13101A", fontWeight: catTotal > 0 ? 500 : 400 }}>
+                      {catTotal > 0 ? `$${catTotal.toFixed(2)}` : "—"}
+                    </span>
+
+                    {/* Spent */}
+                    <span style={{ fontSize: 14, color: spent > 0 ? "#13101A" : "#A09A8C" }}>
+                      {spent > 0 ? `$${spent.toFixed(2)}` : "—"}
+                    </span>
+
+                    {/* Remaining */}
+                    <span style={{ fontSize: 14, color: rowOver ? "#9F3030" : remaining > 0 ? "#2D5445" : "#A09A8C", fontWeight: rowOver ? 500 : 400 }}>
+                      {catTotal > 0 ? (remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : "—"}
+                    </span>
+
+                    {/* Notes toggle */}
+                    <button
+                      onClick={() => setExpandedNotes(prev => {
+                        const n = new Set(prev)
+                        n.has(cat.value) ? n.delete(cat.value) : n.add(cat.value)
+                        return n
+                      })}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: notes ? "#3E1540" : "#C4C0B0", fontSize: 13, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Notes"
+                    >
+                      {notesExpanded ? "▴" : "▾"}
+                    </button>
+                  </div>
+
+                  {/* Notes row */}
+                  {notesExpanded && (
+                    <div style={{ padding: "8px 16px 12px 19px", borderTop: "1px dashed #E8E2D2", background: "#FDFAF5" }}>
+                      {canEdit && !isPastYear ? (
+                        <textarea
+                          defaultValue={notes}
+                          placeholder="Add context for this category (e.g. 'Church provides full retreat budget, CMU covers supplies')"
+                          onBlur={e => handleNotesBlur(cat.value, e.target.value)}
+                          rows={2}
+                          style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--font-inter)", fontStyle: notes ? "normal" : "italic", color: "#5A5466", lineHeight: 1.5, boxSizing: "border-box" }}
+                        />
+                      ) : (
+                        <p style={{ fontSize: 13, color: notes ? "#5A5466" : "#A09A8C", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
+                          {notes || "No notes for this category."}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Footer totals row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "12px 16px", borderTop: "1px solid #E8E2D2", background: "#F8F4EA" }}>
+              <span style={{ ...monoLabel, fontSize: "11px", color: "#5A5466" }}>Total</span>
+              {FUNDS.map(fund => {
+                const fundTotal = CATEGORIES.reduce((s, cat) => s + getAllocAmount(cat.value, fund.value), 0)
+                return (
+                  <span key={fund.value} style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>
+                    {fundTotal > 0 ? `$${fundTotal.toFixed(2)}` : "—"}
+                  </span>
+                )
+              })}
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>
+                {totalAllocated > 0 ? `$${totalAllocated.toFixed(2)}` : "—"}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: totalSpent > 0 ? "#13101A" : "#A09A8C" }}>
+                {totalSpent > 0 ? `$${totalSpent.toFixed(2)}` : "—"}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: overBudget ? "#9F3030" : totalRemaining > 0 ? "#2D5445" : "#A09A8C" }}>
+                {totalAllocated > 0 ? (totalRemaining < 0 ? `-$${Math.abs(totalRemaining).toFixed(2)}` : `$${totalRemaining.toFixed(2)}`) : "—"}
+              </span>
+              <span />
+            </div>
+          </div>
+
+          {/* Empty state hint */}
+          {totalAllocated === 0 && !isPastYear && (
+            <p style={{ textAlign: "center", fontSize: 13, color: "#8A8497", marginTop: 20, fontStyle: "italic" }}>
+              No budget set for {fiscalYear} yet. Click any Church, CMU, or Pitt cell to start allocating.
+            </p>
+          )}
+        </>
       )}
     </div>
   )

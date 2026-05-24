@@ -536,8 +536,8 @@ export interface DesktopSidebarProps {
   onActiveTeamChange: (id: string) => void
   profileSection: "spiritual-profile" | "journal"
   onProfileSectionChange: (s: "spiritual-profile" | "journal") => void
-  financeSection: "give" | "reimbursements" | "budget"
-  onFinanceSectionChange: (s: "give" | "reimbursements" | "budget") => void
+  financeSection: "give" | "reimbursements" | "budget" | "allocation"
+  onFinanceSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
   isTreasurer: boolean
   isDGL: boolean
 }

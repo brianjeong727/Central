@@ -18,6 +18,13 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
+import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
+
+function currentFiscalYear(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+}
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
@@ -4484,6 +4491,7 @@ export function EventPlanWorkspace({
   const [eventStatus, setEventStatus] = useState<'planning' | 'active' | 'complete'>(calendarEvent.status ?? 'planning')
   const [showAddEventModal, setShowAddEventModal] = useState(false)
   const [rsvpCount, setRsvpCount] = useState<number | null>(null)
+  const [ministryBudget, setMinistryBudget] = useState<{ total: number; byFund: Record<string, number> } | null>(null)
 
   const [activeSection, setActiveSection] = useState<ActiveSection>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
@@ -4637,6 +4645,12 @@ export function EventPlanWorkspace({
           .select("*", { count: "exact", head: true })
           .eq("announcement_id", (calendarEvent as { linked_announcement_id: string }).linked_announcement_id)
         setRsvpCount(count ?? 0)
+      }
+
+      // Fetch ministry budget allocation for this event's category
+      if (typeCfg.budgetCategory) {
+        const { data: budgetData } = await getCategoryBudgetAllocation(ministryId, typeCfg.budgetCategory, currentFiscalYear())
+        setMinistryBudget(budgetData)
       }
 
       setLoading(false)
@@ -5049,12 +5063,27 @@ export function EventPlanWorkspace({
                     )}
                     <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated</p>
                     {typeCfg.budgetCategory && (
-                      <button
-                        onClick={() => setActiveSectionAndUrl('overview')}
-                        style={{ marginTop: 8, fontSize: 12, color: "#3E1540", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
-                      >
-                        → View in Finance
-                      </button>
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E8E2D2" }}>
+                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>
+                          Ministry · {typeCfg.label}
+                        </p>
+                        {ministryBudget ? (
+                          <>
+                            <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", marginTop: 6 }}>
+                              ${ministryBudget.total.toFixed(2)} total
+                            </p>
+                            <p style={{ fontSize: 12, color: "#5A5466", marginTop: 2 }}>
+                              {Object.entries(ministryBudget.byFund)
+                                .map(([fund, amt]) => `${fund.charAt(0).toUpperCase() + fund.slice(1)} $${amt.toFixed(2)}`)
+                                .join(" · ")}
+                            </p>
+                          </>
+                        ) : (
+                          <p style={{ fontSize: 12, color: "#A09A8C", fontStyle: "italic", marginTop: 6 }}>
+                            No ministry budget set
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                   {/* Readiness */}

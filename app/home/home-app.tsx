@@ -109,13 +109,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
 
-  const validFinanceSections = ["give", "reimbursements", "budget"] as const
-  const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | null
-  const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget">(
+  const validFinanceSections = ["give", "reimbursements", "budget", "allocation"] as const
+  const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | "allocation" | null
+  const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget" | "allocation">(
     initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "give"
   )
 
-  function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget") {
+  function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
     setFinanceSection(s)
     replaceParam("finance", s === "give" ? null : s)
   }

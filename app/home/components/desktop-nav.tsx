@@ -169,10 +169,11 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     if (activeTab === "giving") {
-      const financeSections: { label: string; section: "give" | "reimbursements" | "budget"; show: boolean }[] = [
+      const financeSections: { label: string; section: "give" | "reimbursements" | "budget" | "allocation"; show: boolean }[] = [
         { label: "Give", section: "give", show: true },
         { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
         { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
+        { label: "Allocation", section: "allocation", show: !!(isTreasurer || isAdmin) },
       ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
