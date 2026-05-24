@@ -5602,6 +5602,7 @@ function GroupGeneratorWizard({
             leader_id: g.leader_id,
             leader_gender: g.leader_gender,
             name: g.name,
+            paired_with_leader_id: g.pair_leader_id,
             members: g.members.map(m => ({ id: m.id })),
           })),
         })
@@ -7928,6 +7929,7 @@ function SmallGroupLeadersTab({
 
   // Home — assignments + small groups
   const [myUpcoming, setMyUpcoming] = useState<DGLAssignmentRow[]>([])
+  const [fridayPartners, setFridayPartners] = useState<Map<string, string>>(new Map()) // week_date → partner name
   const [myGroups, setMyGroups] = useState<SGGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Map<string, SGMember[]>>(new Map())
   const [pairedGroups, setPairedGroups] = useState<Map<string, SGGroup>>(new Map())
@@ -8026,7 +8028,35 @@ function SmallGroupLeadersTab({
       .eq("published", true)
       .eq("semester", semester)
       .order("week_date", { ascending: true })
-    setMyUpcoming((aData ?? []) as DGLAssignmentRow[])
+    const myAssignments = (aData ?? []) as DGLAssignmentRow[]
+    setMyUpcoming(myAssignments)
+
+    // For Friday SG assignments, load the partner (the other DGL assigned to the same week_date+slot)
+    const fridayWeeks = myAssignments.filter(a => a.slot === "friday_sg").map(a => a.week_date)
+    if (fridayWeeks.length > 0) {
+      const { data: partnerData } = await supabase
+        .from("dgl_assignments")
+        .select("week_date, user_id")
+        .eq("team_id", teamId)
+        .eq("slot", "friday_sg")
+        .eq("published", true)
+        .neq("user_id", userId)
+        .in("week_date", fridayWeeks)
+      const partnerUids = (partnerData ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean)
+      let partnerNameMap = new Map<string, string>()
+      if (partnerUids.length > 0) {
+        const { data: pProfiles } = await supabase.from("profiles").select("id, name").in("id", partnerUids)
+        partnerNameMap = new Map((pProfiles ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+      }
+      const fpMap = new Map<string, string>()
+      for (const r of (partnerData ?? []) as { week_date: string; user_id: string }[]) {
+        const name = partnerNameMap.get(r.user_id)
+        if (name) fpMap.set(r.week_date, name)
+      }
+      setFridayPartners(fpMap)
+    } else {
+      setFridayPartners(new Map())
+    }
 
     const { data: gData } = await supabase
       .from("small_groups")
@@ -8412,6 +8442,7 @@ function SmallGroupLeadersTab({
                   const d = new Date(sunday)
                   d.setDate(sunday.getDate() + (slotOffset[a.slot] ?? 0))
                   const isPraiseSlot = a.slot === "wednesday_pm" || a.slot === "friday_sg"
+                  const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
                   return (
                     <div key={a.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[#F3F0F7] flex flex-col items-center justify-center flex-shrink-0">
@@ -8423,7 +8454,7 @@ function SmallGroupLeadersTab({
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-semibold text-[#13101A] truncate">{DGL_SLOT_LABELS[a.slot]}</p>
                         <p className="text-[12px] text-[#8A8497]">
-                          {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {partner ? `Cooking with ${partner.split(" ")[0]}` : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                       </div>
                       {isPraiseSlot && (
@@ -9037,7 +9068,7 @@ function SmallGroupLeadersTab({
                       )}
                       <DGLAssignmentTable
                         assignments={proposedAssignments.map(a => ({
-                          id: `${a.week_date}::${a.slot}`,
+                          id: `${a.week_date}::${a.slot}::${a.user_id}`,
                           user_id: a.user_id, week_date: a.week_date, slot: a.slot,
                           semester, published: false, user_name: a.user_name,
                         }))}
@@ -9125,16 +9156,22 @@ function DGLAssignmentTable({
               )}
             </div>
             {SLOTS.map((slot, si) => {
-              const r = weekRows.find(a => a.slot === slot)
+              const isFriday = slot === "friday_sg"
+              const fridayRows = isFriday ? weekRows.filter(a => a.slot === "friday_sg") : []
+              const r = isFriday ? undefined : weekRows.find(a => a.slot === slot)
               const isFlagged = flaggedKeys.has(`${wd}::${slot}`)
-              const isEditing = editingCell?.weekDate === wd && editingCell?.slot === slot
-              const isHovered = hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
+              const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
+              const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
                 <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
-                  {isEditing && rosterMembers && rosterMembers.length > 0 ? (
+                  {isFriday ? (
+                    <span style={{ fontSize: 13, fontWeight: 500, color: fridayRows.length > 0 ? "#13101A" : "#F87171" }}>
+                      {fridayRows.length > 0 ? fridayRows.map(r => r.user_name.split(" ")[0]).join(" + ") : "Unassigned"}
+                    </span>
+                  ) : isEditing && rosterMembers && rosterMembers.length > 0 ? (
                     <select
                       autoFocus
                       defaultValue={r?.user_id ?? ""}

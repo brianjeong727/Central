@@ -8,7 +8,7 @@ export type GenerateRotationParams = {
   teamId: string
   ministryId: string
   semester: string
-  weeks: string[]  // ISO date strings for each week in the semester
+  weeks: string[]  // ISO date strings for each week in the semester (anchor Sundays)
 }
 
 export type GenerateRotationResult = {
@@ -16,6 +16,8 @@ export type GenerateRotationResult = {
   flaggedWeeks: { week_date: string; slot: DGLSlot; reason: string }[]
   error?: string
 }
+
+type DGLPair = { a: string; b: string; aName: string; bName: string }
 
 // Maps a rotation slot + its anchor Sunday to the specific date and avail slot key
 const SLOT_TO_AVAIL = {
@@ -69,7 +71,37 @@ export async function generateDGLRotationAction(
       (profileRows ?? []).map((p: { id: string; name: string }) => [p.id, p.name])
     )
 
-    // 2. Fetch date-specific availability
+    // 2. Fetch DGL pairs from small_groups (leader_id ↔ paired leader_id)
+    const { data: sgRows } = await admin
+      .from("small_groups")
+      .select("id, leader_id, paired_group_id")
+      .eq("team_id", params.teamId)
+      .not("paired_group_id", "is", null)
+
+    // Build pairs list (deduplicated — each pair appears once)
+    const pairs: DGLPair[] = []
+    const pairedSet = new Set<string>()
+    const leaderByGroupId = new Map<string, string>()
+    for (const sg of (sgRows ?? []) as { id: string; leader_id: string; paired_group_id: string }[]) {
+      leaderByGroupId.set(sg.id, sg.leader_id)
+    }
+    for (const sg of (sgRows ?? []) as { id: string; leader_id: string; paired_group_id: string }[]) {
+      const pairKey = [sg.leader_id, sg.paired_group_id].sort().join("::")
+      if (pairedSet.has(pairKey)) continue
+      pairedSet.add(pairKey)
+      const pairedLeaderId = leaderByGroupId.get(sg.paired_group_id)
+      if (!pairedLeaderId) continue
+      // Only include pairs where both DGLs are in the current roster
+      if (!memberIds.includes(sg.leader_id) || !memberIds.includes(pairedLeaderId)) continue
+      pairs.push({
+        a: sg.leader_id,
+        b: pairedLeaderId,
+        aName: profiles.get(sg.leader_id) ?? sg.leader_id,
+        bName: profiles.get(pairedLeaderId) ?? pairedLeaderId,
+      })
+    }
+
+    // 3. Fetch date-specific availability
     const { data: availRows } = await admin
       .from("dgl_availability")
       .select("user_id, week_date, slot, is_busy")
@@ -83,42 +115,69 @@ export async function generateDGLRotationAction(
         .map((r: { user_id: string; week_date: string; slot: string }) => `${r.user_id}::${r.week_date}::${r.slot}`)
     )
 
-    // 3. Run assignment algorithm — 1 person per slot per week
+    // 4. Run assignment algorithm
     const assignments: ProposedAssignment[] = []
     const flaggedWeeks: GenerateRotationResult["flaggedWeeks"] = []
 
     // slotCounts[uid][slot] = times this person has been assigned to this slot.
-    // Used for soft preference only — no hard cap, repeats are fine.
     const slotCounts = new Map<string, Map<DGLSlot, number>>()
     for (const uid of memberIds) slotCounts.set(uid, new Map())
 
     // totalCounts drives fairness (fewest-assigned gets priority).
     const totalCounts = new Map<string, number>(memberIds.map(id => [id, 0]))
 
+    // pairCounts[pairKey] = times this pair has been assigned to friday_sg.
+    const pairCounts = new Map<string, number>()
+
     for (const weekDate of params.weeks) {
       for (const slot of SLOTS) {
         const specificDate = dateForSlot(weekDate, slot)
         const availSlot = SLOT_TO_AVAIL[slot].availSlot
 
-        // Absence of a record = available. Only is_busy=true means unavailable.
-        const available = memberIds.filter(uid => !busySet.has(`${uid}::${specificDate}::${availSlot}`))
+        if (slot === "friday_sg" && pairs.length > 0) {
+          // ── Friday: assign a PAIR, not an individual ──────────────────────
+          const availablePairs = pairs.filter(p =>
+            !busySet.has(`${p.a}::${specificDate}::${availSlot}`) &&
+            !busySet.has(`${p.b}::${specificDate}::${availSlot}`)
+          )
 
-        // Flag only when zero DGLs are available for this slot.
-        if (available.length === 0) {
-          flaggedWeeks.push({ week_date: weekDate, slot, reason: "No available DGLs." })
-        }
+          const needsReview = availablePairs.length === 0
+          if (needsReview) {
+            flaggedWeeks.push({ week_date: weekDate, slot, reason: "No available DGL pair." })
+          }
 
-        const picked = pickFairest(available, totalCounts, slotCounts, slot)
-        if (picked) {
-          assignments.push({
-            week_date: weekDate, slot,
-            user_id: picked,
-            user_name: profiles.get(picked) ?? picked,
-            needs_review: available.length === 0,
-          })
-          const sc = slotCounts.get(picked)!
-          sc.set(slot, (sc.get(slot) ?? 0) + 1)
-          totalCounts.set(picked, (totalCounts.get(picked) ?? 0) + 1)
+          const pool = availablePairs.length > 0 ? availablePairs : pairs
+          const picked = pickFairestPair(pool, totalCounts, pairCounts)
+          if (picked) {
+            const pk = [picked.a, picked.b].sort().join("::")
+            pairCounts.set(pk, (pairCounts.get(pk) ?? 0) + 1)
+            for (const [uid, name] of [[picked.a, picked.aName], [picked.b, picked.bName]] as [string, string][]) {
+              assignments.push({ week_date: weekDate, slot, user_id: uid, user_name: name, needs_review: needsReview })
+              const sc = slotCounts.get(uid)!
+              sc.set(slot, (sc.get(slot) ?? 0) + 1)
+              totalCounts.set(uid, (totalCounts.get(uid) ?? 0) + 1)
+            }
+          }
+        } else {
+          // ── Other slots (and friday fallback if no pairs configured) ──────
+          const available = memberIds.filter(uid => !busySet.has(`${uid}::${specificDate}::${availSlot}`))
+
+          if (available.length === 0) {
+            flaggedWeeks.push({ week_date: weekDate, slot, reason: "No available DGLs." })
+          }
+
+          const picked = pickFairest(available.length > 0 ? available : memberIds, totalCounts, slotCounts, slot)
+          if (picked) {
+            assignments.push({
+              week_date: weekDate, slot,
+              user_id: picked,
+              user_name: profiles.get(picked) ?? picked,
+              needs_review: available.length === 0,
+            })
+            const sc = slotCounts.get(picked)!
+            sc.set(slot, (sc.get(slot) ?? 0) + 1)
+            totalCounts.set(picked, (totalCounts.get(picked) ?? 0) + 1)
+          }
         }
       }
     }
@@ -127,6 +186,27 @@ export async function generateDGLRotationAction(
   } catch (e) {
     return { assignments: [], flaggedWeeks: [], error: `Unexpected error: ${e instanceof Error ? e.message : String(e)}` }
   }
+}
+
+// Picks the pair with fewest total Friday assignments (sum of both counts), ties broken by min individual count.
+function pickFairestPair(
+  candidates: DGLPair[],
+  totalCounts: Map<string, number>,
+  pairCounts: Map<string, number>,
+): DGLPair | null {
+  if (candidates.length === 0) return null
+  const pool = [...candidates]
+  pool.sort((p1, p2) => {
+    const pk1 = [p1.a, p1.b].sort().join("::")
+    const pk2 = [p2.a, p2.b].sort().join("::")
+    const pc1 = pairCounts.get(pk1) ?? 0
+    const pc2 = pairCounts.get(pk2) ?? 0
+    if (pc1 !== pc2) return pc1 - pc2
+    const total1 = (totalCounts.get(p1.a) ?? 0) + (totalCounts.get(p1.b) ?? 0)
+    const total2 = (totalCounts.get(p2.a) ?? 0) + (totalCounts.get(p2.b) ?? 0)
+    return total1 - total2
+  })
+  return pool[0]
 }
 
 // Primary sort: fewest times in this specific slot (avoid back-to-back same slot).

@@ -19,6 +19,7 @@ export type SGGeneratedGroup = {
   leader_id: string
   leader_name: string
   leader_gender: string | null
+  pair_leader_id: string | null
   members: PoolPerson[]
 }
 
@@ -227,6 +228,7 @@ export function runSmallGroupAlgorithm(
           leader_id: dgl.user_id,
           leader_name: dgl.user_name,
           leader_gender: dgl.gender,
+          pair_leader_id: null,
           members: [],
         })
       }
@@ -252,13 +254,24 @@ export function runSmallGroupAlgorithm(
         leader_id: dgl.user_id,
         leader_name: dgl.user_name,
         leader_gender: dgl.gender,
+        pair_leader_id: null,
         members: genericGroups[i]?.members ?? [],
       })
     }
   }
 
   distribute(augMale, augMalePool)
+  const maleCount = augMale.length
   distribute(augFemale, augFemalePool)
+
+  // Pair male group i with female group i by index
+  for (let i = 0; i < maleCount; i++) {
+    const femaleIdx = maleCount + i
+    if (femaleIdx < result.length) {
+      result[i].pair_leader_id = result[femaleIdx].leader_id
+      result[femaleIdx].pair_leader_id = result[i].leader_id
+    }
+  }
 
   return result
 }

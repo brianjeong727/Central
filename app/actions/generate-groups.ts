@@ -82,11 +82,15 @@ export async function confirmSmallGroupsAction(params: {
     leader_id: string
     leader_gender: string | null
     name: string
+    paired_with_leader_id?: string | null
     members: Array<{ id: string }>
   }>
 }): Promise<{ error?: string; chatResult?: { created: number; updated: number } }> {
   try {
     const admin = createAdminClient()
+
+    // leader_id → group DB id (populated as we upsert)
+    const leaderToGroupId = new Map<string, string>()
 
     for (const g of params.groups) {
       // Find or create the small_groups row for this leader
@@ -103,7 +107,7 @@ export async function confirmSmallGroupsAction(params: {
         groupId = existing.id
         await admin
           .from("small_groups")
-          .update({ name: g.name })
+          .update({ name: g.name, paired_group_id: null })
           .eq("id", groupId)
       } else {
         const groupType = g.leader_gender === "female" ? "sisters" : "brothers"
@@ -115,6 +119,8 @@ export async function confirmSmallGroupsAction(params: {
         if (createErr || !created) return { error: `Failed to create small group: ${createErr?.message}` }
         groupId = created.id
       }
+
+      leaderToGroupId.set(g.leader_id, groupId)
 
       // Replace members
       await admin.from("small_group_members").delete().eq("group_id", groupId)
@@ -129,6 +135,15 @@ export async function confirmSmallGroupsAction(params: {
         const { error: insertErr } = await admin.from("small_group_members").insert(rows)
         if (insertErr) return { error: `Failed to assign members: ${insertErr.message}` }
       }
+    }
+
+    // Persist brother/sister pairings now that all group IDs are known
+    for (const g of params.groups) {
+      if (!g.paired_with_leader_id) continue
+      const thisGroupId = leaderToGroupId.get(g.leader_id)
+      const pairedGroupId = leaderToGroupId.get(g.paired_with_leader_id)
+      if (!thisGroupId || !pairedGroupId) continue
+      await admin.from("small_groups").update({ paired_group_id: pairedGroupId }).eq("id", thisGroupId)
     }
 
     const chatResult = await confirmSmallGroupChatsAction(params.teamId, params.ministryId)
