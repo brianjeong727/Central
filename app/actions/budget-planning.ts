@@ -111,6 +111,60 @@ export async function getCategoryActuals(
   }
 }
 
+export interface BudgetCategory {
+  id: string
+  name: string
+  created_at: string
+}
+
+export async function getBudgetCategories(
+  ministryId: string,
+): Promise<{ data: BudgetCategory[]; error: string | null }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("budget_categories")
+    .select("id, name, created_at")
+    .eq("ministry_id", ministryId)
+    .order("created_at", { ascending: true })
+  if (error) return { data: [], error: error.message }
+  return { data: (data ?? []) as BudgetCategory[], error: null }
+}
+
+export async function addBudgetCategory(
+  ministryId: string,
+  name: string,
+  userId: string,
+): Promise<{ data: BudgetCategory | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("budget_categories")
+    .insert({ ministry_id: ministryId, name: name.trim(), created_by: userId })
+    .select("id, name, created_at")
+    .single()
+  if (error) return { data: null, error: error.message }
+  return { data: data as BudgetCategory, error: null }
+}
+
+export async function deleteBudgetCategory(
+  ministryId: string,
+  categoryName: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  // Delete the allocations for this category first
+  await supabase
+    .from("budget_allocations")
+    .delete()
+    .eq("ministry_id", ministryId)
+    .eq("category", categoryName)
+  const { error } = await supabase
+    .from("budget_categories")
+    .delete()
+    .eq("ministry_id", ministryId)
+    .eq("name", categoryName)
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
 export async function getCategoryBudgetAllocation(
   ministryId: string,
   category: string,

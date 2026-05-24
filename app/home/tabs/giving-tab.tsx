@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/reimbursements"
 import {
   getBudgetAllocations, getCategoryActuals, upsertBudgetAllocation,
+  getBudgetCategories, addBudgetCategory, deleteBudgetCategory,
   type BudgetAllocation, type CategoryActual,
 } from "@/app/actions/budget-planning"
 
@@ -42,16 +43,14 @@ interface Props {
   onSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
 }
 
-const CATEGORIES = [
-  { value: "dg_dinner", label: "DG Dinner" },
-  { value: "welcoming_week", label: "Welcoming Week" },
-  { value: "retreat", label: "Retreat" },
-  { value: "bbq", label: "BBQ" },
-  { value: "coffeehouse", label: "Coffeehouse" },
-  { value: "turkeybowl", label: "Turkey Bowl" },
-  { value: "supplies", label: "Supplies" },
-  { value: "other", label: "Other" },
-]
+interface DynamicCategory {
+  value: string
+  label: string
+  isPermanent: boolean
+}
+
+// DG Dinner is the only hardcoded permanent category; all others come from calendar events + custom DB entries
+const DG_DINNER_CATEGORY: DynamicCategory = { value: "DG Dinner", label: "DG Dinner", isPermanent: true }
 
 const FUNDS = [
   { value: "church", label: "Church" },
@@ -139,14 +138,15 @@ function GivingTrustPanel({ zelleInfo, onCopy, copied }: { zelleInfo: string; on
 }
 
 function SubmitReceiptModal({
-  ministryId, limits, onClose, onSubmitted,
+  ministryId, limits, categories, onClose, onSubmitted,
 }: {
   ministryId: string; limits: ReceiptLimit[];
+  categories: DynamicCategory[];
   onClose: () => void; onSubmitted: (r: ReceiptType) => void
 }) {
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [category, setCategory] = useState("other")
+  const [category, setCategory] = useState(() => categories[0]?.value ?? "DG Dinner")
   const [fund, setFund] = useState("church")
   const [amount, setAmount] = useState("")
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0])
@@ -192,7 +192,7 @@ function SubmitReceiptModal({
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label style={labelStyle}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>{CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+            <div><label style={labelStyle}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>{categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
             <div><label style={labelStyle}>Fund</label><select value={fund} onChange={e => setFund(e.target.value)} style={inputStyle}>{FUNDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}</select></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -202,7 +202,7 @@ function SubmitReceiptModal({
           {overLimit && (
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#FFF8E1", border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color="#B45309" style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 12.5, color: "#B45309", lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {CATEGORIES.find(c => c.value === category)?.label}. You can still submit.</p>
+              <p style={{ fontSize: 12.5, color: "#B45309", lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>
           )}
           <div><label style={labelStyle}>Event name (optional)</label><input type="text" placeholder="e.g. Week 3 DG Dinner" value={eventName} onChange={e => setEventName(e.target.value)} style={inputStyle} /></div>
@@ -752,12 +752,34 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   const [creatingOther, setCreatingOther] = useState(false)
   const [showSubmitReceiptModal, setShowSubmitReceiptModal] = useState(false)
 
+  // Dynamic categories (DG Dinner permanent + calendar events + custom)
+  const [calEventCategories, setCalEventCategories] = useState<string[]>([])
+  const [customCategories, setCustomCategories] = useState<{ id: string; name: string }[]>([])
+
+  const dynamicCategories: DynamicCategory[] = [
+    DG_DINNER_CATEGORY,
+    ...calEventCategories.map(t => ({ value: t, label: t, isPermanent: true })),
+    ...customCategories.map(c => ({ value: c.name, label: c.name, isPermanent: false })),
+  ]
+
+  async function handleAddCategory(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed || dynamicCategories.some(c => c.label.toLowerCase() === trimmed.toLowerCase())) return
+    const { data, error } = await addBudgetCategory(ministryId, trimmed, userId)
+    if (!error && data) setCustomCategories(prev => [...prev, { id: data.id, name: data.name }])
+  }
+
+  async function handleDeleteCategory(categoryName: string) {
+    await deleteBudgetCategory(ministryId, categoryName)
+    setCustomCategories(prev => prev.filter(c => c.name !== categoryName))
+  }
+
   // Budget
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([])
   const [budgetLoading, setBudgetLoading] = useState(false)
   const [showAddEntry, setShowAddEntry] = useState(false)
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0])
-  const [entryCategory, setEntryCategory] = useState("other")
+  const [entryCategory, setEntryCategory] = useState("DG Dinner")
   const [entryDescription, setEntryDescription] = useState("")
   const [entryAmount, setEntryAmount] = useState("")
   const [addingEntry, setAddingEntry] = useState(false)
@@ -769,12 +791,22 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
   useEffect(() => {
     async function load() {
-      const [givingRes, limitsRes] = await Promise.all([
+      const [givingRes, limitsRes, eventsRes, customCatRes] = await Promise.all([
         supabase.from("ministry_giving").select("zelle_info").eq("ministry_id", ministryId).maybeSingle(),
         getReceiptLimits(ministryId),
+        supabase.from("calendar_events").select("title").eq("ministry_id", ministryId).order("start_date"),
+        getBudgetCategories(ministryId),
       ])
       setZelleInfo(givingRes.data?.zelle_info ?? null)
       setLimits(limitsRes.data)
+      // Dedupe calendar event titles (exclude "DG Dinner" — it's already permanent)
+      const seen = new Set<string>(["DG Dinner"])
+      const uniqueTitles: string[] = []
+      for (const e of ((eventsRes.data ?? []) as { title: string }[])) {
+        if (!seen.has(e.title)) { seen.add(e.title); uniqueTitles.push(e.title) }
+      }
+      setCalEventCategories(uniqueTitles)
+      setCustomCategories(customCatRes.data.map(c => ({ id: c.id, name: c.name })))
       setLoading(false)
     }
     load()
@@ -880,7 +912,13 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   }
 
   const displayAmount = amount || "0"
-  const categorySummary = CATEGORIES.map(cat => ({
+  // Build category summary from dynamic categories + any orphaned categories in actual entries
+  const allEntryCategories = Array.from(new Set(budgetEntries.map(e => e.category)))
+  const orphanedCategories = allEntryCategories
+    .filter(c => !dynamicCategories.some(d => d.value === c))
+    .map(c => ({ value: c, label: c, isPermanent: false }))
+  const summaryCategories = [...dynamicCategories, ...orphanedCategories]
+  const categorySummary = summaryCategories.map(cat => ({
     ...cat,
     total: budgetEntries.filter(e => e.category === cat.value).reduce((sum, e) => sum + Number(e.amount), 0),
   })).filter(c => c.total > 0)
@@ -1081,7 +1119,15 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
             {/* ── Allocation ── */}
             {activeSection === "allocation" && canAccessBudget && (
-              <AllocationSection ministryId={ministryId} isTreasurer={isTreasurer} isAdmin={isAdmin} />
+              <AllocationSection
+                ministryId={ministryId}
+                userId={userId}
+                isTreasurer={isTreasurer}
+                isAdmin={isAdmin}
+                categories={dynamicCategories}
+                onAddCategory={handleAddCategory}
+                onDeleteCategory={handleDeleteCategory}
+              />
             )}
 
             {/* ── Budget ── */}
@@ -1104,7 +1150,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>New manual entry</p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                       <div><label style={labelStyle}>Date</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={inputStyle} /></div>
-                      <div><label style={labelStyle}>Category</label><select value={entryCategory} onChange={e => setEntryCategory(e.target.value)} style={inputStyle}>{CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+                      <div><label style={labelStyle}>Category</label><select value={entryCategory} onChange={e => setEntryCategory(e.target.value)} style={inputStyle}>{dynamicCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10 }}>
                       <div><label style={labelStyle}>Description</label><input type="text" placeholder="What was this expense for?" value={entryDescription} onChange={e => setEntryDescription(e.target.value)} style={inputStyle} /></div>
@@ -1147,7 +1193,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                       <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid #F2EDE0" : "none", alignItems: "center" }}>
                         <span style={{ fontSize: 12.5, color: "#5A5466" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                         <span style={{ fontSize: 13, color: "#13101A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
-                        <span style={{ fontSize: 12.5, color: "#5A5466" }}>{CATEGORIES.find(c => c.value === e.category)?.label ?? e.category}</span>
+                        <span style={{ fontSize: 12.5, color: "#5A5466" }}>{e.category}</span>
                         <span style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>${Number(e.amount).toFixed(2)}</span>
                         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? "#EDE5F0" : "#F2F0F5", color: e.source === "reimbursement" ? "#3E1540" : "#5A5466", display: "inline-block" }}>
                           {e.source === "reimbursement" ? "Auto" : "Manual"}
@@ -1166,6 +1212,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
         <SubmitReceiptModal
           ministryId={ministryId}
           limits={limits}
+          categories={dynamicCategories}
           onClose={() => setShowSubmitReceiptModal(false)}
           onSubmitted={() => {}}
         />
@@ -1188,12 +1235,20 @@ function generateYearOptions(): string[] {
 
 function AllocationSection({
   ministryId,
+  userId,
   isTreasurer,
   isAdmin,
+  categories,
+  onAddCategory,
+  onDeleteCategory,
 }: {
   ministryId: string
+  userId: string
   isTreasurer: boolean
   isAdmin: boolean
+  categories: DynamicCategory[]
+  onAddCategory: (name: string) => Promise<void>
+  onDeleteCategory: (name: string) => Promise<void>
 }) {
   const canEdit = isTreasurer || isAdmin
   const [fiscalYear, setFiscalYear] = useState<string>(currentFiscalYear)
@@ -1206,8 +1261,21 @@ function AllocationSection({
   // Draft edits: key = `${category}::${fund}`, value = string input
   const [drafts, setDrafts] = useState<Record<string, string>>({})
 
+  // Add custom category
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [savingCategory, setSavingCategory] = useState(false)
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null)
+
   const yearOptions = generateYearOptions()
   const isPastYear = fiscalYear !== currentFiscalYear()
+
+  // Include any orphaned categories that have allocations but aren't in the dynamic list
+  const allocatedCategories = Array.from(new Set(allocations.map(a => a.category)))
+  const orphanedCategories: DynamicCategory[] = allocatedCategories
+    .filter(c => !categories.some(d => d.value === c))
+    .map(c => ({ value: c, label: c, isPermanent: false }))
+  const allCategories = [...categories, ...orphanedCategories]
 
   useEffect(() => {
     async function load() {
@@ -1278,10 +1346,10 @@ function AllocationSection({
   }
 
   // Totals
-  const totalAllocated = CATEGORIES.reduce((sum, cat) => {
+  const totalAllocated = allCategories.reduce((sum, cat) => {
     return sum + FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
   }, 0)
-  const totalSpent = CATEGORIES.reduce((sum, cat) => sum + getActual(cat.value), 0)
+  const totalSpent = allCategories.reduce((sum, cat) => sum + getActual(cat.value), 0)
   const totalRemaining = totalAllocated - totalSpent
   const pct = totalAllocated > 0 ? Math.min(100, (totalSpent / totalAllocated) * 100) : 0
   const overBudget = totalRemaining < 0
@@ -1397,7 +1465,7 @@ function AllocationSection({
             </div>
 
             {/* Category rows */}
-            {CATEGORIES.map((cat, catIdx) => {
+            {allCategories.map((cat, catIdx) => {
               const catTotal = FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
               const spent = getActual(cat.value)
               const remaining = catTotal - spent
@@ -1419,8 +1487,24 @@ function AllocationSection({
                       background: rowOver ? "#FDF9F9" : "transparent",
                     }}
                   >
-                    {/* Category label */}
-                    <span style={{ fontSize: 14, color: "#13101A" }}>{cat.label}</span>
+                    {/* Category label + delete for custom */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 14, color: "#13101A" }}>{cat.label}</span>
+                      {!cat.isPermanent && canEdit && !isPastYear && (
+                        <button
+                          onClick={async () => {
+                            if (deletingCategory === cat.value) return
+                            setDeletingCategory(cat.value)
+                            await onDeleteCategory(cat.value)
+                            setDeletingCategory(null)
+                          }}
+                          title="Remove custom category"
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#C4B8C0", padding: 0, display: "flex", alignItems: "center", opacity: deletingCategory === cat.value ? 0.4 : 1 }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
 
                     {/* Fund cells */}
                     {FUNDS.map(fund => {
@@ -1524,7 +1608,7 @@ function AllocationSection({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "12px 16px", borderTop: "1px solid #E8E2D2", background: "#F8F4EA" }}>
               <span style={{ ...monoLabel, fontSize: "11px", color: "#5A5466" }}>Total</span>
               {FUNDS.map(fund => {
-                const fundTotal = CATEGORIES.reduce((s, cat) => s + getAllocAmount(cat.value, fund.value), 0)
+                const fundTotal = allCategories.reduce((s, cat) => s + getAllocAmount(cat.value, fund.value), 0)
                 return (
                   <span key={fund.value} style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>
                     {fundTotal > 0 ? `$${fundTotal.toFixed(2)}` : "—"}
@@ -1543,6 +1627,63 @@ function AllocationSection({
               <span />
             </div>
           </div>
+
+          {/* Add custom category */}
+          {canEdit && !isPastYear && (
+            <div style={{ marginTop: 12 }}>
+              {addingCategory ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Category name…"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    onKeyDown={async e => {
+                      if (e.key === "Enter" && newCategoryName.trim()) {
+                        setSavingCategory(true)
+                        await onAddCategory(newCategoryName)
+                        setNewCategoryName("")
+                        setAddingCategory(false)
+                        setSavingCategory(false)
+                      } else if (e.key === "Escape") {
+                        setNewCategoryName(""); setAddingCategory(false)
+                      }
+                    }}
+                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", background: "#FDFBF7", outline: "none" }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!newCategoryName.trim()) return
+                      setSavingCategory(true)
+                      await onAddCategory(newCategoryName)
+                      setNewCategoryName("")
+                      setAddingCategory(false)
+                      setSavingCategory(false)
+                    }}
+                    disabled={savingCategory || !newCategoryName.trim()}
+                    style={{ padding: "8px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
+                  >
+                    {savingCategory ? "Adding…" : "Add"}
+                  </button>
+                  <button
+                    onClick={() => { setNewCategoryName(""); setAddingCategory(false) }}
+                    style={{ padding: "8px 12px", background: "#F2EDE0", color: "#5A5466", borderRadius: 10, border: "none", fontSize: 13, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingCategory(true)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "transparent", border: "1px dashed #C4BFB0", borderRadius: 10, color: "#8A8497", fontSize: 13, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                >
+                  <Plus size={13} />
+                  Add custom category
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Empty state hint */}
           {totalAllocated === 0 && !isPastYear && (

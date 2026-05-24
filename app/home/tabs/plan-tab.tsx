@@ -1141,7 +1141,7 @@ export function MeetingNotesSection({
 // General = month calendar (click → EventPlanWorkspace directly) + UP NEXT + QUICK ADD + notes timeline
 
 export function StudentOrgTeamHome({
-  teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, onTeamSettings,
+  teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, canEditBudget, onTeamSettings,
   planningEvent, onPlanningEventChange,
 }: {
   teamId: string | null
@@ -1153,6 +1153,7 @@ export function StudentOrgTeamHome({
   userRole: string
   isAdmin: boolean
   canEdit: boolean
+  canEditBudget: boolean
   onTeamSettings?: () => void
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
@@ -1256,6 +1257,7 @@ export function StudentOrgTeamHome({
         ministryId={ministryId}
         userId={userId}
         canEdit={canEdit}
+        canEditBudget={canEditBudget}
         teamId={teamId}
         onClose={() => onPlanningEventChange(null)}
       />
@@ -1650,6 +1652,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const router = useRouter()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
+  const [showEditEvent, setShowEditEvent] = useState(false)
 
   function replaceParam(key: string, value: string | null) {
     const params = new URLSearchParams(window.location.search)
@@ -1791,6 +1794,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                 <button
                   className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
                   title="Edit event"
+                  onClick={() => setShowEditEvent(true)}
                 >
                   <Pencil className="w-3.5 h-3.5 text-[#5A5466]" />
                 </button>
@@ -1826,6 +1830,21 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         )}
       </div>
 
+      {/* Edit planning event modal */}
+      {showEditEvent && studentOrgPlanningEvent && (
+        <AddEventModal
+          ministryId={ministryId}
+          teamId={null}
+          userId={userId}
+          existing={studentOrgPlanningEvent}
+          onClose={() => setShowEditEvent(false)}
+          onSaved={(updated) => {
+            setStudentOrgPlanningEvent(updated)
+            setShowEditEvent(false)
+          }}
+        />
+      )}
+
       {/* Desktop content */}
       <div className="hidden md:block">
         {isPraiseTeam && activeTeamId ? (
@@ -1850,6 +1869,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               userRole={studentOrgRole}
               isAdmin={isAdmin}
               canEdit={canEditStudentOrg}
+              canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
               onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
               planningEvent={studentOrgPlanningEvent}
               onPlanningEventChange={setStudentOrgPlanningEvent}
@@ -1912,6 +1932,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             userRole={studentOrgRole}
             isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
+            canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
@@ -2001,6 +2022,17 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           isAdmin={isAdmin}
           onClose={closeSettings}
           onChanged={() => { closeSettings(); onTeamsChange() }}
+        />
+      )}
+
+      {showEditEvent && studentOrgPlanningEvent && (
+        <AddEventModal
+          ministryId={ministryId}
+          teamId={null}
+          userId={userId}
+          existing={studentOrgPlanningEvent}
+          onClose={() => setShowEditEvent(false)}
+          onSaved={(updated) => { setStudentOrgPlanningEvent(updated); setShowEditEvent(false) }}
         />
       )}
     </div>
@@ -3560,116 +3592,216 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
   welcome_week: {
     label: "Welcome Week", icon: "🎉", dot: "#3E1540", bg: "#EDE5F0", text: "#3E1540",
     budgetCategory: "welcoming_week", canHaveSubEvents: true,
-    description: "Multi-day welcoming week for new students",
+    description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
     defaultPhases: [
-      { key: "pre_event", label: "4 Weeks Out", tasks: ["Reserve venues for all sub-events", "Create sign-up forms", "Design promotional graphics", "Coordinate with DGL team for dinners", "Coordinate with Praise Team for kickoff worship", "Draft budget allocation per sub-event"] },
-      { key: "day_of", label: "Week Of", tasks: ["Send reminder announcements", "Confirm all food orders", "Confirm all volunteers and roles", "Set up each venue", "Day-of point of contact for each event"] },
-      { key: "post_event", label: "Post-Week", tasks: ["Log new folks for follow-up", "Submit reimbursement forms", "Thank you messages to volunteers", "Debrief meeting notes"] },
+      { key: "pre_event", label: "June Planning", tasks: [
+        "Reserve venues for all five sub-events (Popsicle Social, Game Night, Sports, Welcoming Night, Praise Night)",
+        "Submit space reservation requests for Pitt and CMU venues",
+        "Design promotional graphics and Instagram posts",
+        "Coordinate with DGL team — confirm who is cooking each night",
+        "Coordinate with Praise Team for Praise Night worship",
+        "Finalize food budget and assign purchasers per sub-event",
+        "Plan games, icebreakers, and activities for each night",
+        "Draft Welcome Week announcement",
+      ]},
+      { key: "day_of", label: "Week Of", tasks: [
+        "Send daily reminder posts and announcements",
+        "Confirm food orders and grocery runs for each night",
+        "Confirm all volunteers and point-of-contact per sub-event",
+        "Set up venue for each event (tables, decorations, AV)",
+        "Log new folks at each event for follow-up",
+      ]},
+      { key: "post_event", label: "Post-Week", tasks: [
+        "Compile full list of new folks for DGL follow-up",
+        "Submit all reimbursement forms",
+        "Post recap photos on Instagram",
+        "Send thank-you messages to all volunteers",
+        "CCSF debrief — what worked, what to improve",
+      ]},
     ],
     defaultRoles: [
-      { name: "Event Director", notes: "Owns the overall week — final decision maker" },
-      { name: "Logistics Lead", notes: "Venues, food, equipment across all sub-events" },
-      { name: "Marketing Lead", notes: "Flyers, social posts, announcement drafts" },
-      { name: "DGL Coordinator", notes: "Liaison with DGL team for group dinners" },
-      { name: "Praise Team Liaison", notes: "Coordinates worship for kickoff night" },
-      { name: "Greeter Lead", notes: "Welcome and first impressions at all events" },
+      { name: "President", notes: "Overall lead — final decision maker, coordinates all sub-events" },
+      { name: "Event Coordinator (Pitt)", notes: "Space reservations, setup/teardown, cleanup crew for Pitt events" },
+      { name: "Event Coordinator (CMU)", notes: "Space reservations, setup/teardown, cleanup crew for CMU events" },
+      { name: "Secretary", notes: "Promotional graphics, Instagram, flyers, slideshow announcements" },
+      { name: "DGL Liaison", notes: "Coordinates with DGL team for dinner cooking rotations" },
+      { name: "Praise Team Liaison", notes: "Coordinates Praise Night worship with Praise Team" },
     ],
     extraTabs: ["sub_events", "new_folks"],
   },
   coffeehouse: {
     label: "Coffeehouse", icon: "☕", dot: "#9D7B4F", bg: "#FDF6EC", text: "#6B4C1E",
     budgetCategory: "coffeehouse", canHaveSubEvents: false,
-    description: "Performance night — music, spoken word, comedy",
+    description: "Annual talent show — performances, praise, and testimony. Held at Rangos Hall (CMU). ~$123 budget for coffee and snacks.",
     defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Book venue and reserve AV equipment", "Open performer sign-ups", "Design promotional graphics", "Arrange food and coffee", "Create run-of-show order", "Plan sound check schedule"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup AV and stage", "Run sound checks per performer", "Welcome guests", "MC briefing", "Clean up after"] },
-      { key: "post_event", label: "Post-Event", tasks: ["Submit reimbursement form", "Thank performers", "Post photos/recap"] },
+      { key: "pre_event", label: "Pre-Event", tasks: [
+        "Book Rangos Hall (CMU) and reserve AV equipment",
+        "Open performer sign-ups (music, spoken word, comedy, dance)",
+        "Plan run-of-show: performances → praise set → testimony",
+        "Design flyers and promotional graphics",
+        "Post Instagram promo and reminders",
+        "Coordinate sound check schedule with performers",
+        "Arrange coffee and snacks (budget ~$123)",
+        "Recruit MC and backstage helpers",
+      ]},
+      { key: "day_of", label: "Day-of", tasks: [
+        "AV and stage setup at Rangos Hall",
+        "Sound check per performer — vocals, instruments, backing tracks",
+        "MC briefing and run-of-show walkthrough",
+        "Welcome guests at the door",
+        "Run the show — keep transitions tight",
+        "Cleanup and load-out",
+      ]},
+      { key: "post_event", label: "Post-Event", tasks: [
+        "Submit reimbursement form (coffee/snacks)",
+        "Post photos and recap on Instagram",
+        "Thank all performers and volunteers",
+      ]},
     ],
     defaultRoles: [
-      { name: "MC", notes: "Hosts the night, introduces each act" },
-      { name: "Sound Tech", notes: "Manages PA, mic levels during sound check and performance" },
-      { name: "Stage Manager", notes: "Coordinates transitions between acts" },
-      { name: "Door Lead", notes: "Greets guests, manages headcount" },
-      { name: "Food Lead", notes: "Manages coffee, snacks setup and cleanup" },
-      { name: "Photographer", notes: "Photo and video coverage of the night" },
+      { name: "President", notes: "Oversees performer bookings and run-of-show coordination" },
+      { name: "Secretary", notes: "Flyers, Instagram promo, announcement slides, event photography" },
+      { name: "Event Coordinator", notes: "Rangos Hall booking, AV setup, sound check logistics" },
+      { name: "MC / Emcee", notes: "Hosts the night and keeps the program moving" },
+      { name: "Sound Tech", notes: "PA system, mic levels, backing track playback" },
+      { name: "Food Lead", notes: "Coffee and snacks setup and service" },
     ],
     extraTabs: ["acts"],
   },
   turkey_bowl: {
     label: "Turkey Bowl", icon: "🏈", dot: "#5B7A6C", bg: "#EEF4F1", text: "#2D5445",
     budgetCategory: "turkeybowl", canHaveSubEvents: false,
-    description: "Annual flag football game and cookout",
+    description: "Annual flag football tournament in November. Separate men's and women's divisions. Budget ~$1,500–1,700 (shirts are the dominant cost).",
     defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve field/location", "Announce teams and sign-up", "Coordinate food and cookout", "Get equipment (footballs, cones, first aid)"] },
-      { key: "day_of", label: "Day-of", tasks: ["Set up field", "Divide teams", "Run game(s)", "Cook food", "Clean up"] },
-      { key: "post_event", label: "Post-Event", tasks: ["Post photos and results", "Submit reimbursement form"] },
+      { key: "pre_event", label: "Pre-Event", tasks: [
+        "Reserve field location",
+        "Open sign-ups for men's and women's divisions",
+        "Design and order jerseys/shirts — submit order early (3–4 week lead time, ~$1,500)",
+        "Confirm shirt sizes and names",
+        "Organize teams and brackets for both divisions",
+        "Coordinate food and cookout supplies",
+        "Get equipment: footballs, cones, first aid kit",
+        "Create announcement and promo graphics",
+      ]},
+      { key: "day_of", label: "Day-of", tasks: [
+        "Field setup — cones, boundaries, end zones",
+        "Distribute shirts to players",
+        "Run men's division games",
+        "Run women's division games",
+        "Cookout — grill, serve food",
+        "Award ceremony (if applicable)",
+        "Cleanup",
+      ]},
+      { key: "post_event", label: "Post-Event", tasks: [
+        "Submit reimbursement form (shirts, food)",
+        "Post game photos and results on Instagram",
+        "Archive final brackets and scores",
+      ]},
     ],
     defaultRoles: [
-      { name: "Commissioner", notes: "Runs the game — rules, refs, bracket" },
-      { name: "Team Captain A", notes: "Captain of Team A" },
-      { name: "Team Captain B", notes: "Captain of Team B" },
-      { name: "Grill Master", notes: "Manages cookout food" },
-      { name: "Photographer", notes: "Captures the day" },
+      { name: "Men's Game Commissioner", notes: "Runs men's bracket — rules, scheduling, officiating" },
+      { name: "Women's Game Commissioner", notes: "Runs women's bracket — rules, scheduling, officiating" },
+      { name: "Shirt Coordinator", notes: "Manages jersey design, sizing, ordering — critical lead-time task" },
+      { name: "Equipment Lead", notes: "Footballs, cones, first aid, field markers" },
+      { name: "Food Lead", notes: "Grill, cookout, serving, cleanup" },
+      { name: "Secretary", notes: "Promo graphics, Instagram, event photos" },
     ],
     extraTabs: ["teams"],
   },
   retreat: {
     label: "Retreat", icon: "⛺", dot: "#5A5466", bg: "#F4F1E8", text: "#3E1540",
     budgetCategory: "retreat", canHaveSubEvents: false,
-    description: "Overnight or weekend trip",
+    description: "Overnight or weekend retreat. Retreat leaders run the program; CCSF handles logistics support. Women's: October · Men's: February · EM: March.",
     defaultPhases: [
-      { key: "pre_event", label: "6 Weeks Out", tasks: ["Book retreat location", "Plan transportation (drivers, capacity)", "Create sign-up and payment form", "Draft retreat program and sessions", "Coordinate with Praise Team for worship sessions"] },
-      { key: "day_of", label: "2 Weeks Out", tasks: ["Confirm headcount and lodge assignments", "Finalize transportation roster", "Send packing list to attendees", "Purchase supplies and food"] },
-      { key: "post_event", label: "Post-Retreat", tasks: ["Submit reimbursement forms", "Debrief with leadership", "Follow up with new folks"] },
+      { key: "pre_event", label: "6 Weeks Out", tasks: [
+        "Confirm retreat dates and type (Women's / Men's / EM)",
+        "Book retreat location and confirm capacity",
+        "Plan transportation — identify drivers, confirm car capacity",
+        "Create sign-up form with payment collection",
+        "Coordinate with retreat leaders on program and session schedule",
+        "Coordinate with Praise Team for worship sessions",
+        "Draft packing list for attendees",
+      ]},
+      { key: "day_of", label: "2 Weeks Out", tasks: [
+        "Confirm headcount and finalize lodge room assignments",
+        "Finalize transportation roster — every rider confirmed with a driver",
+        "Send packing list and logistics info to all attendees",
+        "Purchase supplies, food, and any retreat materials",
+        "Confirm payment collection is complete",
+      ]},
+      { key: "post_event", label: "Post-Retreat", tasks: [
+        "Submit all reimbursement forms (food, supplies, any deposits)",
+        "CCSF and retreat leaders debrief",
+        "Follow up with new folks who attended",
+        "Post photos recap",
+      ]},
     ],
     defaultRoles: [
-      { name: "Retreat Director", notes: "Overall retreat lead and decision maker" },
-      { name: "Transportation Coordinator", notes: "Manages cars, drivers, and rider assignments" },
-      { name: "Program Director", notes: "Designs and leads retreat sessions and schedule" },
+      { name: "Retreat Lead", notes: "Overall point of contact — final decisions on logistics and program" },
+      { name: "Transportation Coordinator", notes: "Assigns every attendee a driver; confirms car capacities" },
+      { name: "Program Director", notes: "Retreat leaders design and run sessions — CCSF coordinates support" },
       { name: "Worship Leader", notes: "Leads worship sessions during retreat" },
-      { name: "Logistics Lead", notes: "Food, supplies, lodging check-in" },
+      { name: "Treasurer Liaison", notes: "Manages sign-up payments, tracks deposits, submits reimbursements" },
+      { name: "Logistics Lead", notes: "Food, supplies, lodging check-in, and day-of execution" },
     ],
     extraTabs: ["transport", "program"],
   },
   appreciation_night: {
     label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
-    budgetCategory: null, canHaveSubEvents: false,
-    description: "SAN or GAN — appreciation night for sisters or brothers",
+    budgetCategory: "appreciation_night", canHaveSubEvents: false,
+    description: "SAN (Sisters Appreciation Night) or GAN (Guys Appreciation Night) — both held in February. Led by Event Coordinator. Costs: flowers, food, venue.",
     defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve venue", "Plan program and performers/activities", "Arrange decorations and flowers", "Coordinate food", "Create invitation announcement"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup decorations and space", "Welcome guests", "Run program", "Serve food", "Clean up"] },
-      { key: "post_event", label: "Post-Event", tasks: ["Submit reimbursement form", "Post photos", "Thank volunteers"] },
+      { key: "pre_event", label: "Pre-Event", tasks: [
+        "Reserve venue",
+        "Plan program — activities, performances, speeches",
+        "Order flowers and arrange decorations",
+        "Coordinate food and drinks",
+        "Design and post invitation announcement",
+        "Recruit helpers for setup and service",
+      ]},
+      { key: "day_of", label: "Day-of", tasks: [
+        "Setup decorations, flowers, tables, and lighting",
+        "Welcome guests at the door",
+        "Run the program — MC keeps it on schedule",
+        "Serve food and drinks",
+        "Cleanup",
+      ]},
+      { key: "post_event", label: "Post-Event", tasks: [
+        "Submit reimbursement form (flowers, food, venue)",
+        "Post photos on Instagram",
+        "Thank all volunteers and helpers",
+      ]},
     ],
     defaultRoles: [
-      { name: "Event Lead", notes: "Owns the night and the program" },
-      { name: "Decoration Lead", notes: "Sets the atmosphere — flowers, lighting, tables" },
-      { name: "Food Lead", notes: "Food and drinks setup and service" },
-      { name: "MC / Emcee", notes: "Hosts the program" },
-      { name: "Photographer", notes: "Captures memories" },
+      { name: "Event Coordinator (Lead)", notes: "Overall lead — owned by Event Coordinator role on CCSF" },
+      { name: "Decoration Lead", notes: "Flowers, lighting, table setup — sets the atmosphere" },
+      { name: "Food Lead", notes: "Coordinates food and drinks for guests" },
+      { name: "MC / Emcee", notes: "Hosts the night and runs the program" },
+      { name: "Photographer", notes: "Photos and video coverage for Instagram recap" },
     ],
     extraTabs: [],
   },
   social: {
     label: "Social", icon: "🎊", dot: "#8A8497", bg: "#FBF8F2", text: "#5A5466",
     budgetCategory: null, canHaveSubEvents: false,
-    description: "Hangout, game night, dinner — any informal social event",
+    description: "Informal social events — Church Picnic, game nights, IM sports, community volunteering (Wilkinsburg Food Pantry), or any hangout.",
     defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve location", "Coordinate food or activities", "Create announcement"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup", "Welcome guests", "Clean up"] },
+      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve location or confirm venue", "Coordinate food or activity supplies", "Create announcement or invite"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup", "Welcome guests", "Run activity or game", "Clean up"] },
     ],
     defaultRoles: [
-      { name: "Event Lead", notes: "" },
-      { name: "Food Coordinator", notes: "" },
+      { name: "Event Lead", notes: "Point of contact and day-of coordinator" },
+      { name: "Food Coordinator", notes: "Food and drinks logistics" },
     ],
     extraTabs: [],
   },
   ministry: {
     label: "Ministry Event", icon: "🙏", dot: "#3E1540", bg: "#F3F0F7", text: "#5A5466",
     budgetCategory: null, canHaveSubEvents: false,
-    description: "Prayer night, Bible study, outreach, service",
+    description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
     defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Prepare content/materials", "Create announcement", "Assign roles"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup space", "Run the event", "Clean up"] },
+      { key: "pre_event", label: "Pre-Event", tasks: ["Prepare content, set list, or materials", "Create announcement", "Assign roles (worship lead, speaker, host)"] },
+      { key: "day_of", label: "Day-of", tasks: ["Setup space", "Run the event", "Cleanup"] },
     ],
     defaultRoles: [
       { name: "Facilitator", notes: "" },
@@ -4502,6 +4634,7 @@ export function EventPlanWorkspace({
   ministryId,
   userId,
   canEdit,
+  canEditBudget = false,
   onClose,
   inline = false,
   hideHero = false,
@@ -4511,6 +4644,7 @@ export function EventPlanWorkspace({
   ministryId: string
   userId: string
   canEdit: boolean
+  canEditBudget?: boolean
   onClose: () => void
   inline?: boolean
   hideHero?: boolean
@@ -4535,7 +4669,6 @@ export function EventPlanWorkspace({
   const [loading, setLoading] = useState(true)
   const [savingStatus, setSavingStatus] = useState(false)
   const [eventStatus, setEventStatus] = useState<'planning' | 'active' | 'complete'>(calendarEvent.status ?? 'planning')
-  const [showAddEventModal, setShowAddEventModal] = useState(false)
   const [rsvpCount, setRsvpCount] = useState<number | null>(null)
   const [ministryBudget, setMinistryBudget] = useState<{ total: number; byFund: Record<string, number> } | null>(null)
 
@@ -4693,9 +4826,9 @@ export function EventPlanWorkspace({
         setRsvpCount(count ?? 0)
       }
 
-      // Fetch ministry budget allocation for this event's category
+      // Fetch ministry budget allocation — keyed by calendar event title (matches dynamic category system)
       if (typeCfg.budgetCategory) {
-        const { data: budgetData } = await getCategoryBudgetAllocation(ministryId, typeCfg.budgetCategory, currentFiscalYear())
+        const { data: budgetData } = await getCategoryBudgetAllocation(ministryId, calendarEvent.title, currentFiscalYear())
         setMinistryBudget(budgetData)
       }
 
@@ -5006,14 +5139,6 @@ export function EventPlanWorkspace({
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
-              {canEdit && (
-                <button
-                  onClick={() => setShowAddEventModal(true)}
-                  style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(251,248,242,0.25)", background: "rgba(251,248,242,0.08)", color: "#FBF8F2", fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  ✎ Edit event
-                </button>
-              )}
               <button
                 onClick={onClose}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.55)", fontSize: 13, fontFamily: "var(--font-inter)", padding: 0 }}
@@ -5066,6 +5191,25 @@ export function EventPlanWorkspace({
                       </>
                     )}
                   </div>
+
+                  {/* Planning notes */}
+                  <div style={{ marginTop: 28 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>Planning Notes</p>
+                    {canEdit ? (
+                      <textarea
+                        value={overviewNotes}
+                        onChange={e => setOverviewNotes(e.target.value)}
+                        onBlur={handleSaveOverview}
+                        placeholder="Add context, key decisions, or reminders for this event…"
+                        rows={4}
+                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid #E8E2D2", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                      />
+                    ) : overviewNotes ? (
+                      <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
+                    ) : (
+                      <p style={{ fontSize: 14, color: "#A09A8C", fontStyle: "italic" }}>No planning notes yet.</p>
+                    )}
+                  </div>
                 </section>
 
                 {/* Right: stat cards */}
@@ -5094,8 +5238,11 @@ export function EventPlanWorkspace({
                   </div>
                   {/* Budget */}
                   <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Budget</p>
-                    {canEdit ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>Budget</p>
+                      {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
+                    </div>
+                    {canEditBudget ? (
                       <input
                         type="number"
                         value={budget}
@@ -5107,11 +5254,11 @@ export function EventPlanWorkspace({
                     ) : (
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
                     )}
-                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated</p>
+                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated for this event</p>
                     {typeCfg.budgetCategory && (
                       <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E8E2D2" }}>
                         <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>
-                          Ministry · {typeCfg.label}
+                          Ministry Allocation · {calendarEvent.title}
                         </p>
                         {ministryBudget ? (
                           <>
@@ -5510,20 +5657,6 @@ export function EventPlanWorkspace({
         )}
       </div>
 
-      {/* Edit event modal */}
-      {showAddEventModal && (
-        <AddEventModal
-          ministryId={ministryId}
-          teamId={null}
-          userId={userId}
-          existing={calendarEvent}
-          onClose={() => setShowAddEventModal(false)}
-          onSaved={(updated) => {
-            setShowAddEventModal(false)
-            onClose()
-          }}
-        />
-      )}
     </div>
   )
 }
