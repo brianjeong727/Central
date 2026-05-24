@@ -70,6 +70,14 @@ function JoinContent() {
   // Pending action to run after gender is saved
   const [pendingAction, setPendingAction] = useState<"code" | "browse" | null>(null)
 
+  // School collection — shown after join if the ministry has schools defined
+  const [needsSchool, setNeedsSchool] = useState(false)
+  const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("")
+  const [savingSchool, setSavingSchool] = useState(false)
+  const [schoolError, setSchoolError] = useState<string | null>(null)
+  const [pendingSchoolRedirect, setPendingSchoolRedirect] = useState<(() => void) | null>(null)
+
   // Clear consumed sessionStorage handoff + load user's existing memberships + check gender
   useEffect(() => {
     sessionStorage.removeItem("pending_invite_code")
@@ -104,13 +112,28 @@ function JoinContent() {
     return () => clearTimeout(t)
   }, [tab, search, fetchMinistries])
 
+  async function checkAndShowSchoolPicker(afterFn: () => void) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { afterFn(); return }
+    const { data: profile } = await supabase.from("profiles").select("ministry_id, school_id").eq("id", user.id).maybeSingle()
+    if (!profile?.ministry_id || profile?.school_id) { afterFn(); return }
+    const { data: schools } = await supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", profile.ministry_id).order("sort_order")
+    if (!schools || schools.length === 0) { afterFn(); return }
+    setSchoolOptions(schools)
+    setNeedsSchool(true)
+    setPendingSchoolRedirect(() => afterFn)
+    setJoining(false)
+    setConfirming(false)
+  }
+
   async function doCodeJoin() {
     setJoining(true)
     setCodeError(null)
     try {
       const { error } = await joinMinistryByCode(inviteCode)
       if (error) { setCodeError(error); setJoining(false); return }
-      window.location.assign("/home")
+      await checkAndShowSchoolPicker(() => window.location.assign("/home"))
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoining(false)
@@ -137,7 +160,22 @@ function JoinContent() {
     setConfirmError(null)
     const { error } = await joinMinistryById(selected.id)
     if (error) { setConfirmError(error); setConfirming(false); return }
-    window.location.assign("/home")
+    await checkAndShowSchoolPicker(() => window.location.assign("/home"))
+  }
+
+  async function handleSaveSchool() {
+    if (!selectedSchoolId) return
+    setSavingSchool(true)
+    setSchoolError(null)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSchoolError("Not signed in."); setSavingSchool(false); return }
+    const schoolId = selectedSchoolId === "other" ? null : selectedSchoolId
+    const { error } = await supabase.from("profiles").update({ school_id: schoolId }).eq("id", user.id)
+    if (error) { setSchoolError("Failed to save. Try again."); setSavingSchool(false); return }
+    setSavingSchool(false)
+    setNeedsSchool(false)
+    if (pendingSchoolRedirect) pendingSchoolRedirect()
   }
 
   async function handleBrowseJoin() {
@@ -164,6 +202,38 @@ function JoinContent() {
 
   return (
     <>
+    {needsSchool && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>One more thing</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>Which school?</h2>
+          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>This helps us organize groups and events by campus.</p>
+          {schoolError && (
+            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{schoolError}</div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {schoolOptions.map(s => {
+              const active = selectedSchoolId === s.id
+              return (
+                <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{ padding: "11px 16px", fontSize: 14, fontWeight: active ? 600 : 400, borderRadius: 12, border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: active ? "#3E1540" : "#FBF8F2", color: active ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
+                  {s.name}
+                  <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>({s.abbreviation})</span>
+                </button>
+              )
+            })}
+            <button type="button" onClick={() => setSelectedSchoolId("other")} style={{ padding: "11px 16px", fontSize: 14, fontWeight: selectedSchoolId === "other" ? 600 : 400, borderRadius: 12, border: selectedSchoolId === "other" ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: selectedSchoolId === "other" ? "#3E1540" : "#FBF8F2", color: selectedSchoolId === "other" ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
+              Other / Not a student
+            </button>
+          </div>
+          <button onClick={handleSaveSchool} disabled={!selectedSchoolId || savingSchool} style={{ width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600, fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none", cursor: selectedSchoolId && !savingSchool ? "pointer" : "not-allowed", opacity: !selectedSchoolId || savingSchool ? 0.5 : 1, transition: "opacity 0.15s" }}>
+            {savingSchool ? "Saving…" : "Continue"}
+          </button>
+          <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }} style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}>
+            Skip for now
+          </button>
+        </div>
+      </div>
+    )}
     {needsGender && pendingAction !== null && (
       <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
         <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>

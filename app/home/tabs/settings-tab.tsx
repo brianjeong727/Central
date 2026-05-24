@@ -118,14 +118,23 @@ export function SettingsTab({
   const [archiveConfirmText, setArchiveConfirmText] = useState("")
   const [archiving, setArchiving] = useState(false)
 
+  // Schools
+  const [schools, setSchools] = useState<{ id: string; name: string; abbreviation: string; sort_order: number }[]>([])
+  const [addingSchool, setAddingSchool] = useState(false)
+  const [newSchoolName, setNewSchoolName] = useState("")
+  const [newSchoolAbbr, setNewSchoolAbbr] = useState("")
+  const [savingSchool, setSavingSchool] = useState(false)
+  const [schoolError, setSchoolError] = useState<string | null>(null)
+
   // Loading
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }] = await Promise.all([
+      const [{ data: min }, { data: profiles }, { data: schoolRows }] = await Promise.all([
         supabase.from("ministries").select("name, university, size, invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
+        supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
       ])
 
       if (min) {
@@ -136,6 +145,7 @@ export function SettingsTab({
           setAutomationSettings(s => ({ ...s, ...(min.automation_settings as Record<string, boolean>) }))
         }
       }
+      setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setMembers(profiles ?? [])
       setLoading(false)
     }
@@ -218,6 +228,25 @@ export function SettingsTab({
     window.location.href = "/landing"
   }
 
+  async function handleAddSchool() {
+    const name = newSchoolName.trim()
+    const abbr = newSchoolAbbr.trim()
+    if (!name || !abbr) return
+    setSavingSchool(true)
+    setSchoolError(null)
+    const { data, error } = await supabase.from("ministry_schools").insert({ ministry_id: ministryId, name, abbreviation: abbr, sort_order: schools.length }).select("id, name, abbreviation, sort_order").single()
+    if (error || !data) { setSchoolError("Failed to add school."); setSavingSchool(false); return }
+    setSchools(prev => [...prev, data as { id: string; name: string; abbreviation: string; sort_order: number }])
+    setNewSchoolName("")
+    setNewSchoolAbbr("")
+    setAddingSchool(false)
+    setSavingSchool(false)
+  }
+
+  async function handleDeleteSchool(id: string) {
+    const { error } = await supabase.from("ministry_schools").delete().eq("id", id).eq("ministry_id", ministryId)
+    if (!error) setSchools(prev => prev.filter(s => s.id !== id))
+  }
 
   return (
     <div className="md:h-full md:overflow-y-auto">
@@ -383,6 +412,63 @@ export function SettingsTab({
                       <div className="absolute top-0.5 w-5 h-5 rounded-full bg-[#FBF8F2] transition-transform duration-200" style={{ transform: isPublic ? "translateX(21px)" : "translateX(2px)" }} />
                     </button>
                   </div>
+                </div>
+              </section>
+
+              {/* Schools */}
+              <section>
+                <p style={SECTION_LABEL} className="mb-3">Schools</p>
+                <div style={CARD} className="overflow-hidden">
+                  {schools.length === 0 && !addingSchool && (
+                    <div className="px-5 py-4">
+                      <p style={{ fontSize: 13, color: "#8A8497" }}>No schools added yet. Schools appear as options when members join.</p>
+                    </div>
+                  )}
+                  {schools.map(s => (
+                    <div key={s.id} className="flex items-center justify-between px-5 py-3 border-b border-[#F0EBE0] last:border-0">
+                      <div>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{s.name}</span>
+                        <span style={{ fontSize: 12, color: "#8A8497", marginLeft: 8 }}>({s.abbreviation})</span>
+                      </div>
+                      {isAdmin && (
+                        <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8497", padding: "2px 6px", borderRadius: 6, fontSize: 12 }}>
+                          <X style={{ width: 13, height: 13 }} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {isAdmin && (
+                    addingSchool ? (
+                      <div className="px-5 py-4 border-t border-[#F0EBE0]">
+                        {schoolError && <p style={{ fontSize: 12, color: "#E53E3E", marginBottom: 8 }}>{schoolError}</p>}
+                        <div className="flex flex-col gap-2 mb-3">
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="School name (e.g. University of Pittsburgh)"
+                            value={newSchoolName}
+                            onChange={e => setNewSchoolName(e.target.value)}
+                            style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Abbreviation (e.g. Pitt)"
+                            value={newSchoolAbbr}
+                            onChange={e => setNewSchoolAbbr(e.target.value)}
+                            style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                          <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-5 py-3 border-t border-[#F0EBE0]">
+                        <button onClick={() => setAddingSchool(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add school</button>
+                      </div>
+                    )
+                  )}
                 </div>
               </section>
 

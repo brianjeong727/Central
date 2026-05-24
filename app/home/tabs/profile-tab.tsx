@@ -572,6 +572,23 @@ export function ProfileTab({
     prayer_request: initialProfile.prayer_request ?? "",
     pray_for_me: initialProfile.pray_for_me ?? "",
   })
+  const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
+  const [currentSchoolId, setCurrentSchoolId] = useState<string | null>(initialProfile.school_id ?? null)
+
+  useEffect(() => {
+    if (!initialProfile.ministry_id) return
+    supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", initialProfile.ministry_id).order("sort_order").then(({ data }) => {
+      if (data) setSchoolOptions(data as { id: string; name: string; abbreviation: string }[])
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProfile.ministry_id])
+
+  async function handleSchoolChange(schoolId: string) {
+    const newId = schoolId === "" ? null : schoolId
+    setCurrentSchoolId(newId)
+    await supabase.from("profiles").update({ school_id: newId }).eq("id", userId)
+    setProfile(p => ({ ...p, school_id: newId }))
+  }
 
   async function handleTogglePublic() {
     if (!isAdmin || togglingPublic) return
@@ -796,6 +813,12 @@ export function ProfileTab({
                   {profile.graduation_year}
                 </div>
               )}
+              {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && (
+                <div>
+                  <span style={{ color: "rgba(246,244,239,0.55)" }}>School · </span>
+                  {schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}
+                </div>
+              )}
               <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
             </div>
             {profile.pray_for_me && (
@@ -854,6 +877,9 @@ export function ProfileTab({
                 <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
                   <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
                   {profile.graduation_year && <span className="text-[12px] text-[#8A8497] font-medium">Class of {profile.graduation_year}</span>}
+                  {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && (
+                    <span className="text-[12px] text-[#8A8497] font-medium">{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>
+                  )}
                 </div>
                 <p className="text-[12px] text-[#8A8497]">{profile.email}</p>
               </div>
@@ -891,14 +917,45 @@ export function ProfileTab({
 
       {/* ── Field cards ── */}
       {/* Desktop: 2x2 grid */}
-      <div className="hidden md:grid px-7 py-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        {fields.map(({ key, label, placeholder }) => (
-          <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
-        ))}
+      <div className="hidden md:block px-7 pt-6">
+        {schoolOptions.length > 0 && (
+          <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)] mb-4">
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>School</p>
+            <select
+              value={currentSchoolId ?? ""}
+              onChange={(e) => handleSchoolChange(e.target.value)}
+              className="w-full text-[13px] text-[#5A5466] bg-transparent border-none outline-none cursor-pointer"
+            >
+              <option value="">Other / Not a student</option>
+              {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="grid pb-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+          {fields.map(({ key, label, placeholder }) => (
+            <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
+          ))}
+        </div>
       </div>
 
       {/* Mobile: stacked sections */}
       <div className="md:hidden px-5 pb-6">
+          {schoolOptions.length > 0 && (
+            <div className="mb-5">
+              <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Personal</p>
+              <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>School</p>
+                <select
+                  value={currentSchoolId ?? ""}
+                  onChange={(e) => handleSchoolChange(e.target.value)}
+                  className="w-full text-[13px] text-[#5A5466] bg-transparent border-none outline-none cursor-pointer"
+                >
+                  <option value="">Other / Not a student</option>
+                  {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="mb-5">
             <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
             <div className="flex flex-col gap-3">

@@ -16,6 +16,7 @@ export interface Profile {
   pray_for_me: string | null
   ministry_id?: string | null
   avatar_url?: string | null
+  school_id?: string | null
 }
 
 export interface Devotional {
