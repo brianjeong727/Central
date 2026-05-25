@@ -2137,6 +2137,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           ministryId={ministryId}
           isDGL={isDGL}
           isPraiseTeamMember={isPraiseTeamMember}
+          isAdmin={isAdmin}
           onClose={() => setShowCreateTeam(false)}
           onCreated={(teamId) => { setShowCreateTeam(false); onTeamsChange(); onTeamCreated(teamId) }}
         />
@@ -8588,12 +8589,13 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
 
 // ── CreateTeamOverlay ─────────────────────────────────────────────────────────
 
-export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPraiseTeamMember, onClose, onCreated }: {
+export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPraiseTeamMember, isAdmin, onClose, onCreated }: {
   userId: string
   userName: string
   ministryId: string
   isDGL?: boolean
   isPraiseTeamMember?: boolean
+  isAdmin?: boolean
   onClose: () => void
   onCreated: (teamId: string) => void
 }) {
@@ -8812,7 +8814,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             {/* Desktop: 2-col grid; mobile: stack */}
             <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
               {TEAM_PRESETS.filter(preset => {
-                if (preset.id === "dg_praise" || preset.id === "one_time") return isDGL || isPraiseTeamMember
+                if (preset.id === "dg_praise" || preset.id === "one_time") return isAdmin || isDGL || isPraiseTeamMember
                 return true
               }).map((preset) => (
                 <button
