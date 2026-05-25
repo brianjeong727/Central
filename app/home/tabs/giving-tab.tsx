@@ -930,8 +930,8 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     ...(canAccessBudget ? [{ id: "allocation" as const, label: "Allocation" }] : []),
   ]
 
-  const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : activeSection === "budget" ? "Budget" : "Allocation"
-  const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : activeSection === "budget" ? "Track all ministry expenses and approved reimbursements." : "Set per-fund targets for each spending category and track progress toward them."
+  const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : "Budget"
+  const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : "Track expenses, reimbursements, and per-fund spending targets."
   const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }
 
   return (
@@ -1116,6 +1116,17 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Budget / Allocation sub-tabs ── */}
+            {(activeSection === "budget" || activeSection === "allocation") && canAccessBudget && (
+              <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+                {[{ id: "budget" as const, label: "Expenses" }, { id: "allocation" as const, label: "Allocation" }].map(t => (
+                  <button key={t.id} onClick={() => onSectionChange(t.id)} style={{ padding: "6px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === t.id ? "none" : "1px solid #ECE8DE", background: activeSection === t.id ? "#3E1540" : "white", color: activeSection === t.id ? "#F6F4EF" : "#5A5466", cursor: "pointer" }}>
+                    {t.label}
+                  </button>
+                ))}
               </div>
             )}
 
