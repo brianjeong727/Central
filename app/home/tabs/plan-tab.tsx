@@ -8291,6 +8291,16 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setConfirmRemoveId(null)
   }
 
+  async function handleChangeRole(memberId: string, newRoleId: string) {
+    const { error: err } = await supabase.from("team_members")
+      .update({ role_id: newRoleId })
+      .eq("team_id", team.id)
+      .eq("user_id", memberId)
+    if (err) { setError(err.message); return }
+    const newRole = roles.find(r => r.id === newRoleId)
+    setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
+  }
+
   async function handleRenameTeam() {
     const val = teamNameDraft.trim()
     if (!val || val === localTeamName) { setEditingTeamName(false); return }
@@ -8436,8 +8446,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   const addMemberForm = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Role picker */}
-      {roles.length > 1 && (
+      {/* Role picker — always shown */}
+      {roles.length > 0 && (
         <div>
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 10 }}>Assign Role</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
@@ -8695,7 +8705,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>Members</span>
                         <div className="flex-1 h-px bg-[#ECE8DE]" />
                       </div>
-                      {isAdmin && (
+                      {(isAdmin || isPresident) && (
                         <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 flex-shrink-0">
                           + Add
                         </button>
@@ -8709,16 +8719,27 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         return (
                           <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[#ECE8DE] p-3"
                             style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
-                            onClick={() => { if (isAdmin && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
+                            onClick={() => { if ((isAdmin || isPresident) && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
                               {getInitials(m.name)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
-                              <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                              {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
+                                <select
+                                  value={m.role_id}
+                                  onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ fontSize: 12, color: "#5A5466", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
+                                >
+                                  {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                </select>
+                              ) : (
+                                <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                              )}
                             </div>
-                            {isAdmin && m.user_id !== userId && (
+                            {(isAdmin || isPresident) && m.user_id !== userId && (
                               isConfirming ? (
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
                                   <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
@@ -8941,7 +8962,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                 {/* Members roster */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Members</p>
-                  {isAdmin && (
+                  {(isAdmin || isPresident) && (
                     <button
                       onClick={() => setShowAddMember(true)}
                       style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#3E1540", border: "none", borderRadius: 8, color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
@@ -8980,9 +9001,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                           {getInitials(m.name)}
                         </div>
                         <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
-                        <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
+                        {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
+                          <select
+                            value={m.role_id}
+                            onChange={e => handleChangeRole(m.user_id, e.target.value)}
+                            style={{ fontSize: 13, color: "#5A5466", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
+                          >
+                            {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
+                        )}
                         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
-                          {isAdmin && m.user_id !== userId && (
+                          {(isAdmin || isPresident) && m.user_id !== userId && (
                             isConfirming ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                                 <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
