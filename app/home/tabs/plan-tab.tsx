@@ -1820,9 +1820,10 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               <div>
                 <button
                   onClick={() => setStudentOrgPlanningEvent(null)}
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)", fontSize: "12px", color: "#8A8497", display: "flex", alignItems: "center", gap: 4 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] text-[#5A5466] text-[13px] hover:bg-[#ECE8DE] hover:text-[#3E1540] transition-colors"
+                  style={{ cursor: "pointer", fontFamily: "var(--font-inter)" }}
                 >
-                  <ArrowLeft className="w-3 h-3" /> Back to calendar
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to calendar
                 </button>
                 <p style={{ ...monoStyle, marginTop: 12 }}>{evCfg.label.toUpperCase()} · {evDateStr.toUpperCase()}</p>
                 <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
