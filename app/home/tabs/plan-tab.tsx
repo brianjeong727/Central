@@ -1401,27 +1401,37 @@ export function StudentOrgTeamHome({
                   const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
                   const isConfirmDelete = deleteConfirmId === ev.id
                   return (
-                    <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 99, background: getEventConfig(ev).dot, flexShrink: 0 }} />
+                    <div
+                      key={ev.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 18,
+                        padding: "18px 20px", borderRadius: 14,
+                        border: `1px solid ${isConfirmDelete ? "#F0C8C8" : "#E8E2D2"}`,
+                        background: isConfirmDelete ? "#FEF7F7" : "#FBF8F2",
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: isConfirmDelete ? "#C0392B" : getEventConfig(ev).dot, flexShrink: 0, transition: "background 0.15s" }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
-                        <p style={{ fontSize: 13, color: "#8A8497", margin: "3px 0 0" }}>{dateStr}{ev.location ? ` · ${ev.location}` : ""}</p>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: isConfirmDelete ? "#9F3030" : "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                        <p style={{ fontSize: 13, color: isConfirmDelete ? "#C08080" : "#8A8497", margin: "3px 0 0" }}>
+                          {isConfirmDelete ? "Delete this event and all its planning data?" : `${dateStr}${ev.location ? ` · ${ev.location}` : ""}`}
+                        </p>
                       </div>
                       {isConfirmDelete ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          <span style={{ fontSize: 12, color: "#9F3030", fontWeight: 500 }}>Delete?</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            style={{ padding: "8px 16px", borderRadius: 9, border: "1px solid #E8E2D2", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "#5A5466" }}
+                          >
+                            Cancel
+                          </button>
                           <button
                             onClick={() => handleDeleteEvent(ev.id)}
                             disabled={deleting}
-                            style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}
+                            style={{ padding: "8px 16px", borderRadius: 9, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}
                           >
-                            {deleting ? "…" : "Confirm"}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E8E2D2", background: "transparent", fontSize: 12, cursor: "pointer", color: "#5A5466" }}
-                          >
-                            Cancel
+                            {deleting ? "Deleting…" : "Delete"}
                           </button>
                         </div>
                       ) : (
