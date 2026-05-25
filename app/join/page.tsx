@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
-import { Spinner } from "@/app/home/components/shared"
+import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
 const GENDERS = [
@@ -295,11 +295,7 @@ function JoinContent() {
         <div className="max-w-[520px] mx-auto w-full px-6" style={{ padding: "28px 24px 32px", position: "relative" }}>
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 22 }}>
-            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
-              <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
-            </svg>
+            <RingCrossLogo size={20} color="#F6F4EF" />
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
           </div>
           <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.45)", marginBottom: 8 }}>
@@ -327,7 +323,7 @@ function JoinContent() {
                 marginBottom: -1,
               }}
             >
-              {t === "browse" ? "Browse" : "Invite code"}
+              {t === "browse" ? "Find ministry" : "I have a code"}
             </button>
           ))}
         </div>
@@ -376,9 +372,18 @@ function JoinContent() {
                     <Search className="w-5 h-5 text-[#8A8497]" />
                   </div>
                   <p className="text-[14px] font-semibold text-[#13101A] mb-1">No ministries found</p>
-                  <p className="text-[13px] text-[#8A8497]">
-                    {search ? "Try a different search." : "No public ministries yet."}
+                  <p className="text-[13px] text-[#8A8497] text-center">
+                    {search ? "Try a different search." : "Your ministry might be private."}
                   </p>
+                  {!search && (
+                    <button
+                      type="button"
+                      onClick={() => setTab("code")}
+                      style={{ fontSize: 13, color: "#3E1540", fontWeight: 600, marginTop: 8, background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      Try an invite code instead →
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -434,6 +439,12 @@ function JoinContent() {
 
             {/* Join button pinned at bottom of content area */}
             <div className="flex-shrink-0 pt-4 pb-5 border-t border-[#E8E2D2]">
+              <p className="text-center text-[14px] mb-3">
+                Starting a new ministry?{" "}
+                <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
+                  Register here
+                </a>
+              </p>
               <button
                 onClick={handleBrowseJoin}
                 disabled={!selected || confirming || !!switching}
@@ -441,15 +452,6 @@ function JoinContent() {
               >
                 {switching ? "Switching…" : confirming ? "Joining…" : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →` : selected ? `Join ${selected.name} →` : "Select a ministry"}
               </button>
-              <p className="text-center text-[13px] text-[#8A8497] mt-4">
-                Starting a new ministry?{" "}
-                <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
-                  Register here
-                </a>
-              </p>
-              <p className="text-center mt-5" style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#A09A8C" }}>
-                &ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10
-              </p>
             </div>
           </div>
         )}
@@ -503,9 +505,6 @@ function JoinContent() {
               <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
                 Register here
               </a>
-            </p>
-            <p className="text-center mt-2" style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#A09A8C" }}>
-              &ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10
             </p>
           </form>
         )}

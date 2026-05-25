@@ -4,7 +4,8 @@ import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo, Spinner } from "@/app/home/components/shared"
+import { GoogleIcon, PasswordToggle } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 
@@ -21,21 +22,13 @@ const GENDERS = [
   { value: "female", label: "Female" },
 ] as const
 
-const GoogleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-    <path d="M43.6 20.5H42V20.4H24v7.2h11.3C33.9 31.6 29.4 34.4 24 34.4c-5.7 0-10.4-4.7-10.4-10.4S18.3 13.6 24 13.6c2.7 0 5.2 1 7.1 2.7l5.1-5.1C33.1 8.5 28.8 6.8 24 6.8 13.8 6.8 5.6 15 5.6 25.2S13.8 43.6 24 43.6c10.2 0 18.4-8.2 18.4-18.4 0-1.2-.1-2.4-.3-3.7z" fill="#FFC107"/>
-    <path d="M7.3 15.5l5.9 4.3C14.8 16.5 19.1 13.6 24 13.6c2.7 0 5.2 1 7.1 2.7l5.1-5.1C33.1 8.5 28.8 6.8 24 6.8c-7.2 0-13.4 4.1-16.7 10.2z" fill="#FF3D00"/>
-    <path d="M24 43.6c4.7 0 9-1.7 12.2-4.5l-5.6-4.7c-1.8 1.3-4.1 2-6.6 2-5.3 0-9.8-3.6-11.4-8.5l-5.9 4.6C8.4 39.3 15.7 43.6 24 43.6z" fill="#4CAF50"/>
-    <path d="M43.6 20.5H42V20.4H24v7.2h11.3c-.7 2-2.1 3.7-3.8 4.9l5.6 4.7c-.4.4 6.7-4.9 6.7-13.6 0-1.2-.1-2.4-.3-3.7z" fill="#1976D2"/>
-  </svg>
-)
-
 function SignupContent() {
   const searchParams = useSearchParams()
   const intent = searchParams.get("intent")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPw, setShowPw] = useState(false)
   const [grade, setGrade] = useState<string>("")
   const [gender, setGender] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +61,18 @@ function SignupContent() {
   }
 
   const inputClass = "w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+
+  const pillBase: React.CSSProperties = {
+    fontFamily: "var(--font-inter)", borderRadius: 999, cursor: "pointer", transition: "all 0.15s",
+  }
+  const pillActive: React.CSSProperties = {
+    ...pillBase, fontWeight: 600, border: "1.5px solid #3E1540", background: "#3E1540", color: "#F6F4EF",
+  }
+  const pillInactive: React.CSSProperties = {
+    ...pillBase, fontWeight: 400, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466",
+  }
+
+  const requiredStar = <span style={{ color: "#B91C1C" }}> *</span>
 
   return (
     <div style={{ minHeight: "100svh", display: "flex", fontFamily: "var(--font-inter)" }}>
@@ -148,7 +153,8 @@ function SignupContent() {
 
             <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {error && (
-                <div style={{ borderRadius: 12, background: "rgba(62,21,64,0.08)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                <div style={{ borderRadius: 12, background: "rgba(220,38,38,0.08)", padding: "10px 14px", fontSize: 13, color: "#B91C1C", fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }} role="alert">
+                  <span style={{ flexShrink: 0 }}>⚠</span>
                   {error}
                 </div>
               )}
@@ -160,28 +166,21 @@ function SignupContent() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Gender</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>
+                  Gender{requiredStar}
+                </label>
+                <p style={{ fontSize: 11, color: "#8A8497", margin: "-4px 0 0" }}>Helps us place you in the right small group.</p>
                 <div style={{ display: "flex", gap: 7 }}>
-                  {GENDERS.map(({ value, label }) => {
-                    const active = gender === value
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setGender(value)}
-                        style={{
-                          padding: "6px 20px", fontSize: 13, fontWeight: active ? 600 : 400,
-                          fontFamily: "var(--font-inter)", borderRadius: 999,
-                          border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
-                          background: active ? "#3E1540" : "#FBF8F2",
-                          color: active ? "#F6F4EF" : "#5A5466",
-                          cursor: "pointer", transition: "all 0.15s",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
+                  {GENDERS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setGender(value)}
+                      style={{ ...(gender === value ? pillActive : pillInactive), padding: "6px 20px", fontSize: 13 }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -193,44 +192,55 @@ function SignupContent() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Password</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" required minLength={6} autoComplete="new-password" className={inputClass} />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPw ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    className={inputClass + " pr-10"}
+                  />
+                  <PasswordToggle show={showPw} onToggle={() => setShowPw((v) => !v)} />
+                </div>
+                <p style={{ fontSize: 11, color: "#8A8497", marginTop: 2 }}>At least 6 characters</p>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Year</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>
+                  Year{requiredStar}
+                </label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                  {GRADES.map(({ value, label }) => {
-                    const active = grade === value
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setGrade(value)}
-                        style={{
-                          padding: "6px 14px", fontSize: 13, fontWeight: active ? 600 : 400,
-                          fontFamily: "var(--font-inter)", borderRadius: 999,
-                          border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
-                          background: active ? "#3E1540" : "#FBF8F2",
-                          color: active ? "#F6F4EF" : "#5A5466",
-                          cursor: "pointer", transition: "all 0.15s",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
+                  {GRADES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setGrade(value)}
+                      style={{ ...(grade === value ? pillActive : pillInactive), padding: "6px 14px", fontSize: 13 }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading || !grade || !gender}
-                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
+                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] flex items-center justify-center gap-2"
                 style={{ marginTop: 4 }}
               >
+                {loading && <Spinner />}
                 {loading ? "Creating account…" : "Create account"}
               </button>
+
+              {(!grade || !gender) && !loading && (
+                <p style={{ fontSize: 12, color: "#8A8497", textAlign: "center", marginTop: 2 }}>
+                  Select your year and gender to continue
+                </p>
+              )}
             </form>
           </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Menu, X, ChevronDown } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
@@ -59,6 +60,7 @@ export default function LandingPage() {
   const [authChecked, setAuthChecked] = useState(false)
   const [ministryCount, setMinistryCount] = useState<number>(1)
   const [heroVisible, setHeroVisible] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     function onScroll() {
@@ -85,6 +87,11 @@ export default function LandingPage() {
       }
     })
   }, [])
+
+  // Close mobile menu on scroll
+  useEffect(() => {
+    if (scrolled) setMenuOpen(false)
+  }, [scrolled])
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -120,7 +127,7 @@ export default function LandingPage() {
             Central
           </Link>
 
-          {/* Center links */}
+          {/* Center links — hidden on mobile */}
           <div className="cl-nav-links" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 28 }}>
             {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
               <a key={label} href={href} className="cl-nav-link" style={{ fontSize: 13, color: navMuted, textDecoration: "none" }}>
@@ -129,8 +136,8 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Right CTAs */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+          {/* Right CTAs — desktop */}
+          <div className="cl-nav-right" style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
             {authChecked && authUser ? (
               <>
                 <a
@@ -142,7 +149,7 @@ export default function LandingPage() {
                 </a>
                 <button
                   onClick={handleSignOut}
-                  className="cl-nav-sign-out"
+                  className="cl-nav-sign-out cl-desktop-only"
                   style={{ background: "transparent", border: 0, color: navMuted, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}
                 >
                   Sign out
@@ -152,40 +159,93 @@ export default function LandingPage() {
               <>
                 <a
                   href="/login"
-                  className="cl-nav-signin"
+                  className="cl-nav-signin cl-desktop-only"
                   style={{ height: 36, padding: "0 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, textDecoration: "none", border: "none", background: "transparent", color: navColor, fontFamily: SANS }}
                 >
                   Sign in
                 </a>
                 <button
                   onClick={() => router.push("/onboarding")}
-                  className="cl-nav-get-started"
+                  className="cl-nav-get-started cl-desktop-only"
                   style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.plum}` : `1px solid ${C.ivory}`, background: scrolled ? C.plum : C.ivory, color: scrolled ? C.ivory : C.plum, cursor: "pointer", fontFamily: SANS }}
                 >
                   Get started
                 </button>
               </>
             )}
+
+            {/* Hamburger — mobile only */}
+            <button
+              className="cl-hamburger"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: navColor, display: "none", alignItems: "center", justifyContent: "center" }}
+            >
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
           </div>
         </div>
       </nav>
 
+      {/* ── Mobile drawer ── */}
+      <div
+        className="cl-mobile-drawer"
+        style={{
+          display: "none",
+          position: "fixed", top: 72, left: 0, right: 0, zIndex: 49,
+          background: "rgba(251,248,242,0.97)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderBottom: `1px solid ${C.border}`,
+          flexDirection: "column",
+          padding: "16px 24px 24px",
+          gap: 4,
+          opacity: menuOpen ? 1 : 0,
+          pointerEvents: menuOpen ? "all" : "none",
+          transform: menuOpen ? "translateY(0)" : "translateY(-8px)",
+          transition: "opacity 200ms ease, transform 200ms ease",
+        }}
+      >
+        {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
+          <a
+            key={label}
+            href={href}
+            onClick={() => setMenuOpen(false)}
+            style={{ fontSize: 16, color: C.ink, textDecoration: "none", padding: "12px 0", borderBottom: `1px solid ${C.border}`, fontWeight: 500 }}
+          >
+            {label}
+          </a>
+        ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
+          {authChecked && authUser ? (
+            <a href={ministryCount > 1 ? "/pick-ministry" : "/home"} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+              Open app
+            </a>
+          ) : (
+            <>
+              <a href="/ministries" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                Find my ministry
+              </a>
+              <a href="/login" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: C.ink, borderRadius: 12, fontSize: 14, fontWeight: 500, textDecoration: "none", border: `1px solid ${C.border}` }}>
+                Sign in
+              </a>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* ── HERO ── */}
       <section className="cl-hero" style={{ position: "relative", minHeight: 760, overflow: "hidden" }}>
-        {/* Chapel — no overlay washes, image speaks for itself */}
         <img
           src="/chapel.jpg"
           alt=""
           aria-hidden
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
-        {/* Warm plum veil — brand color tint so the image feels intentional, not gloomy.
-            Opacity stays low; text shadows do the real contrast work per-letter. */}
         <div
           aria-hidden
           style={{ position: "absolute", inset: 0, background: "linear-gradient(110deg, rgba(62,21,64,0.52) 0%, rgba(62,21,64,0.26) 42%, rgba(62,21,64,0.07) 68%, transparent 88%)", zIndex: 1 }}
         />
-        {/* Warm amber bottom dissolve into the page */}
         <div
           aria-hidden
           style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 220, background: "linear-gradient(180deg, transparent 0%, rgba(251,245,234,0.5) 50%, #FBF8F2 100%)", zIndex: 1 }}
@@ -200,14 +260,14 @@ export default function LandingPage() {
               className={`cl-hero-eyebrow${heroVisible ? " cl-anim-in" : ""}`}
               style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.72)" }}
             >
-              For college ministry leaders
+              For college ministries
             </p>
             <h1
               className={`cl-hero-title${heroVisible ? " cl-anim-in" : ""}`}
               style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400, "--anim-delay": "0.12s" } as React.CSSProperties}
             >
-              Know who&apos;s connected<br />and what needs{" "}
-              <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>follow-up.</span>
+              The hub for your ministry —{" "}
+              <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>between Sundays.</span>
             </h1>
             <p
               className={`cl-hero-sub${heroVisible ? " cl-anim-in" : ""}`}
@@ -219,24 +279,26 @@ export default function LandingPage() {
               className={`cl-hero-ctas${heroVisible ? " cl-anim-in" : ""}`}
               style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap", "--anim-delay": "0.36s" } as React.CSSProperties}
             >
+              {/* Primary — students find their ministry */}
+              <a
+                href="/ministries"
+                className="cl-btn-hero-primary"
+                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+              >
+                Find my ministry
+              </a>
+              {/* Secondary — leaders register */}
               <button
                 onClick={() => router.push("/onboarding")}
-                className="cl-btn-hero-primary"
-                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
+                className="cl-btn-hero-secondary"
+                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
               >
                 Register your ministry
               </button>
-              <a
-                href="/ministries"
-                className="cl-btn-hero-secondary"
-                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-              >
-                Find an existing one
-              </a>
             </div>
           </div>
 
-          {/* Verse — pinned upper-right, sits in the plum sky of the image */}
+          {/* Verse — pinned upper-right */}
           <div
             className="cl-verse-anchor"
             style={{ position: "absolute", right: 56, top: 130, maxWidth: 240, textAlign: "right", zIndex: 2 }}
@@ -248,6 +310,18 @@ export default function LandingPage() {
               Matthew 18 : 20
             </p>
           </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div
+          className="cl-scroll-indicator"
+          style={{
+            position: "absolute", bottom: 48, left: "50%", transform: "translateX(-50%)",
+            zIndex: 2, opacity: scrolled ? 0 : 1, transition: "opacity 300ms ease",
+            pointerEvents: "none",
+          }}
+        >
+          <ChevronDown size={24} color="rgba(246,244,239,0.6)" className="cl-bounce" />
         </div>
       </section>
 
@@ -317,13 +391,13 @@ export default function LandingPage() {
           <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 19, color: "rgba(246,244,239,0.82)", marginTop: 24, maxWidth: 520, lineHeight: 1.5 }}>
             Register a ministry, invite your students, and keep the week moving with a little less friction.
           </p>
-          <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button
               onClick={() => router.push("/onboarding")}
               className="cl-btn-cta-primary"
               style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
             >
-              Start with Central
+              Register your ministry
             </button>
             <a
               href="/login"
@@ -331,6 +405,13 @@ export default function LandingPage() {
               style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: "1px solid rgba(246,244,239,0.35)", background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
               Sign in
+            </a>
+            <a
+              href="/ministries"
+              className="cl-btn-cta-tertiary"
+              style={{ height: 52, padding: "0 20px", borderRadius: 999, fontSize: 14, fontWeight: 500, color: "rgba(246,244,239,0.75)", textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", background: "transparent" }}
+            >
+              Find an existing ministry →
             </a>
           </div>
         </div>
@@ -373,6 +454,15 @@ export default function LandingPage() {
           border-radius: 2px;
         }
 
+        /* ── Scroll indicator bounce ── */
+        @keyframes cl-bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(6px); }
+        }
+        .cl-bounce { animation: cl-bounce 1.8s ease-in-out infinite; }
+        .cl-scroll-indicator { animation: cl-fadein 0.6s ease 1.2s both; }
+        @keyframes cl-fadein { from { opacity: 0; } to { opacity: 1; } }
+
         /* ── Hero entrance animation ── */
         .cl-hero-eyebrow,
         .cl-hero-title,
@@ -393,7 +483,7 @@ export default function LandingPage() {
         }
         .cl-hero-eyebrow { --anim-delay: 0s; }
 
-        /* ── Hero text shadows — contrast without darkening the image ── */
+        /* ── Hero text shadows ── */
         .cl-hero-eyebrow { text-shadow: 0 1px 4px rgba(20,5,18,0.3); }
         .cl-hero-title   { text-shadow: 0 2px 8px rgba(20,5,18,0.4), 0 8px 32px rgba(20,5,18,0.22); }
         .cl-hero-sub     { text-shadow: 0 1px 4px rgba(20,5,18,0.32), 0 4px 16px rgba(20,5,18,0.18); }
@@ -479,6 +569,10 @@ export default function LandingPage() {
           background: rgba(20,8,18,0.95) !important;
         }
         .cl-btn-cta-secondary:active { transform: scale(0.97); }
+        .cl-btn-cta-tertiary {
+          transition: color 150ms ease;
+        }
+        .cl-btn-cta-tertiary:hover { color: rgba(246,244,239,1) !important; }
 
         /* ── Footer links ── */
         .cl-footer-link {
@@ -489,6 +583,10 @@ export default function LandingPage() {
         /* ── Responsive ── */
         @media (max-width: 900px) {
           .cl-nav-links { display: none !important; }
+          .cl-desktop-only { display: none !important; }
+          .cl-hamburger { display: flex !important; }
+          .cl-mobile-drawer { display: flex !important; }
+
           .cl-hero { min-height: 520px !important; }
           .cl-hero-container { padding: 0 24px !important; }
           .cl-hero-body { padding: 112px 0 72px !important; max-width: 100% !important; }

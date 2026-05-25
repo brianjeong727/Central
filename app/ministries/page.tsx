@@ -1,10 +1,11 @@
 "use client"
 
 import { Suspense, useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
-import { Spinner } from "@/app/home/components/shared"
+import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 
 const SIZE_LABELS: Record<string, string> = {
   small: "Under 50",
@@ -21,6 +22,7 @@ function getInitials(name: string) {
 }
 
 function MinistriesContent() {
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>("browse")
   const [authChecked, setAuthChecked] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -37,6 +39,7 @@ function MinistriesContent() {
   const [publicMinistries, setPublicMinistries] = useState<PublicMinistry[]>([])
   const [browsingPublic, setBrowsingPublic] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [joiningId, setJoiningId] = useState<string | null>(null)
   const [joinError, setJoinError] = useState<string | null>(null)
 
@@ -55,14 +58,25 @@ function MinistriesContent() {
           if (data && data.length > 0) {
             setMyMinistries(data)
             setMyIds(new Set(data.map((m) => m.id)))
-            setTab("mine")
+            // If user has ministries, default to "mine" tab unless URL says otherwise
+            const urlTab = new URLSearchParams(window.location.search).get("tab") as Tab | null
+            if (!urlTab) setTab("mine")
           }
           setLoadingMine(false)
         })
       }
       setAuthChecked(true)
     })
+
+    // Init tab from URL param
+    const urlTab = new URLSearchParams(window.location.search).get("tab") as Tab | null
+    if (urlTab && ["mine", "browse", "code"].includes(urlTab)) setTab(urlTab)
   }, [])
+
+  function changeTab(t: Tab) {
+    setTab(t)
+    router.replace(`/ministries?tab=${t}`, { scroll: false })
+  }
 
   const fetchPublic = useCallback(async (q: string) => {
     setBrowsingPublic(true)
@@ -90,6 +104,7 @@ function MinistriesContent() {
   async function handleJoin(ministry: PublicMinistry) {
     if (!isLoggedIn) { window.location.assign("/signup"); return }
     setJoiningId(ministry.id)
+    setConfirmingId(null)
     setJoinError(null)
     const { error } = await joinMinistryById(ministry.id)
     if (error) { setJoinError(error); setJoiningId(null); return }
@@ -112,7 +127,6 @@ function MinistriesContent() {
     }
   }
 
-  // Only show "My ministries" tab once we know they have at least one
   const showMineTab = authChecked && myMinistries.length > 0
 
   const tabs: { key: Tab; label: string }[] = [
@@ -127,12 +141,8 @@ function MinistriesContent() {
       {/* ── Plum header ── */}
       <div className="bg-[#3E1540] px-6 pt-12 pb-8 flex-shrink-0">
         <div className="max-w-[860px] mx-auto">
-          <a href="/landing" className="inline-flex items-center gap-2.5 mb-6" style={{ textDecoration: "none" }}>
-            <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
-              <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
-              <rect x="22" y="47" width="56" height="6" fill="#F6F4EF" />
-            </svg>
+          <a href="/" className="inline-flex items-center gap-2.5 mb-6" style={{ textDecoration: "none" }}>
+            <RingCrossLogo size={24} color="#F6F4EF" />
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#F6F4EF", letterSpacing: "-0.01em", lineHeight: 1 }}>
               Central
             </span>
@@ -152,7 +162,7 @@ function MinistriesContent() {
           {tabs.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => changeTab(key)}
               className="py-3.5 text-[13px] font-semibold transition-colors"
               style={{
                 paddingLeft: 20,
@@ -234,8 +244,17 @@ function MinistriesContent() {
                 </div>
                 <p className="text-[14px] font-semibold text-[#13101A] mb-1">No ministries found</p>
                 <p className="text-[13px] text-[#8A8497]">
-                  {search ? "Try a different search." : myIds.size > 0 ? "You've joined all available public ministries." : "No public ministries are listed yet."}
+                  {search ? "Try a different search." : myIds.size > 0 ? "You've joined all available public ministries." : "Your ministry might be private."}
                 </p>
+                {!search && myIds.size === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => changeTab("code")}
+                    className="text-[13px] font-semibold text-[#3E1540] mt-2 bg-transparent border-none cursor-pointer hover:underline underline-offset-2"
+                  >
+                    Try an invite code instead →
+                  </button>
+                )}
               </div>
             )}
 
@@ -252,13 +271,33 @@ function MinistriesContent() {
                       <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
                       <p className="text-[12px] text-[#8A8497] truncate">{m.university} · {SIZE_LABELS[m.size] ?? m.size}</p>
                     </div>
-                    <button
-                      onClick={() => handleJoin(m)}
-                      disabled={joiningId === m.id}
-                      className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150"
-                    >
-                      {joiningId === m.id ? "Joining…" : "Join"}
-                    </button>
+                    {/* Confirmation inline or Join button */}
+                    {confirmingId === m.id ? (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[13px] text-[#13101A] font-medium">Join {m.name}?</span>
+                        <button
+                          onClick={() => handleJoin(m)}
+                          disabled={joiningId === m.id}
+                          className="px-3 py-1.5 bg-[#3E1540] text-[#F6F4EF] text-[12px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150"
+                        >
+                          {joiningId === m.id ? "Joining…" : "Confirm"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmingId(null)}
+                          className="px-3 py-1.5 text-[12px] font-medium text-[#8A8497] rounded-lg border border-[#ECE8DE] hover:bg-[#F4F1E8] transition-colors duration-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmingId(m.id)}
+                        disabled={joiningId === m.id}
+                        className="flex-shrink-0 px-4 py-2 bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold rounded-lg hover:bg-[#2D0F2E] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150"
+                      >
+                        Join
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -309,7 +348,7 @@ function MinistriesContent() {
 
             <button
               type="button"
-              onClick={() => setTab("browse")}
+              onClick={() => changeTab("browse")}
               className="text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
             >
               Don&apos;t have a code?{" "}
@@ -322,7 +361,7 @@ function MinistriesContent() {
       {/* Footer */}
       <div className="border-t border-[#ECE8DE] px-6 py-5">
         <div className="max-w-[860px] mx-auto flex items-center gap-6">
-          <a href="/landing" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>← Back to home</a>
+          <a href="/" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>← Back to home</a>
           <a href="/onboarding" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>Register a ministry</a>
         </div>
       </div>

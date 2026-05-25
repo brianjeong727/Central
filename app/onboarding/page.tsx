@@ -5,7 +5,7 @@ import { Check, Plus, X } from "lucide-react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
-const STEPS = 5
+const STEPS = 4
 
 const STRUCTURE_QUESTIONS = [
   { id: "worship", label: "Worship / Music", desc: "Worship leading and music ministry" },
@@ -29,14 +29,13 @@ const SIZE_OPTIONS = [
   { value: "large" as const, label: "100+", desc: "Large campus group" },
 ]
 
-const STEP_TITLES = ["Basic info", "Structure", "Teams", "Review", "Pricing"]
+const STEP_TITLES = ["Basic info", "Structure", "Teams", "Review"]
 
 const STEP_HEADINGS = [
   "Basic information",
   "Ministry structure",
   "Your teams",
-  "Review & confirm",
-  "Simple pricing.",
+  "Review & submit",
 ]
 
 const STEP_SUBTITLES = [
@@ -44,8 +43,9 @@ const STEP_SUBTITLES = [
   "Select everything that applies to your ministry.",
   "We'll create these teams in your workspace.",
   "Review your details before submitting.",
-  "Central is free while we're in beta.",
 ]
+
+const EMOJI_OPTIONS = ["🙏","📖","💒","🌍","🎓","❤️","💜","⭐","📋","🎯","🎉","💡","🏠","🍞","🌱","🤲","🫶","🎤","🥁","🎸","🎵","🎬","👥","🤝","✝️"]
 
 function mapLandingSize(s: string): "small" | "medium" | "large" {
   if (s === "100+") return "large"
@@ -61,7 +61,6 @@ interface Team {
 
 function readPendingMinistry(): { name: string; university: string; size: "small" | "medium" | "large" } {
   if (typeof window === "undefined") return { name: "", university: "", size: "small" }
-
   try {
     const raw = sessionStorage.getItem("pending_ministry")
     if (!raw) return { name: "", university: "", size: "small" }
@@ -78,6 +77,9 @@ function readPendingMinistry(): { name: string; university: string; size: "small
 
 const inputClass =
   "w-full px-4 py-3 rounded-[10px] border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+
+const inputErrorClass =
+  "w-full px-4 py-3 rounded-[10px] border border-red-400 bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-red-200 transition-all"
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -102,13 +104,14 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 
 export default function OnboardingPage() {
   const pendingMinistry = useState(readPendingMinistry)[0]
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
 
   // Step 1
   const [name, setName] = useState(pendingMinistry.name)
   const [university, setUniversity] = useState(pendingMinistry.university)
   const [location, setLocation] = useState("")
   const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
+  const [step1Touched, setStep1Touched] = useState(false)
 
   // Step 2
   const [structure, setStructure] = useState<Record<string, boolean>>({
@@ -144,19 +147,18 @@ export default function OnboardingPage() {
 
   function next() {
     if (step === 1) {
+      if (!step1Valid) { setStep1Touched(true); return }
       setStep(2)
     } else if (step === 2) {
       setTeams(buildTeamsFromStructure())
       setStep(3)
     } else if (step === 3) {
       setStep(4)
-    } else if (step === 4) {
-      setStep(5)
     }
   }
 
   function back() {
-    setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4 | 5)
+    setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4)
   }
 
   function addTeam() {
@@ -195,7 +197,7 @@ export default function OnboardingPage() {
 
       {/* ── Plum header ── */}
       <div style={{ background: "#3E1540" }}>
-        <div style={{ maxWidth: 580, margin: "0 auto", padding: "36px 40px 40px" }}>
+        <div className="px-6 sm:px-10" style={{ maxWidth: 580, margin: "0 auto", paddingTop: 36, paddingBottom: 40 }}>
 
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 32 }}>
@@ -206,21 +208,23 @@ export default function OnboardingPage() {
           </div>
 
           {/* Eyebrow + heading + subtitle */}
-          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", marginBottom: 12, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", margin: "0 0 12px" }}>
             Register your ministry
           </p>
           <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 10px" }}>
             Set up your ministry workspace.
           </h1>
-          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.7)", lineHeight: 1.5, margin: "0 0 36px" }}>
+          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.7)", lineHeight: 1.5, margin: "0 0 6px" }}>
             It only takes a few minutes. We&apos;ll get your team ready to go.
+          </p>
+          <p style={{ fontSize: 12, color: "rgba(246,244,239,0.45)", margin: "0 0 32px" }}>
+            Approved within 24–48 hours · Free during beta
           </p>
 
           {/* Step indicator */}
           <div style={{ display: "flex", alignItems: "flex-start" }}>
             {Array.from({ length: STEPS }, (_, i) => (
               <div key={i} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS - 1 ? 1 : undefined }}>
-                {/* Circle + label */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
@@ -243,7 +247,6 @@ export default function OnboardingPage() {
                     {STEP_TITLES[i]}
                   </span>
                 </div>
-                {/* Connector line — pushed down to align with circle centers */}
                 {i < STEPS - 1 && (
                   <div style={{
                     flex: 1, height: 1, marginTop: 14, marginLeft: 8, marginRight: 8,
@@ -259,7 +262,7 @@ export default function OnboardingPage() {
 
       {/* ── Form area ── */}
       <div style={{ background: "#FBF8F2", flex: 1 }}>
-        <div style={{ maxWidth: 580, margin: "0 auto", padding: "36px 40px 48px" }}>
+        <div className="px-6 pt-9 pb-12 sm:px-10" style={{ maxWidth: 580, margin: "0 auto" }}>
 
           {/* Step heading */}
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", margin: "0 0 6px" }}>
@@ -275,17 +278,23 @@ export default function OnboardingPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Ministry name</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Central Student Fellowship" className={inputClass} />
+                  placeholder="e.g. Central Student Fellowship"
+                  className={step1Touched && !name.trim() ? inputErrorClass : inputClass} />
+                {step1Touched && !name.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>University</label>
                 <input type="text" value={university} onChange={(e) => setUniversity(e.target.value)}
-                  placeholder="e.g. University of Pittsburgh" className={inputClass} />
+                  placeholder="e.g. University of Pittsburgh"
+                  className={step1Touched && !university.trim() ? inputErrorClass : inputClass} />
+                {step1Touched && !university.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Location</label>
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Pittsburgh, PA" className={inputClass} />
+                  placeholder="e.g. Pittsburgh, PA"
+                  className={step1Touched && !location.trim() ? inputErrorClass : inputClass} />
+                {step1Touched && !location.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
               </div>
 
               {/* Size cards */}
@@ -375,18 +384,32 @@ export default function OnboardingPage() {
               ))}
 
               {showAdd ? (
-                <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ECE8DE", background: "white", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <select value={newIcon} onChange={(e) => setNewIcon(e.target.value)}
-                      style={{ width: 52, padding: "8px 4px", borderRadius: 8, border: "1px solid #ECE8DE", background: "white", textAlign: "center", fontSize: 18, cursor: "pointer", outline: "none" }}>
-                      {["🙏","📖","💒","🌍","🎓","❤️","💜","⭐","📋","🎯","🎉","💡","🏠","🍞","🌱","🤲","🫶","🎤","🥁","🎸","🎵","🎬","👥","🤝","✝️"].map((e) => (
-                        <option key={e} value={e}>{e}</option>
+                <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ECE8DE", background: "white", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Emoji grid picker */}
+                  <div>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.04em", marginBottom: 8 }}>Choose an icon</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+                      {EMOJI_OPTIONS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => setNewIcon(e)}
+                          style={{
+                            width: 36, height: 36, fontSize: 18,
+                            borderRadius: 8, border: newIcon === e ? "1.5px solid #3E1540" : "1.5px solid transparent",
+                            background: newIcon === e ? "rgba(62,21,64,0.08)" : "transparent",
+                            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.12s",
+                          }}
+                        >
+                          {e}
+                        </button>
                       ))}
-                    </select>
-                    <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Team name" className={`${inputClass} flex-1`}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeam() } }} />
+                    </div>
                   </div>
+                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Team name" className={inputClass}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeam() } }} />
                   <div style={{ display: "flex", gap: 8 }}>
                     <button type="button" onClick={addTeam} disabled={!newName.trim()}
                       style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newName.trim() ? 0.5 : 1 }}>
@@ -416,7 +439,7 @@ export default function OnboardingPage() {
           {step === 4 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {error && (
-                <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.07)", padding: "12px 16px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                <div style={{ borderRadius: 10, background: "rgba(220,38,38,0.08)", padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500 }}>
                   {error}
                 </div>
               )}
@@ -457,75 +480,34 @@ export default function OnboardingPage() {
                 padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE",
               }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>Make ministry discoverable</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Anyone can find and join once approved</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>List in public directory</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Anyone can find and request to join</p>
                 </div>
                 <Toggle on={isPublic} onToggle={() => setIsPublic((v) => !v)} />
               </div>
 
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 18px", borderRadius: 10, background: "#F4F1E8", border: "1px solid #ECE8DE" }}>
-                <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                  <Check style={{ width: 10, height: 10, color: "#8A8497" }} />
+              {/* Free beta banner */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 10, background: "#F4F1E8", border: "1px solid #ECE8DE" }}>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Check style={{ width: 11, height: 11, color: "white" }} />
                 </div>
-                <p style={{ fontSize: 12, color: "#8A8497", lineHeight: 1.6, margin: 0 }}>
-                  Your application will be reviewed by the Central team within 24–48 hours. You&apos;ll receive full access once approved.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 5: Pricing ── */}
-          {step === 5 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {error && (
-                <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.07)", padding: "12px 16px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
-                  {error}
-                </div>
-              )}
-              <div style={{
-                padding: "28px 24px", borderRadius: 14, background: "white",
-                border: "1px solid #ECE8DE", textAlign: "center",
-              }}>
-                <div style={{
-                  display: "inline-block", background: "#F4F1E8", borderRadius: 9999,
-                  padding: "4px 14px", fontSize: 11, fontWeight: 700, color: "#3E1540",
-                  letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16,
-                }}>
-                  Beta
-                </div>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, fontWeight: 400, color: "#13101A", margin: "0 0 6px", letterSpacing: "-0.01em" }}>
-                  Free
-                </p>
-                <p style={{ fontSize: 14, color: "#8A8497", margin: "0 0 20px", lineHeight: 1.5 }}>
-                  No credit card required. Free for all ministries while Central is in beta.
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
-                  {["Unlimited members", "Real-time messaging", "Announcements & events", "Member directory", "Team planning"].map((item) => (
-                    <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Check style={{ width: 10, height: 10, color: "white" }} />
-                      </div>
-                      <span style={{ fontSize: 13, color: "#5A5466" }}>{item}</span>
-                    </div>
-                  ))}
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>Free during beta · No credit card required</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Your application will be reviewed within 24–48 hours.</p>
                 </div>
               </div>
-              <p style={{ fontSize: 12, color: "#8A8497", textAlign: "center", lineHeight: 1.5 }}>
-                Pricing may change after beta. You&apos;ll be notified before any changes take effect.
-              </p>
             </div>
           )}
 
           {/* Navigation */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 36 }}>
             {step < STEPS ? (
-              <button type="button" onClick={next} disabled={step === 1 && !step1Valid}
+              <button type="button" onClick={next}
                 className="active:scale-[0.97]"
                 style={{
                   width: "100%", padding: "14px 0", background: "#3E1540", color: "#F6F4EF",
                   border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600,
-                  cursor: step === 1 && !step1Valid ? "not-allowed" : "pointer",
-                  opacity: step === 1 && !step1Valid ? 0.5 : 1,
+                  cursor: "pointer",
                   transition: "opacity 0.15s, transform 0.15s",
                 }}>
                 Continue
