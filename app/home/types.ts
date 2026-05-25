@@ -162,6 +162,17 @@ export interface Message {
   attachment_type?: string | null
   attachment_name?: string | null
   attachment_size?: number | null
+  poll_id?: string | null
+}
+
+
+export interface Poll {
+  id: string
+  group_id: string
+  question: string
+  options: string[]
+  created_by: string
+  created_at: string
 }
 
 export interface Reaction {
