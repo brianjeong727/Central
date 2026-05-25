@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -1016,8 +1016,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null)
+  const [fullReactionPickerFor, setFullReactionPickerFor] = useState<string | null>(null)
   const [contextMenuFor, setContextMenuFor] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState("")
+  const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
+  const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
+  const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
   const [showComposerEmojiPicker, setShowComposerEmojiPicker] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; avatarUrl: string | null }>>({})
@@ -1084,10 +1090,40 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   async function handleDeleteMessage(msgId: string) {
     setDeletingId(null)
     setContextMenuFor(null)
-    // Optimistic
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "" } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
     await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", userId)
+  }
+
+  async function handleEditMessage() {
+    const trimmed = editText.trim()
+    const id = editingId
+    if (!trimmed || !id) return
+    setEditingId(null)
+    setEditText("")
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, content: trimmed, is_edited: true } : m))
+    await supabase.from("messages").update({ content: trimmed, is_edited: true, edited_at: new Date().toISOString() }).eq("id", id).eq("sender_id", userId)
+  }
+
+  async function handleForward(targetGroupId: string) {
+    if (!forwardingMsg) return
+    setForwardSentTo(targetGroupId)
+    await supabase.from("messages").insert({ group_id: targetGroupId, sender_id: userId, content: forwardingMsg.content, message_type: "forwarded" })
+    setTimeout(() => { setForwardingMsg(null); setForwardSentTo(null) }, 1000)
+  }
+
+  async function openForwardSheet(msg: Message) {
+    setForwardingMsg(msg)
+    setContextMenuFor(null)
+    setForwardSentTo(null)
+    const { data } = await supabase.from("group_members").select("group_id, groups!group_id(id, name)").eq("user_id", userId)
+    const groups = (data ?? [])
+      .map((r: { group_id: string; groups: { id: string; name: string } | { id: string; name: string }[] | null }) => {
+        const g = Array.isArray(r.groups) ? r.groups[0] : r.groups
+        return g ? { id: g.id, name: g.name } : null
+      })
+      .filter((g): g is { id: string; name: string } => g !== null && g.id !== groupId)
+    setForwardGroups(groups)
   }
 
   // Fetch group type + archived status for settings
@@ -1192,7 +1228,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1222,6 +1258,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             reply_to_content: replyRaw?.content ?? null,
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
             message_type: m.message_type ?? "user",
+            is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
           }
         })
         setMessages(enriched)
@@ -1799,7 +1836,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         className={`absolute bottom-[calc(100%-4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
-                        <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3">
+                        <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
                           {REACTION_EMOJIS.map((emoji) => (
                             <button
                               key={emoji}
@@ -1811,7 +1848,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               {emoji}
                             </button>
                           ))}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEmojiPickerFor(null); setFullReactionPickerFor(msg.id) }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[#5A5466] hover:bg-[#ECE8DE] transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
                         </div>
+                        {fullReactionPickerFor === msg.id && (
+                          <div className={`absolute bottom-[calc(100%+4px)] z-[161] ${isOwn ? "right-0" : "left-0"}`} onPointerDown={(e) => e.stopPropagation()}>
+                            <Picker data={data} onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} theme="light" previewPosition="none" skinTonePosition="none" />
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1821,7 +1870,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         className={`absolute bottom-[calc(100%+4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
-                        <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[140px]">
+                        <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
@@ -1830,6 +1879,24 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             <CornerUpLeft className="w-4 h-4 text-[#5A5466]" />
                             Reply
                           </button>
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); openForwardSheet(msg) }}
+                            className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                          >
+                            <Forward className="w-4 h-4 text-[#5A5466]" />
+                            Forward
+                          </button>
+                          {isOwn && !msg.deleted && (
+                            <button
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content) }}
+                              className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            >
+                              <Pencil className="w-4 h-4 text-[#5A5466]" />
+                              Edit
+                            </button>
+                          )}
                           {isOwn && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
@@ -1845,6 +1912,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     )}
 
                     {/* Sender name + time — above first bubble only, incoming only */}
+                    {msg.message_type === "forwarded" && (
+                      <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
+                        <Forward className="w-3 h-3 text-[#8A8497]" />
+                        <span className="text-[11px] text-[#8A8497]">Forwarded</span>
+                      </div>
+                    )}
                     {!isOwn && isFirstInGroup && (
                       <div className="flex items-baseline gap-1.5 mb-1 ml-9">
                         <span className="text-[13px] font-semibold text-[#13101A]">{msg.sender_name}</span>
@@ -1908,11 +1981,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 </button>
                               </div>
                             )}
-                            <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
-                              {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
-                                ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
-                                : msg.content}
-                            </div>
+                            {editingId === msg.id ? (
+                              <div className="px-3 py-2.5 flex flex-col gap-2" onPointerDown={(e) => e.stopPropagation()}>
+                                <textarea
+                                  autoFocus
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditMessage() } else if (e.key === "Escape") { setEditingId(null) } }}
+                                  className="w-full resize-none rounded-lg bg-white/10 text-inherit text-[14px] p-2 outline-none border border-white/20 min-h-[60px]"
+                                  style={{ fontFamily: "inherit" }}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <button onClick={() => setEditingId(null)} className="text-[12px] opacity-60 hover:opacity-100 transition-opacity">Cancel</button>
+                                  <button onClick={handleEditMessage} className="text-[12px] font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors">Save</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
+                                {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
+                                  ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
+                                  : msg.content}
+                                {msg.is_edited && <span className={`text-[10px] ml-1.5 opacity-50`}>edited</span>}
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -2083,11 +2174,53 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       )}
 
       {/* Overlay to dismiss emoji / context menu */}
-      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker) && (
+      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[296px]"
-          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false) }}
+          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null) }}
         />
+      )}
+
+      {/* Forward sheet */}
+      {forwardingMsg && (
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center" onClick={() => setForwardingMsg(null)}>
+          <div className="w-full max-w-[390px] md:max-w-[420px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Forward to</p>
+              <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                <X className="w-4 h-4 text-[#5A5466]" />
+              </button>
+            </div>
+            <div className="px-3 py-2 max-h-[50vh] overflow-y-auto">
+              {forwardGroups.length === 0 ? (
+                <p className="text-[13px] text-[#8A8497] px-3 py-4">No other chats available.</p>
+              ) : (
+                forwardGroups.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => handleForward(g.id)}
+                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-[#3E1540] flex items-center justify-center text-[12px] font-semibold text-[#F6F4EF] flex-shrink-0">
+                        {g.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-[14px] font-medium text-[#13101A]">{g.name}</span>
+                    </div>
+                    {forwardSentTo === g.id ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Forward className="w-4 h-4 text-[#C4C4C4]" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-[#F0EEF8]">
+              <p className="text-[11px] text-[#8A8497] truncate">"{forwardingMsg.content.slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </AnimateIn>

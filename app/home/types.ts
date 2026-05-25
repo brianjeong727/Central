@@ -156,6 +156,8 @@ export interface Message {
   reply_to_sender: string | null
   deleted?: boolean
   message_type?: string
+  is_edited?: boolean
+  edited_at?: string | null
 }
 
 export interface Reaction {
