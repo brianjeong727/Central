@@ -1797,7 +1797,12 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const studentOrgRole = (isStudentOrgBoard ? activeUserTeam?.roleName : undefined) ?? ""
   const canEditStudentOrg = isAdmin || activeTeamPerms.includes("can_plan_events")
 
-  const isPraiseTeam = /\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p))
+  // Tech Team detected by name first — before isPraiseTeam — to avoid permission overlap
+  // (Tech Team shares can_view_worship_set / can_generate_slides with praise team members)
+  const isTechTeam = /\btech\b/i.test(activeTeamLabel)
+    && activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p))
+
+  const isPraiseTeam = !isTechTeam && (/\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p)))
   const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
   const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
@@ -1813,9 +1818,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
   const isDgPraiseTeam = activeTeamFull?.team_type === 'dg_praise'
   const isOneTimeTeam = activeTeamFull?.team_type === 'one_time'
-  // Tech Team: has slides permission but not worship management (read-only slides viewer)
-  const isTechTeam = !isPraiseTeam && !isDgPraiseTeam && !isOneTimeTeam && !isDGLTeam && !isStudentOrgBoard
-    && activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p))
   // isPraiseTeamMember: used for CreateTeamOverlay visibility
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
