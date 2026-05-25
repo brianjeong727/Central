@@ -21,7 +21,11 @@ const TABS_BASE = [
 const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
-  const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
+  const base = TABS_BASE.filter(t => t.id !== "profile")
+  const profile = TABS_BASE.find(t => t.id === "profile")!
+  const tabs = showPlan
+    ? [...base, PLAN_TAB, profile]
+    : [...base, profile]
   const compact = tabs.length > 5
 
   return (

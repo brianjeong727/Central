@@ -38,10 +38,10 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
     { id: "chats", icon: MessageCircle },
-    { id: "directory", icon: BookOpen },
-    { id: "profile", icon: User },
-    { id: "giving", icon: Wallet },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
+    { id: "directory", icon: BookOpen },
+    { id: "giving", icon: Wallet },
+    { id: "profile", icon: User },
   ]
 
   const monoStyle: React.CSSProperties = {
