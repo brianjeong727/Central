@@ -1060,6 +1060,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [pollCounts, setPollCounts] = useState<Record<string, number[]>>({}) // poll_id → counts per option
   const [changingVotePollIds, setChangingVotePollIds] = useState<Set<string>>(new Set())
   const [votingPollId, setVotingPollId] = useState<string | null>(null)
+  const [pollVoters, setPollVoters] = useState<Record<string, { option_index: number; user_id: string; name: string; avatar_url: string | null }[]>>({})
+  const [votersPollId, setVotersPollId] = useState<string | null>(null)
   // GIFs
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [gifSearch, setGifSearch] = useState("")
@@ -1315,10 +1317,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   async function loadPollsData(pollIds: string[]) {
     if (pollIds.length === 0) return
-    const [{ data: pollsRows }, { data: votesRows }, { data: countsRows }] = await Promise.all([
+    const [{ data: pollsRows }, { data: votesRows }, { data: allVotesRows }] = await Promise.all([
       supabase.from("polls").select("id, question, options").in("id", pollIds),
       supabase.from("poll_votes").select("poll_id, option_index").in("poll_id", pollIds).eq("user_id", userId),
-      supabase.from("poll_votes").select("poll_id, option_index").in("poll_id", pollIds),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supabase.from("poll_votes").select("poll_id, option_index, user_id, profiles!user_id(name, avatar_url)").in("poll_id", pollIds) as any,
     ])
     if (pollsRows) {
       const map: Record<string, { question: string; options: string[] }> = {}
@@ -1330,14 +1333,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       for (const v of votesRows) map[v.poll_id] = v.option_index
       setPollVotes(prev => ({ ...prev, ...map }))
     }
-    if (countsRows) {
-      const map: Record<string, number[]> = {}
-      for (const v of countsRows) {
-        if (!map[v.poll_id]) map[v.poll_id] = []
-        while (map[v.poll_id].length <= v.option_index) map[v.poll_id].push(0)
-        map[v.poll_id][v.option_index]++
+    if (allVotesRows) {
+      const countMap: Record<string, number[]> = {}
+      const voterMap: Record<string, { option_index: number; user_id: string; name: string; avatar_url: string | null }[]> = {}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const v of allVotesRows as any[]) {
+        if (!countMap[v.poll_id]) countMap[v.poll_id] = []
+        while (countMap[v.poll_id].length <= v.option_index) countMap[v.poll_id].push(0)
+        countMap[v.poll_id][v.option_index]++
+        const p = Array.isArray(v.profiles) ? v.profiles[0] : v.profiles
+        if (!voterMap[v.poll_id]) voterMap[v.poll_id] = []
+        voterMap[v.poll_id].push({ option_index: v.option_index, user_id: v.user_id, name: (p as { name: string } | null)?.name ?? "Unknown", avatar_url: (p as { avatar_url: string | null } | null)?.avatar_url ?? null })
       }
-      setPollCounts(prev => ({ ...prev, ...map }))
+      setPollCounts(prev => ({ ...prev, ...countMap }))
+      setPollVoters(prev => ({ ...prev, ...voterMap }))
     }
   }
 
@@ -1370,11 +1379,25 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }
 
   async function handleVote(pollId: string, optionIndex: number) {
-    // If user is in "change vote" mode, clear it first so count math uses real prev
     setChangingVotePollIds(prev => { const next = new Set(prev); next.delete(pollId); return next })
 
     const prev = pollVotes[pollId]
-    if (prev === optionIndex) return // already voted this option
+    const firstName = userName.split(" ")[0]
+
+    // Clicking current selection → unvote
+    if (prev === optionIndex) {
+      setPollVotes(pv => { const next = { ...pv }; delete next[pollId]; return next })
+      setPollCounts(pc => {
+        const counts = [...(pc[pollId] ?? [])]
+        counts[optionIndex] = Math.max(0, (counts[optionIndex] ?? 0) - 1)
+        return { ...pc, [pollId]: counts }
+      })
+      setPollVoters(pv => ({ ...pv, [pollId]: (pv[pollId] ?? []).filter(v => v.user_id !== userId) }))
+      await supabase.from("poll_votes").delete().eq("poll_id", pollId).eq("user_id", userId)
+      await supabase.from("messages").insert({ group_id: groupId, sender_id: null, content: `${firstName} removed their vote`, message_type: "system" })
+      loadPollsData([pollId])
+      return
+    }
 
     // Optimistic update
     setPollVotes(pv => ({ ...pv, [pollId]: optionIndex }))
@@ -1386,18 +1409,23 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       counts[optionIndex] = (counts[optionIndex] ?? 0) + 1
       return { ...pc, [pollId]: counts }
     })
+    // Optimistic voter update
+    setPollVoters(pv => {
+      const voters = (pv[pollId] ?? []).filter(v => v.user_id !== userId)
+      return { ...pv, [pollId]: [...voters, { option_index: optionIndex, user_id: userId, name: userName, avatar_url: null }] }
+    })
 
     await supabase.from("poll_votes").upsert({ poll_id: pollId, user_id: userId, option_index: optionIndex }, { onConflict: "poll_id,user_id" })
 
-    // Insert vote receipt system message so all members see it
     const optName = pollsData[pollId]?.options[optionIndex]
     if (optName) {
       await supabase.from("messages").insert({
         group_id: groupId, sender_id: null,
-        content: `${userName.split(" ")[0]} voted for "${optName}"`,
+        content: `${firstName} voted for "${optName}"`,
         message_type: "system",
       })
     }
+    loadPollsData([pollId])
   }
 
   async function handleGifSearch(query: string) {
@@ -2919,15 +2947,25 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const vUserVote = pollVotes[votingPollId]
         const vCounts = pollCounts[votingPollId] ?? []
         const vTotal = vCounts.reduce((s, c) => s + c, 0)
+        const vVoters = pollVoters[votingPollId] ?? []
+        const closeFn = () => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }
         return (
-          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }}>
+          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={closeFn}>
             <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
                 <div className="flex-1">
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Poll</p>
                   {vPoll && <p className="text-[11px] text-[#8A8497] mt-0.5">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>}
                 </div>
-                <button onClick={() => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                {vTotal > 0 && (
+                  <button
+                    onClick={() => { setVotersPollId(votingPollId); closeFn() }}
+                    className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 transition-opacity mr-3"
+                  >
+                    See all votes
+                  </button>
+                )}
+                <button onClick={closeFn} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
                   <X className="w-4 h-4 text-[#5A5466]" />
                 </button>
               </div>
@@ -2938,12 +2976,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     const count = vCounts[oi] ?? 0
                     const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
                     const isSelected = vUserVote === oi
+                    const optVoters = vVoters.filter(v => v.option_index === oi).slice(0, 3)
                     return (
                       <button
                         key={oi}
                         onClick={async () => {
                           await handleVote(votingPollId, oi)
-                          setVotingPollId(null)
+                          if (vUserVote !== oi) setVotingPollId(null) // close unless unvoting
                         }}
                         className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
                         style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
@@ -2955,11 +2994,34 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             </div>
                             <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
                           </div>
-                          <span className={`text-[12px] font-semibold ml-2 flex-shrink-0 ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            {/* Avatar stack */}
+                            {optVoters.length > 0 && (
+                              <div className="flex items-center">
+                                {optVoters.map((v, vi) => (
+                                  <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0 ${vi > 0 ? "-ml-1.5" : ""} ${getAvatarColor(v.name)}`}>
+                                    {v.avatar_url
+                                      ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                      : <span className="text-white font-bold flex items-center justify-center h-full" style={{ fontSize: 7 }}>{v.name.charAt(0).toUpperCase()}</span>
+                                    }
+                                  </div>
+                                ))}
+                                {count > 3 && (
+                                  <div className="-ml-1.5 w-5 h-5 rounded-full bg-[#E8E2D2] border border-white flex items-center justify-center flex-shrink-0">
+                                    <span style={{ fontSize: 7, fontWeight: 700, color: "#5A5466" }}>+{count - 3}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                          </div>
                         </div>
                         <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }} />
                         </div>
+                        {isSelected && (
+                          <p className="text-[11px] text-[#8A8497] mt-1.5">Tap to remove your vote</p>
+                        )}
                       </button>
                     )
                   })}
@@ -2969,6 +3031,55 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Voters breakdown modal */}
+      {votersPollId && (() => {
+        const vPoll = pollsData[votersPollId]
+        const vVoters = pollVoters[votersPollId] ?? []
+        return (
+          <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40" onClick={() => setVotersPollId(null)}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", flex: 1 }}>Votes</p>
+                <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                  <X className="w-4 h-4 text-[#5A5466]" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+                {vPoll ? vPoll.options.map((opt, oi) => {
+                  const optVoters = vVoters.filter(v => v.option_index === oi)
+                  if (optVoters.length === 0) return null
+                  return (
+                    <div key={oi}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[13px] font-semibold text-[#13101A]">{opt}</p>
+                        <span className="text-[11px] text-[#8A8497] font-medium">{optVoters.length} vote{optVoters.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {optVoters.map(v => (
+                          <div key={v.user_id} className="flex items-center gap-2.5">
+                            <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${getAvatarColor(v.name)}`}>
+                              {v.avatar_url
+                                ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                : <span className="text-white font-bold" style={{ fontSize: 10 }}>{v.name.charAt(0).toUpperCase()}</span>
+                              }
+                            </div>
+                            <span className="text-[13px] text-[#13101A]">{v.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                }) : (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )
