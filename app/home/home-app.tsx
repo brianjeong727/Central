@@ -31,7 +31,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "profile", "settings", "forms"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "give", "profile", "settings", "forms"]
   const TAB_ALIASES: Record<string, Tab> = { finance: "giving", you: "profile" }
   const rawTab = searchParams.get("tab")
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
@@ -543,7 +543,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             </div>
           )}
 
-          {activeTab === "giving" && (
+          {(activeTab === "giving" || activeTab === "give") && (
             <div className="md:h-full md:overflow-y-auto">
               <GivingTab
                 ministryId={ministryId}
@@ -553,7 +553,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 isAdmin={isAdmin}
                 isTreasurer={isTreasurer}
                 isDGL={isDGL}
-                activeSection={financeSection}
+                activeSection={activeTab === "give" ? "give" : financeSection}
                 onSectionChange={handleFinanceSectionChange}
               />
             </div>

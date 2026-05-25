@@ -170,7 +170,6 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
 
     if (activeTab === "giving") {
       const financeSections: { label: string; section: "give" | "reimbursements" | "budget" | "allocation"; show: boolean }[] = [
-        { label: "Give", section: "give", show: true },
         { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
         { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
         { label: "Allocation", section: "allocation", show: !!(isTreasurer || isAdmin) },
@@ -210,10 +209,10 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }
 
     // Home panel — Home, Announcements, Give, Forms, and Settings (admin-only)
-    const homeItems: { label: string; tab: "home" | "announcements" | "giving" | "forms" | "settings" }[] = [
+    const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
       { label: "Home", tab: "home" },
       { label: "Announcements", tab: "announcements" },
-      { label: "Give", tab: "giving" },
+      { label: "Give", tab: "give" },
       { label: "Forms", tab: "forms" },
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
@@ -247,7 +246,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         </a>
 
         {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "giving"))
+          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "give"))
           return (
             <button
               key={id}
