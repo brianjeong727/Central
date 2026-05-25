@@ -4250,6 +4250,12 @@ export function AddEventModal({
       ? `${endDateStr}T23:59:59+00:00`
       : `${endDateStr}T${endTimeStr}:00+00:00`
 
+    const startDate = new Date(startTs)
+    const endDate = new Date(endTs)
+    const startYear = startDate.getFullYear()
+    if (startYear < 2000 || startYear > 2100) { setError("Please enter a valid date."); return }
+    if (endDate < startDate) { setError("End date must be after start date."); return }
+
     setSaving(true)
     setError(null)
     try {

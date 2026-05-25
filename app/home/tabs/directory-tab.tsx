@@ -43,6 +43,11 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
     m.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  useEffect(() => {
+    if (search && filtered.length === 0) selectMember(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered.length, search])
+
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
 

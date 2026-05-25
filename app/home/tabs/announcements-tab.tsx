@@ -904,7 +904,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                   <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}>
                     <div>
                       <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.6, marginBottom: "8px" }}>📌 Pinned</p>
-                      <h2 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
+                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
                       <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
                     </div>
                     <div className="flex gap-2.5 items-center">
@@ -945,7 +945,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
                       </div>
                       <div>
-                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2 }}>{ann.title}</div>
+                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ann.title}</div>
                         <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
                       </div>
                       <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
@@ -979,7 +979,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                           <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
                         </div>
                       </div>
-                      <h3 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
+                      <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
                       <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
                       <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
@@ -1193,7 +1193,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
               </div>
             </div>
 
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
+            <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
             <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{announcement.body}</p>
             <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
 
@@ -1278,7 +1278,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             )}
           </div>
 
-          <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
+          <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
           <p className="text-[13px] leading-relaxed line-clamp-2 mb-1" style={{ color: "#5A5466" }}>{announcement.body}</p>
           <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
 

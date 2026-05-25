@@ -135,6 +135,7 @@ export function SettingsTab({
   const [newLimitFund, setNewLimitFund] = useState("church")
   const [newLimitAmount, setNewLimitAmount] = useState("")
   const [savingLimit, setSavingLimit] = useState(false)
+  const [limitError, setLimitError] = useState<string | null>(null)
 
   // Loading
   const [loading, setLoading] = useState(true)
@@ -262,7 +263,9 @@ export function SettingsTab({
 
   async function handleAddLimit() {
     const amount = parseFloat(newLimitAmount)
-    if (!amount || amount <= 0) return
+    if (isNaN(amount) || amount <= 0) { setLimitError("Please enter a positive amount."); return }
+    if (amount > 1_000_000) { setLimitError("Amount cannot exceed $1,000,000."); return }
+    setLimitError(null)
     setSavingLimit(true)
     const { error } = await upsertReceiptLimit({ ministryId, category: newLimitCategory, fund: newLimitFund, maxAmount: amount })
     if (!error) {
@@ -540,8 +543,9 @@ export function SettingsTab({
                           </select>
                           <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
                         </div>
+                        {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", margin: 0 }}>{limitError}</p>}
                         <div className="flex gap-2">
-                          <button onClick={() => { setAddingLimit(false); setNewLimitAmount("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                          <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
                           <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>

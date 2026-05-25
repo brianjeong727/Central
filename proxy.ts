@@ -125,6 +125,20 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Redirect vanity paths to their tab equivalents
+  const TAB_REDIRECTS: Record<string, string> = {
+    '/announcements': '/home?tab=announcements',
+    '/forms': '/home?tab=forms',
+    '/settings': '/home?tab=settings',
+    '/church-settings': '/home?tab=settings',
+    '/profile': '/home?tab=profile',
+    '/messages': '/home?tab=chats',
+    '/events': '/home?tab=announcements',
+  }
+  if (TAB_REDIRECTS[pathname]) {
+    return NextResponse.redirect(new URL(TAB_REDIRECTS[pathname], request.url))
+  }
+
   return supabaseResponse
 }
 

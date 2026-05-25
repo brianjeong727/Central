@@ -94,10 +94,13 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
     for (const f of fields) {
       if (!f.required) continue
       const ans = answers[f.id]
+      const fieldName = f.label?.trim() || "This field"
       if (f.type === 'checkbox') {
-        if ((ans as string[]).length === 0) { setError(`"${f.label}" is required.`); return }
+        if ((ans as string[]).length === 0) { setError(`"${fieldName}" requires at least one selection.`); return }
+      } else if (f.type === 'multiple_choice' || f.type === 'dropdown') {
+        if (!ans || (ans as string).trim() === '') { setError(`Please select an option for "${fieldName}".`); return }
       } else {
-        if (!ans || (ans as string).trim() === '') { setError(`"${f.label}" is required.`); return }
+        if (!ans || (ans as string).trim() === '') { setError(`"${fieldName}" is required.`); return }
       }
     }
     setSubmitting(true)

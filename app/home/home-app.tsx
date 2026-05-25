@@ -32,10 +32,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const searchParams = useSearchParams()
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "profile", "settings", "forms"]
-  const initialTab = (searchParams.get("tab") as Tab | null)
-  const [activeTab, setActiveTabState] = useState<Tab>(
-    initialTab && validTabs.includes(initialTab) ? initialTab : "home"
-  )
+  const TAB_ALIASES: Record<string, Tab> = { finance: "giving", you: "profile" }
+  const rawTab = searchParams.get("tab")
+  const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
+  const initialTab = resolvedTab && validTabs.includes(resolvedTab) ? resolvedTab : "home"
+  const [activeTab, setActiveTabState] = useState<Tab>(initialTab)
 
   // Persist a single URL param without clobbering others
   function replaceParam(key: string, value: string | null) {
@@ -89,10 +90,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPaletteOpen(true) }
     }
     function handleOpenEvent() { setPaletteOpen(true) }
-    window.addEventListener("keydown", handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown)
     window.addEventListener("open-command-palette", handleOpenEvent)
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
+      document.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("open-command-palette", handleOpenEvent)
     }
   }, [])
