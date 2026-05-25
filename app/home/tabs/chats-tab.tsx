@@ -1058,6 +1058,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [pollsData, setPollsData] = useState<Record<string, { question: string; options: string[] }>>({})
   const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // poll_id → option_index user voted (-1 = none)
   const [pollCounts, setPollCounts] = useState<Record<string, number[]>>({}) // poll_id → counts per option
+  const [changingVotePollIds, setChangingVotePollIds] = useState<Set<string>>(new Set())
   // GIFs
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [gifSearch, setGifSearch] = useState("")
@@ -1163,6 +1164,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         .catch(() => {})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages])
+
+  // Group consecutive vote receipt system messages within 2 minutes into one row
+  type PMsg = Message & { _voteGroup?: string[] }
+  const processedMessages = useMemo((): PMsg[] => {
+    const result: PMsg[] = []
+    const skip = new Set<string>()
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i]
+      if (skip.has(msg.id)) continue
+      const isVoteR = msg.message_type === "system" && / voted for "/.test(msg.content)
+      if (!isVoteR) { result.push(msg); continue }
+      const group = [msg]
+      for (let j = i + 1; j < messages.length; j++) {
+        const next = messages[j]
+        if (next.message_type === "system" && / voted for "/.test(next.content) &&
+            Math.abs(new Date(next.created_at).getTime() - new Date(msg.created_at).getTime()) < 120000) {
+          group.push(next)
+          skip.add(next.id)
+        } else break
+      }
+      const voters = group.map(m => m.content.split(' voted for "')[0])
+      result.push({ ...msg, _voteGroup: voters })
+    }
+    return result
   }, [messages])
 
   const scrollToBottom = useCallback((smooth = true) => {
@@ -1343,6 +1369,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }
 
   async function handleVote(pollId: string, optionIndex: number) {
+    // If user is in "change vote" mode, clear it first so count math uses real prev
+    setChangingVotePollIds(prev => { const next = new Set(prev); next.delete(pollId); return next })
+
     const prev = pollVotes[pollId]
     if (prev === optionIndex) return // already voted this option
 
@@ -1358,6 +1387,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     })
 
     await supabase.from("poll_votes").upsert({ poll_id: pollId, user_id: userId, option_index: optionIndex }, { onConflict: "poll_id,user_id" })
+
+    // Insert vote receipt system message so all members see it
+    const optName = pollsData[pollId]?.options[optionIndex]
+    if (optName) {
+      await supabase.from("messages").insert({
+        group_id: groupId, sender_id: null,
+        content: `${userName.split(" ")[0]} voted for "${optName}"`,
+        message_type: "system",
+      })
+    }
   }
 
   async function handleGifSearch(query: string) {
@@ -1608,6 +1647,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               if (prev.find(m => m.id === raw.id)) return prev
               return [...prev, { id: raw.id, group_id: raw.group_id, sender_id: raw.sender_id, content: raw.content, created_at: raw.created_at, sender_name: "", sender_avatar_url: null, reply_to_id: null, reply_to_content: null, reply_to_sender: null, message_type: "system" }]
             })
+            // Reload poll data if someone else voted
+            if (raw.content.includes(' voted for "') && raw.sender_id !== userId) {
+              const pollIds = messagesRef.current.filter(m => m.poll_id).map(m => m.poll_id!)
+              if (pollIds.length > 0) loadPollsData(pollIds)
+            }
             return
           }
 
@@ -2137,10 +2181,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {messages.map((msg, i) => {
+            {processedMessages.map((msg, i) => {
               const isOwn = msg.sender_id === userId
-              const prevMsg = i > 0 ? messages[i - 1] : null
-              const nextMsg = i < messages.length - 1 ? messages[i + 1] : null
+              const prevMsg = i > 0 ? processedMessages[i - 1] : null
+              const nextMsg = i < processedMessages.length - 1 ? processedMessages[i + 1] : null
 
               const sameMinute = (a: Message, b: Message) =>
                 a.message_type !== "system" && b.message_type !== "system" &&
@@ -2178,9 +2222,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               if (msg.message_type === "poll" && msg.poll_id) {
                 const poll = pollsData[msg.poll_id]
                 const userVote = pollVotes[msg.poll_id]
+                const isChanging = changingVotePollIds.has(msg.poll_id)
                 const counts = pollCounts[msg.poll_id] ?? []
                 const totalVotes = counts.reduce((s, c) => s + c, 0)
-                const hasVoted = userVote !== undefined
+                const hasVoted = userVote !== undefined && !isChanging
 
                 return (
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
@@ -2193,20 +2238,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         <div className="flex-1 h-px bg-[#E8E2D2]" />
                       </div>
                     )}
-                    <div className={`mt-3 flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-                      <div className={`text-[11px] text-[#8A8497] mb-1 flex items-center gap-1.5 ${isOwn ? "justify-end" : ""}`}>
-                        <BarChart2 className="w-3 h-3" />
-                        <span>{isOwn ? "You" : msg.sender_name} created a poll</span>
-                        <span className="text-[#C4C4C4]">· {formatMessageTime(msg.created_at)}</span>
-                      </div>
-                      <div className="w-[75%] bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
+                    <div className="flex flex-col items-center mt-4 mb-1">
+                      <div className="w-full max-w-[290px] bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
                         {poll ? (
                           <>
-                            <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6]">
-                              <p className="text-[15px] font-semibold text-[#13101A] leading-snug">{poll.question}</p>
+                            <div className="px-4 pt-4 pb-3 text-center border-b border-[#F0EDE6]">
+                              <p className="text-[15px] font-bold text-[#13101A] leading-snug">{poll.question}</p>
                               <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
                             </div>
-                            <div className="px-3 py-2 flex flex-col gap-1.5">
+                            <div className="px-4 py-3 flex flex-col gap-3">
                               {poll.options.map((opt, oi) => {
                                 const count = counts[oi] ?? 0
                                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
@@ -2215,36 +2255,47 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   <button
                                     key={oi}
                                     onClick={() => handleVote(msg.poll_id!, oi)}
-                                    className="relative w-full text-left rounded-xl overflow-hidden border transition-all"
-                                    style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: "transparent" }}
+                                    disabled={hasVoted}
+                                    className="w-full text-left disabled:cursor-default"
                                   >
-                                    {hasVoted && (
-                                      <div
-                                        className="absolute inset-y-0 left-0 rounded-xl transition-all"
-                                        style={{ width: `${pct}%`, background: isSelected ? "rgba(62,21,64,0.12)" : "rgba(0,0,0,0.04)" }}
-                                      />
-                                    )}
-                                    <div className="relative flex items-center justify-between px-3 py-2.5 gap-2">
-                                      <span className={`text-[13px] font-medium ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
-                                      {hasVoted && <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{pct}%</span>}
-                                      {isSelected && (
-                                        <div className="w-4 h-4 rounded-full bg-[#3E1540] flex items-center justify-center flex-shrink-0">
-                                          <Check className="w-2.5 h-2.5 text-white" />
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className={`text-[13px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                                      {hasVoted && (
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                          {isSelected && <Check className="w-3 h-3 text-[#3E1540]" />}
+                                          <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count}</span>
                                         </div>
                                       )}
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full transition-all duration-500"
+                                        style={{ width: hasVoted ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }}
+                                      />
                                     </div>
                                   </button>
                                 )
                               })}
                             </div>
+                            {hasVoted && (
+                              <div className="px-4 pb-3">
+                                <button
+                                  onClick={() => setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))}
+                                  className="w-full py-2.5 rounded-xl bg-[#F4F1E8] hover:bg-[#ECE8DE] active:bg-[#E5E0D2] transition-colors text-[13px] font-semibold text-[#5A5466]"
+                                >
+                                  Change vote
+                                </button>
+                              </div>
+                            )}
                           </>
                         ) : (
-                          <div className="px-4 py-4 flex items-center gap-2">
+                          <div className="px-4 py-4 flex items-center justify-center gap-2">
                             <div className="w-4 h-4 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
                             <span className="text-[13px] text-[#8A8497]">Loading poll…</span>
                           </div>
                         )}
                       </div>
+                      <p className="text-[11px] text-[#B0A9A0] mt-1.5">{formatMessageTime(msg.created_at)}</p>
                     </div>
                   </div>
                 )
@@ -2252,6 +2303,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
               // System message — centered event note, no bubble
               if (msg.message_type === "system") {
+                const voteGroup = (msg as PMsg)._voteGroup
+                let displayContent = msg.content
+                if (voteGroup && voteGroup.length > 1) {
+                  if (voteGroup.length <= 3) displayContent = `${voteGroup.join(", ")} voted in the poll`
+                  else displayContent = `${voteGroup.slice(0, 2).join(", ")} and ${voteGroup.length - 2} others voted in the poll`
+                }
                 return (
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                     {showDateSep && (
@@ -2266,7 +2323,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     <div className="flex items-center gap-3 my-2 px-1">
                       <div className="flex-1 h-px bg-[#E8E2D2]/70" />
                       <span style={{ fontSize: "12px", color: "#8A8497", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
-                        {msg.content}
+                        {displayContent}
                       </span>
                       <div className="flex-1 h-px bg-[#E8E2D2]/70" />
                     </div>
