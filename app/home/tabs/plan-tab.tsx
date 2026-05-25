@@ -8179,7 +8179,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; email?: string }[]>([])
   const [addSearch, setAddSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [selectedRoleId, setSelectedRoleId] = useState<string>("")
+  const [defaultRoleId, setDefaultRoleId] = useState<string>("")
+  const [memberRoles, setMemberRoles] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeRole, setActiveRole] = useState(0)
@@ -8243,7 +8244,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   useEffect(() => {
     if (!showAddMember) return
     setSelectedIds(new Set())
-    setSelectedRoleId(roles[0]?.id ?? "")
+    setMemberRoles({})
+    setDefaultRoleId(roles[0]?.id ?? "")
     const memberIds = new Set([...members.map((m) => m.user_id)])
     supabase
       .from("profiles")
@@ -8271,18 +8273,35 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   async function handleAddMembers() {
     if (selectedIds.size === 0) return
-    if (!selectedRoleId) { setError("This team has no roles. Delete the team and recreate it."); return }
+    if (!defaultRoleId && roles.length > 0) { setError("Select a role before adding."); return }
     setSaving(true)
     setError(null)
-    const { error: err } = await supabase.from("team_members").insert(
-      Array.from(selectedIds).map((uid) => ({ team_id: team.id, user_id: uid, role_id: selectedRoleId, added_by: userId }))
-    )
+    const rows = Array.from(selectedIds).map((uid) => ({
+      team_id: team.id,
+      user_id: uid,
+      role_id: memberRoles[uid] ?? defaultRoleId,
+      added_by: userId,
+    }))
+    const { error: err } = await supabase.from("team_members").insert(rows)
     if (err) { setError(err.message); setSaving(false); return }
+    // Reload members locally and return to settings — do NOT call onChanged() which closes settings
+    const { data: membersData } = await supabase
+      .from("team_members")
+      .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
+      .eq("team_id", team.id)
+    type RawMember = { user_id: string; role_id: string; joined_at: string; profiles: { name: string } | { name: string }[] | null; team_roles: { name: string } | { name: string }[] | null }
+    setMembers(
+      (membersData ?? []).map((m: RawMember) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+        const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+        return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+      })
+    )
     setShowAddMember(false)
     setSelectedIds(new Set())
+    setMemberRoles({})
     setAddSearch("")
     setSaving(false)
-    onChanged()
   }
 
   async function handleRemoveMember(memberId: string) {
@@ -8446,20 +8465,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   const addMemberForm = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Role picker — always shown */}
+      {/* Default role picker */}
       {roles.length > 0 && (
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 10 }}>Assign Role</p>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 6 }}>Default role</p>
+          <p style={{ fontSize: 12, color: "#A09A8C", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
               <button
                 key={r.id}
-                onClick={() => setSelectedRoleId(r.id)}
+                onClick={() => setDefaultRoleId(r.id)}
                 style={{
                   padding: "7px 14px", borderRadius: 999, fontSize: 13,
-                  border: `1px solid ${selectedRoleId === r.id ? "#2D0F2E" : "#E2DDCF"}`,
-                  background: selectedRoleId === r.id ? "#2D0F2E" : "#FBF8F2",
-                  color: selectedRoleId === r.id ? "#FBF8F2" : "#5A5466",
+                  border: `1px solid ${defaultRoleId === r.id ? "#2D0F2E" : "#E2DDCF"}`,
+                  background: defaultRoleId === r.id ? "#2D0F2E" : "#FBF8F2",
+                  color: defaultRoleId === r.id ? "#FBF8F2" : "#5A5466",
                   cursor: "pointer", transition: "all 0.12s",
                 }}
               >
@@ -8496,15 +8516,23 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               return (
                 <button
                   key={member.id}
-                  onClick={() => setSelectedIds((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(member.id)) next.delete(member.id)
-                    else next.add(member.id)
-                    return next
-                  })}
+                  onClick={() => {
+                    const wasSelected = selectedIds.has(member.id)
+                    setSelectedIds((prev) => {
+                      const next = new Set(prev)
+                      if (wasSelected) next.delete(member.id)
+                      else next.add(member.id)
+                      return next
+                    })
+                    if (wasSelected) {
+                      setMemberRoles((prev) => { const r = { ...prev }; delete r[member.id]; return r })
+                    } else {
+                      setMemberRoles((prev) => ({ ...prev, [member.id]: defaultRoleId }))
+                    }
+                  }}
                   style={{
                     display: "flex", alignItems: "center", gap: 14, width: "100%",
-                    minHeight: 52, padding: "14px 0",
+                    padding: selected && roles.length > 1 ? "12px 0" : "14px 0",
                     borderTop: "none", borderLeft: "none", borderRight: "none",
                     borderBottom: isLast ? "none" : "1px solid #EFE9DA",
                     background: selected ? "#F1ECDE" : "transparent",
@@ -8522,7 +8550,28 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
-                    {member.email && <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2, marginBottom: 0 }}>{member.email}</p>}
+                    {selected && roles.length > 1 ? (
+                      <select
+                        value={memberRoles[member.id] ?? defaultRoleId}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setMemberRoles((prev) => ({ ...prev, [member.id]: e.target.value }))
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          marginTop: 5, fontSize: 12, padding: "4px 8px",
+                          border: "1px solid #C9C0B0", borderRadius: 6,
+                          background: "#FBF8F2", color: "#13101A", cursor: "pointer",
+                          outline: "none", maxWidth: "100%",
+                        }}
+                      >
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      member.email && <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2, marginBottom: 0 }}>{member.email}</p>
+                    )}
                   </div>
                   {selected && (
                     <div style={{
