@@ -113,7 +113,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const validFinanceSections = ["give", "reimbursements", "budget", "allocation"] as const
   const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | "allocation" | null
   const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget" | "allocation">(
-    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "give"
+    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
   )
 
   function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
