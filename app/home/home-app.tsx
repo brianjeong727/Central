@@ -107,6 +107,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   }, [])
 
   const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
+  const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
@@ -519,6 +520,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 allTeams={allTeams}
                 isAdmin={isAdmin}
                 isDGL={isDGL}
+                isPastor={isPastor}
                 onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}

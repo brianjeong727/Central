@@ -8,6 +8,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
+  FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -34,6 +35,7 @@ import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
+import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -1716,7 +1718,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   )
 }
 
-export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat }: PlanTabProps) {
+export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, isPastor, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const router = useRouter()
@@ -1992,6 +1994,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               ministryId={ministryId}
               userId={userId}
               isPresident={isDGLPresident}
+              isPastor={isPastor}
+              onOpenChat={onOpenChat}
               praiseTeamId={
                 allTeams.find(t =>
                   /\b(praise|worship)\b/i.test(t.name) ||
@@ -2069,6 +2073,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             ministryId={ministryId}
             userId={userId}
             isPresident={isDGLPresident}
+            isPastor={isPastor}
+            onOpenChat={onOpenChat}
             praiseTeamId={
               allTeams.find(t =>
                 /\b(praise|worship)\b/i.test(t.name) ||
@@ -10452,21 +10458,28 @@ function SmallGroupLeadersTab({
   ministryId,
   userId,
   isPresident,
+  isPastor,
   praiseTeamId,
+  onOpenChat,
 }: {
   teamId: string
   ministryId: string
   userId: string
   isPresident: boolean
+  isPastor: boolean
   praiseTeamId?: string | null
+  onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [activeSubTab, setActiveSubTab] = useState<"home" | "schedule">(() => {
+  type SGLTab = "home" | "schedule" | "bible_study"
+  const validTabs: SGLTab[] = isPastor ? ["bible_study", "schedule"] : ["home", "schedule", "bible_study"]
+  const defaultTab: SGLTab = isPastor ? "bible_study" : "home"
+  const [activeSubTab, setActiveSubTab] = useState<SGLTab>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
-    return (p === "home" || p === "schedule") ? p : "home"
+    return (validTabs.includes(p as SGLTab)) ? p as SGLTab : defaultTab
   })
-  function setActiveSubTabAndUrl(t: "home" | "schedule") {
+  function setActiveSubTabAndUrl(t: SGLTab) {
     setActiveSubTab(t)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sgltab", t)
@@ -10753,7 +10766,7 @@ function SmallGroupLeadersTab({
     setAllBusyMap(newMap)
     setBusySet(myBusy)
 
-    if (isPresident) await loadExistingAssignments()
+    if (isPresident || isPastor) await loadExistingAssignments()
   }
 
   async function loadExistingAssignments() {
@@ -10938,17 +10951,30 @@ function SmallGroupLeadersTab({
       {/* Sub-tab switcher */}
       <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
-          tabs={[
-            { key: "home", label: "Home" },
-            { key: "schedule", label: "Schedule" },
-          ]}
+          tabs={validTabs.map(k => ({
+            key: k,
+            label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+          }))}
           active={activeSubTab}
-          onChange={t => setActiveSubTabAndUrl(t as "home" | "schedule")}
+          onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
         />
       </div>
 
+      {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
+      {activeSubTab === "bible_study" && (
+        <BibleStudySubTab
+          teamId={teamId}
+          ministryId={ministryId}
+          userId={userId}
+          isPastor={isPastor}
+          isPresident={isPresident}
+          semester={semester}
+          onOpenChat={onOpenChat}
+        />
+      )}
+
       {/* ── Home Tab ──────────────────────────────────────────────────────── */}
-      {activeSubTab === "home" && (
+      {activeSubTab === "home" && !isPastor && (
         <div className="flex flex-col gap-6">
 
           {/* June 1 renewal banner (president only) */}
@@ -11424,8 +11450,8 @@ function SmallGroupLeadersTab({
       {activeSubTab === "schedule" && (
         <div className="flex flex-col gap-6">
 
-          {/* Availability Grid */}
-          <div>
+          {/* Availability Grid — hidden for pastors */}
+          {!isPastor && <div>
             <PlanSectionHeader>My Availability — {semesterLabel}</PlanSectionHeader>
 
             {!rosterConfirmedForSchedule ? (
@@ -11531,10 +11557,27 @@ function SmallGroupLeadersTab({
                 </>
               )
             })()}
-          </div>
+          </div>}
+
+          {/* Pastor: read-only view of published rotation */}
+          {isPastor && (
+            <div>
+              <PlanSectionHeader>Published Rotation — {semesterLabel}</PlanSectionHeader>
+              {existingAssignments.filter(a => a.published).length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                  <p className="text-[13px] text-[#8A8497]">The rotation hasn&apos;t been published yet.</p>
+                </div>
+              ) : (
+                <DGLAssignmentTable
+                  assignments={existingAssignments.filter(a => a.published)}
+                  flaggedKeys={new Set()}
+                />
+              )}
+            </div>
+          )}
 
           {/* Rotation Assigner (president only) */}
-          {isPresident && (
+          {isPresident && !isPastor && (
             <div>
               <PlanSectionHeader>Rotation Assigner</PlanSectionHeader>
 
@@ -11669,6 +11712,617 @@ function SmallGroupLeadersTab({
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Bible Study Tab ────────────────────────────────────────────────────────────
+
+function getRecentFridays(n = 8): string[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const day = today.getDay()
+  const daysBack = (day - 5 + 7) % 7
+  const lastFriday = new Date(today)
+  lastFriday.setDate(today.getDate() - daysBack)
+  const result: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(lastFriday)
+    d.setDate(lastFriday.getDate() - i * 7)
+    result.push(d.toISOString().split("T")[0])
+  }
+  return result
+}
+
+type BSSheet = {
+  id: string
+  week_date: string
+  google_doc_url: string
+  pdf_url: string | null
+  pastor_notes: string | null
+  status: "draft" | "finalized"
+  finalized_at: string | null
+  created_by: string
+}
+
+type BSAnnotation = { page: number; x: number; y: number; text: string }
+type BSProgress = { user_id: string; name: string; read_at: string | null }
+
+function BibleStudySubTab({
+  teamId, ministryId, userId, isPastor, isPresident, semester, onOpenChat,
+}: {
+  teamId: string
+  ministryId: string
+  userId: string
+  isPastor: boolean
+  isPresident: boolean
+  semester: string
+  onOpenChat?: (id: string, name: string) => void
+}) {
+  const supabase = createClient()
+  const fridays = useMemo(() => getRecentFridays(8), [])
+  const [selectedWeek, setSelectedWeek] = useState(fridays[fridays.length - 1])
+  const [sheet, setSheet] = useState<BSSheet | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Create form
+  const [creating, setCreating] = useState(false)
+  const [newDocUrl, setNewDocUrl] = useState("")
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Pastor notes (auto-save)
+  const [noteDraft, setNoteDraft] = useState("")
+  const [savingNote, setSavingNote] = useState(false)
+  const noteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Finalize
+  const [finalizeConfirm, setFinalizeConfirm] = useState(false)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
+
+  // PDF rendering
+  const [pdfPages, setPdfPages] = useState<HTMLCanvasElement[]>([])
+  const [renderingPdf, setRenderingPdf] = useState(false)
+
+  // Annotations
+  const [annotations, setAnnotations] = useState<BSAnnotation[]>([])
+  const [pendingAnnotation, setPendingAnnotation] = useState<{ page: number; x: number; y: number } | null>(null)
+  const [annotationText, setAnnotationText] = useState("")
+  const [savingAnnotation, setSavingAnnotation] = useState(false)
+  const [hoveredAnnotation, setHoveredAnnotation] = useState<number | null>(null)
+
+  // Progress
+  const [progress, setProgress] = useState<BSProgress[]>([])
+
+  // Share
+  const [sharing, setSharing] = useState(false)
+  const [shareSuccess, setShareSuccess] = useState(false)
+
+  useEffect(() => { void loadSheet() }, [selectedWeek, teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadSheet() {
+    setLoading(true)
+    setPdfPages([])
+    setAnnotations([])
+    setProgress([])
+    setSheet(null)
+    setCreating(false)
+    setFinalizeConfirm(false)
+    setFinalizeError(null)
+    setShareSuccess(false)
+
+    const { data } = await supabase
+      .from("bible_study_sheets")
+      .select("*")
+      .eq("team_id", teamId)
+      .eq("week_date", selectedWeek)
+      .maybeSingle()
+
+    const s = data as BSSheet | null
+    setSheet(s)
+    if (s) {
+      setNoteDraft(s.pastor_notes ?? "")
+      if (s.status === "finalized" && s.pdf_url) {
+        void renderPdf(s.pdf_url)
+        void loadAnnotations(s.id)
+        void loadProgress(s.id)
+        void markRead(s.id)
+      }
+    }
+    setLoading(false)
+  }
+
+  async function renderPdf(url: string) {
+    setRenderingPdf(true)
+    try {
+      const pdfjsLib = await import("pdfjs-dist")
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+      const pdf = await pdfjsLib.getDocument(url).promise
+      const canvases: HTMLCanvasElement[] = []
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const viewport = page.getViewport({ scale: 1.5 })
+        const canvas = document.createElement("canvas")
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        const ctx = canvas.getContext("2d")!
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise
+        canvases.push(canvas)
+      }
+      setPdfPages(canvases)
+    } catch {
+      // PDF failed to render — link fallback shown below
+    } finally {
+      setRenderingPdf(false)
+    }
+  }
+
+  async function loadAnnotations(sheetId: string) {
+    const { data } = await supabase
+      .from("bible_study_annotations")
+      .select("annotations")
+      .eq("sheet_id", sheetId)
+      .eq("user_id", userId)
+      .maybeSingle()
+    setAnnotations((data?.annotations as BSAnnotation[]) ?? [])
+  }
+
+  async function loadProgress(sheetId: string) {
+    const { data: members } = await supabase
+      .from("team_members")
+      .select("user_id, profiles!user_id(name)")
+      .eq("team_id", teamId)
+    const { data: reads } = await supabase
+      .from("bible_study_progress")
+      .select("user_id, read_at")
+      .eq("sheet_id", sheetId)
+
+    const readMap = new Map<string, string>(
+      (reads ?? []).map((r: { user_id: string; read_at: string }) => [r.user_id, r.read_at])
+    )
+    type RawMember = { user_id: string; profiles: { name: string } | { name: string }[] | null }
+    setProgress(
+      (members ?? []).map((m: RawMember) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+        return { user_id: m.user_id, name: p?.name ?? "Unknown", read_at: readMap.get(m.user_id) ?? null }
+      })
+    )
+  }
+
+  async function markRead(sheetId: string) {
+    await supabase
+      .from("bible_study_progress")
+      .upsert({ sheet_id: sheetId, user_id: userId }, { onConflict: "sheet_id,user_id" })
+  }
+
+  async function handleCreate() {
+    if (!newDocUrl.trim()) { setCreateError("Paste a Google Doc URL."); return }
+    if (!newDocUrl.includes("docs.google.com/document")) { setCreateError("Please paste a Google Docs link."); return }
+    setSaving(true)
+    setCreateError(null)
+    const { error } = await supabase.from("bible_study_sheets").insert({
+      team_id: teamId,
+      ministry_id: ministryId,
+      week_date: selectedWeek,
+      semester,
+      google_doc_url: newDocUrl.trim(),
+      status: "draft",
+      created_by: userId,
+    })
+    if (error) { setCreateError(error.message); setSaving(false); return }
+    setCreating(false)
+    setNewDocUrl("")
+    void loadSheet()
+    setSaving(false)
+  }
+
+  function handleNoteChange(v: string) {
+    setNoteDraft(v)
+    if (noteTimeout.current) clearTimeout(noteTimeout.current)
+    if (!sheet) return
+    noteTimeout.current = setTimeout(async () => {
+      setSavingNote(true)
+      await savePastorNotesAction(sheet.id, v)
+      setSavingNote(false)
+    }, 1200)
+  }
+
+  async function handleFinalize() {
+    if (!sheet) return
+    setFinalizing(true)
+    setFinalizeError(null)
+    const result = await finalizeBibleStudyAction(sheet.id, sheet.google_doc_url, userId)
+    if (result.error) { setFinalizeError(result.error); setFinalizing(false); return }
+    const updated = { ...sheet, status: "finalized" as const, pdf_url: result.publicUrl ?? null }
+    setSheet(updated)
+    setFinalizeConfirm(false)
+    if (result.publicUrl) {
+      void renderPdf(result.publicUrl)
+      void loadAnnotations(sheet.id)
+      void loadProgress(sheet.id)
+    }
+    setFinalizing(false)
+  }
+
+  async function saveAnnotations(next: BSAnnotation[]) {
+    if (!sheet) return
+    setAnnotations(next)
+    await supabase.from("bible_study_annotations").upsert(
+      { sheet_id: sheet.id, user_id: userId, annotations: next, updated_at: new Date().toISOString() },
+      { onConflict: "sheet_id,user_id" }
+    )
+  }
+
+  async function handleAddAnnotation() {
+    if (!pendingAnnotation || !annotationText.trim()) return
+    setSavingAnnotation(true)
+    await saveAnnotations([...annotations, { ...pendingAnnotation, text: annotationText.trim() }])
+    setPendingAnnotation(null)
+    setAnnotationText("")
+    setSavingAnnotation(false)
+  }
+
+  async function handleDeleteAnnotation(idx: number) {
+    await saveAnnotations(annotations.filter((_, i) => i !== idx))
+  }
+
+  async function handleShare() {
+    if (!sheet?.pdf_url) return
+    setSharing(true)
+    const dateLabel = new Date(selectedWeek + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    // Find existing team group chat (type "my", name contains team identifier)
+    const { data: groups } = await supabase
+      .from("groups")
+      .select("id, name")
+      .eq("ministry_id", ministryId)
+      .eq("type", "my")
+      .order("created_at", { ascending: false })
+    // Find a group whose members include this team's members
+    const { data: teamMembers } = await supabase
+      .from("team_members")
+      .select("user_id")
+      .eq("team_id", teamId)
+    const memberIds = new Set((teamMembers ?? []).map((m: { user_id: string }) => m.user_id))
+    let targetGroup: { id: string; name: string } | null = null
+    for (const g of groups ?? []) {
+      const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", g.id)
+      const gIds = new Set((gm ?? []).map((m: { user_id: string }) => m.user_id))
+      const overlap = [...memberIds].filter(id => gIds.has(id)).length
+      if (overlap >= Math.min(memberIds.size, 2)) { targetGroup = g; break }
+    }
+    if (targetGroup) {
+      await supabase.from("messages").insert({
+        group_id: targetGroup.id,
+        sender_id: userId,
+        content: `Bible Study sheet for ${dateLabel}`,
+        attachment_url: sheet.pdf_url,
+        attachment_type: "application/pdf",
+        attachment_name: `Bible Study ${dateLabel}.pdf`,
+        message_type: "attachment",
+      })
+      setShareSuccess(true)
+      if (onOpenChat) onOpenChat(targetGroup.id, targetGroup.name)
+    } else {
+      setFinalizeError("No group chat found. Create a group chat from the team settings first.")
+    }
+    setSharing(false)
+  }
+
+  const weekLabel = (d: string) =>
+    new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+
+  if (loading) {
+    return <div style={{ display: "flex", justifyContent: "center", paddingTop: 48 }}><Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" /></div>
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Week selector */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" as const, paddingBottom: 2 }}>
+        {fridays.map(fri => (
+          <button
+            key={fri}
+            onClick={() => setSelectedWeek(fri)}
+            style={{
+              padding: "6px 14px", borderRadius: 20, fontSize: 13,
+              fontWeight: selectedWeek === fri ? 600 : 400,
+              border: selectedWeek === fri ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
+              background: selectedWeek === fri ? "#3E1540" : "transparent",
+              color: selectedWeek === fri ? "#F6F4EF" : "#5A5466",
+              cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit",
+            }}
+          >
+            {weekLabel(fri)}
+          </button>
+        ))}
+      </div>
+
+      {/* No sheet */}
+      {!sheet && !creating && (
+        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed #E8E2D2", padding: "32px 24px", textAlign: "center" as const }}>
+          <FileText style={{ width: 32, height: 32, color: "#C4C0B0", margin: "0 auto 12px" }} />
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No Bible Study for {weekLabel(selectedWeek)}</p>
+          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: isPastor ? 16 : 0 }}>
+            {isPastor ? "Paste a Google Doc link to set this week’s study." : "Check back when the pastor has added this week’s study."}
+          </p>
+          {isPastor && (
+            <button
+              onClick={() => setCreating(true)}
+              style={{ padding: "8px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              + Add Bible Study
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Create form */}
+      {creating && (
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid #E8E2D2", padding: "20px" }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Set Google Doc for {weekLabel(selectedWeek)}</p>
+          <p style={{ fontSize: 12, color: "#8A8497", marginBottom: 12 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
+          <input
+            type="url"
+            value={newDocUrl}
+            onChange={e => setNewDocUrl(e.target.value)}
+            placeholder="https://docs.google.com/document/d/..."
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+          />
+          {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => { setCreating(false); setCreateError(null); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sheet exists */}
+      {sheet && (
+        <>
+          {/* Header row: status badge + open-doc link */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const,
+                padding: "3px 8px", borderRadius: 6,
+                background: sheet.status === "finalized" ? "#E8F5E9" : "#FFF8E7",
+                color: sheet.status === "finalized" ? "#2E7D32" : "#8A6200",
+              }}>
+                {sheet.status === "finalized" ? "Finalized" : "Draft"}
+              </span>
+              <span style={{ fontSize: 12, color: "#8A8497" }}>{weekLabel(sheet.week_date)}</span>
+            </div>
+            <a
+              href={sheet.google_doc_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#3E1540", fontWeight: 600, textDecoration: "none" }}
+            >
+              <ExternalLink style={{ width: 12, height: 12 }} />
+              Open doc
+            </a>
+          </div>
+
+          {/* DRAFT: iframe preview */}
+          {sheet.status === "draft" && (
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+              <iframe
+                src={sheet.google_doc_url.replace(/\/edit.*$/, "") + "/preview"}
+                style={{ width: "100%", height: 600, border: "none", display: "block" }}
+                title="Bible Study Document"
+              />
+            </div>
+          )}
+
+          {/* FINALIZED: pdfjs-rendered pages with annotation overlay */}
+          {sheet.status === "finalized" && (
+            <div>
+              {renderingPdf && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
+                  <Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" />
+                </div>
+              )}
+              {!renderingPdf && pdfPages.length === 0 && sheet.pdf_url && (
+                <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", padding: 20, textAlign: "center" as const }}>
+                  <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 12 }}>PDF preview unavailable.</p>
+                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#3E1540", fontWeight: 600, textDecoration: "none" }}>
+                    Download PDF →
+                  </a>
+                </div>
+              )}
+              {pdfPages.map((srcCanvas, pi) => (
+                <div
+                  key={pi}
+                  style={{ position: "relative", marginBottom: 8, cursor: "crosshair", userSelect: "none" as const }}
+                  onClick={e => {
+                    if (pendingAnnotation !== null) return
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    setPendingAnnotation({ page: pi, x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height })
+                    setAnnotationText("")
+                  }}
+                >
+                  <canvas
+                    width={srcCanvas.width}
+                    height={srcCanvas.height}
+                    style={{ display: "block", width: "100%", borderRadius: pi === 0 ? "12px 12px 0 0" : pi === pdfPages.length - 1 ? "0 0 12px 12px" : "0", border: "1px solid #E8E2D2" }}
+                    ref={el => { if (el) el.getContext("2d")?.drawImage(srcCanvas, 0, 0) }}
+                  />
+                  {annotations.filter(a => a.page === pi).map((ann, ai) => {
+                    const globalIdx = annotations.findIndex((a, i) => a.page === pi && i === annotations.indexOf(ann) + ai)
+                    const gIdx = annotations.indexOf(ann)
+                    return (
+                      <div
+                        key={ai}
+                        style={{
+                          position: "absolute", left: `${ann.x * 100}%`, top: `${ann.y * 100}%`,
+                          transform: "translate(-50%, -50%)", width: 22, height: 22, borderRadius: "50%",
+                          background: "#3E1540", border: "2px solid #F6F4EF", cursor: "pointer", zIndex: 10,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 10, fontWeight: 700, color: "#F6F4EF",
+                          boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                        }}
+                        onMouseEnter={() => setHoveredAnnotation(gIdx)}
+                        onMouseLeave={() => setHoveredAnnotation(null)}
+                        onClick={e => { e.stopPropagation(); handleDeleteAnnotation(gIdx) }}
+                      >
+                        {gIdx + 1}
+                        {hoveredAnnotation === gIdx && (
+                          <div style={{
+                            position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
+                            background: "#13101A", color: "#F6F4EF", fontSize: 11, padding: "4px 8px", borderRadius: 6,
+                            whiteSpace: "nowrap" as const, maxWidth: 200, zIndex: 20, pointerEvents: "none" as const,
+                          }}>
+                            {ann.text}
+                            <div style={{ fontSize: 10, color: "#A09A8C" }}>Click to delete</div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+              {pdfPages.length > 0 && (
+                <p style={{ fontSize: 11, color: "#8A8497", textAlign: "center" as const, marginTop: 4 }}>
+                  Click anywhere on the PDF to add a personal annotation. Annotations are private to you.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Pending annotation input */}
+          {pendingAnnotation !== null && (
+            <div style={{ background: "white", borderRadius: 14, border: "1.5px solid #E8E2D2", padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", marginBottom: 8 }}>Add annotation</p>
+              <textarea
+                autoFocus
+                value={annotationText}
+                onChange={e => setAnnotationText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleAddAnnotation() } }}
+                placeholder="Type your note…"
+                style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
+                  {savingAnnotation ? "Saving…" : "Save note"}
+                </button>
+                <button onClick={() => { setPendingAnnotation(null); setAnnotationText("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Pastor notes */}
+          <div>
+            <PlanSectionHeader>
+              {isPastor ? "Your Notes to DGLs" : "Pastor Notes"}
+              {savingNote && <span style={{ fontSize: 11, color: "#8A8497", marginLeft: 8, fontWeight: 400 }}>Saving…</span>}
+            </PlanSectionHeader>
+            {isPastor ? (
+              <textarea
+                value={noteDraft}
+                onChange={e => handleNoteChange(e.target.value)}
+                placeholder="Add notes for the DGLs…"
+                style={{ width: "100%", resize: "vertical" as const, minHeight: 100, padding: "10px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 10, fontFamily: "inherit", color: "#13101A", background: "white", outline: "none", boxSizing: "border-box" as const }}
+              />
+            ) : sheet.pastor_notes ? (
+              <div style={{ padding: "12px 16px", background: "#F4F1E8", borderRadius: 10, border: "1px solid #E8E2D2", fontSize: 13, color: "#13101A", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
+                {sheet.pastor_notes}
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: "#8A8497" }}>No notes added yet.</p>
+            )}
+          </div>
+
+          {/* Finalize (pastor, draft only) */}
+          {isPastor && sheet.status === "draft" && (
+            <div>
+              {!finalizeConfirm ? (
+                <button
+                  onClick={() => setFinalizeConfirm(true)}
+                  style={{ padding: "10px 24px", background: "#2D0F2E", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Finalize &amp; Export PDF →
+                </button>
+              ) : (
+                <div style={{ padding: "14px 16px", background: "#FBF8F2", border: "1.5px solid #E8E2D2", borderRadius: 12 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
+                  <p style={{ fontSize: 12, color: "#8A8497", marginBottom: 10 }}>
+                    The Google Doc will be exported to PDF and locked for annotation. Ensure the doc is publicly viewable.
+                  </p>
+                  {finalizeError && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10 }}>
+                      <AlertCircle style={{ width: 13, height: 13, color: "#9F3030", flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: "#9F3030" }}>{finalizeError}</p>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      {finalizing ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Exporting…</> : "Confirm"}
+                    </button>
+                    <button onClick={() => { setFinalizeConfirm(false); setFinalizeError(null) }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Share to chat (finalized, pastor or president) */}
+          {sheet.status === "finalized" && (isPastor || isPresident) && onOpenChat && (
+            <div>
+              {shareSuccess ? (
+                <p style={{ fontSize: 13, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 style={{ width: 14, height: 14 }} />
+                  Shared to group chat!
+                </p>
+              ) : (
+                <button
+                  onClick={handleShare}
+                  disabled={sharing}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "transparent", color: "#3E1540", border: "1.5px solid #3E1540", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: sharing ? "not-allowed" : "pointer", opacity: sharing ? 0.6 : 1, fontFamily: "inherit" }}
+                >
+                  <Share2 style={{ width: 13, height: 13 }} />
+                  {sharing ? "Sharing…" : "Share to group chat"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Progress tracker */}
+          {sheet.status === "finalized" && progress.length > 0 && (
+            <div>
+              <PlanSectionHeader>Read Progress</PlanSectionHeader>
+              <div style={{ background: "white", borderRadius: 14, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+                {progress.map((p, i) => (
+                  <div key={p.user_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: i < progress.length - 1 ? "1px solid #F8F6F1" : "none" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                      {getInitials(p.name)}
+                    </div>
+                    <p style={{ flex: 1, fontSize: 13, color: "#13101A" }}>{p.name}</p>
+                    {p.read_at ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <CheckCircle2 style={{ width: 14, height: 14, color: "#2E7D32" }} />
+                        <span style={{ fontSize: 11, color: "#5A5466" }}>
+                          {new Date(p.read_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+                    ) : (
+                      <Circle style={{ width: 14, height: 14, color: "#C4C0B0" }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

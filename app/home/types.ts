@@ -454,6 +454,7 @@ export interface PlanTabProps {
   allTeams: Team[]
   isAdmin: boolean
   isDGL: boolean
+  isPastor: boolean
   onTeamsChange: () => void
   showCreateTeam: boolean
   onShowCreateTeam: (v: boolean) => void
