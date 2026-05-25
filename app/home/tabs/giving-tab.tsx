@@ -1499,6 +1499,9 @@ function AllocationSection({
                                 setDeletingCategory(cat.value)
                                 setConfirmDeleteCategory(null)
                                 await onDeleteCategory(cat.value)
+                                // Also purge from local allocations state so orphanedCategories
+                                // doesn't immediately re-add it before the next full fetch
+                                setAllocations(prev => prev.filter(a => a.category !== cat.value))
                                 setDeletingCategory(null)
                               }}
                               disabled={deletingCategory === cat.value}
