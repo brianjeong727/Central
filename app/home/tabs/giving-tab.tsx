@@ -931,26 +931,28 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   ]
 
   const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : activeSection === "budget" ? "Budget" : "Allocation"
+  const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : activeSection === "budget" ? "Track all ministry expenses and approved reimbursements." : "Set per-fund targets for each spending category and track progress toward them."
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }
 
   return (
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
       <DesktopTopbar crumbs={["Central", "Giving", ...(activeSection !== "give" ? [sectionLabel] : [])]} />
 
-      <div className="px-5 pt-14 md:px-10 md:py-8 max-w-[740px] md:max-w-none">
+      {/* Mobile header */}
+      <div className="md:hidden px-5 pt-14 pb-5">
+        <p style={monoStyle}>2 Corinthians 9:7</p>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>{sectionLabel}</h1>
+        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>{sectionSubtitle}</p>
+      </div>
 
-        {/* Header */}
-        <div className="mb-6 mt-6 md:mt-0 md:mb-8 md:max-w-[680px]">
-          <p className="text-[11px] tracking-[0.14em] uppercase text-[#8A8497] mb-2.5">2 Corinthians 9:7</p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(32px, 5vw, 48px)", lineHeight: 1, color: "#13101A", fontWeight: 400 }}>
-            {sectionLabel}
-          </h1>
-          <p className="mt-3 text-[14px] text-[#5A5466] leading-relaxed md:max-w-[520px]">
-            {activeSection === "give" && "Give directly and track ministry expenses in one place."}
-            {activeSection === "reimbursements" && "Submit receipts and track reimbursement forms for ministry expenses."}
-            {activeSection === "budget" && "Track all ministry expenses and approved reimbursements."}
-            {activeSection === "allocation" && "Set per-fund targets for each spending category and track progress toward them."}
-          </p>
-        </div>
+      {/* Desktop header */}
+      <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
+        <p style={monoStyle}>2 Corinthians 9:7</p>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>{sectionLabel}</h1>
+        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>{sectionSubtitle}</p>
+      </div>
+
+      <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none">
 
         {/* Mobile section tab strip */}
         {visibleSections.length > 1 && (
