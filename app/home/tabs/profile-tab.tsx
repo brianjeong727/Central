@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { ChevronRight, ChevronDown, X, Check, ArrowLeft, Camera, Edit3, BookOpen, Search, ImageIcon, LogOut, MoreHorizontal, Plus, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { updateMinistryPublic } from "@/app/actions/ministry"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
@@ -537,6 +536,46 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
   )
 }
 
+type ProfileDraftField = "phone" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
+
+const PROFILE_SECTIONS: {
+  id: string
+  label: string
+  fields: { key: ProfileDraftField; label: string; placeholder: string; multiline: boolean }[]
+}[] = [
+  {
+    id: "contact",
+    label: "Contact",
+    fields: [
+      { key: "phone", label: "Phone", placeholder: "Your phone number", multiline: false },
+    ],
+  },
+  {
+    id: "about",
+    label: "About",
+    fields: [
+      { key: "bio", label: "Bio", placeholder: "Write a short bio…", multiline: true },
+    ],
+  },
+  {
+    id: "faith",
+    label: "Faith",
+    fields: [
+      { key: "testimony", label: "Testimony", placeholder: "Share your faith story…", multiline: true },
+      { key: "favorite_verse", label: "Favorite verse", placeholder: "e.g. Philippians 4:13", multiline: false },
+      { key: "favorite_worship_song", label: "Favorite worship song", placeholder: "A song that moves you", multiline: false },
+      { key: "favorite_book_of_bible", label: "Favorite book of the Bible", placeholder: "e.g. Psalms", multiline: false },
+    ],
+  },
+  {
+    id: "prayer",
+    label: "Prayer",
+    fields: [
+      { key: "prayer_request", label: "Prayer request", placeholder: "Share what you'd like prayer for…", multiline: true },
+    ],
+  },
+]
+
 export function ProfileTab({
   userId,
   initialProfile,
@@ -560,17 +599,18 @@ export function ProfileTab({
 }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile>(initialProfile)
-  const [ministryIsPublic, setMinistryIsPublic] = useState(initialMinistryIsPublic ?? false)
-  const [togglingPublic, setTogglingPublic] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
-  const [draft, setDraft] = useState({
-    about_me: initialProfile.about_me ?? "",
-    bible_verse: initialProfile.bible_verse ?? "",
+  const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
+    phone: initialProfile.phone ?? "",
+    bio: initialProfile.bio ?? "",
+    testimony: initialProfile.testimony ?? "",
+    favorite_verse: initialProfile.favorite_verse ?? "",
+    favorite_worship_song: initialProfile.favorite_worship_song ?? "",
+    favorite_book_of_bible: initialProfile.favorite_book_of_bible ?? "",
     prayer_request: initialProfile.prayer_request ?? "",
-    pray_for_me: initialProfile.pray_for_me ?? "",
   })
   const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
   const [currentSchoolId, setCurrentSchoolId] = useState<string | null>(initialProfile.school_id ?? null)
@@ -580,7 +620,7 @@ export function ProfileTab({
     supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", initialProfile.ministry_id).order("sort_order").then(({ data }) => {
       if (data) setSchoolOptions(data as { id: string; name: string; abbreviation: string }[])
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProfile.ministry_id])
 
   async function handleSchoolChange(schoolId: string) {
@@ -590,21 +630,15 @@ export function ProfileTab({
     setProfile(p => ({ ...p, school_id: newId }))
   }
 
-  async function handleTogglePublic() {
-    if (!isAdmin || togglingPublic) return
-    setTogglingPublic(true)
-    const next = !ministryIsPublic
-    const { error } = await updateMinistryPublic(next)
-    if (!error) setMinistryIsPublic(next)
-    setTogglingPublic(false)
-  }
-
   const startEdit = () => {
     setDraft({
-      about_me: profile.about_me ?? "",
-      bible_verse: profile.bible_verse ?? "",
+      phone: profile.phone ?? "",
+      bio: profile.bio ?? "",
+      testimony: profile.testimony ?? "",
+      favorite_verse: profile.favorite_verse ?? "",
+      favorite_worship_song: profile.favorite_worship_song ?? "",
+      favorite_book_of_bible: profile.favorite_book_of_bible ?? "",
       prayer_request: profile.prayer_request ?? "",
-      pray_for_me: profile.pray_for_me ?? "",
     })
     setEditing(true)
   }
@@ -616,16 +650,18 @@ export function ProfileTab({
     const { data, error } = await supabase
       .from("profiles")
       .update({
-        about_me: draft.about_me || null,
-        bible_verse: draft.bible_verse || null,
+        phone: draft.phone || null,
+        bio: draft.bio || null,
+        testimony: draft.testimony || null,
+        favorite_verse: draft.favorite_verse || null,
+        favorite_worship_song: draft.favorite_worship_song || null,
+        favorite_book_of_bible: draft.favorite_book_of_bible || null,
         prayer_request: draft.prayer_request || null,
-        pray_for_me: draft.pray_for_me || null,
       })
       .eq("id", userId)
       .eq("ministry_id", initialProfile.ministry_id ?? "")
       .select()
       .single()
-
     if (!error && data) setProfile(data as Profile)
     setSaving(false)
     setEditing(false)
@@ -637,57 +673,112 @@ export function ProfileTab({
     if (!file) return
     setUploadingAvatar(true)
     setAvatarError(null)
-    // Derive extension; default to png for extensionless files (e.g. iOS share)
     const raw = file.name.split(".").pop()?.toLowerCase()
     const ext = raw && raw !== file.name.toLowerCase() ? raw : "png"
     const fileName = `${userId}.${ext}`
     const { data: uploadData, error } = await supabase.storage
       .from("profile-images")
       .upload(fileName, file, { upsert: true, contentType: file.type || "image/png" })
-    if (error) {
-      setAvatarError(error.message)
-      setUploadingAvatar(false)
-      e.target.value = ""
-      return
-    }
+    if (error) { setAvatarError(error.message); setUploadingAvatar(false); e.target.value = ""; return }
     if (uploadData) {
-      const { data: { publicUrl } } = supabase.storage
-        .from("profile-images")
-        .getPublicUrl(uploadData.path)
+      const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(uploadData.path)
       await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
-      setProfile((p) => ({ ...p, avatar_url: publicUrl }))
+      setProfile(p => ({ ...p, avatar_url: publicUrl }))
       onAvatarChange?.(publicUrl)
     }
     setUploadingAvatar(false)
     e.target.value = ""
   }
 
-  const fields = [
-    { key: "about_me" as const, label: "About me", placeholder: "Tell the community about yourself…" },
-    { key: "bible_verse" as const, label: "Current Bible verse", placeholder: "What verse are you meditating on?" },
-    { key: "prayer_request" as const, label: "Prayer request", placeholder: "Share what you'd like prayer for…" },
-    { key: "pray_for_me" as const, label: "How to pray for me this week", placeholder: "Specific ways others can intercede…" },
-  ]
+  function getFieldValue(key: ProfileDraftField): string {
+    return ((profile as unknown) as Record<string, string | null | undefined>)[key] ?? ""
+  }
 
-  function FieldCard({ fieldKey, label, placeholder }: { fieldKey: keyof typeof draft; label: string; placeholder: string }) {
+  const monoFieldLabel: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: 10,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+    margin: 0,
+    marginBottom: 4,
+  }
+
+  function renderProfileSections() {
+    const hasAnyContent = PROFILE_SECTIONS.some(s => s.fields.some(f => !!getFieldValue(f.key).trim()))
     return (
-      <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)] md:rounded-xl md:border-[#E5E0D2] md:bg-[#FBF8F2]">
-        <div style={MONO_STYLE}>{fieldKey === "about_me" ? "About" : fieldKey === "bible_verse" ? "Verse" : "Prayer"}</div>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginTop: "4px", marginBottom: "8px", letterSpacing: "-0.01em" }}>
-          {label}
-        </p>
-        {editing ? (
-          <textarea
-            value={draft[fieldKey]}
-            onChange={(e) => setDraft((d) => ({ ...d, [fieldKey]: e.target.value }))}
-            placeholder={placeholder}
-            rows={3}
-            className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]"
-          />
-        ) : (
-          <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">
-            {profile[fieldKey] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}
-          </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {PROFILE_SECTIONS.map(section => {
+          const filledFields = section.fields.filter(f => !!getFieldValue(f.key).trim())
+          if (!editing && filledFields.length === 0) return null
+          const fieldsToRender = editing ? section.fields : filledFields
+          return (
+            <div key={section.id}>
+              <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>{section.label}</p>
+              <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+                {fieldsToRender.map((field, i) => (
+                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid #E5E0D2" : "none" }}>
+                    {editing ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <p style={monoFieldLabel}>{field.label}</p>
+                        <p style={{ ...monoFieldLabel, color: "#C4C4C4", marginBottom: 0 }}>Optional</p>
+                      </div>
+                    ) : (
+                      <p style={monoFieldLabel}>{field.label}</p>
+                    )}
+                    {editing ? (
+                      field.multiline ? (
+                        <textarea
+                          value={draft[field.key]}
+                          onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
+                          placeholder={field.placeholder}
+                          rows={field.key === "testimony" ? 5 : 3}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "#13101A", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
+                        />
+                      ) : (
+                        <input
+                          type={field.key === "phone" ? "tel" : "text"}
+                          value={draft[field.key]}
+                          onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
+                          placeholder={field.placeholder}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "#13101A", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0 }}
+                        />
+                      )
+                    ) : (
+                      <p style={{ fontSize: 14, color: "#13101A", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0 }}>
+                        {getFieldValue(field.key)}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+
+        {editing && schoolOptions.length > 0 && (
+          <div>
+            <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>School</p>
+            <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+              <div style={{ padding: "14px 18px" }}>
+                <select
+                  value={currentSchoolId ?? ""}
+                  onChange={e => handleSchoolChange(e.target.value)}
+                  style={{ width: "100%", fontSize: 14, color: "#13101A", background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                >
+                  <option value="">Other / Not a student</option>
+                  {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!editing && !hasAnyContent && (
+          <div style={{ textAlign: "center", padding: "40px 0 24px" }}>
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4, marginTop: 0 }}>Nothing here yet</p>
+            <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Edit your profile to share details with your community.</p>
+          </div>
         )}
       </div>
     )
@@ -723,21 +814,17 @@ export function ProfileTab({
 
       {activeSection === "journal" && (
         <div className="pb-6 md:pb-0">
-          {/* Mobile header */}
           <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
             <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
               <RingCrossLogo size={26} />
               <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
             </a>
           </div>
-
-          {/* Journal page header */}
           <div className="px-5 pt-6 pb-2 md:px-14 md:pt-11 md:pb-6">
             <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: "12px" }}>Your Journal</p>
             <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(34px,4vw,52px)", fontWeight: 400, color: "#13101A", lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0 }}>Journal</h1>
             <p style={{ fontSize: "14px", color: "#5A5466", marginTop: "12px", lineHeight: 1.5 }}>Your prayers, reflections, and devotionals.</p>
           </div>
-
           <div className="md:px-6">
             <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
           </div>
@@ -745,161 +832,73 @@ export function ProfileTab({
       )}
 
       {activeSection === "spiritual-profile" && <>
-      {/* Mobile header */}
-      <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
-        <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <RingCrossLogo size={26} />
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-        </a>
-      </div>
-
-      {/* ── Desktop: hero ── */}
-      <div className="hidden md:block px-7 pt-7 pb-0">
-        <div
-          className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
-          style={{
-            background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)",
-            padding: "40px 40px 36px",
-            display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center",
-          }}
-        >
-          <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
-          <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
-
-          {/* Avatar — label wraps input for reliable iOS file picker */}
-          <label
-            className="relative group flex-shrink-0"
-            style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }}
-            aria-label="Change profile photo"
-          >
-            <input
-              type="file"
-              accept="image/*"
-              style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
-              onChange={handleAvatarUpload}
-              disabled={uploadingAvatar}
-            />
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "44px" }}>{getInitials(profile.name)}</span>
-            )}
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera className="w-6 h-6 text-white" />
-            </div>
-            {uploadingAvatar && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </label>
-
-          {/* Name + details */}
-          <div className="relative">
-            {avatarError && (
-              <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6, maxWidth: 220 }}>{avatarError}</p>
-            )}
-            <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>
-              {profile.name}
-            </h1>
-            <div style={{ marginTop: 12, display: "flex", gap: 24, color: "rgba(246,244,239,0.85)", fontSize: 13.5 }}>
-              <div>
-                <span style={{ color: "rgba(246,244,239,0.55)" }}>Role · </span>
-                {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-              </div>
-              {profile.graduation_year && (
-                <div>
-                  <span style={{ color: "rgba(246,244,239,0.55)" }}>Class · </span>
-                  {profile.graduation_year}
-                </div>
-              )}
-              {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && (
-                <div>
-                  <span style={{ color: "rgba(246,244,239,0.55)" }}>School · </span>
-                  {schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}
-                </div>
-              )}
-              <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
-            </div>
-            {profile.pray_for_me && (
-              <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "1px solid rgba(255,255,255,0.12)", maxWidth: "480px" }}>
-                <div style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", opacity: 0.6, marginBottom: "6px" }}>This week</div>
-                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.4, opacity: 0.92 }}>
-                  &ldquo;{profile.pray_for_me}&rdquo;
-                </div>
-              </div>
-            )}
-          </div>
-
+        {/* Mobile header */}
+        <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
+          <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+            <RingCrossLogo size={26} />
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          </a>
         </div>
-      </div>
 
-
-      {/* Mobile identity card */}
-      <div className="md:hidden px-5">
-        <div className="rounded-2xl overflow-hidden border border-[#ECE8DE] shadow-[0_2px_8px_rgba(19,16,26,0.06)] mb-5">
-          <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
-            <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.16)_0%,transparent_65%)]" />
-            <div className="relative z-10 flex flex-col items-center gap-4">
-              <label
-                className="relative w-24 h-24 rounded-full overflow-hidden bg-[#3E1540] border-[3px] border-white/20 group flex-shrink-0"
-                style={{ cursor: uploadingAvatar ? "not-allowed" : "pointer", display: "block" }}
-                aria-label="Change profile photo"
-              >
-                <input
-                  type="file"
-                  accept="image/*"
-                  style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
-                  onChange={handleAvatarUpload}
-                  disabled={uploadingAvatar}
-                />
-                {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="flex items-center justify-center w-full h-full text-[#F6F4EF]" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400 }}>
-                    {getInitials(profile.name)}
-                  </span>
-                )}
-                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Camera className="w-5 h-5 text-white" />
-                </div>
-                {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-              </label>
-              <div className="text-center">
-                {avatarError && (
-                  <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6 }}>{avatarError}</p>
-                )}
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
-                <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
-                  <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
-                  {profile.graduation_year && <span className="text-[12px] text-[#8A8497] font-medium">Class of {profile.graduation_year}</span>}
-                  {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && (
-                    <span className="text-[12px] text-[#8A8497] font-medium">{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>
-                  )}
-                </div>
-                <p className="text-[12px] text-[#8A8497]">{profile.email}</p>
+        {/* Desktop hero banner */}
+        <div className="hidden md:block px-7 pt-7 pb-0">
+          <div
+            className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
+            style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "40px 40px 36px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center" }}
+          >
+            <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
+            <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+            <label className="relative group flex-shrink-0" style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+              {profile.avatar_url ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" /> : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "44px" }}>{getInitials(profile.name)}</span>}
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Camera className="w-6 h-6 text-white" /></div>
+              {uploadingAvatar && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
+            </label>
+            <div className="relative">
+              {avatarError && <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6, maxWidth: 220 }}>{avatarError}</p>}
+              <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>{profile.name}</h1>
+              <div style={{ marginTop: 12, display: "flex", gap: 24, color: "rgba(246,244,239,0.85)", fontSize: 13.5, flexWrap: "wrap" }}>
+                <div><span style={{ color: "rgba(246,244,239,0.55)" }}>Role · </span>{profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}</div>
+                {profile.graduation_year && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>Class · </span>{profile.graduation_year}</div>}
+                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>School · </span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</div>}
+                <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
               </div>
             </div>
           </div>
-          <div className="px-4 py-2.5 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between gap-2">
-            <div className="flex gap-1">
-              <button
-                style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "#3E1540", color: "#F6F4EF", border: "none", letterSpacing: "0.08em", textTransform: "uppercase" as const }}
-              >
-                Profile
-              </button>
+        </div>
+
+        {/* Mobile identity card */}
+        <div className="md:hidden px-5">
+          <div className="rounded-2xl overflow-hidden border border-[#ECE8DE] shadow-[0_2px_8px_rgba(19,16,26,0.06)] mb-5">
+            <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
+              <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.16)_0%,transparent_65%)]" />
+              <div className="relative z-10 flex flex-col items-center gap-4">
+                <label className="relative w-24 h-24 rounded-full overflow-hidden bg-[#3E1540] border-[3px] border-white/20 group flex-shrink-0" style={{ cursor: uploadingAvatar ? "not-allowed" : "pointer", display: "block" }} aria-label="Change profile photo">
+                  <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                  {profile.avatar_url ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" /> : <span className="flex items-center justify-center w-full h-full text-[#F6F4EF]" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400 }}>{getInitials(profile.name)}</span>}
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Camera className="w-5 h-5 text-white" /></div>
+                  {uploadingAvatar && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
+                </label>
+                <div className="text-center">
+                  {avatarError && <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6 }}>{avatarError}</p>}
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
+                  <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
+                    <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
+                    {profile.graduation_year && <span className="text-[12px] text-[#8A8497] font-medium">Class of {profile.graduation_year}</span>}
+                    {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <span className="text-[12px] text-[#8A8497] font-medium">{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+                  </div>
+                  <p className="text-[12px] text-[#8A8497]">{profile.email}</p>
+                </div>
+              </div>
             </div>
-            {activeSection === "spiritual-profile" && (
+            <div className="px-4 py-2.5 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between gap-2">
+              <div className="flex gap-1">
+                <button style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "#3E1540", color: "#F6F4EF", border: "none", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Profile</button>
+              </div>
               <div className="flex items-center gap-2">
                 {editing ? (
                   <>
-                    <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors">
-                      <X className="w-3.5 h-3.5 text-[#5A5466]" />
-                    </button>
+                    <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors"><X className="w-3.5 h-3.5 text-[#5A5466]" /></button>
                     <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50">
                       <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
                     </button>
@@ -910,82 +909,18 @@ export function ProfileTab({
                   </button>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Field cards ── */}
-      {/* Desktop: 2x2 grid */}
-      <div className="hidden md:block px-7 pt-6">
-        {schoolOptions.length > 0 && (
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)] mb-4">
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>School</p>
-            <select
-              value={currentSchoolId ?? ""}
-              onChange={(e) => handleSchoolChange(e.target.value)}
-              className="w-full text-[13px] text-[#5A5466] bg-transparent border-none outline-none cursor-pointer"
-            >
-              <option value="">Other / Not a student</option>
-              {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-        )}
-        <div className="grid pb-6 gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-          {fields.map(({ key, label, placeholder }) => (
-            <FieldCard key={key} fieldKey={key} label={label} placeholder={placeholder} />
-          ))}
+        {/* Desktop: profile sections */}
+        <div className="hidden md:block px-7 pt-6 pb-6">
+          {renderProfileSections()}
         </div>
-      </div>
 
-      {/* Mobile: stacked sections */}
-      <div className="md:hidden px-5 pb-6">
-          {schoolOptions.length > 0 && (
-            <div className="mb-5">
-              <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Personal</p>
-              <div className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>School</p>
-                <select
-                  value={currentSchoolId ?? ""}
-                  onChange={(e) => handleSchoolChange(e.target.value)}
-                  className="w-full text-[13px] text-[#5A5466] bg-transparent border-none outline-none cursor-pointer"
-                >
-                  <option value="">Other / Not a student</option>
-                  {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-          <div className="mb-5">
-            <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Your story</p>
-            <div className="flex flex-col gap-3">
-              {fields.slice(0, 2).map(({ key, label, placeholder }) => (
-                <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
-                  {editing ? (
-                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
-                  ) : (
-                    <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mb-6">
-            <p className="mb-3 ml-0.5" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "19px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1 }}>Prayer</p>
-            <div className="flex flex-col gap-3">
-              {fields.slice(2).map(({ key, label, placeholder }) => (
-                <div key={key} className="bg-white rounded-2xl border border-[#ECE8DE] p-5 shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "15px", color: "#3E1540", fontWeight: 400, marginBottom: "8px", letterSpacing: "-0.01em" }}>{label}</p>
-                  {editing ? (
-                    <textarea value={draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} placeholder={placeholder} rows={3} className="w-full text-[13px] text-[#5A5466] leading-relaxed bg-transparent resize-none focus:outline-none placeholder:text-[#C4C4C4]" />
-                  ) : (
-                    <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{profile[key] || <span className="text-[#C4C4C4] italic text-[13px]">{placeholder}</span>}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Mobile: profile sections */}
+        <div className="md:hidden px-5 pb-6">
+          {renderProfileSections()}
         </div>
       </>}
     </div>
