@@ -48,3 +48,16 @@ function setTabAndUrl(t: TabType) {
 **Sidebar navigation must atomically clear `view` param:** `handleSidebarTabChange` clears `view=settings` and sets `tab` in one `router.replace` call. Two separate `replaceParam` calls race on `window.location.search` — the second overwrites the first's deletion.
 
 **Team switch must clear all team-specific sub-params atomically:** On team change, clear `view`, `sotab`, `ptab`, `sgltab`, `evtab` in a single `router.replace` — same race condition applies to sequential calls.
+
+## Deletion must always have confirmation
+Date: 2026-05-24
+
+**Rule: Every delete action in the app requires a two-step confirmation. No exceptions.**
+
+Use the inline confirm pattern — first click reveals "Delete / Cancel" inline; second click (on "Delete") executes the action. Never trigger a delete on a single click.
+
+**Why:** Users have accidentally deleted tasks, categories, and other data because the X button fired immediately. The cost of a single-click delete is high (data loss), the cost of a two-step confirm is zero (one extra click).
+
+**How to apply:** See §14 of `skills/design-system/DESIGN_SYSTEM.md` for the exact implementation pattern. Always use two state variables: `confirmId` (pending confirmation) and `deleting` (in-flight). Never use `window.confirm()`.
+
+**Common mistake to avoid:** Using `window.confirm()` or a modal for small items in lists/tables. The inline pattern is always preferred — it keeps focus in place and feels native to the UI.

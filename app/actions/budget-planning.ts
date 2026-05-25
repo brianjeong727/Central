@@ -149,13 +149,15 @@ export async function deleteBudgetCategory(
   ministryId: string,
   categoryName: string,
 ): Promise<{ error: string | null }> {
-  const supabase = await createClient()
-  // Delete the allocations for this category first
-  await supabase
-    .from("budget_allocations")
+  const admin = createAdminClient()
+  // Delete allocations first (uses admin to bypass RLS on ministry_budgets)
+  await admin
+    .from("ministry_budgets")
     .delete()
     .eq("ministry_id", ministryId)
     .eq("category", categoryName)
+  // Delete the category row (RLS policy allows leader/admin)
+  const supabase = await createClient()
   const { error } = await supabase
     .from("budget_categories")
     .delete()

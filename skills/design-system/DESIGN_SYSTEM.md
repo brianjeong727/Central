@@ -742,6 +742,54 @@ const MyNewPage = () => (
 
 ---
 
-## 14. Final principle
+## 14. Deletion confirmation (mandatory)
+
+**Every destructive action requires a two-step confirmation.** No exceptions — not even for small items.
+
+### Inline confirmation pattern (preferred for table rows and list items)
+
+First click replaces the delete control with a compact inline confirm:
+
+```tsx
+{confirmId === item.id ? (
+  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+    <button
+      onClick={async () => { setDeleting(item.id); setConfirmId(null); await onDelete(item.id); setDeleting(null) }}
+      disabled={deleting === item.id}
+      style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2",
+               border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px",
+               cursor: "pointer", whiteSpace: "nowrap",
+               opacity: deleting === item.id ? 0.5 : 1 }}
+    >
+      {deleting === item.id ? "Deleting…" : "Delete"}
+    </button>
+    <button
+      onClick={() => setConfirmId(null)}
+      style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none",
+               cursor: "pointer", padding: "2px 4px" }}
+    >
+      Cancel
+    </button>
+  </div>
+) : (
+  <button onClick={() => setConfirmId(item.id)} style={{ /* ghost X */ }}>
+    <X size={13} />
+  </button>
+)}
+```
+
+**State shape:** always two separate state variables:
+- `confirmId: string | null` — which item is awaiting confirmation
+- `deleting: string | null` — which item is actively being deleted (shows "Deleting…", disables button)
+
+**Rules:**
+- Only one item can be in confirm state at a time — opening a new confirm closes the previous
+- Cancel always restores the original X button immediately, no async needed
+- "Delete" button text changes to "Deleting…" during the async call and disables itself
+- Never use `window.confirm()` — it blocks the main thread and looks wrong on mobile
+
+---
+
+## 15. Final principle
 
 When a decision isn't covered above, default to **less**. Less color, less weight, less border, less iconography. The Central app earns its character from *restraint* — every time the original screens went wrong, it was by adding (a gradient, a red, a bold sans, a modal, a tab, an icon). The corrections were almost always subtractive. Build that way.

@@ -1266,6 +1266,7 @@ function AllocationSection({
   const [newCategoryName, setNewCategoryName] = useState("")
   const [savingCategory, setSavingCategory] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null)
+  const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
 
   const yearOptions = generateYearOptions()
   const isPastYear = fiscalYear !== currentFiscalYear()
@@ -1491,18 +1492,36 @@ function AllocationSection({
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 14, color: "#13101A" }}>{cat.label}</span>
                       {!cat.isPermanent && canEdit && !isPastYear && (
-                        <button
-                          onClick={async () => {
-                            if (deletingCategory === cat.value) return
-                            setDeletingCategory(cat.value)
-                            await onDeleteCategory(cat.value)
-                            setDeletingCategory(null)
-                          }}
-                          title="Remove custom category"
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#C4B8C0", padding: 0, display: "flex", alignItems: "center", opacity: deletingCategory === cat.value ? 0.4 : 1 }}
-                        >
-                          <X size={13} />
-                        </button>
+                        confirmDeleteCategory === cat.value ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                            <button
+                              onClick={async () => {
+                                setDeletingCategory(cat.value)
+                                setConfirmDeleteCategory(null)
+                                await onDeleteCategory(cat.value)
+                                setDeletingCategory(null)
+                              }}
+                              disabled={deletingCategory === cat.value}
+                              style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
+                            >
+                              {deletingCategory === cat.value ? "Deleting…" : "Delete"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteCategory(null)}
+                              style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteCategory(cat.value)}
+                            title="Remove custom category"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#C4B8C0", padding: 0, display: "flex", alignItems: "center" }}
+                          >
+                            <X size={13} />
+                          </button>
+                        )
                       )}
                     </div>
 
