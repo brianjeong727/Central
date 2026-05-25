@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward, Paperclip, Pin, FileDown } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -1051,6 +1051,21 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [mentionMembers, setMentionMembers] = useState<{ id: string; name: string }[]>([])
   const [mentionIndex, setMentionIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Polls
+  const [showPollCreator, setShowPollCreator] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState("")
+  const [pollOptions, setPollOptions] = useState(["", ""])
+  const [pollsData, setPollsData] = useState<Record<string, { question: string; options: string[] }>>({})
+  const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // poll_id → option_index user voted (-1 = none)
+  const [pollCounts, setPollCounts] = useState<Record<string, number[]>>({}) // poll_id → counts per option
+  // GIFs
+  const [showGifPicker, setShowGifPicker] = useState(false)
+  const [gifSearch, setGifSearch] = useState("")
+  const [gifResults, setGifResults] = useState<{ id: string; previewUrl: string; fullUrl: string }[]>([])
+  const [gifLoading, setGifLoading] = useState(false)
+  const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Link previews
+  const [linkPreviews, setLinkPreviews] = useState<Record<string, { title: string | null; description: string | null; image: string | null; hostname: string; url: string }>>({})
 
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -1104,6 +1119,51 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     loadGroupMembers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
+
+  // Load trending GIFs when GIF picker opens
+  useEffect(() => {
+    if (!showGifPicker) return
+    if (gifResults.length > 0) return
+    handleGifSearch("")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showGifPicker])
+
+  // Debounced GIF search
+  useEffect(() => {
+    if (!showGifPicker) return
+    if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current)
+    gifDebounceRef.current = setTimeout(() => handleGifSearch(gifSearch), 400)
+    return () => { if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gifSearch, showGifPicker])
+
+  // Fetch link previews for URLs found in messages
+  useEffect(() => {
+    const urlRe = /https?:\/\/[^\s<>"']+/gi
+    const toFetch: string[] = []
+    for (const msg of messages) {
+      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll") continue
+      const found = msg.content.match(urlRe)
+      if (!found) continue
+      for (const url of found) {
+        if (!linkPreviews[url]) toFetch.push(url)
+      }
+    }
+    if (toFetch.length === 0) return
+    // Mark as loading to prevent duplicate fetches
+    setLinkPreviews(prev => {
+      const next = { ...prev }
+      for (const url of toFetch) if (!next[url]) next[url] = { title: null, description: null, image: null, hostname: new URL(url).hostname.replace(/^www\./, ""), url }
+      return next
+    })
+    for (const url of toFetch) {
+      fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && !d.error) setLinkPreviews(prev => ({ ...prev, [url]: d })) })
+        .catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -1223,6 +1283,119 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setMentionQuery(null)
     requestAnimationFrame(() => el?.focus())
   }
+
+  // ─── Phase 3 handlers ────────────────────────────────────────────────────
+
+  async function loadPollsData(pollIds: string[]) {
+    if (pollIds.length === 0) return
+    const [{ data: pollsRows }, { data: votesRows }, { data: countsRows }] = await Promise.all([
+      supabase.from("polls").select("id, question, options").in("id", pollIds),
+      supabase.from("poll_votes").select("poll_id, option_index").in("poll_id", pollIds).eq("user_id", userId),
+      supabase.from("poll_votes").select("poll_id, option_index").in("poll_id", pollIds),
+    ])
+    if (pollsRows) {
+      const map: Record<string, { question: string; options: string[] }> = {}
+      for (const p of pollsRows) map[p.id] = { question: p.question, options: p.options }
+      setPollsData(prev => ({ ...prev, ...map }))
+    }
+    if (votesRows) {
+      const map: Record<string, number> = {}
+      for (const v of votesRows) map[v.poll_id] = v.option_index
+      setPollVotes(prev => ({ ...prev, ...map }))
+    }
+    if (countsRows) {
+      const map: Record<string, number[]> = {}
+      for (const v of countsRows) {
+        if (!map[v.poll_id]) map[v.poll_id] = []
+        while (map[v.poll_id].length <= v.option_index) map[v.poll_id].push(0)
+        map[v.poll_id][v.option_index]++
+      }
+      setPollCounts(prev => ({ ...prev, ...map }))
+    }
+  }
+
+  async function handleCreatePoll() {
+    if (!pollQuestion.trim()) return
+    const opts = pollOptions.filter(o => o.trim())
+    if (opts.length < 2) return
+    setShowPollCreator(false)
+
+    const { data: pollRow } = await supabase.from("polls").insert({ group_id: groupId, question: pollQuestion.trim(), options: opts, created_by: userId }).select("id").single()
+    if (!pollRow) return
+
+    const optimisticId = `optimistic-poll-${Date.now()}`
+    const now = new Date().toISOString()
+    const optimisticMsg: Message = {
+      id: optimisticId, group_id: groupId, sender_id: userId, content: "",
+      created_at: now, sender_name: userName, reply_to_id: null,
+      reply_to_content: null, reply_to_sender: null, message_type: "poll",
+      poll_id: pollRow.id,
+    }
+    setMessages(prev => [...prev, optimisticMsg])
+    setPollsData(prev => ({ ...prev, [pollRow.id]: { question: pollQuestion.trim(), options: opts } }))
+    setPollCounts(prev => ({ ...prev, [pollRow.id]: opts.map(() => 0) }))
+
+    const { data } = await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", message_type: "poll", poll_id: pollRow.id }).select("id").single()
+    if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+
+    setPollQuestion("")
+    setPollOptions(["", ""])
+  }
+
+  async function handleVote(pollId: string, optionIndex: number) {
+    const prev = pollVotes[pollId]
+    if (prev === optionIndex) return // already voted this option
+
+    // Optimistic update
+    setPollVotes(pv => ({ ...pv, [pollId]: optionIndex }))
+    setPollCounts(pc => {
+      const counts = [...(pc[pollId] ?? [])]
+      const poll = pollsData[pollId]
+      if (poll) while (counts.length < poll.options.length) counts.push(0)
+      if (prev !== undefined && prev >= 0) counts[prev] = Math.max(0, (counts[prev] ?? 0) - 1)
+      counts[optionIndex] = (counts[optionIndex] ?? 0) + 1
+      return { ...pc, [pollId]: counts }
+    })
+
+    await supabase.from("poll_votes").upsert({ poll_id: pollId, user_id: userId, option_index: optionIndex }, { onConflict: "poll_id,user_id" })
+  }
+
+  async function handleGifSearch(query: string) {
+    setGifLoading(true)
+    try {
+      const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY
+      const endpoint = query.trim()
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(query)}&limit=24&rating=g`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=g`
+      const res = await fetch(endpoint)
+      const json = await res.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setGifResults((json.data ?? []).map((g: any) => ({
+        id: g.id,
+        previewUrl: g.images?.fixed_height_small?.url ?? g.images?.preview_gif?.url ?? "",
+        fullUrl: g.images?.original?.url ?? "",
+      })))
+    } catch { /* swallow */ }
+    setGifLoading(false)
+  }
+
+  function handleSendGif(fullUrl: string) {
+    setShowGifPicker(false)
+    if (!fullUrl) return
+    const optimisticId = `optimistic-gif-${Date.now()}`
+    const now = new Date().toISOString()
+    const optimisticMsg: Message = {
+      id: optimisticId, group_id: groupId, sender_id: userId, content: "",
+      created_at: now, sender_name: userName, reply_to_id: null,
+      reply_to_content: null, reply_to_sender: null, message_type: "user",
+      attachment_url: fullUrl, attachment_type: "image/gif",
+    }
+    setMessages(prev => [...prev, optimisticMsg])
+    supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", attachment_url: fullUrl, attachment_type: "image/gif" }).select("id").single()
+      .then(({ data }) => { if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m)) })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Fetch group type + archived status + pinned message
   useEffect(() => {
@@ -1344,7 +1517,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1379,9 +1552,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
             attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
             attachment_size: (m as { attachment_size?: number | null }).attachment_size ?? null,
+            poll_id: (m as { poll_id?: string | null }).poll_id ?? null,
           }
         })
         setMessages(enriched)
+
+        // Load polls for any poll messages
+        const pollIds = enriched.filter(m => m.poll_id).map(m => m.poll_id!)
+        if (pollIds.length > 0) loadPollsData(pollIds)
 
         // Load all reactions for these messages in one query
         const messageIds = enriched.map((m) => m.id)
@@ -1422,7 +1600,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
         async (payload) => {
-          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null }
+          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; poll_id?: string | null }
 
           // System messages: just append directly for everyone
           if (raw.message_type === "system") {
@@ -1465,7 +1643,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             }
           }
 
-          setMessages((prev) => [...prev, {
+          const newMsg = {
             ...raw,
             sender_name: senderName,
             sender_avatar_url: raw.sender_id ? (avatarCache.current[raw.sender_id] ?? null) : null,
@@ -1477,7 +1655,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             attachment_type: raw.attachment_type ?? null,
             attachment_name: raw.attachment_name ?? null,
             attachment_size: raw.attachment_size ?? null,
-          }])
+            poll_id: raw.poll_id ?? null,
+          }
+          setMessages((prev) => [...prev, newMsg])
+          if (raw.poll_id) loadPollsData([raw.poll_id])
 
           // Keep last_read_at current as messages arrive so the badge is
           // already cleared in the DB by the time the user navigates back.
@@ -1963,6 +2144,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
               const sameMinute = (a: Message, b: Message) =>
                 a.message_type !== "system" && b.message_type !== "system" &&
+                a.message_type !== "poll" && b.message_type !== "poll" &&
                 a.sender_id === b.sender_id &&
                 Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
@@ -1991,6 +2173,82 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
               const rxGroups = groupedReactions(msg.id)
               const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
+
+              // Poll message — full-width card with vote buttons
+              if (msg.message_type === "poll" && msg.poll_id) {
+                const poll = pollsData[msg.poll_id]
+                const userVote = pollVotes[msg.poll_id]
+                const counts = pollCounts[msg.poll_id] ?? []
+                const totalVotes = counts.reduce((s, c) => s + c, 0)
+                const hasVoted = userVote !== undefined
+
+                return (
+                  <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
+                    {showDateSep && (
+                      <div className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-[#E8E2D2]" />
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
+                          {formatDateLabel(msg.created_at)}
+                        </span>
+                        <div className="flex-1 h-px bg-[#E8E2D2]" />
+                      </div>
+                    )}
+                    <div className="mt-3 mx-0">
+                      <div className="text-[11px] text-[#8A8497] mb-1 flex items-center gap-1.5">
+                        <BarChart2 className="w-3 h-3" />
+                        <span>{isOwn ? "You" : msg.sender_name} created a poll</span>
+                        <span className="text-[#C4C4C4]">· {formatMessageTime(msg.created_at)}</span>
+                      </div>
+                      <div className="bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
+                        {poll ? (
+                          <>
+                            <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6]">
+                              <p className="text-[15px] font-semibold text-[#13101A] leading-snug">{poll.question}</p>
+                              <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
+                            </div>
+                            <div className="px-3 py-2 flex flex-col gap-1.5">
+                              {poll.options.map((opt, oi) => {
+                                const count = counts[oi] ?? 0
+                                const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
+                                const isSelected = userVote === oi
+                                return (
+                                  <button
+                                    key={oi}
+                                    onClick={() => handleVote(msg.poll_id!, oi)}
+                                    className="relative w-full text-left rounded-xl overflow-hidden border transition-all"
+                                    style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: "transparent" }}
+                                  >
+                                    {hasVoted && (
+                                      <div
+                                        className="absolute inset-y-0 left-0 rounded-xl transition-all"
+                                        style={{ width: `${pct}%`, background: isSelected ? "rgba(62,21,64,0.12)" : "rgba(0,0,0,0.04)" }}
+                                      />
+                                    )}
+                                    <div className="relative flex items-center justify-between px-3 py-2.5 gap-2">
+                                      <span className={`text-[13px] font-medium ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                                      {hasVoted && <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{pct}%</span>}
+                                      {isSelected && (
+                                        <div className="w-4 h-4 rounded-full bg-[#3E1540] flex items-center justify-center flex-shrink-0">
+                                          <Check className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="px-4 py-4 flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[13px] text-[#8A8497]">Loading poll…</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
 
               // System message — centered event note, no bubble
               if (msg.message_type === "system") {
@@ -2252,14 +2510,41 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   </a>
                                 )}
                                 {/* Text content */}
-                                {msg.content && (
-                                  <div className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}>
-                                    {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
-                                      ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
-                                      : renderMentions(msg.content, isOwn)}
-                                    {msg.is_edited && <span className="text-[10px] ml-1.5 opacity-50">edited</span>}
-                                  </div>
-                                )}
+                                {msg.content && (() => {
+                                  const urlRe = /https?:\/\/[^\s<>"']+/gi
+                                  const urls = msg.content.match(urlRe) ?? []
+                                  const preview = urls.map(u => linkPreviews[u]).find(p => p && p.title)
+                                  return (
+                                    <>
+                                      <div className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}>
+                                        {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
+                                          ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
+                                          : renderMentions(msg.content, isOwn)}
+                                        {msg.is_edited && <span className="text-[10px] ml-1.5 opacity-50">edited</span>}
+                                      </div>
+                                      {preview && (
+                                        <a
+                                          href={preview.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-white/10" : "border-[#E8E2D2] bg-[#F4F1E8]"}`}
+                                          style={{ textDecoration: "none" }}
+                                        >
+                                          {preview.image && (
+                                            <img src={preview.image} alt="" className="w-full max-h-[120px] object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
+                                          )}
+                                          <div className="px-3 py-2">
+                                            <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[#8A8497]"}`}>{preview.hostname}</p>
+                                            {preview.title && <p className={`text-[13px] font-semibold leading-snug ${isOwn ? "text-white" : "text-[#13101A]"}`}>{preview.title.slice(0, 80)}</p>}
+                                            {preview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[#5A5466]"}`}>{preview.description.slice(0, 120)}</p>}
+                                          </div>
+                                        </a>
+                                      )}
+                                    </>
+                                  )
+                                })()}
                               </>
                             )}
                           </>
@@ -2406,6 +2691,47 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         </div>
       )}
 
+      {/* ── GIF Picker panel ── */}
+      {showGifPicker && !groupArchived && (
+        <div className="flex-shrink-0 bg-white border-t border-[#E8E2D2] z-[156] relative" style={{ height: 240 }}>
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
+            <input
+              autoFocus
+              value={gifSearch}
+              onChange={e => setGifSearch(e.target.value)}
+              placeholder="Search GIFs…"
+              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[#E8E2D2] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
+            />
+            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto h-[188px]">
+            {gifLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : gifResults.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-[13px] text-[#8A8497]">No GIFs found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1 p-1">
+                {gifResults.map(gif => (
+                  <button
+                    key={gif.id}
+                    onClick={() => handleSendGif(gif.fullUrl)}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-[#F4F1E8] hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <img src={gif.previewUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Input bar ── */}
       {groupArchived ? (
         <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
@@ -2443,11 +2769,26 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors disabled:opacity-40"
+              title="Attach file"
             >
               {uploading
                 ? <div className="w-4 h-4 border-2 border-[#5A5466] border-t-transparent rounded-full animate-spin" />
                 : <Paperclip className="w-4 h-4" />
               }
+            </button>
+            <button
+              onClick={() => { setShowGifPicker(p => !p); setShowPollCreator(false) }}
+              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors ${showGifPicker ? "bg-[#3E1540] text-white border-[#3E1540]" : "text-[#5A5466] border-[#E2DDCF] hover:border-[#3E1540]/30 hover:text-[#13101A]"}`}
+              title="Send a GIF"
+            >
+              GIF
+            </button>
+            <button
+              onClick={() => { setShowPollCreator(p => !p); setShowGifPicker(false) }}
+              className={`flex-shrink-0 transition-colors ${showPollCreator ? "text-[#3E1540]" : "text-[#5A5466] hover:text-[#13101A]"}`}
+              title="Create a poll"
+            >
+              <BarChart2 className="w-4 h-4" />
             </button>
             <textarea
               ref={textareaRef}
@@ -2500,12 +2841,76 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         </div>
       )}
 
-      {/* Overlay to dismiss emoji / context menu */}
-      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor) && (
+      {/* Overlay to dismiss emoji / context menu / GIF picker */}
+      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker) && (
         <div
           className="fixed inset-0 z-[155] md:left-[296px]"
-          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null) }}
+          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false) }}
         />
+      )}
+
+      {/* Poll creator modal */}
+      {showPollCreator && !groupArchived && (
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowPollCreator(false)}>
+          <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Create a poll</p>
+              <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                <X className="w-4 h-4 text-[#5A5466]" />
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wide mb-1.5 block">Question</label>
+                <input
+                  autoFocus
+                  value={pollQuestion}
+                  onChange={e => setPollQuestion(e.target.value)}
+                  placeholder="Ask something…"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wide mb-1.5 block">Options</label>
+                <div className="flex flex-col gap-2">
+                  {pollOptions.map((opt, oi) => (
+                    <div key={oi} className="flex items-center gap-2">
+                      <input
+                        value={opt}
+                        onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
+                        placeholder={`Option ${oi + 1}`}
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {pollOptions.length < 5 && (
+                    <button
+                      onClick={() => setPollOptions(prev => [...prev, ""])}
+                      className="flex items-center gap-1.5 text-[13px] text-[#3E1540] font-medium hover:opacity-70 transition-opacity self-start mt-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add option
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={handleCreatePoll}
+                disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
+              >
+                Create poll
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Forward sheet */}
