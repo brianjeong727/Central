@@ -4787,6 +4787,7 @@ export function EventPlanWorkspace({
   const [newTaskPhase, setNewTaskPhase] = useState<EventTask["phase"]>("pre_event")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
+  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -5464,9 +5465,26 @@ export function EventPlanWorkspace({
                                 </span>
                               )}
                               {canEdit && (
-                                <button onClick={() => handleDeleteTask(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
+                                confirmDeleteTaskId === task.id ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <button
+                                      onClick={() => { handleDeleteTask(task.id); setConfirmDeleteTaskId(null) }}
+                                      style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
+                                    >
+                                      Delete
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteTaskId(null)}
+                                      style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setConfirmDeleteTaskId(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )
                               )}
                             </div>
                           ))}
