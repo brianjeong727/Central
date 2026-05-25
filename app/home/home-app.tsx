@@ -209,19 +209,21 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     type RawMembership = {
       team_id: string
       role_id: string
-      teams: { id: string; name: string; icon: string | null; description: string | null } | { id: string; name: string; icon: string | null; description: string | null }[] | null
+      teams: { id: string; name: string; icon: string | null; description: string | null; team_type: string } | { id: string; name: string; icon: string | null; description: string | null; team_type: string }[] | null
       team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
     }
     const { data } = await supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description), team_roles(id, name, permissions)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type), team_roles(id, name, permissions)")
       .eq("user_id", userId)
     if (!data) return
     const teams: UserTeam[] = (data as RawMembership[]).flatMap((m) => {
       const t = Array.isArray(m.teams) ? m.teams[0] : m.teams
       const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
       if (!t || !r) return []
-      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
+      const rawType = t.team_type ?? 'standard'
+      const teamType: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
+      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
@@ -236,7 +238,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     if (!isAdmin) return
     const { data } = await supabase
       .from("teams")
-      .select("id, name, icon, description, created_by")
+      .select("id, name, icon, description, created_by, team_type")
       .eq("ministry_id", ministryId)
       .order("created_at")
     if (!data) return
@@ -246,7 +248,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
     }
-    setAllTeams((data as { id: string; name: string; icon: string | null; description: string | null; created_by: string }[]).map((t) => ({ ...t, member_count: countMap[t.id] ?? 0 })))
+    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string }
+    setAllTeams((data as RawTeam[]).map((t) => {
+      const rawType = t.team_type ?? 'standard'
+      const team_type: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
+      return { ...t, team_type, member_count: countMap[t.id] ?? 0 }
+    }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, ministryId])
 
@@ -508,6 +515,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 userTeams={userTeams}
                 allTeams={allTeams}
                 isAdmin={isAdmin}
+                isDGL={isDGL}
                 onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}

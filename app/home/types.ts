@@ -291,6 +291,7 @@ export interface UserTeam {
   teamName: string
   teamIcon: string | null
   teamDescription: string | null
+  teamType: 'standard' | 'dg_praise' | 'one_time'
   roleId: string
   roleName: string
   permissions: string[]
@@ -303,6 +304,7 @@ export interface Team {
   description: string | null
   created_by: string
   member_count: number
+  team_type: 'standard' | 'dg_praise' | 'one_time'
 }
 
 export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
@@ -434,6 +436,7 @@ export interface PlanTabProps {
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean
+  isDGL: boolean
   onTeamsChange: () => void
   showCreateTeam: boolean
   onShowCreateTeam: (v: boolean) => void
@@ -449,6 +452,7 @@ export interface WorshipWeek {
   status: "draft" | "filled" | "confirmed"
   auto_archive_date: string | null
   chat_group_id: string | null
+  event_name: string | null
   roles: WorshipRoleRow[]
 }
 

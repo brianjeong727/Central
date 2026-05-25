@@ -119,6 +119,28 @@ const TEAM_PRESETS = [
     description: "Technical support and media",
     roles: [{ name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] }],
   },
+  {
+    id: "dg_praise",
+    name: "DG Praise Team",
+    icon: "🎵",
+    description: "Discipleship group praise and worship",
+    teamType: "dg_praise" as const,
+    roles: [
+      { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
+      { name: "Member", permissions: ["can_view_worship_set"] },
+    ],
+  },
+  {
+    id: "one_time",
+    name: "One-Time Event",
+    icon: "⭐",
+    description: "Praise team for a one-time event (SSO, Welcome Week, etc.)",
+    teamType: "one_time" as const,
+    roles: [
+      { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
+      { name: "Member", permissions: ["can_view_worship_set"] },
+    ],
+  },
 ]
 
 
@@ -1694,7 +1716,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   )
 }
 
-export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
+export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const router = useRouter()
@@ -1732,7 +1754,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
     const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
       const ut = userTeams.find(t => t.teamId === activeTeamId)
       if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0 } satisfies Team
+      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType } satisfies Team
     })()
     if (!team) return
     setOpenTeam(team)
@@ -1781,13 +1803,21 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
 
   const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
-    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0 } : undefined)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType } : undefined)
 
   const isActiveTeamPresident = (activeUserTeam?.roleName ?? "").toLowerCase().includes("president")
   const canOpenTeamSettings = isAdmin || isActiveTeamPresident
 
   const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
   const isDGLPresident = isDGLTeam && isActiveTeamPresident
+
+  const isDgPraiseTeam = activeTeamFull?.team_type === 'dg_praise'
+  const isOneTimeTeam = activeTeamFull?.team_type === 'one_time'
+  // Tech Team: has slides permission but not worship management (read-only slides viewer)
+  const isTechTeam = !isPraiseTeam && !isDgPraiseTeam && !isOneTimeTeam && !isDGLTeam && !isStudentOrgBoard
+    && activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p))
+  // isPraiseTeamMember: used for CreateTeamOverlay visibility
+  const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
   return (
     <div className="pb-2 md:pb-0">
@@ -1902,7 +1932,29 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
       {/* Desktop content */}
       <div className="hidden md:block">
-        {isPraiseTeam && activeTeamId ? (
+        {isDgPraiseTeam && activeTeamId ? (
+          <div className="px-14 py-7">
+            <DgPraiseTeamTab
+              teamId={activeTeamId}
+              ministryId={ministryId}
+              userId={userId}
+              canManage={canManageWorship || isAdmin}
+            />
+          </div>
+        ) : isOneTimeTeam && activeTeamId ? (
+          <div className="px-14 py-7">
+            <OneTimeTeamTab
+              teamId={activeTeamId}
+              ministryId={ministryId}
+              userId={userId}
+              canManage={canManageWorship || isAdmin}
+            />
+          </div>
+        ) : isTechTeam ? (
+          <div className="px-14 py-7">
+            <TechTeamTab ministryId={ministryId} userId={userId} />
+          </div>
+        ) : isPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <PraiseTeamTab
               teamId={activeTeamId}
@@ -1969,7 +2021,23 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
       {/* Mobile content */}
       <div className="md:hidden px-5 pb-4">
-        {isPraiseTeam && activeTeamId ? (
+        {isDgPraiseTeam && activeTeamId ? (
+          <DgPraiseTeamTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            canManage={canManageWorship || isAdmin}
+          />
+        ) : isOneTimeTeam && activeTeamId ? (
+          <OneTimeTeamTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            canManage={canManageWorship || isAdmin}
+          />
+        ) : isTechTeam ? (
+          <TechTeamTab ministryId={ministryId} userId={userId} />
+        ) : isPraiseTeam && activeTeamId ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2065,6 +2133,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           userId={userId}
           userName={userName}
           ministryId={ministryId}
+          isDGL={isDGL}
+          isPraiseTeamMember={isPraiseTeamMember}
           onClose={() => setShowCreateTeam(false)}
           onCreated={(teamId) => { setShowCreateTeam(false); onTeamsChange(); onTeamCreated(teamId) }}
         />
@@ -2148,7 +2218,10 @@ function getUpcomingSundays(n = 26): { date: string; label: string }[] {
   return sundays
 }
 
-const WORSHIP_ROLE_OPTIONS = ["Vocals", "Keys", "Guitar", "Bass", "Drums", "Other"]
+const WORSHIP_ROLE_OPTIONS = [
+  "Lead Vocals", "Backup Vocals", "Keys", "Acoustic Guitar", "Electric Guitar",
+  "Bass", "Drums", "Cajon", "Violin", "Cello", "Flute", "Trumpet", "Other",
+]
 
 export function worshipWeekDateLabel(dateStr: string) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
@@ -2183,12 +2256,12 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
 export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManageSchedule }: { teamId: string; ministryId: string; userId: string; canManage: boolean; canManageSchedule: boolean }) {
   const supabase = createClient()
   const router = useRouter()
-  const validPTabs = ["schedule", "setlist", "slides", "availability"] as const
-  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "slides" | "availability">(() => {
+  const validPTabs = ["schedule", "setlist", "availability"] as const
+  const [subTab, setSubTab] = useState<"schedule" | "setlist" | "availability">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ptab") : null
-    return (validPTabs as readonly string[]).includes(p ?? "") ? p as "schedule" | "setlist" | "slides" | "availability" : "schedule"
+    return (validPTabs as readonly string[]).includes(p ?? "") ? p as "schedule" | "setlist" | "availability" : "schedule"
   })
-  function setSubTabAndUrl(t: "schedule" | "setlist" | "slides" | "availability") {
+  function setSubTabAndUrl(t: "schedule" | "setlist" | "availability") {
     setSubTab(t)
     const sp = new URLSearchParams(window.location.search)
     sp.set("ptab", t)
@@ -2238,15 +2311,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const [viewingChart, setViewingChart] = useState<WorshipSong | null>(null)
   const [ocrInProgress, setOcrInProgress] = useState<Set<string>>(new Set())
 
-  // Slides state
-  const [slidesWeekId, setSlidesWeekId] = useState<string | null>(null)
-  const [rawOcrBySong, setRawOcrBySong] = useState<Record<string, string>>({})
-  type SlidePage = { songTitle: string; songKey: string; section: string; lyrics: string; isTitle?: boolean }
-  const [slidesDeck, setSlidesDeck] = useState<SlidePage[] | null>(null)
-  const [slidesGenerating, setSlidesGenerating] = useState(false)
-  const [slidesOverlayOpen, setSlidesOverlayOpen] = useState(false)
-  const [slidesActiveIndex, setSlidesActiveIndex] = useState(0)
-
   // Generation counter to cancel stale loadSchedule results
   const loadScheduleGenRef = useRef(0)
 
@@ -2287,7 +2351,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     setWeeks(weeksData.map(w => {
       const raw = w as unknown as { id: string; week_date: string; leader_id: string | null; status: string; profiles: { name: string } | { name: string }[] | null }
       const p = Array.isArray(raw.profiles) ? raw.profiles[0] : raw.profiles
-      return { id: raw.id, week_date: raw.week_date, leader_id: raw.leader_id, leader_name: p?.name ?? null, status: raw.status as WorshipWeek["status"], auto_archive_date: (raw as { auto_archive_date?: string | null }).auto_archive_date ?? null, chat_group_id: (raw as { chat_group_id?: string | null }).chat_group_id ?? null, roles: rolesByWeek[raw.id] ?? [] }
+      return { id: raw.id, week_date: raw.week_date, leader_id: raw.leader_id, leader_name: p?.name ?? null, status: raw.status as WorshipWeek["status"], auto_archive_date: (raw as { auto_archive_date?: string | null }).auto_archive_date ?? null, chat_group_id: (raw as { chat_group_id?: string | null }).chat_group_id ?? null, event_name: (raw as { event_name?: string | null }).event_name ?? null, roles: rolesByWeek[raw.id] ?? [] }
     }))
     setScheduleLoading(false)
   }
@@ -2332,18 +2396,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId])
 
-  // Set default week for slides/charts tabs once weeks are loaded
-  useEffect(() => {
-    if (weeks.length === 0) return
-    const todayStr = new Date().toISOString().split("T")[0]
-    const upcoming = weeks.find(w => w.week_date >= todayStr) ?? weeks[0]
-    setSlidesWeekId(prev => prev ?? upcoming.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeks])
-
   useEffect(() => {
     if (subTab === "availability") loadAvailability()
-    if (["setlist", "slides"].includes(subTab)) loadSetList()
+    if (subTab === "setlist") loadSetList()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subTab, teamId])
 
@@ -2499,7 +2554,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
         await worker.terminate()
         const rawText = result.data.text
         console.log("[OCR] raw text:", rawText)
-        setRawOcrBySong(prev => ({ ...prev, [songId]: rawText }))
 
         const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0)
 
@@ -2608,118 +2662,6 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
     setEditingSong(null)
   }
 
-  function handleExportSlides(songs: WorshipSong[]) {
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Worship Slides</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #1a0a1c; font-family: Georgia, serif; }
-  .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #3E1540; page-break-after: always; }
-  .title { font-size: clamp(48px, 8vw, 96px); color: #F6F4EF; text-align: center; font-weight: 400; line-height: 1.15; padding: 0 10vw; }
-  .key { margin-top: 28px; font-family: monospace; font-size: clamp(18px, 2.5vw, 28px); color: rgba(246,244,239,0.55); letter-spacing: 0.2em; text-transform: uppercase; }
-  @media print { .slide { page-break-after: always; } }
-</style>
-</head>
-<body>
-${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("\n")}
-</body>
-</html>`
-    const blob = new Blob([html], { type: "text/html" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "worship-slides.html"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  async function handleGenerateSlides(songs: WorshipSong[]) {
-    setSlidesGenerating(true)
-    const allSlides: SlidePage[] = []
-
-    for (const song of songs) {
-      // Title slide for this song
-      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: "", isTitle: true })
-
-      let ocrText = rawOcrBySong[song.id]
-
-      // If no cached OCR text but chart is available, re-fetch and OCR the PDF
-      if (!ocrText && song.chart_url) {
-        try {
-          const buf = await fetch(song.chart_url).then(r => r.arrayBuffer())
-          const pdfjsLib = await import("pdfjs-dist")
-          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
-          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise
-          const page = await pdf.getPage(1)
-          const viewport = page.getViewport({ scale: 2 })
-          const canvas = document.createElement("canvas")
-          canvas.width = viewport.width
-          canvas.height = viewport.height
-          const ctx = canvas.getContext("2d")
-          if (ctx) {
-            await page.render({ canvasContext: ctx, viewport, canvas }).promise
-            const { createWorker } = await import("tesseract.js")
-            const worker = await createWorker("eng")
-            const result = await worker.recognize(canvas)
-            await worker.terminate()
-            ocrText = result.data.text
-            setRawOcrBySong(prev => ({ ...prev, [song.id]: ocrText }))
-          }
-        } catch (e) { console.error("[slides] OCR failed for", song.title, e) }
-      }
-
-      if (ocrText) {
-        try {
-          const res = await fetch("/api/generate-slides", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ocrText }),
-          })
-          if (res.ok) {
-            const data = await res.json()
-            for (const s of (data.sections ?? [])) {
-              allSlides.push({ songTitle: song.title, songKey: song.key, section: s.section, lyrics: s.lyrics })
-            }
-            continue
-          } else {
-            const errBody = await res.text().catch(() => "")
-            console.error("[slides] generate-slides returned", res.status, errBody)
-          }
-        } catch (e) { console.error("[slides] fetch generate-slides failed", e) }
-      }
-
-      // Fallback: single title slide
-      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: song.title })
-    }
-
-    setSlidesDeck(allSlides)
-    setSlidesActiveIndex(0)
-    setSlidesOverlayOpen(true)
-    setSlidesGenerating(false)
-  }
-
-  // Keyboard navigation for the slides overlay
-  useEffect(() => {
-    if (!slidesOverlayOpen || !slidesDeck) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        setSlidesActiveIndex(i => Math.max(i - 1, 0))
-      } else if (e.key === "Escape") {
-        setSlidesOverlayOpen(false)
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [slidesOverlayOpen, slidesDeck])
-
   const visibleWeeks = weeks
   const worshipLeaders = teamMembers.filter(m => m.role_name === "Worship Leader")
   const weekDates = weeks.map(w => w.week_date)
@@ -2746,81 +2688,16 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         />
       )}
 
-      {/* ── Slides full-screen overlay ── */}
-      {slidesOverlayOpen && slidesDeck && (() => {
-        const slide = slidesDeck[slidesActiveIndex]
-        return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
-            {/* Radial glow */}
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
-
-            {/* Close button */}
-            <button
-              onClick={() => setSlidesOverlayOpen(false)}
-              style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#F6F4EF" }}
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Left tap zone */}
-            <div
-              onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))}
-              style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }}
-            />
-            {/* Right tap zone */}
-            <div
-              onClick={() => setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))}
-              style={{ position: "absolute", right: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex < slidesDeck.length - 1 ? "pointer" : "default" }}
-            />
-
-            {/* Slide content */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 40px 80px", textAlign: "center", position: "relative", zIndex: 6 }}>
-              {slide.isTitle ? (
-                /* ── Title slide ── */
-                <>
-                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.62)", marginBottom: 20 }}>
-                    {slide.songKey ? `Key of ${slide.songKey}` : ""}
-                  </p>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "#F6F4EF", lineHeight: 1.15, fontWeight: 400 }}>
-                    {slide.songTitle}
-                  </p>
-                  <div style={{ width: 40, height: 1.5, background: "rgba(246,244,239,0.32)", margin: "28px auto 0" }} />
-                </>
-              ) : (
-                /* ── Lyric slide ── */
-                <>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6, letterSpacing: "0.01em" }}>{slide.songTitle}</p>
-                  {slide.section && (
-                    <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>
-                  )}
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>
-                    {slide.lyrics}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Counter */}
-            <div style={{ position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center", zIndex: 6 }}>
-              <span style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "rgba(246,244,239,0.4)", letterSpacing: "0.04em" }}>
-                {slidesActiveIndex + 1} / {slidesDeck.length}
-              </span>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* Sub-tabs */}
       <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={[
             { key: "schedule", label: "Schedule" },
             { key: "setlist", label: "Set List" },
-            { key: "slides", label: "Slides" },
             { key: "availability", label: "Availability" },
           ]}
           active={subTab}
-          onChange={t => setSubTabAndUrl(t as "schedule" | "setlist" | "slides" | "availability")}
+          onChange={t => setSubTabAndUrl(t as "schedule" | "setlist" | "availability")}
         />
       </div>
 
@@ -3194,75 +3071,6 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
         </div>
       )}
 
-      {/* ── Slides ── */}
-      {subTab === "slides" && (() => {
-        const todayStr = new Date().toISOString().split("T")[0]
-        const slidesSongs = (songsByWeek[slidesWeekId ?? ""] ?? []).sort((a, b) => a.order_index - b.order_index)
-        return (
-          <div>
-            {/* Week selector */}
-            {weeks.length > 1 && (
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 6 }}>Week</label>
-                <select
-                  value={slidesWeekId ?? ""}
-                  onChange={e => { setSlidesWeekId(e.target.value); setSlidesDeck(null) }}
-                  style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "#FBF8F2", fontSize: 14, color: "#13101A", outline: "none" }}
-                >
-                  {weeks.map(w => (
-                    <option key={w.id} value={w.id}>{worshipWeekDateLabel(w.week_date)}{w.week_date < todayStr ? " (past)" : ""}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {songsLoading ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
-            ) : slidesSongs.length === 0 ? (
-              <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No songs in the set list yet.</p>
-                <p style={{ fontSize: 13, color: "#8A8497" }}>Add songs in the Set List tab first.</p>
-              </div>
-            ) : (
-              <div>
-                {/* Song list preview */}
-                <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
-                  {slidesSongs.map((song, i) => (
-                    <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: i < slidesSongs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
-                      <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
-                      {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8 }}>{song.key}</span>}
-                      {!rawOcrBySong[song.id] && !song.chart_url && (
-                        <span style={{ fontSize: 11, color: "#C4C4C4" }}>no chart</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {canManage && (
-                    <button
-                      onClick={() => slidesDeck ? setSlidesOverlayOpen(true) : handleGenerateSlides(slidesSongs)}
-                      disabled={slidesGenerating}
-                      style={{ flex: 1, padding: "11px 0", background: slidesGenerating ? "#8A8497" : "#3E1540", color: "#F6F4EF", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer" }}
-                    >
-                      {slidesGenerating ? "Generating…" : slidesDeck ? "View slides" : "Generate slides"}
-                    </button>
-                  )}
-                  {canManage && (
-                    <button
-                      onClick={() => handleExportSlides(slidesSongs)}
-                      style={{ padding: "11px 18px", background: "transparent", color: "#3E1540", borderRadius: 12, fontSize: 14, fontWeight: 600, border: "1.5px solid #3E1540", cursor: "pointer" }}
-                    >
-                      Export HTML
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
       {/* ── Availability ── */}
       {subTab === "availability" && (
         <div>
@@ -3359,6 +3167,1053 @@ ${songs.map(s => `  <div class="slide"><p class="title">${esc(s.title)}</p><p cl
               )}
             </>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── DgPraiseTeamTab ───────────────────────────────────────────────────────────
+
+function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
+  const supabase = createClient()
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+
+  const [events, setEvents] = useState<{ id: string; week_date: string; roles: WorshipRoleRow[] }[]>([])
+  const [teamMembers, setTeamMembers] = useState<{ user_id: string; name: string }[]>([])
+  const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [newEventDate, setNewEventDate] = useState("")
+  const [addingEvent, setAddingEvent] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
+
+  // Add role to event
+  const [addRoleToEventId, setAddRoleToEventId] = useState<string | null>(null)
+  const [addRoleUserId, setAddRoleUserId] = useState("")
+  const [addRoleSearch, setAddRoleSearch] = useState("")
+  const [addRoleFocused, setAddRoleFocused] = useState(false)
+  const [addRoleValue, setAddRoleValue] = useState(WORSHIP_ROLE_OPTIONS[0])
+  const [addRoleCustom, setAddRoleCustom] = useState("")
+  const [addingRole, setAddingRole] = useState(false)
+
+  // Add team member
+  const [allMinistryMembers, setAllMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  const [addMemberSearch, setAddMemberSearch] = useState("")
+  const [addMemberFocused, setAddMemberFocused] = useState(false)
+  const [addMemberId, setAddMemberId] = useState("")
+  const [addingMember, setAddingMember] = useState(false)
+
+  // Upload/edit songs
+  const [uploadingEventId, setUploadingEventId] = useState<string | null>(null)
+  const [editingSong, setEditingSong] = useState<{ songId: string; field: "title" | "key"; value: string } | null>(null)
+  const [ocrInProgress, setOcrInProgress] = useState<Set<string>>(new Set())
+
+  async function loadData() {
+    setLoading(true)
+    const { data: eventsData } = await supabase
+      .from("worship_weeks")
+      .select("id, week_date")
+      .eq("team_id", teamId)
+      .order("week_date")
+    if (!eventsData) { setLoading(false); return }
+
+    const eventIds = eventsData.map(e => e.id)
+    const [{ data: rolesData }, { data: songsData }, { data: membersData }] = await Promise.all([
+      eventIds.length > 0 ? supabase.from("worship_roles").select("id, week_id, user_id, role_name, profiles!user_id(name)").in("week_id", eventIds) : { data: [] as never[] },
+      eventIds.length > 0 ? supabase.from("worship_songs").select("id, week_id, title, key, song_leader_id, order_index, chart_url").in("week_id", eventIds).order("order_index") : { data: [] as never[] },
+      supabase.from("team_members").select("user_id, profiles!user_id(name)").eq("team_id", teamId),
+    ])
+
+    type RawRole = { id: string; week_id: string; user_id: string; role_name: string; profiles: { name: string } | { name: string }[] | null }
+    const rolesByEvent: Record<string, WorshipRoleRow[]> = {}
+    for (const r of (rolesData ?? []) as RawRole[]) {
+      const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+      if (!rolesByEvent[r.week_id]) rolesByEvent[r.week_id] = []
+      rolesByEvent[r.week_id].push({ id: r.id, user_id: r.user_id, user_name: p?.name ?? "Unknown", role_name: r.role_name })
+    }
+
+    type RawSong = { id: string; week_id: string; title: string; key: string; song_leader_id: string | null; order_index: number; chart_url: string | null }
+    const songMap: Record<string, WorshipSong[]> = {}
+    for (const s of (songsData ?? []) as RawSong[]) {
+      if (!songMap[s.week_id]) songMap[s.week_id] = []
+      songMap[s.week_id].push({ id: s.id, week_id: s.week_id, title: s.title, key: s.key, song_leader_id: s.song_leader_id, song_leader_name: null, order_index: s.order_index, chart_url: s.chart_url })
+    }
+
+    type RawMember = { user_id: string; profiles: { name: string } | { name: string }[] | null }
+    setTeamMembers((membersData ?? []).map((m: RawMember) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+      return { user_id: m.user_id, name: p?.name ?? "Unknown" }
+    }))
+
+    setEvents(eventsData.map(e => ({ id: e.id, week_date: e.week_date, roles: rolesByEvent[e.id] ?? [] })))
+    setSongsByEvent(songMap)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [teamId])
+
+  useEffect(() => {
+    if (!showMembers) return
+    supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+      .then(({ data }) => setAllMinistryMembers(data ?? []))
+  }, [showMembers])
+
+  async function handleAddEvent() {
+    if (!newEventDate) return
+    setAddingEvent(true)
+    await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newEventDate, status: "draft" })
+    setShowAddEvent(false); setNewEventDate(""); setAddingEvent(false)
+    await loadData()
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    setEvents(prev => prev.filter(e => e.id !== eventId))
+    await supabase.from("worship_songs").delete().eq("week_id", eventId)
+    await supabase.from("worship_roles").delete().eq("week_id", eventId)
+    await supabase.from("worship_weeks").delete().eq("id", eventId)
+    await loadData()
+  }
+
+  async function handleAddRole(eventId: string) {
+    if (!addRoleUserId) return
+    setAddingRole(true)
+    const roleName = addRoleValue === "Other" ? (addRoleCustom.trim() || "Other") : addRoleValue
+    await supabase.from("worship_roles").insert({ week_id: eventId, user_id: addRoleUserId, role_name: roleName })
+    setAddRoleToEventId(null); setAddRoleUserId(""); setAddRoleSearch(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom(""); setAddingRole(false)
+    await loadData()
+  }
+
+  async function handleRemoveRole(roleId: string) {
+    await supabase.from("worship_roles").delete().eq("id", roleId)
+    setEvents(prev => prev.map(e => ({ ...e, roles: e.roles.filter(r => r.id !== roleId) })))
+  }
+
+  async function handleAddTeamMember() {
+    if (!addMemberId) return
+    setAddingMember(true)
+    const { data: roleData } = await supabase.from("team_roles").select("id").eq("team_id", teamId).limit(1).single()
+    if (roleData) {
+      await supabase.from("team_members").insert({ team_id: teamId, user_id: addMemberId, role_id: roleData.id, added_by: userId })
+    }
+    setAddMemberId(""); setAddMemberSearch(""); setAddingMember(false)
+    await loadData()
+  }
+
+  async function handleRemoveTeamMember(memberId: string) {
+    await supabase.from("team_members").delete().eq("team_id", teamId).eq("user_id", memberId)
+    setTeamMembers(prev => prev.filter(m => m.user_id !== memberId))
+  }
+
+  async function handleDeleteSong(eventId: string, songId: string) {
+    await supabase.from("worship_songs").delete().eq("id", songId)
+    setSongsByEvent(prev => ({ ...prev, [eventId]: (prev[eventId] ?? []).filter(s => s.id !== songId) }))
+  }
+
+  async function handleSaveInlineEdit() {
+    if (!editingSong) return
+    const { songId, field, value } = editingSong
+    if (!value.trim()) { setEditingSong(null); return }
+    await supabase.from("worship_songs").update({ [field]: value.trim() }).eq("id", songId)
+    setSongsByEvent(prev => {
+      const next = { ...prev }
+      for (const eid of Object.keys(next)) next[eid] = next[eid].map(s => s.id === songId ? { ...s, [field]: value.trim() } : s)
+      return next
+    })
+    setEditingSong(null)
+  }
+
+  async function handleUploadChart(eventId: string, file: File) {
+    setUploadingEventId(eventId)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const existingSongs = songsByEvent[eventId] ?? []
+      const orderIndex = existingSongs.length > 0 ? Math.max(...existingSongs.map(s => s.order_index)) + 1 : 0
+      const { data: inserted } = await supabase.from("worship_songs").insert({ week_id: eventId, title: "", key: "", order_index: orderIndex }).select("id").single()
+      if (!inserted) return
+      const songId = (inserted as { id: string }).id
+      const path = `${teamId}/${eventId}/${songId}.pdf`
+      const { error: upErr } = await supabase.storage.from("worship-charts").upload(path, file, { contentType: "application/pdf" })
+      if (upErr) { await supabase.from("worship_songs").delete().eq("id", songId); return }
+      const { data: urlData } = supabase.storage.from("worship-charts").getPublicUrl(path)
+      const chartUrl = urlData.publicUrl
+      await supabase.from("worship_songs").update({ chart_url: chartUrl }).eq("id", songId)
+      const newSong: WorshipSong = { id: songId, week_id: eventId, title: "", key: "", song_leader_id: null, song_leader_name: null, order_index: orderIndex, chart_url: chartUrl }
+      setSongsByEvent(prev => ({ ...prev, [eventId]: [...(prev[eventId] ?? []), newSong] }))
+      // OCR background
+      const pdfjsLib = await import("pdfjs-dist")
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+      setOcrInProgress(prev => { const next = new Set(prev); next.add(songId); return next })
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise
+        const page = await pdf.getPage(1)
+        const viewport = page.getViewport({ scale: 2 })
+        const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
+        const ctx = canvas.getContext("2d")
+        if (ctx) {
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise
+          const { createWorker } = await import("tesseract.js")
+          const worker = await createWorker("eng")
+          const result = await worker.recognize(canvas); await worker.terminate()
+          const lines = result.data.text.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+          const ocrTitle = (lines[0] ?? "").split("%")[0].split("SongSelect")[0].trim()
+          let ocrKey = ""
+          for (const line of lines) { if (!line.includes("Key")) continue; const m = line.match(/Key\s*-\s*([A-G][b#]?)/) ?? line.match(/Key([A-G][b#]?)/); if (m) { ocrKey = m[1]; break } }
+          await supabase.from("worship_songs").update({ title: ocrTitle, key: ocrKey }).eq("id", songId)
+          setSongsByEvent(prev => ({ ...prev, [eventId]: (prev[eventId] ?? []).map(s => s.id === songId ? { ...s, title: ocrTitle, key: ocrKey } : s) }))
+        }
+      } catch { /* OCR non-blocking */ }
+      setOcrInProgress(prev => { const next = new Set(prev); next.delete(songId); return next })
+    } finally { setUploadingEventId(null) }
+  }
+
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+
+  const filteredForRole = teamMembers.filter(m =>
+    !addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase())
+  )
+  const filteredForAdd = allMinistryMembers.filter(m =>
+    m.id !== userId && !teamMembers.some(tm => tm.user_id === m.id) &&
+    (!addMemberSearch || m.name.toLowerCase().includes(addMemberSearch.toLowerCase()))
+  )
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <p style={monoStyle}>Events · {events.length}</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowMembers(!showMembers)}
+            style={{ padding: "6px 14px", background: showMembers ? "#3E1540" : "transparent", color: showMembers ? "#F6F4EF" : "#5A5466", border: "1px solid #E2DDCF", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+            Members
+          </button>
+          {canManage && !showAddEvent && (
+            <button onClick={() => setShowAddEvent(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+              <Plus className="w-3.5 h-3.5" /> Add event
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Members panel */}
+      {showMembers && (
+        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 24 }}>
+          <p style={{ ...monoStyle, marginBottom: 14 }}>Team members</p>
+          {teamMembers.length === 0 && <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 12 }}>No members yet.</p>}
+          {teamMembers.map(m => (
+            <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #EFE9DA" }}>
+              <span style={{ fontSize: 14, color: "#13101A" }}>{m.name}</span>
+              {canManage && m.user_id !== userId && (
+                <button onClick={() => handleRemoveTeamMember(m.user_id)} style={{ fontSize: 12, color: "#C4C4C4", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+              )}
+            </div>
+          ))}
+          {canManage && (
+            <div style={{ marginTop: 14, position: "relative" }}>
+              <input type="text" placeholder="Add member…" value={addMemberSearch}
+                onChange={e => { setAddMemberSearch(e.target.value); setAddMemberId("") }}
+                onFocus={() => setAddMemberFocused(true)}
+                onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+              {addMemberFocused && filteredForAdd.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                  {filteredForAdd.map(m => (
+                    <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddMemberId(m.id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {addMemberId && (
+                <button onClick={handleAddTeamMember} disabled={addingMember}
+                  style={{ marginTop: 8, padding: "8px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
+                  {addingMember ? "Adding…" : "Add"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add event form */}
+      {showAddEvent && (
+        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New event</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
+              <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
+                style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                {addingEvent ? "Adding…" : "Add"}
+              </button>
+              <button onClick={() => { setShowAddEvent(false); setNewEventDate("") }}
+                style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Events list */}
+      {events.length === 0 && !showAddEvent ? (
+        <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No events yet.</p>
+          <p style={{ fontSize: 13, color: "#8A8497" }}>Add an event to get started.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {events.map(event => {
+            const songs = [...(songsByEvent[event.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
+            const isAddRoleTarget = addRoleToEventId === event.id
+            const assignedIds = new Set(event.roles.map(r => r.user_id))
+            const availableMembers = teamMembers.filter(m => !assignedIds.has(m.user_id) && (!addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase())))
+            return (
+              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+                {/* Date header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A" }}>
+                    {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                  </p>
+                  {canManage && (
+                    <button onClick={() => handleDeleteEvent(event.id)} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Roles */}
+                {event.roles.map(role => (
+                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
+                    <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
+                    <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                    {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
+                  </div>
+                ))}
+
+                {/* Add role row */}
+                {canManage && !isAddRoleTarget && (
+                  <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "#5A5466" }}>
+                    + Add person
+                  </button>
+                )}
+                {isAddRoleTarget && (
+                  <div style={{ padding: "12px 20px", borderTop: "1px solid #EFE9DA" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ position: "relative" }}>
+                        <input type="text" placeholder="Search member…" value={addRoleSearch}
+                          onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
+                          onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                        {addRoleFocused && !addRoleUserId && availableMembers.length > 0 && (
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                            {availableMembers.map(m => (
+                              <button key={m.user_id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.user_id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
+                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addRoleUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                {m.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }}>
+                        {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      {addRoleValue === "Other" && (
+                        <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }} />
+                      )}
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
+                          style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          {addingRole ? "Adding…" : "Add"}
+                        </button>
+                        <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
+                          style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Setlist */}
+                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
+                    <p style={monoStyle}>Set list</p>
+                    {canManage && (
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                        <Plus className="w-3 h-3" />
+                        {uploadingEventId === event.id ? "Uploading…" : "Chart"}
+                        <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadChart(event.id, f); e.target.value = "" }} />
+                      </label>
+                    )}
+                  </div>
+                  {songs.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                  ) : (
+                    <div>
+                      {songs.map((song, idx) => {
+                        const isEditingTitle = editingSong?.songId === song.id && editingSong?.field === "title"
+                        const isEditingKey = editingSong?.songId === song.id && editingSong?.field === "key"
+                        const isOcr = ocrInProgress.has(song.id)
+                        return (
+                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
+                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {isOcr ? <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
+                                <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
+                                  placeholder="Song title…" onChange={e => setEditingSong({ songId: song.id, field: "title", value: e.target.value })}
+                                  onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
+                                  onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", background: "transparent", borderBottom: "1px solid #E2DDCF" }} />
+                              ) : (
+                                <button onClick={() => setEditingSong({ songId: song.id, field: "title", value: song.title })}
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                                  {song.title}
+                                </button>
+                              )}
+                            </div>
+                            {!isOcr && (
+                              <div style={{ flexShrink: 0 }}>
+                                {isEditingKey || !song.key ? (
+                                  <input autoFocus={isEditingKey} value={isEditingKey ? (editingSong?.value ?? "") : ""}
+                                    placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
+                                    onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
+                                    onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                ) : (
+                                  <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
+                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    {song.key || "—"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {canManage && (
+                              <button onClick={() => handleDeleteSong(event.id, song.id)} style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── OneTimeTeamTab ─────────────────────────────────────────────────────────────
+
+function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
+  const supabase = createClient()
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+
+  const [events, setEvents] = useState<{ id: string; week_date: string; event_name: string | null; roles: WorshipRoleRow[] }[]>([])
+  const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [newEventDate, setNewEventDate] = useState("")
+  const [newEventName, setNewEventName] = useState("")
+  const [addingEvent, setAddingEvent] = useState(false)
+  const [allMinistryMembers, setAllMinistryMembers] = useState<{ id: string; name: string }[]>([])
+
+  // Add role to event
+  const [addRoleToEventId, setAddRoleToEventId] = useState<string | null>(null)
+  const [addRoleUserId, setAddRoleUserId] = useState("")
+  const [addRoleSearch, setAddRoleSearch] = useState("")
+  const [addRoleFocused, setAddRoleFocused] = useState(false)
+  const [addRoleValue, setAddRoleValue] = useState(WORSHIP_ROLE_OPTIONS[0])
+  const [addRoleCustom, setAddRoleCustom] = useState("")
+  const [addingRole, setAddingRole] = useState(false)
+
+  // Upload/edit songs
+  const [uploadingEventId, setUploadingEventId] = useState<string | null>(null)
+  const [editingSong, setEditingSong] = useState<{ songId: string; field: "title" | "key"; value: string } | null>(null)
+  const [ocrInProgress, setOcrInProgress] = useState<Set<string>>(new Set())
+
+  async function loadData() {
+    setLoading(true)
+    const { data: eventsData } = await supabase
+      .from("worship_weeks")
+      .select("id, week_date, event_name")
+      .eq("team_id", teamId)
+      .order("week_date")
+    if (!eventsData) { setLoading(false); return }
+
+    const eventIds = eventsData.map(e => e.id)
+    const [{ data: rolesData }, { data: songsData }] = await Promise.all([
+      eventIds.length > 0 ? supabase.from("worship_roles").select("id, week_id, user_id, role_name, profiles!user_id(name)").in("week_id", eventIds) : { data: [] as never[] },
+      eventIds.length > 0 ? supabase.from("worship_songs").select("id, week_id, title, key, song_leader_id, order_index, chart_url").in("week_id", eventIds).order("order_index") : { data: [] as never[] },
+    ])
+
+    // Load all ministry members for role assignment
+    const { data: membersData } = await supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+    setAllMinistryMembers(membersData ?? [])
+
+    type RawRole = { id: string; week_id: string; user_id: string; role_name: string; profiles: { name: string } | { name: string }[] | null }
+    const rolesByEvent: Record<string, WorshipRoleRow[]> = {}
+    for (const r of (rolesData ?? []) as RawRole[]) {
+      const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+      if (!rolesByEvent[r.week_id]) rolesByEvent[r.week_id] = []
+      rolesByEvent[r.week_id].push({ id: r.id, user_id: r.user_id, user_name: p?.name ?? "Unknown", role_name: r.role_name })
+    }
+
+    type RawSong = { id: string; week_id: string; title: string; key: string; song_leader_id: string | null; order_index: number; chart_url: string | null }
+    const songMap: Record<string, WorshipSong[]> = {}
+    for (const s of (songsData ?? []) as RawSong[]) {
+      if (!songMap[s.week_id]) songMap[s.week_id] = []
+      songMap[s.week_id].push({ id: s.id, week_id: s.week_id, title: s.title, key: s.key, song_leader_id: s.song_leader_id, song_leader_name: null, order_index: s.order_index, chart_url: s.chart_url })
+    }
+
+    setEvents(eventsData.map(e => ({ id: e.id, week_date: e.week_date, event_name: e.event_name ?? null, roles: rolesByEvent[e.id] ?? [] })))
+    setSongsByEvent(songMap)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [teamId])
+
+  async function handleAddEvent() {
+    if (!newEventDate) return
+    setAddingEvent(true)
+    await supabase.from("worship_weeks").insert({ team_id: teamId, ministry_id: ministryId, week_date: newEventDate, event_name: newEventName.trim() || null, status: "draft" })
+    setShowAddEvent(false); setNewEventDate(""); setNewEventName(""); setAddingEvent(false)
+    await loadData()
+  }
+
+  async function handleDeleteEvent(eventId: string) {
+    setEvents(prev => prev.filter(e => e.id !== eventId))
+    await supabase.from("worship_songs").delete().eq("week_id", eventId)
+    await supabase.from("worship_roles").delete().eq("week_id", eventId)
+    await supabase.from("worship_weeks").delete().eq("id", eventId)
+    await loadData()
+  }
+
+  async function handleAddRole(eventId: string) {
+    if (!addRoleUserId) return
+    setAddingRole(true)
+    const roleName = addRoleValue === "Other" ? (addRoleCustom.trim() || "Other") : addRoleValue
+    await supabase.from("worship_roles").insert({ week_id: eventId, user_id: addRoleUserId, role_name: roleName })
+    setAddRoleToEventId(null); setAddRoleUserId(""); setAddRoleSearch(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom(""); setAddingRole(false)
+    await loadData()
+  }
+
+  async function handleRemoveRole(roleId: string) {
+    await supabase.from("worship_roles").delete().eq("id", roleId)
+    setEvents(prev => prev.map(e => ({ ...e, roles: e.roles.filter(r => r.id !== roleId) })))
+  }
+
+  async function handleSaveInlineEdit() {
+    if (!editingSong) return
+    const { songId, field, value } = editingSong
+    if (!value.trim()) { setEditingSong(null); return }
+    await supabase.from("worship_songs").update({ [field]: value.trim() }).eq("id", songId)
+    setSongsByEvent(prev => {
+      const next = { ...prev }
+      for (const eid of Object.keys(next)) next[eid] = next[eid].map(s => s.id === songId ? { ...s, [field]: value.trim() } : s)
+      return next
+    })
+    setEditingSong(null)
+  }
+
+  async function handleUploadChart(eventId: string, file: File) {
+    setUploadingEventId(eventId)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const existingSongs = songsByEvent[eventId] ?? []
+      const orderIndex = existingSongs.length > 0 ? Math.max(...existingSongs.map(s => s.order_index)) + 1 : 0
+      const { data: inserted } = await supabase.from("worship_songs").insert({ week_id: eventId, title: "", key: "", order_index: orderIndex }).select("id").single()
+      if (!inserted) return
+      const songId = (inserted as { id: string }).id
+      const path = `${teamId}/${eventId}/${songId}.pdf`
+      const { error: upErr } = await supabase.storage.from("worship-charts").upload(path, file, { contentType: "application/pdf" })
+      if (upErr) { await supabase.from("worship_songs").delete().eq("id", songId); return }
+      const { data: urlData } = supabase.storage.from("worship-charts").getPublicUrl(path)
+      const chartUrl = urlData.publicUrl
+      await supabase.from("worship_songs").update({ chart_url: chartUrl }).eq("id", songId)
+      const newSong: WorshipSong = { id: songId, week_id: eventId, title: "", key: "", song_leader_id: null, song_leader_name: null, order_index: orderIndex, chart_url: chartUrl }
+      setSongsByEvent(prev => ({ ...prev, [eventId]: [...(prev[eventId] ?? []), newSong] }))
+      setOcrInProgress(prev => { const next = new Set(prev); next.add(songId); return next })
+      try {
+        const pdfjsLib = await import("pdfjs-dist")
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise
+        const page = await pdf.getPage(1)
+        const viewport = page.getViewport({ scale: 2 })
+        const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
+        const ctx = canvas.getContext("2d")
+        if (ctx) {
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise
+          const { createWorker } = await import("tesseract.js")
+          const worker = await createWorker("eng")
+          const result = await worker.recognize(canvas); await worker.terminate()
+          const lines = result.data.text.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+          const ocrTitle = (lines[0] ?? "").split("%")[0].split("SongSelect")[0].trim()
+          let ocrKey = ""
+          for (const line of lines) { if (!line.includes("Key")) continue; const m = line.match(/Key\s*-\s*([A-G][b#]?)/) ?? line.match(/Key([A-G][b#]?)/); if (m) { ocrKey = m[1]; break } }
+          await supabase.from("worship_songs").update({ title: ocrTitle, key: ocrKey }).eq("id", songId)
+          setSongsByEvent(prev => ({ ...prev, [eventId]: (prev[eventId] ?? []).map(s => s.id === songId ? { ...s, title: ocrTitle, key: ocrKey } : s) }))
+        }
+      } catch { /* OCR non-blocking */ }
+      setOcrInProgress(prev => { const next = new Set(prev); next.delete(songId); return next })
+    } finally { setUploadingEventId(null) }
+  }
+
+  async function handleDeleteSong(eventId: string, songId: string) {
+    await supabase.from("worship_songs").delete().eq("id", songId)
+    setSongsByEvent(prev => ({ ...prev, [eventId]: (prev[eventId] ?? []).filter(s => s.id !== songId) }))
+  }
+
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+
+  const filteredForRole = allMinistryMembers.filter(m => !addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase()))
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <p style={monoStyle}>Events · {events.length}</p>
+        {canManage && !showAddEvent && (
+          <button onClick={() => setShowAddEvent(true)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+            <Plus className="w-3.5 h-3.5" /> Add event
+          </button>
+        )}
+      </div>
+
+      {showAddEvent && (
+        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New event</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Event name</label>
+              <input type="text" placeholder="e.g. Welcome Week Praise Night" value={newEventName} onChange={e => setNewEventName(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
+              <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
+                style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                {addingEvent ? "Adding…" : "Add"}
+              </button>
+              <button onClick={() => { setShowAddEvent(false); setNewEventDate(""); setNewEventName("") }}
+                style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {events.length === 0 && !showAddEvent ? (
+        <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No events yet.</p>
+          <p style={{ fontSize: 13, color: "#8A8497" }}>Add an event to get started.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {events.map(event => {
+            const songs = [...(songsByEvent[event.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
+            const isAddRoleTarget = addRoleToEventId === event.id
+            const assignedIds = new Set(event.roles.map(r => r.user_id))
+            const availableForRole = filteredForRole.filter(m => !assignedIds.has(m.id))
+            return (
+              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                  <div>
+                    {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>{event.event_name}</p>}
+                    <p style={{ fontSize: 13, color: event.event_name ? "#8A8497" : "#13101A", fontFamily: event.event_name ? "var(--font-inter)" : "var(--font-instrument-serif)", ...(event.event_name ? {} : { fontSize: 17 }) }}>
+                      {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    </p>
+                  </div>
+                  {canManage && (
+                    <button onClick={() => handleDeleteEvent(event.id)} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {event.roles.map(role => (
+                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
+                    <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
+                    <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                    {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
+                  </div>
+                ))}
+
+                {canManage && !isAddRoleTarget && (
+                  <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "#5A5466" }}>
+                    + Add person
+                  </button>
+                )}
+                {isAddRoleTarget && (
+                  <div style={{ padding: "12px 20px", borderTop: "1px solid #EFE9DA" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ position: "relative" }}>
+                        <input type="text" placeholder="Search member…" value={addRoleSearch}
+                          onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
+                          onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                        {addRoleFocused && !addRoleUserId && availableForRole.length > 0 && (
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                            {availableForRole.map(m => (
+                              <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
+                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addRoleUserId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                {m.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }}>
+                        {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      {addRoleValue === "Other" && (
+                        <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }} />
+                      )}
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
+                          style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          {addingRole ? "Adding…" : "Add"}
+                        </button>
+                        <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
+                          style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
+                    <p style={monoStyle}>Set list</p>
+                    {canManage && (
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                        <Plus className="w-3 h-3" />
+                        {uploadingEventId === event.id ? "Uploading…" : "Chart"}
+                        <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadChart(event.id, f); e.target.value = "" }} />
+                      </label>
+                    )}
+                  </div>
+                  {songs.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                  ) : (
+                    <div>
+                      {songs.map((song, idx) => {
+                        const isEditingTitle = editingSong?.songId === song.id && editingSong?.field === "title"
+                        const isEditingKey = editingSong?.songId === song.id && editingSong?.field === "key"
+                        const isOcr = ocrInProgress.has(song.id)
+                        return (
+                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
+                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {isOcr ? <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
+                                <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
+                                  placeholder="Song title…" onChange={e => setEditingSong({ songId: song.id, field: "title", value: e.target.value })}
+                                  onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
+                                  onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", background: "transparent", borderBottom: "1px solid #E2DDCF" }} />
+                              ) : (
+                                <button onClick={() => setEditingSong({ songId: song.id, field: "title", value: song.title })}
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                                  {song.title}
+                                </button>
+                              )}
+                            </div>
+                            {!isOcr && (
+                              <div style={{ flexShrink: 0 }}>
+                                {isEditingKey || !song.key ? (
+                                  <input autoFocus={isEditingKey} value={isEditingKey ? (editingSong?.value ?? "") : ""}
+                                    placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
+                                    onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
+                                    onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                ) : (
+                                  <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
+                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    {song.key || "—"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {canManage && (
+                              <button onClick={() => handleDeleteSong(event.id, song.id)} style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── TechTeamTab ────────────────────────────────────────────────────────────────
+
+function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: string }) {
+  const supabase = createClient()
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+
+  type TeamInfo = { id: string; name: string; team_type: string }
+  type EventWithMeta = { id: string; week_date: string; event_name: string | null; team_id: string; teamName: string; teamType: string }
+
+  const [teams, setTeams] = useState<TeamInfo[]>([])
+  const [events, setEvents] = useState<EventWithMeta[]>([])
+  const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
+  const [loading, setLoading] = useState(true)
+
+  // Slides state
+  const [rawOcrBySong, setRawOcrBySong] = useState<Record<string, string>>({})
+  type SlidePage = { songTitle: string; songKey: string; section: string; lyrics: string; isTitle?: boolean }
+  const [slidesDeck, setSlidesDeck] = useState<SlidePage[] | null>(null)
+  const [slidesGenerating, setSlidesGenerating] = useState(false)
+  const [slidesOverlayOpen, setSlidesOverlayOpen] = useState(false)
+  const [slidesActiveIndex, setSlidesActiveIndex] = useState(0)
+  const [slidesEventLabel, setSlidesEventLabel] = useState("")
+
+  useEffect(() => {
+    if (!slidesOverlayOpen || !slidesDeck) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") setSlidesActiveIndex(i => Math.max(i - 1, 0))
+      else if (e.key === "Escape") setSlidesOverlayOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [slidesOverlayOpen, slidesDeck])
+
+  async function loadData() {
+    setLoading(true)
+    const { data: teamsData } = await supabase.from("teams").select("id, name, team_type").eq("ministry_id", ministryId)
+    const teamMap: Record<string, TeamInfo> = {}
+    for (const t of teamsData ?? []) teamMap[t.id] = { id: t.id, name: t.name, team_type: t.team_type }
+    setTeams(teamsData ?? [])
+
+    const { data: weeksData } = await supabase
+      .from("worship_weeks")
+      .select("id, week_date, event_name, team_id")
+      .eq("ministry_id", ministryId)
+      .order("week_date", { ascending: false })
+    if (!weeksData) { setLoading(false); return }
+
+    const enrichedEvents: EventWithMeta[] = (weeksData as { id: string; week_date: string; event_name: string | null; team_id: string }[])
+      .filter(w => teamMap[w.team_id])
+      .map(w => ({
+        id: w.id,
+        week_date: w.week_date,
+        event_name: w.event_name,
+        team_id: w.team_id,
+        teamName: teamMap[w.team_id]?.name ?? "",
+        teamType: teamMap[w.team_id]?.team_type ?? "standard",
+      }))
+    setEvents(enrichedEvents)
+
+    const eventIds = weeksData.map(w => w.id)
+    if (eventIds.length > 0) {
+      const { data: songsData } = await supabase
+        .from("worship_songs")
+        .select("id, week_id, title, key, song_leader_id, order_index, chart_url")
+        .in("week_id", eventIds)
+        .order("order_index")
+      type RawSong = { id: string; week_id: string; title: string; key: string; song_leader_id: string | null; order_index: number; chart_url: string | null }
+      const songMap: Record<string, WorshipSong[]> = {}
+      for (const s of (songsData ?? []) as RawSong[]) {
+        if (!songMap[s.week_id]) songMap[s.week_id] = []
+        songMap[s.week_id].push({ id: s.id, week_id: s.week_id, title: s.title, key: s.key, song_leader_id: s.song_leader_id, song_leader_name: null, order_index: s.order_index, chart_url: s.chart_url })
+      }
+      setSongsByEvent(songMap)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [ministryId])
+
+  function handleExportSlides(songs: WorshipSong[]) {
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#3E1540;page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:#F6F4EF;text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
+    const blob = new Blob([html], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a"); a.href = url; a.download = "worship-slides.html"
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+  }
+
+  async function handleGenerateSlides(songs: WorshipSong[], eventLabel: string) {
+    setSlidesGenerating(true)
+    setSlidesEventLabel(eventLabel)
+    const allSlides: SlidePage[] = []
+    for (const song of songs) {
+      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: "", isTitle: true })
+      let ocrText = rawOcrBySong[song.id]
+      if (!ocrText && song.chart_url) {
+        try {
+          const buf = await fetch(song.chart_url).then(r => r.arrayBuffer())
+          const pdfjsLib = await import("pdfjs-dist")
+          pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise
+          const page = await pdf.getPage(1)
+          const viewport = page.getViewport({ scale: 2 })
+          const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
+          const ctx = canvas.getContext("2d")
+          if (ctx) {
+            await page.render({ canvasContext: ctx, viewport, canvas }).promise
+            const { createWorker } = await import("tesseract.js")
+            const worker = await createWorker("eng")
+            const result = await worker.recognize(canvas); await worker.terminate()
+            ocrText = result.data.text
+            setRawOcrBySong(prev => ({ ...prev, [song.id]: ocrText }))
+          }
+        } catch (e) { console.error("[slides] OCR failed for", song.title, e) }
+      }
+      if (ocrText) {
+        try {
+          const res = await fetch("/api/generate-slides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ocrText }) })
+          if (res.ok) {
+            const data = await res.json()
+            for (const s of (data.sections ?? [])) allSlides.push({ songTitle: song.title, songKey: song.key, section: s.section, lyrics: s.lyrics })
+            continue
+          }
+        } catch { /* fallback */ }
+      }
+      allSlides.push({ songTitle: song.title, songKey: song.key, section: "", lyrics: song.title })
+    }
+    setSlidesDeck(allSlides); setSlidesActiveIndex(0); setSlidesOverlayOpen(true); setSlidesGenerating(false)
+  }
+
+  const sundayEvents = events.filter(e => e.teamType === "standard")
+  const dgPraiseEvents = events.filter(e => e.teamType === "dg_praise")
+  const oneTimeEvents = events.filter(e => e.teamType === "one_time")
+
+  const renderEventCard = (event: EventWithMeta, showTeamName: boolean) => {
+    const songs = [...(songsByEvent[event.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
+    const label = event.event_name ?? (showTeamName ? event.teamName : event.teamName)
+    const dateStr = new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    return (
+      <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: songs.length > 0 ? "1px solid #EFE9DA" : "none" }}>
+          <div>
+            {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "#13101A" }}>{event.event_name}</p>}
+            {showTeamName && !event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "#13101A" }}>{event.teamName}</p>}
+            <p style={{ fontSize: 15, color: event.event_name || showTeamName ? "#8A8497" : "#13101A", marginTop: event.event_name || showTeamName ? 1 : 0, fontFamily: "var(--font-instrument-serif)" }}>{dateStr}</p>
+          </div>
+          {songs.length > 0 && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => slidesDeck && slidesEventLabel === label ? setSlidesOverlayOpen(true) : handleGenerateSlides(songs, label)}
+                disabled={slidesGenerating}
+                style={{ padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
+                {slidesGenerating && slidesEventLabel === label ? "…" : "Slides"}
+              </button>
+              <button onClick={() => handleExportSlides(songs)}
+                style={{ padding: "6px 12px", background: "transparent", color: "#3E1540", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid #3E1540", cursor: "pointer" }}>
+                Export
+              </button>
+            </div>
+          )}
+        </div>
+        {songs.map((song, i) => (
+          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
+            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
+          </div>
+        ))}
+        {songs.length === 0 && <p style={{ fontSize: 13, color: "#C4C4C4", padding: "12px 18px" }}>No songs in set.</p>}
+      </div>
+    )
+  }
+
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+
+  return (
+    <div>
+      {/* Slides overlay */}
+      {slidesOverlayOpen && slidesDeck && (() => {
+        const slide = slidesDeck[slidesActiveIndex]
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
+            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#F6F4EF" }}>
+              <X className="w-5 h-5" />
+            </button>
+            <div onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))} style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }} />
+            <div onClick={() => setSlidesActiveIndex(i => Math.min(i + 1, slidesDeck.length - 1))} style={{ position: "absolute", right: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex < slidesDeck.length - 1 ? "pointer" : "default" }} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 40px 80px", textAlign: "center", position: "relative", zIndex: 6 }}>
+              {slide.isTitle ? (
+                <>
+                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.62)", marginBottom: 20 }}>{slide.songKey ? `Key of ${slide.songKey}` : ""}</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "#F6F4EF", lineHeight: 1.15, fontWeight: 400 }}>{slide.songTitle}</p>
+                  <div style={{ width: 40, height: 1.5, background: "rgba(246,244,239,0.32)", margin: "28px auto 0" }} />
+                </>
+              ) : (
+                <>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6 }}>{slide.songTitle}</p>
+                  {slide.section && <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>}
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>{slide.lyrics}</p>
+                </>
+              )}
+            </div>
+            <div style={{ position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center", zIndex: 6 }}>
+              <span style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "rgba(246,244,239,0.4)" }}>{slidesActiveIndex + 1} / {slidesDeck.length}</span>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Sunday Service */}
+      <div style={{ marginBottom: 36 }}>
+        <p style={{ ...monoStyle, marginBottom: 16 }}>Sunday Service</p>
+        {sundayEvents.length === 0 ? (
+          <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 12, padding: "28px 20px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: "#8A8497" }}>No Sunday sets yet.</p>
+          </div>
+        ) : sundayEvents.map(e => renderEventCard(e, false))}
+      </div>
+
+      {/* DG Praise */}
+      {dgPraiseEvents.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <p style={{ ...monoStyle, marginBottom: 16 }}>DG Praise</p>
+          {dgPraiseEvents.map(e => renderEventCard(e, true))}
+        </div>
+      )}
+
+      {/* One-Time */}
+      {oneTimeEvents.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <p style={{ ...monoStyle, marginBottom: 16 }}>One-Time</p>
+          {oneTimeEvents.map(e => renderEventCard(e, true))}
         </div>
       )}
     </div>
@@ -7731,15 +8586,18 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
 
 // ── CreateTeamOverlay ─────────────────────────────────────────────────────────
 
-export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCreated }: {
+export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPraiseTeamMember, onClose, onCreated }: {
   userId: string
   userName: string
   ministryId: string
+  isDGL?: boolean
+  isPraiseTeamMember?: boolean
   onClose: () => void
   onCreated: (teamId: string) => void
 }) {
   const supabase = createClient()
   const [step, setStep] = useState<CreateStep>("preset")
+  const [selectedTeamType, setSelectedTeamType] = useState<'standard' | 'dg_praise' | 'one_time'>('standard')
   const [teamName, setTeamName] = useState("")
   const [teamIcon, setTeamIcon] = useState("👥")
   const [teamDesc, setTeamDesc] = useState("")
@@ -7778,6 +8636,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
     setTeamIcon(preset.icon)
     setTeamDesc(preset.description)
     setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions] })))
+    setSelectedTeamType((preset as { teamType?: 'standard' | 'dg_praise' | 'one_time' }).teamType ?? 'standard')
     setStep("customize")
   }
 
@@ -7828,7 +8687,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
 
     const { data: team, error: teamErr } = await supabase
       .from("teams")
-      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId })
+      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType })
       .select("id")
       .single()
 
@@ -7950,7 +8809,10 @@ export function CreateTeamOverlay({ userId, userName, ministryId, onClose, onCre
 
             {/* Desktop: 2-col grid; mobile: stack */}
             <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {TEAM_PRESETS.map((preset) => (
+              {TEAM_PRESETS.filter(preset => {
+                if (preset.id === "dg_praise" || preset.id === "one_time") return isDGL || isPraiseTeamMember
+                return true
+              }).map((preset) => (
                 <button
                   key={preset.id}
                   onClick={() => applyPreset(preset)}
