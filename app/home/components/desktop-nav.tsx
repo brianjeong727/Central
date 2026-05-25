@@ -216,10 +216,15 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       { label: "Forms", tab: "forms" },
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
+    const generalTabs = ["home", "announcements", "give"] as const
+    const restrictedTabs = ["forms", "settings"] as const
+    const generalItems = homeItems.filter(i => (generalTabs as readonly string[]).includes(i.tab))
+    const restrictedItems = homeItems.filter(i => (restrictedTabs as readonly string[]).includes(i.tab))
+
     return (
       <div className="flex-1 overflow-y-auto px-2 pb-3">
         <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
-        {homeItems.map((item) => (
+        {generalItems.map((item) => (
           <button
             key={item.tab}
             style={subItemStyle(activeTab === item.tab)}
@@ -228,6 +233,20 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
             <span style={{ flex: 1 }}>{item.label}</span>
           </button>
         ))}
+        {restrictedItems.length > 0 && (
+          <>
+            <div style={{ height: 1, background: "#E5E0D2", margin: "4px 8px" }} />
+            {restrictedItems.map((item) => (
+              <button
+                key={item.tab}
+                style={subItemStyle(activeTab === item.tab)}
+                onClick={() => onTabChange(item.tab)}
+              >
+                <span style={{ flex: 1 }}>{item.label}</span>
+              </button>
+            ))}
+          </>
+        )}
       </div>
     )
   }
