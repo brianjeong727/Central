@@ -297,6 +297,7 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
 
   const infoRows = [
     { label: "EMAIL", value: member.email },
+    { label: "PHONE", value: member.phone || null },
     { label: "ROLE", value: member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null },
     { label: "CLASS", value: member.graduation_year ? `Class of ${member.graduation_year}` : null },
   ].filter(r => r.value)
@@ -519,6 +520,13 @@ export function MemberSheet({
             const verseVal = member.favorite_verse || member.bible_verse
 
             const sections: { id: string; label: string; fields: { label: string; value: string; italic?: boolean }[] }[] = [
+              {
+                id: "contact", label: "Contact",
+                fields: [
+                  member.graduation_year ? { label: "Graduation year", value: String(member.graduation_year) } : null,
+                  member.phone ? { label: "Phone", value: member.phone } : null,
+                ].filter(Boolean) as { label: string; value: string }[]
+              },
               {
                 id: "about", label: "About",
                 fields: aboutVal ? [{ label: "Bio", value: aboutVal }] : []

@@ -536,18 +536,19 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
   )
 }
 
-type ProfileDraftField = "phone" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
+type ProfileDraftField = "phone" | "graduation_year" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
 
 const PROFILE_SECTIONS: {
   id: string
   label: string
-  fields: { key: ProfileDraftField; label: string; placeholder: string; multiline: boolean }[]
+  fields: { key: ProfileDraftField; label: string; placeholder: string; multiline: boolean; inputType?: string }[]
 }[] = [
   {
     id: "contact",
     label: "Contact",
     fields: [
-      { key: "phone", label: "Phone", placeholder: "Your phone number", multiline: false },
+      { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
+      { key: "phone", label: "Phone", placeholder: "Your phone number", multiline: false, inputType: "tel" },
     ],
   },
   {
@@ -604,6 +605,7 @@ export function ProfileTab({
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
+    graduation_year: String(initialProfile.graduation_year ?? ""),
     phone: initialProfile.phone ?? "",
     bio: initialProfile.bio ?? "",
     testimony: initialProfile.testimony ?? "",
@@ -632,6 +634,7 @@ export function ProfileTab({
 
   const startEdit = () => {
     setDraft({
+      graduation_year: String(profile.graduation_year ?? ""),
       phone: profile.phone ?? "",
       bio: profile.bio ?? "",
       testimony: profile.testimony ?? "",
@@ -650,6 +653,7 @@ export function ProfileTab({
     const { data, error } = await supabase
       .from("profiles")
       .update({
+        graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
         phone: draft.phone || null,
         bio: draft.bio || null,
         testimony: draft.testimony || null,
@@ -691,7 +695,9 @@ export function ProfileTab({
   }
 
   function getFieldValue(key: ProfileDraftField): string {
-    return ((profile as unknown) as Record<string, string | null | undefined>)[key] ?? ""
+    const val = ((profile as unknown) as Record<string, string | number | null | undefined>)[key]
+    if (val == null) return ""
+    return String(val)
   }
 
   const monoFieldLabel: React.CSSProperties = {
@@ -737,7 +743,7 @@ export function ProfileTab({
                         />
                       ) : (
                         <input
-                          type={field.key === "phone" ? "tel" : "text"}
+                          type={field.inputType ?? "text"}
                           value={draft[field.key]}
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
