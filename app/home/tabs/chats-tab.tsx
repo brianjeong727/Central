@@ -1328,10 +1328,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       for (const p of pollsRows) map[p.id] = { question: p.question, options: p.options }
       setPollsData(prev => ({ ...prev, ...map }))
     }
-    if (votesRows) {
+    if (votesRows !== null) {
       const map: Record<string, number> = {}
       for (const v of votesRows) map[v.poll_id] = v.option_index
-      setPollVotes(prev => ({ ...prev, ...map }))
+      setPollVotes(prev => {
+        const next = { ...prev }
+        for (const id of pollIds) {
+          if (map[id] !== undefined) next[id] = map[id]
+          else delete next[id]
+        }
+        return next
+      })
     }
     if (allVotesRows) {
       const countMap: Record<string, number[]> = {}
