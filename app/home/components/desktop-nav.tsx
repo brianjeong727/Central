@@ -176,7 +176,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Finance</p>
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Giving</p>
           {financeSections.filter(s => s.show).map(s => (
             <button key={s.section} style={subItemStyle(financeSection === s.section)} onClick={() => onFinanceSectionChange(s.section)}>
               <span style={{ flex: 1 }}>{s.label}</span>

@@ -930,11 +930,11 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     ...(canAccessBudget ? [{ id: "allocation" as const, label: "Allocation" }] : []),
   ]
 
-  const sectionLabel = activeSection === "give" ? "Finance" : activeSection === "reimbursements" ? "Reimbursements" : activeSection === "budget" ? "Budget" : "Allocation"
+  const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : activeSection === "budget" ? "Budget" : "Allocation"
 
   return (
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
-      <DesktopTopbar crumbs={["Central", "Finance", ...(activeSection !== "give" ? [sectionLabel] : [])]} />
+      <DesktopTopbar crumbs={["Central", "Giving", ...(activeSection !== "give" ? [sectionLabel] : [])]} />
 
       <div className="px-5 pt-14 md:px-10 md:py-8 max-w-[740px] md:max-w-none">
 
