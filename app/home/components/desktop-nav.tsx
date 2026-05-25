@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -40,6 +40,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     { id: "chats", icon: MessageCircle },
     { id: "directory", icon: BookOpen },
     { id: "profile", icon: User },
+    { id: "giving", icon: Wallet },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
   ]
 
@@ -165,6 +166,25 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
 
     if (activeTab === "directory") {
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
+    }
+
+    if (activeTab === "giving") {
+      const financeSections: { label: string; section: "give" | "reimbursements" | "budget" | "allocation"; show: boolean }[] = [
+        { label: "Give", section: "give", show: true },
+        { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
+        { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
+        { label: "Allocation", section: "allocation", show: !!(isTreasurer || isAdmin) },
+      ]
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Finance</p>
+          {financeSections.filter(s => s.show).map(s => (
+            <button key={s.section} style={subItemStyle(financeSection === s.section)} onClick={() => onFinanceSectionChange(s.section)}>
+              <span style={{ flex: 1 }}>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )
     }
 
     if (activeTab === "profile") {
