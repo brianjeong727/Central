@@ -8813,10 +8813,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
             {/* Desktop: 2-col grid; mobile: stack */}
             <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {TEAM_PRESETS.filter(preset => {
-                if (preset.id === "dg_praise" || preset.id === "one_time") return isAdmin || isDGL || isPraiseTeamMember
-                return true
-              }).map((preset) => (
+              {TEAM_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   onClick={() => applyPreset(preset)}
