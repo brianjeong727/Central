@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward, Paperclip, Pin, FileDown } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -1042,6 +1042,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [searchQuery, setSearchQuery] = useState("")
   const [searchMatchIndex, setSearchMatchIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null)
+  const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null } | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionMembers, setMentionMembers] = useState<{ id: string; name: string }[]>([])
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -1050,6 +1058,51 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       .filter(m => !m.deleted && m.content.toLowerCase().includes(q))
       .map(m => m.id)
   }, [messages, searchQuery])
+
+  const filteredMentions = useMemo(() => {
+    if (mentionQuery === null) return []
+    const q = mentionQuery.toLowerCase()
+    return mentionMembers.filter(m => m.name.split(" ")[0].toLowerCase().startsWith(q)).slice(0, 5)
+  }, [mentionQuery, mentionMembers])
+
+  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
+  const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  function renderMentions(content: string, isOwn: boolean): React.ReactNode {
+    const parts = content.split(/(@\S+)/g)
+    return <>{parts.map((part, i) =>
+      part.startsWith("@")
+        ? <span key={i} style={{ fontWeight: 700, color: isOwn ? "#F6C96A" : "#8B5E1A" }}>{part}</span>
+        : part
+    )}</>
+  }
+
+  // Load group members for @mention autocomplete
+  useEffect(() => {
+    async function loadGroupMembers() {
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id, profiles!user_id(name)")
+        .eq("group_id", groupId)
+      if (data) {
+        const members = data
+          .map((m: { user_id: string; profiles: { name: string } | { name: string }[] | null }) => {
+            const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+            return p ? { id: m.user_id, name: p.name } : null
+          })
+          .filter((m): m is { id: string; name: string } => m !== null && m.id !== userId)
+        setMentionMembers(members)
+      }
+    }
+    loadGroupMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -1108,7 +1161,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   async function handleForward(targetGroupId: string) {
     if (!forwardingMsg) return
     setForwardSentTo(targetGroupId)
-    await supabase.from("messages").insert({ group_id: targetGroupId, sender_id: userId, content: forwardingMsg.content, message_type: "forwarded" })
+    await supabase.from("messages").insert({
+      group_id: targetGroupId, sender_id: userId,
+      content: forwardingMsg.content, message_type: "forwarded",
+      attachment_url: forwardingMsg.attachment_url ?? null,
+      attachment_type: forwardingMsg.attachment_type ?? null,
+      attachment_name: forwardingMsg.attachment_name ?? null,
+      attachment_size: forwardingMsg.attachment_size ?? null,
+    })
     setTimeout(() => { setForwardingMsg(null); setForwardSentTo(null) }, 1000)
   }
 
@@ -1126,14 +1186,88 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setForwardGroups(groups)
   }
 
-  // Fetch group type + archived status for settings
+  async function handleAttachment(file: File) {
+    setUploading(true)
+    const ext = file.name.split(".").pop() ?? "bin"
+    const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { data: storageData, error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(path, file, { cacheControl: "3600", upsert: false })
+    if (error || !storageData) { setUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMsg: Message = {
+      id: optimisticId, group_id: groupId, sender_id: userId,
+      content: "", created_at: new Date().toISOString(), sender_name: userName,
+      reply_to_id: null, reply_to_content: null, reply_to_sender: null,
+      message_type: "user", attachment_url: publicUrl,
+      attachment_type: file.type, attachment_name: file.name, attachment_size: file.size,
+    }
+    setMessages(prev => [...prev, optimisticMsg])
+    const { data } = await supabase.from("messages").insert({
+      group_id: groupId, sender_id: userId, content: "",
+      attachment_url: publicUrl, attachment_type: file.type,
+      attachment_name: file.name, attachment_size: file.size,
+    }).select("id").single()
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+    }
+    setUploading(false)
+  }
+
+  async function handlePin(msgId: string) {
+    setContextMenuFor(null)
+    const msg = messages.find(m => m.id === msgId)
+    setPinnedMessageId(msgId)
+    if (msg) setPinnedMessage({ id: msg.id, content: msg.content, sender_name: msg.sender_name, attachment_url: msg.attachment_url ?? null, attachment_type: msg.attachment_type ?? null })
+    await supabase.from("groups").update({ pinned_message_id: msgId }).eq("id", groupId).eq("ministry_id", ministryId)
+  }
+
+  async function handleUnpin() {
+    setPinnedMessageId(null)
+    setPinnedMessage(null)
+    await supabase.from("groups").update({ pinned_message_id: null }).eq("id", groupId).eq("ministry_id", ministryId)
+  }
+
+  function handleMentionSelect(name: string) {
+    const firstName = name.split(" ")[0]
+    const el = textareaRef.current
+    const pos = el?.selectionStart ?? inputText.length
+    const before = inputText.slice(0, pos)
+    const after = inputText.slice(pos)
+    const atIdx = before.lastIndexOf("@")
+    const newText = before.slice(0, atIdx) + `@${firstName} ` + after
+    setInputText(newText)
+    setMentionQuery(null)
+    requestAnimationFrame(() => el?.focus())
+  }
+
+  // Fetch group type + archived status + pinned message
   useEffect(() => {
     supabase
       .from("groups")
-      .select("type, archived")
+      .select("type, archived, pinned_message_id")
       .eq("id", groupId)
       .single()
-      .then(({ data }) => { if (data) { setGroupType(data.type); setGroupArchived(data.archived ?? false) } })
+      .then(async ({ data }) => {
+        if (data) {
+          setGroupType(data.type)
+          setGroupArchived(data.archived ?? false)
+          if (data.pinned_message_id) {
+            setPinnedMessageId(data.pinned_message_id)
+            const { data: pmsg } = await supabase
+              .from("messages")
+              .select("id, content, attachment_url, attachment_type, profiles!sender_id(name)")
+              .eq("id", data.pinned_message_id)
+              .maybeSingle()
+            if (pmsg) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const p = Array.isArray((pmsg as any).profiles) ? (pmsg as any).profiles[0] : (pmsg as any).profiles
+              setPinnedMessage({ id: pmsg.id, content: pmsg.content, sender_name: (p as { name: string } | null)?.name ?? "Unknown", attachment_url: (pmsg as { attachment_url?: string | null }).attachment_url ?? null, attachment_type: (pmsg as { attachment_type?: string | null }).attachment_type ?? null })
+            }
+          }
+        }
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
 
@@ -1228,7 +1362,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1259,6 +1393,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
             message_type: m.message_type ?? "user",
             is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
+            attachment_url: (m as { attachment_url?: string | null }).attachment_url ?? null,
+            attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
+            attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
+            attachment_size: (m as { attachment_size?: number | null }).attachment_size ?? null,
           }
         })
         setMessages(enriched)
@@ -1302,7 +1440,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
         async (payload) => {
-          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string }
+          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null }
 
           // System messages: just append directly for everyone
           if (raw.message_type === "system") {
@@ -1353,6 +1491,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             reply_to_content: replyToContent,
             reply_to_sender: replyToSender,
             message_type: raw.message_type ?? "user",
+            attachment_url: raw.attachment_url ?? null,
+            attachment_type: raw.attachment_type ?? null,
+            attachment_name: raw.attachment_name ?? null,
+            attachment_size: raw.attachment_size ?? null,
           }])
 
           // Keep last_read_at current as messages arrive so the badge is
@@ -1428,8 +1570,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }, [searchMatchIndex, searchMatches])
 
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setInputText(e.target.value)
-    if (typingChannelRef.current && e.target.value.trim()) {
+    const val = e.target.value
+    setInputText(val)
+    // @mention detection
+    const pos = e.target.selectionStart ?? val.length
+    const before = val.slice(0, pos)
+    const atMatch = before.match(/@(\w*)$/)
+    if (atMatch) {
+      setMentionQuery(atMatch[1])
+      setMentionIndex(0)
+    } else if (mentionQuery !== null) {
+      setMentionQuery(null)
+    }
+    if (typingChannelRef.current && val.trim()) {
       typingChannelRef.current.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: true } })
       if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
       myTypingTimeoutRef.current = setTimeout(() => {
@@ -1448,6 +1601,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
     setSending(true)
     setInputText("")
+    setMentionQuery(null)
 
     const replyTarget = replyingTo
     setReplyingTo(null)
@@ -1497,6 +1651,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (mentionQuery !== null && filteredMentions.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredMentions.length - 1)); return }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
+      if (e.key === "Escape") { setMentionQuery(null); return }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -1743,6 +1903,30 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         )}
       </div>
 
+      {/* ── Pinned message banner ── */}
+      {pinnedMessage && (
+        <div
+          className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#F8F4EA] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
+          onClick={() => scrollToMessage(pinnedMessage.id)}
+        >
+          <Pin className="w-3.5 h-3.5 text-[#3E1540] flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-[#3E1540]">{pinnedMessage.sender_name}</p>
+            <p className="text-[12px] text-[#5A5466] truncate">
+              {pinnedMessage.content || (pinnedMessage.attachment_type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")}
+            </p>
+          </div>
+          {canPin && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleUnpin() }}
+              className="flex-shrink-0 p-1 text-[#C4C4C4] hover:text-[#5A5466] transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
         {loading ? (
@@ -1887,6 +2071,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             <Forward className="w-4 h-4 text-[#5A5466]" />
                             Forward
                           </button>
+                          {!msg.deleted && canPin && (
+                            <button
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); pinnedMessageId === msg.id ? handleUnpin() : handlePin(msg.id) }}
+                              className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            >
+                              <Pin className="w-4 h-4 text-[#5A5466]" />
+                              {pinnedMessageId === msg.id ? "Unpin" : "Pin"}
+                            </button>
+                          )}
                           {isOwn && !msg.deleted && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
@@ -1946,7 +2140,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         onPointerUp={() => handlePointerUp(msg)}
                         onPointerLeave={handlePointerCancel}
                         onPointerCancel={handlePointerCancel}
-                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none ${
+                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
                           msg.deleted
                             ? isOwn
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
@@ -1954,7 +2148,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             : isOwn
                               ? `bg-[#2D0F2E] text-[#F6F4EF] ${outgoingRadius}`
                               : `bg-[#FBF8F2] border border-[#E8E2D2] text-[#13101A] ${incomingRadius}`
-                        } ${!msg.deleted && msg.reply_to_id ? "" : !msg.deleted ? "px-4 py-2.5" : ""}`}
+                        } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
                       >
                         {msg.deleted ? (
                           <span className="italic text-[13px]">Message deleted</span>
@@ -1997,12 +2191,53 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 </div>
                               </div>
                             ) : (
-                              <div className={msg.reply_to_id ? "px-4 pt-2 pb-2.5" : ""}>
-                                {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
-                                  ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
-                                  : msg.content}
-                                {msg.is_edited && <span className={`text-[10px] ml-1.5 opacity-50`}>edited</span>}
-                              </div>
+                              <>
+                                {/* Image attachment */}
+                                {msg.attachment_url && msg.attachment_type?.startsWith("image/") && (
+                                  <div
+                                    className={msg.reply_to_id ? "mt-2 mb-0.5" : ""}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => { e.stopPropagation(); setLightboxUrl(msg.attachment_url!) }}
+                                  >
+                                    <img
+                                      src={msg.attachment_url}
+                                      alt="Image"
+                                      className="w-full max-h-[280px] object-cover cursor-pointer"
+                                    />
+                                  </div>
+                                )}
+                                {/* File attachment */}
+                                {msg.attachment_url && msg.attachment_type && !msg.attachment_type.startsWith("image/") && (
+                                  <a
+                                    href={msg.attachment_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[#F1ECDE]"}`}>
+                                      <FileDown className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[13px] font-medium truncate">{msg.attachment_name ?? "File"}</p>
+                                      {msg.attachment_size != null && (
+                                        <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[#8A8497]"}`}>{formatFileSize(msg.attachment_size)}</p>
+                                      )}
+                                    </div>
+                                    <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[#C4C4C4]"}`} />
+                                  </a>
+                                )}
+                                {/* Text content */}
+                                {msg.content && (
+                                  <div className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}>
+                                    {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
+                                      ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
+                                      : renderMentions(msg.content, isOwn)}
+                                    {msg.is_edited && <span className="text-[10px] ml-1.5 opacity-50">edited</span>}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </>
                         )}
@@ -2117,10 +2352,42 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-3.5">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-3.5 relative">
+          {/* @mention dropdown */}
+          {mentionQuery !== null && filteredMentions.length > 0 && (
+            <div className="absolute bottom-full left-4 mb-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[#ECE8DE] overflow-hidden min-w-[180px] z-10">
+              {filteredMentions.map((member, idx) => (
+                <button
+                  key={member.id}
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => handleMentionSelect(member.name)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[#FBF8F2]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ${getAvatarColor(member.name)}`}>
+                    {member.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-[14px] font-medium text-[#13101A]">{member.name.split(" ")[0]}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3" style={{ minHeight: 44 }}>
-            <button className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors">
-              <Plus className="w-4 h-4" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf,.doc,.docx,.txt,.xlsx,.pptx"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = "" }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors disabled:opacity-40"
+            >
+              {uploading
+                ? <div className="w-4 h-4 border-2 border-[#5A5466] border-t-transparent rounded-full animate-spin" />
+                : <Paperclip className="w-4 h-4" />
+              }
             </button>
             <textarea
               ref={textareaRef}
@@ -2239,6 +2506,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}
         onClose={() => { setShowSettings(false); onClose() }}
       />
+    )}
+
+    {/* Image lightbox */}
+    {lightboxUrl && (
+      <div
+        className="fixed inset-0 z-[300] bg-black/92 flex items-center justify-center"
+        onClick={() => setLightboxUrl(null)}
+      >
+        <button
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <img
+          src={lightboxUrl}
+          alt="Full size"
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
     )}
     </>
   )
