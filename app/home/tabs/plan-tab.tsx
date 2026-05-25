@@ -1142,7 +1142,7 @@ export function MeetingNotesSection({
 
 export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, canEditBudget, onTeamSettings,
-  planningEvent, onPlanningEventChange,
+  planningEvent, onPlanningEventChange, refreshSignal,
 }: {
   teamId: string | null
   teamName: string
@@ -1157,6 +1157,7 @@ export function StudentOrgTeamHome({
   onTeamSettings?: () => void
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
+  refreshSignal?: number
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1178,11 +1179,10 @@ export function StudentOrgTeamHome({
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [calLoading, setCalLoading] = useState(true)
 
-  // Quick add
-  const [quickTitle, setQuickTitle] = useState("")
-  const [quickDate, setQuickDate] = useState("")
-  const [quickCategory, setQuickCategory] = useState<EventType>("social")
-  const [creatingEvent, setCreatingEvent] = useState(false)
+  // Add / delete
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
@@ -1201,7 +1201,7 @@ export function StudentOrgTeamHome({
     supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
       .then(({ data }) => setPlannedIds(new Set((data ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, ministryId])
+  }, [teamId, ministryId, refreshSignal])
 
   useEffect(() => {
     if (!teamId) return
@@ -1220,27 +1220,23 @@ export function StudentOrgTeamHome({
   const now = new Date()
   const upNext = calEvents.find(ev => new Date(ev.start_date) >= now)
 
-  async function handleQuickCreate() {
-    if (!quickTitle.trim() || !quickDate) return
-    setCreatingEvent(true)
-    const { data: newEv } = await supabase.from("calendar_events").insert({
-      ministry_id: ministryId,
-      ...(teamId ? { team_id: teamId } : {}),
-      title: quickTitle.trim(),
-      start_date: new Date(quickDate + "T12:00:00").toISOString(),
-      end_date: new Date(quickDate + "T12:00:00").toISOString(),
-      all_day: true,
-      category: quickCategory,
-      event_type: quickCategory,
-      created_by: userId,
-    }).select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by").single()
-    setCreatingEvent(false)
-    if (newEv) {
-      const sorted = [...calEvents, newEv as CalendarEvent].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
-      setCalEvents(sorted)
-      setQuickTitle(""); setQuickDate("")
-      onPlanningEventChange(newEv as CalendarEvent)
+  async function handleDeleteEvent(evId: string) {
+    setDeleting(true)
+    const { data: plan } = await supabase.from("event_plans").select("id").eq("calendar_event_id", evId).maybeSingle()
+    if (plan) {
+      await Promise.all([
+        supabase.from("event_tasks").delete().eq("event_plan_id", plan.id),
+        supabase.from("event_roles").delete().eq("event_plan_id", plan.id),
+        supabase.from("event_notes").delete().eq("event_plan_id", plan.id),
+      ])
+      await supabase.from("event_plans").delete().eq("id", plan.id)
     }
+    await supabase.from("calendar_events").delete().eq("id", evId)
+    setCalEvents(prev => prev.filter(e => e.id !== evId))
+    setPlannedIds(prev => { const next = new Set(prev); next.delete(evId); return next })
+    setDeleteConfirmId(null)
+    setDeleting(false)
+    if (planningEvent?.id === evId) onPlanningEventChange(null)
   }
 
   const mono: React.CSSProperties = {
@@ -1265,6 +1261,7 @@ export function StudentOrgTeamHome({
   }
 
   return (
+    <>
     <div>
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
       <div style={{ marginBottom: 24 }}>
@@ -1359,40 +1356,14 @@ export function StudentOrgTeamHome({
                 )}
 
                 {canEdit && (
-                  <div style={{ padding: 18, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
-                    <p style={mono}>Quick add</p>
-                    <input
-                      value={quickTitle}
-                      onChange={e => setQuickTitle(e.target.value)}
-                      placeholder="Event name"
-                      style={{ marginTop: 12, width: "100%", padding: "10px 12px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, fontFamily: "var(--font-inter)", outline: "none", boxSizing: "border-box" }}
-                    />
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <input
-                        type="date"
-                        value={quickDate}
-                        onChange={e => setQuickDate(e.target.value)}
-                        style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 12, color: quickDate ? "#5A5466" : "#A09A8C", fontFamily: "var(--font-inter)", outline: "none" }}
-                      />
-                      <select
-                        value={quickCategory}
-                        onChange={e => setQuickCategory(e.target.value as EventType)}
-                        style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 12, color: "#5A5466", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }}
-                      >
-                        {(Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).map(t => (
-                          <option key={t} value={t}>{EVENT_TYPE_CONFIGS[t].icon} {EVENT_TYPE_CONFIGS[t].label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      onClick={handleQuickCreate}
-                      disabled={creatingEvent || !quickTitle.trim() || !quickDate}
-                      style={{ marginTop: 12, width: "100%", padding: "10px 14px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: creatingEvent || !quickTitle.trim() || !quickDate ? "not-allowed" : "pointer", opacity: creatingEvent || !quickTitle.trim() || !quickDate ? 0.5 : 1 }}
-                    >
-                      {creatingEvent ? "Creating…" : "Create & open plan"}
-                    </button>
-                    <p style={{ fontSize: 11, color: "#8A8497", marginTop: 8, textAlign: "center" }}>Drops you straight into Overview — no modal.</p>
-                  </div>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    style={{ width: "100%", padding: "16px 18px", borderRadius: 14, border: "1.5px dashed #D4CECD", background: "transparent", color: "#5A5466", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "var(--font-inter)", transition: "border-color 150ms, background 150ms" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#3E1540"; (e.currentTarget as HTMLButtonElement).style.color = "#3E1540" }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#D4CECD"; (e.currentTarget as HTMLButtonElement).style.color = "#5A5466" }}
+                  >
+                    <Plus className="w-4 h-4" /> New Event
+                  </button>
                 )}
               </aside>
             </section>
@@ -1405,19 +1376,30 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {teamTab === "Plan" && (
           <div>
-            <div style={{ marginBottom: 28 }}>
-              <p style={mono}>Events & planning</p>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
+              <div>
+                <p style={mono}>Events & planning</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+              </div>
+              {canEdit && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> New Event
+                </button>
+              )}
             </div>
             {calEvents.length === 0 ? (
               <div style={{ borderLeft: "2px solid #E8E2D2", paddingLeft: 20 }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Use Quick Add on the General tab to create one.</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Click &ldquo;New Event&rdquo; to get started.</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {calEvents.map(ev => {
                   const isPlanned = plannedIds.has(ev.id)
                   const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
+                  const isConfirmDelete = deleteConfirmId === ev.id
                   return (
                     <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: getEventConfig(ev).dot, flexShrink: 0 }} />
@@ -1425,15 +1407,45 @@ export function StudentOrgTeamHome({
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
                         <p style={{ fontSize: 13, color: "#8A8497", margin: "3px 0 0" }}>{dateStr}{ev.location ? ` · ${ev.location}` : ""}</p>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: isPlanned ? "#14532D" : "#92400E", background: isPlanned ? "#DCFCE7" : "#FEF3C7", borderRadius: 9999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                        {isPlanned ? "Planned ✓" : "Needs planning"}
-                      </span>
-                      <button
-                        onClick={() => onPlanningEventChange(ev)}
-                        style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-                      >
-                        {isPlanned ? "View plan →" : "Plan →"}
-                      </button>
+                      {isConfirmDelete ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: 12, color: "#9F3030", fontWeight: 500 }}>Delete?</span>
+                          <button
+                            onClick={() => handleDeleteEvent(ev.id)}
+                            disabled={deleting}
+                            style={{ padding: "5px 12px", borderRadius: 8, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}
+                          >
+                            {deleting ? "…" : "Confirm"}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E8E2D2", background: "transparent", fontSize: 12, cursor: "pointer", color: "#5A5466" }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: isPlanned ? "#14532D" : "#92400E", background: isPlanned ? "#DCFCE7" : "#FEF3C7", borderRadius: 9999, padding: "3px 10px", whiteSpace: "nowrap" }}>
+                            {isPlanned ? "Planned ✓" : "Needs planning"}
+                          </span>
+                          <button
+                            onClick={() => onPlanningEventChange(ev)}
+                            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                          >
+                            {isPlanned ? "View plan →" : "Plan →"}
+                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => setDeleteConfirmId(ev.id)}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "#C4BEBC", flexShrink: 0, display: "flex", alignItems: "center" }}
+                              title="Delete event"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   )
                 })}
@@ -1512,6 +1524,23 @@ export function StudentOrgTeamHome({
         )}
       </div>
     </div>
+
+    {showAddModal && (
+      <AddEventModal
+        ministryId={ministryId}
+        teamId={teamId}
+        userId={userId}
+        onClose={() => setShowAddModal(false)}
+        onSaved={(newEv) => {
+          const sorted = [...calEvents, newEv].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+          setCalEvents(sorted)
+          setPlannedIds(prev => new Set([...prev, newEv.id]))
+          setShowAddModal(false)
+          onPlanningEventChange(newEv)
+        }}
+      />
+    )}
+    </>
   )
 }
 
@@ -1653,6 +1682,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
+  const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
 
   function replaceParam(key: string, value: string | null) {
     const params = new URLSearchParams(window.location.search)
@@ -1842,6 +1872,11 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             setStudentOrgPlanningEvent(updated)
             setShowEditEvent(false)
           }}
+          onDelete={() => {
+            setShowEditEvent(false)
+            setStudentOrgPlanningEvent(null)
+            setStudentOrgRefreshSignal(s => s + 1)
+          }}
         />
       )}
 
@@ -1873,6 +1908,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
               planningEvent={studentOrgPlanningEvent}
               onPlanningEventChange={setStudentOrgPlanningEvent}
+              refreshSignal={studentOrgRefreshSignal}
             />
           </div>
         ) : isDGLTeam && activeTeamId ? (
@@ -4116,6 +4152,7 @@ export function AddEventModal({
   userId,
   onClose,
   onSaved,
+  onDelete,
   parentEventId,
   excludeTypes,
   existing,
@@ -4125,6 +4162,7 @@ export function AddEventModal({
   userId: string
   onClose: () => void
   onSaved: (ev: CalendarEvent) => void
+  onDelete?: () => void
   parentEventId?: string | null
   excludeTypes?: EventType[]
   existing?: CalendarEvent
@@ -4153,6 +4191,25 @@ export function AddEventModal({
   const [allDay, setAllDay] = useState(existing?.all_day ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (!existing) return
+    setDeleting(true)
+    const { data: plan } = await supabase.from("event_plans").select("id").eq("calendar_event_id", existing.id).maybeSingle()
+    if (plan) {
+      await Promise.all([
+        supabase.from("event_tasks").delete().eq("event_plan_id", plan.id),
+        supabase.from("event_roles").delete().eq("event_plan_id", plan.id),
+        supabase.from("event_notes").delete().eq("event_plan_id", plan.id),
+      ])
+      await supabase.from("event_plans").delete().eq("id", plan.id)
+    }
+    await supabase.from("calendar_events").delete().eq("id", existing.id)
+    setDeleting(false)
+    onDelete?.()
+  }
 
   const availableTypes = (Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).filter(t => !excludeTypes?.includes(t))
   const cfg = EVENT_TYPE_CONFIGS[eventType]
@@ -4362,7 +4419,28 @@ export function AddEventModal({
           {error && <p style={{ fontSize: 13, color: "#C0392B" }}>{error}</p>}
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          {isEditing && onDelete && (
+            <div style={{ borderTop: "1px solid #E8E2D2", paddingTop: 18, marginTop: 8 }}>
+              {deleteConfirm ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 13, color: "#9F3030", flex: 1 }}>This will permanently delete the event and all its planning data.</span>
+                  <button onClick={() => setDeleteConfirm(false)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "transparent", fontSize: 13, cursor: "pointer", color: "#5A5466" }}>Cancel</button>
+                  <button onClick={handleDelete} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
+                    {deleting ? "Deleting…" : "Delete forever"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirm(true)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#C0392B", padding: 0 }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete event
+                </button>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
             <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "#5A5466", cursor: "pointer" }}>
               Cancel
             </button>
