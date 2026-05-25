@@ -1060,6 +1060,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [pollCounts, setPollCounts] = useState<Record<string, number[]>>({}) // poll_id → counts per option
   const [changingVotePollIds, setChangingVotePollIds] = useState<Set<string>>(new Set())
   const [votingPollId, setVotingPollId] = useState<string | null>(null)
+  const [pendingVoteOption, setPendingVoteOption] = useState<number | "unvote" | undefined>(undefined)
+  const [pollMenuFor, setPollMenuFor] = useState<string | null>(null)
   const [pollVoters, setPollVoters] = useState<Record<string, { option_index: number; user_id: string; name: string; avatar_url: string | null }[]>>({})
   const [votersPollId, setVotersPollId] = useState<string | null>(null)
   // GIFs
@@ -1236,6 +1238,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "" } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
     await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", userId)
+  }
+
+  async function handleDeletePoll(msgId: string, pollId: string) {
+    setPollMenuFor(null)
+    setMessages(prev => prev.filter(m => m.id !== msgId))
+    await supabase.from("poll_votes").delete().eq("poll_id", pollId)
+    await supabase.from("polls").delete().eq("id", pollId)
+    await supabase.from("messages").delete().eq("id", msgId)
   }
 
   async function handleEditMessage() {
@@ -2278,9 +2288,34 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       <div className="w-full max-w-[290px] bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
                         {poll ? (
                           <>
-                            <div className="px-4 pt-4 pb-3 text-center border-b border-[#F0EDE6]">
-                              <p className="text-[15px] font-bold text-[#13101A] leading-snug">{poll.question}</p>
-                              <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
+                            {/* Card header */}
+                            <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6] flex items-start gap-2">
+                              <div className="flex-1 text-center">
+                                <p className="text-[15px] font-bold text-[#13101A] leading-snug">{poll.question}</p>
+                                <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
+                              </div>
+                              {/* Delete button — visible to creator or admin/leader */}
+                              {(msg.sender_id === userId || isAdminOrLeader) && (
+                                <div className="relative flex-shrink-0 -mt-1 -mr-1">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setPollMenuFor(pollMenuFor === msg.id ? null : msg.id) }}
+                                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F0EDE6] transition-colors"
+                                  >
+                                    <MoreHorizontal className="w-3.5 h-3.5 text-[#8A8497]" />
+                                  </button>
+                                  {pollMenuFor === msg.id && (
+                                    <div className="absolute right-0 top-8 z-10 bg-white rounded-xl border border-[#E8E2D2] shadow-lg overflow-hidden min-w-[130px]">
+                                      <button
+                                        onClick={() => handleDeletePoll(msg.id, msg.poll_id!)}
+                                        className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete poll
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             {/* Preview — first 3 options, read-only */}
                             <div className="px-4 pt-3 pb-2 flex flex-col gap-2.5">
@@ -2321,6 +2356,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             <div className="px-4 pb-4 pt-1">
                               <button
                                 onClick={() => {
+                                  setPollMenuFor(null)
+                                  setPendingVoteOption(undefined)
                                   if (hasVoted) setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))
                                   setVotingPollId(msg.poll_id!)
                                 }}
@@ -2941,10 +2978,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       )}
 
       {/* Overlay to dismiss emoji / context menu / GIF picker */}
-      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker) && (
+      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker || pollMenuFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[296px]"
-          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false) }}
+          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
         />
       )}
 
@@ -2955,7 +2992,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const vCounts = pollCounts[votingPollId] ?? []
         const vTotal = vCounts.reduce((s, c) => s + c, 0)
         const vVoters = pollVoters[votingPollId] ?? []
-        const closeFn = () => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }
+        const closeFn = () => { setVotingPollId(null); setPendingVoteOption(undefined); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }
+        // displaySelection: what the user currently has highlighted in the modal (before confirming)
+        const displaySelection: number | undefined = pendingVoteOption === "unvote" ? undefined : pendingVoteOption !== undefined ? pendingVoteOption : vUserVote
+        const hasPending = pendingVoteOption !== undefined
+        const confirmLabel = pendingVoteOption === "unvote" ? "Remove vote" : vUserVote !== undefined ? "Change vote" : "Submit vote"
         return (
           <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={closeFn}>
             <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
@@ -2977,62 +3018,89 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 </button>
               </div>
               {vPoll ? (
-                <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
-                  <p className="text-[15px] font-bold text-[#13101A] leading-snug mb-2">{vPoll.question}</p>
-                  {vPoll.options.map((opt, oi) => {
-                    const count = vCounts[oi] ?? 0
-                    const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
-                    const isSelected = vUserVote === oi
-                    const optVoters = vVoters.filter(v => v.option_index === oi).slice(0, 3)
-                    return (
-                      <button
-                        key={oi}
-                        onClick={async () => {
-                          await handleVote(votingPollId, oi)
-                          if (vUserVote !== oi) setVotingPollId(null) // close unless unvoting
-                        }}
-                        className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
-                        style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[#3E1540] bg-[#3E1540]" : "border-[#D8D3C8]"}`}>
-                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </div>
-                            <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                            {/* Avatar stack */}
-                            {optVoters.length > 0 && (
-                              <div className="flex items-center">
-                                {optVoters.map((v, vi) => (
-                                  <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0 ${vi > 0 ? "-ml-1.5" : ""} ${getAvatarColor(v.name)}`}>
-                                    {v.avatar_url
-                                      ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
-                                      : <span className="text-white font-bold flex items-center justify-center h-full" style={{ fontSize: 7 }}>{v.name.charAt(0).toUpperCase()}</span>
-                                    }
-                                  </div>
-                                ))}
-                                {count > 3 && (
-                                  <div className="-ml-1.5 w-5 h-5 rounded-full bg-[#E8E2D2] border border-white flex items-center justify-center flex-shrink-0">
-                                    <span style={{ fontSize: 7, fontWeight: 700, color: "#5A5466" }}>+{count - 3}</span>
-                                  </div>
-                                )}
+                <>
+                  <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
+                    <p className="text-[15px] font-bold text-[#13101A] leading-snug mb-2">{vPoll.question}</p>
+                    {vPoll.options.map((opt, oi) => {
+                      const count = vCounts[oi] ?? 0
+                      const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
+                      const isSelected = displaySelection === oi
+                      const optVoters = vVoters.filter(v => v.option_index === oi).slice(0, 3)
+                      return (
+                        <button
+                          key={oi}
+                          onClick={() => {
+                            if (isSelected) {
+                              // Clicking highlighted option: unvote if it was original, revert if it was a pending change
+                              if (oi === vUserVote) setPendingVoteOption("unvote")
+                              else setPendingVoteOption(undefined)
+                            } else {
+                              setPendingVoteOption(oi)
+                            }
+                          }}
+                          className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
+                          style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[#3E1540] bg-[#3E1540]" : "border-[#D8D3C8]"}`}>
+                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                               </div>
-                            )}
-                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                              <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {optVoters.length > 0 && (
+                                <div className="flex items-center">
+                                  {optVoters.map((v, vi) => (
+                                    <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0 ${vi > 0 ? "-ml-1.5" : ""} ${getAvatarColor(v.name)}`}>
+                                      {v.avatar_url
+                                        ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                        : <span className="text-white font-bold flex items-center justify-center h-full" style={{ fontSize: 7 }}>{v.name.charAt(0).toUpperCase()}</span>
+                                      }
+                                    </div>
+                                  ))}
+                                  {count > 3 && (
+                                    <div className="-ml-1.5 w-5 h-5 rounded-full bg-[#E8E2D2] border border-white flex items-center justify-center flex-shrink-0">
+                                      <span style={{ fontSize: 7, fontWeight: 700, color: "#5A5466" }}>+{count - 3}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }} />
-                        </div>
-                        {isSelected && (
-                          <p className="text-[11px] text-[#8A8497] mt-1.5">Tap to remove your vote</p>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
+                          <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }} />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {/* Confirm footer — only shown when user has made a selection */}
+                  <div className="px-5 pb-5 pt-3 border-t border-[#F0EDE6] flex-shrink-0 flex gap-2">
+                    <button
+                      onClick={closeFn}
+                      className="flex-1 py-2.5 rounded-xl border border-[#E8E2D2] text-[13px] font-semibold text-[#5A5466] hover:bg-[#F4F1E8] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={!hasPending}
+                      onClick={async () => {
+                        if (pendingVoteOption === "unvote") {
+                          await handleVote(votingPollId, vUserVote!)
+                        } else if (pendingVoteOption !== undefined) {
+                          await handleVote(votingPollId, pendingVoteOption)
+                        }
+                        closeFn()
+                      }}
+                      className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                      style={{ background: hasPending ? "#3E1540" : "#E8E2D2", color: hasPending ? "#F6F4EF" : "#8A8497", cursor: hasPending ? "pointer" : "default" }}
+                    >
+                      {hasPending ? confirmLabel : "Select an option"}
+                    </button>
+                  </div>
+                </>
               ) : (
                 <div className="flex items-center justify-center py-10">
                   <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
