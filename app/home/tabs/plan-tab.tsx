@@ -4221,6 +4221,19 @@ export function AddEventModal({
     onDelete?.()
   }
 
+  function eventTypeToCategory(et: EventType): string {
+    const map: Record<EventType, string> = {
+      welcome_week: "welcoming",
+      coffeehouse: "social",
+      turkey_bowl: "social",
+      retreat: "retreat",
+      appreciation_night: "social",
+      social: "social",
+      ministry: "regular",
+    }
+    return map[et] ?? "regular"
+  }
+
   const availableTypes = (Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).filter(t => !excludeTypes?.includes(t))
   const cfg = EVENT_TYPE_CONFIGS[eventType]
 
@@ -4252,7 +4265,7 @@ export function AddEventModal({
             start_date: startTs,
             end_date: endTs,
             all_day: allDay,
-            category: eventType,
+            category: eventTypeToCategory(eventType),
             event_type: eventType,
           })
           .eq("id", existing.id)
@@ -4273,7 +4286,7 @@ export function AddEventModal({
             start_date: startTs,
             end_date: endTs,
             all_day: allDay,
-            category: eventType,
+            category: eventTypeToCategory(eventType),
             event_type: eventType,
             parent_event_id: parentEventId ?? null,
             created_by: userId,
