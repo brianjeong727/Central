@@ -1529,7 +1529,6 @@ export function StudentOrgTeamHome({
             ministryId={ministryId}
             userId={userId}
             canEdit={canEdit || isAdmin}
-            roster={roster}
           />
         )}
       </div>
@@ -1565,12 +1564,12 @@ interface CCSFRotation {
   notes: string | null
 }
 
-function RotationsTab({ teamId, ministryId, userId, canEdit, roster }: {
+function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   teamId: string; ministryId: string; userId: string; canEdit: boolean
-  roster: { id: string; user_id: string; name: string; role: string }[]
 }) {
   const supabase = createClient()
   const [rotations, setRotations] = useState<CCSFRotation[]>([])
+  const [roster, setRoster] = useState<{ user_id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
 
@@ -1594,6 +1593,22 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, roster }: {
   useEffect(() => {
     async function load() {
       setLoading(true)
+
+      // Fetch roster: get user_ids from team_members, then names from profiles
+      const { data: memberRows } = await supabase
+        .from("team_members")
+        .select("user_id")
+        .eq("team_id", teamId)
+      const userIds = (memberRows ?? []).map((m: { user_id: string }) => m.user_id)
+      if (userIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds)
+          .order("name")
+        setRoster((profileRows ?? []).map((p: { id: string; name: string }) => ({ user_id: p.id, name: p.name })))
+      }
+
       const { data } = await supabase
         .from("ccsf_rotations")
         .select("id, rotation_type, assigned_to, week_date, notes")
