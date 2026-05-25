@@ -1660,21 +1660,15 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, roster }: {
                     <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "#3E1540" : "#5A5466" }}>{dateLabel}</p>
                     {isToday && <p style={{ fontSize: 10.5, color: "#8A8497", marginTop: 1 }}>This week</p>}
                   </div>
-                  {canEdit ? (
-                    <select
-                      value={assignment?.assigned_to ?? ""}
-                      disabled={saving === key}
-                      onChange={e => handleAssign(type, weekDate, e.target.value || null)}
-                      style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "#13101A" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      <option value="">— Unassigned —</option>
-                      {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-                    </select>
-                  ) : (
-                    <p style={{ flex: 1, fontSize: 13, color: assignment?.assigned_name ? "#13101A" : "#C4C4C4", fontStyle: assignment?.assigned_name ? "normal" : "italic" }}>
-                      {assignment?.assigned_name ?? "Unassigned"}
-                    </p>
-                  )}
+                  <select
+                    value={assignment?.assigned_to ?? ""}
+                    disabled={saving === key}
+                    onChange={e => handleAssign(type, weekDate, e.target.value || null)}
+                    style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "#13101A" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    <option value="">— Unassigned —</option>
+                    {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                  </select>
                 </div>
               )
             })}
