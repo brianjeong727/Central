@@ -277,6 +277,12 @@ export interface DirectoryMember {
   bible_verse: string | null
   prayer_request: string | null
   pray_for_me: string | null
+  phone?: string | null
+  bio?: string | null
+  testimony?: string | null
+  favorite_worship_song?: string | null
+  favorite_verse?: string | null
+  favorite_book_of_bible?: string | null
   avatar_url: string | null
 }
 

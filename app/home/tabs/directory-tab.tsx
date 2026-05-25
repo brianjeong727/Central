@@ -26,7 +26,7 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
     async function load() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
+        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
         .eq("ministry_id", ministryId)
         .order("name")
       const list = data ?? []
@@ -378,25 +378,24 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
           </div>
         ))}
 
-        {/* Spiritual fields */}
-        {member.bible_verse && (
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>VERSE</span>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 14, color: "#3E1540", fontStyle: "italic" }}>&ldquo;{member.bible_verse}&rdquo;</span>
-          </div>
-        )}
-        {member.pray_for_me && (
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>PRAY FOR</span>
-            <span style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6 }}>{member.pray_for_me}</span>
-          </div>
-        )}
-        {member.about_me && (
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>ABOUT</span>
-            <span style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6 }}>{member.about_me}</span>
-          </div>
-        )}
+        {/* Profile fields — new fields with fallback to legacy */}
+        {(() => {
+          const aboutVal = member.bio || member.about_me
+          const verseVal = member.favorite_verse || member.bible_verse
+          const rows: { label: string; value: string; italic?: boolean }[] = []
+          if (aboutVal) rows.push({ label: "ABOUT", value: aboutVal })
+          if (member.testimony) rows.push({ label: "TESTIMONY", value: member.testimony })
+          if (verseVal) rows.push({ label: "VERSE", value: verseVal, italic: true })
+          if (member.favorite_worship_song) rows.push({ label: "WORSHIP SONG", value: member.favorite_worship_song })
+          if (member.favorite_book_of_bible) rows.push({ label: "FAVORITE BOOK", value: member.favorite_book_of_bible })
+          if (member.prayer_request) rows.push({ label: "PRAYER", value: member.prayer_request })
+          return rows.map(row => (
+            <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+              <span style={{ fontSize: 14, color: row.italic ? "#3E1540" : "#5A5466", lineHeight: 1.65, fontStyle: row.italic ? "italic" : "normal", fontFamily: row.italic ? "var(--font-instrument-serif)" : "inherit" }}>{row.value}</span>
+            </div>
+          ))
+        })()}
       </div>
     </div>
   )
@@ -514,37 +513,57 @@ export function MemberSheet({
             </p>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {member.bible_verse && (
-              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>Bible verse</p>
-                <p className="text-[13px] text-[#5A5466] italic leading-relaxed">&ldquo;{member.bible_verse}&rdquo;</p>
+          {(() => {
+            const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", margin: 0, marginBottom: 4 }
+            const aboutVal = member.bio || member.about_me
+            const verseVal = member.favorite_verse || member.bible_verse
+
+            const sections: { id: string; label: string; fields: { label: string; value: string; italic?: boolean }[] }[] = [
+              {
+                id: "about", label: "About",
+                fields: aboutVal ? [{ label: "Bio", value: aboutVal }] : []
+              },
+              {
+                id: "faith", label: "Faith",
+                fields: [
+                  member.testimony ? { label: "Testimony", value: member.testimony } : null,
+                  verseVal ? { label: "Favorite verse", value: verseVal, italic: true } : null,
+                  member.favorite_worship_song ? { label: "Favorite worship song", value: member.favorite_worship_song } : null,
+                  member.favorite_book_of_bible ? { label: "Favorite book of the Bible", value: member.favorite_book_of_bible } : null,
+                ].filter(Boolean) as { label: string; value: string; italic?: boolean }[]
+              },
+              {
+                id: "prayer", label: "Prayer",
+                fields: member.prayer_request ? [{ label: "Prayer request", value: member.prayer_request }] : []
+              }
+            ].filter(s => s.fields.length > 0)
+
+            if (sections.length === 0) {
+              return (
+                <div className="flex items-center justify-center py-10">
+                  <p className="text-[13px] text-[#8A8497]/60">No details shared yet</p>
+                </div>
+              )
+            }
+
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {sections.map(section => (
+                  <div key={section.id}>
+                    <p style={{ ...monoLabel, marginBottom: 10 }}>{section.label}</p>
+                    <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+                      {section.fields.map((field, i) => (
+                        <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid #E5E0D2" : "none" }}>
+                          <p style={monoLabel}>{field.label}</p>
+                          <p style={{ fontSize: 14, color: field.italic ? "#3E1540" : "#13101A", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, fontStyle: field.italic ? "italic" : "normal", fontFamily: field.italic ? "var(--font-instrument-serif)" : "inherit" }}>{field.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-            {member.prayer_request && (
-              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>Prayer request</p>
-                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.prayer_request}</p>
-              </div>
-            )}
-            {member.pray_for_me && (
-              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>How to pray for me</p>
-                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.pray_for_me}</p>
-              </div>
-            )}
-            {member.about_me && (
-              <div className="bg-white rounded-2xl p-5 border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "14px", color: "#3E1540", fontWeight: 400, marginBottom: "6px" }}>About</p>
-                <p className="text-[13px] text-[#5A5466] leading-relaxed">{member.about_me}</p>
-              </div>
-            )}
-            {!member.bible_verse && !member.prayer_request && !member.pray_for_me && !member.about_me && (
-              <div className="flex items-center justify-center py-10">
-                <p className="text-[13px] text-[#8A8497]/60">No details shared yet</p>
-              </div>
-            )}
-          </div>
+            )
+          })()}
         </div>
 
         {!isOwnProfile && (
