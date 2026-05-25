@@ -2193,13 +2193,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         <div className="flex-1 h-px bg-[#E8E2D2]" />
                       </div>
                     )}
-                    <div className="mt-3 mx-0">
-                      <div className="text-[11px] text-[#8A8497] mb-1 flex items-center gap-1.5">
+                    <div className={`mt-3 flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
+                      <div className={`text-[11px] text-[#8A8497] mb-1 flex items-center gap-1.5 ${isOwn ? "justify-end" : ""}`}>
                         <BarChart2 className="w-3 h-3" />
                         <span>{isOwn ? "You" : msg.sender_name} created a poll</span>
                         <span className="text-[#C4C4C4]">· {formatMessageTime(msg.created_at)}</span>
                       </div>
-                      <div className="bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
+                      <div className="w-[75%] bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
                         {poll ? (
                           <>
                             <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6]">
