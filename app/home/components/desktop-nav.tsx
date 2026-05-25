@@ -33,7 +33,7 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   )
 }
 
-export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL }: DesktopSidebarProps) {
+export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL, canCreateTeam }: DesktopSidebarProps) {
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
@@ -120,7 +120,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 6px" }}>
             <p style={monoStyle}>Your teams · {userTeams.length}</p>
-            {isAdmin && onCreateTeam && (
+            {(canCreateTeam || isAdmin) && onCreateTeam && (
               <button
                 onClick={onCreateTeam}
                 style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", borderRadius: 4, padding: 0 }}

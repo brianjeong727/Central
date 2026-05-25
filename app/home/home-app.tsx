@@ -109,6 +109,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const isAdmin = ["admin", "leader"].includes(initialProfile.role.toLowerCase())
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
+  const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
+  const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
 
   const validFinanceSections = ["give", "reimbursements", "budget", "allocation"] as const
   const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | "allocation" | null
@@ -417,6 +419,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         activeGroupId={globalOpenChat?.id}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        canCreateTeam={canCreateTeam}
         onCreateTeam={() => setShowQuickCreateTeam(true)}
         activeTeamId={activeTeamId}
         onActiveTeamChange={handleTeamChange}
@@ -634,6 +637,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         <QuickCreateTeamModal
           userId={userId}
           ministryId={ministryId}
+          isAdmin={isAdmin}
+          isDGL={isDGL}
+          isPraiseTeamMember={isPraiseTeamMember}
           onClose={() => setShowQuickCreateTeam(false)}
           onCreated={(teamId) => {
             setShowQuickCreateTeam(false)

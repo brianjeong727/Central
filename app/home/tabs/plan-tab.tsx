@@ -10002,10 +10002,12 @@ const WIZARD_ICON_OPTIONS = [
 
 // Step 1 preset display data (icon keys, no emojis)
 const WIZARD_PRESETS_DISPLAY = [
-  { id: "praise", iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts." },
-  { id: "board",  iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management." },
-  { id: "dgl",    iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance." },
-  { id: "tech",   iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing." },
+  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false },
+  { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false },
+  { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false },
+  { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false },
+  { id: "dg_praise", iconKey: "music",    label: "DG Praise Team",      desc: "Lightweight praise team for a discipleship group.",        restricted: true  },
+  { id: "one_time",  iconKey: "music",    label: "One-Time Event",      desc: "Praise team for a one-time event (SSO, Welcome Week…).",  restricted: true  },
 ]
 
 const WIZARD_MONO = {
@@ -10016,9 +10018,12 @@ const WIZARD_MONO = {
   color: "#8A8497",
 }
 
-export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }: {
+export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPraiseTeamMember, onClose, onCreated }: {
   userId: string
   ministryId: string
+  isAdmin?: boolean
+  isDGL?: boolean
+  isPraiseTeamMember?: boolean
   onClose: () => void
   onCreated: (teamId: string) => void
 }) {
@@ -10053,8 +10058,10 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
 
   async function handleCreate() {
     setSaving(true); setError(null)
+    const presetData = TEAM_PRESETS.find(p => p.id === selectedPresetId)
+    const teamType = (presetData as { teamType?: string } | undefined)?.teamType ?? "standard"
     const { data: team, error: tErr } = await supabase
-      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId })
+      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType })
       .select("id").single()
     if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
 
@@ -10126,7 +10133,10 @@ export function QuickCreateTeamModal({ userId, ministryId, onClose, onCreated }:
           {/* ── Step 1: Choose a template ── */}
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {WIZARD_PRESETS_DISPLAY.map(p => {
+              {WIZARD_PRESETS_DISPLAY.filter(p => {
+                if (p.restricted) return isAdmin || isDGL || isPraiseTeamMember
+                return !!isAdmin  // non-restricted: admins only
+              }).map(p => {
                 const on = selectedPresetId === p.id
                 const roleCount = TEAM_PRESETS.find(t => t.id === p.id)?.roles.length ?? 0
                 const iconOpt = WIZARD_ICON_OPTIONS.find(o => o.key === p.iconKey)

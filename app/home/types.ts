@@ -573,6 +573,7 @@ export interface DesktopSidebarProps {
   onFinanceSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
   isTreasurer: boolean
   isDGL: boolean
+  canCreateTeam?: boolean
 }
 
 export interface HomeAppProps {
