@@ -1046,6 +1046,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null } | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionMembers, setMentionMembers] = useState<{ id: string; name: string }[]>([])
   const [mentionIndex, setMentionIndex] = useState(0)
@@ -1186,33 +1187,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setForwardGroups(groups)
   }
 
-  async function handleAttachment(file: File) {
-    setUploading(true)
-    const ext = file.name.split(".").pop() ?? "bin"
-    const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { data: storageData, error } = await supabase.storage
-      .from("chat-attachments")
-      .upload(path, file, { cacheControl: "3600", upsert: false })
-    if (error || !storageData) { setUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
-    const optimisticId = `optimistic-${Date.now()}`
-    const optimisticMsg: Message = {
-      id: optimisticId, group_id: groupId, sender_id: userId,
-      content: "", created_at: new Date().toISOString(), sender_name: userName,
-      reply_to_id: null, reply_to_content: null, reply_to_sender: null,
-      message_type: "user", attachment_url: publicUrl,
-      attachment_type: file.type, attachment_name: file.name, attachment_size: file.size,
-    }
-    setMessages(prev => [...prev, optimisticMsg])
-    const { data } = await supabase.from("messages").insert({
-      group_id: groupId, sender_id: userId, content: "",
-      attachment_url: publicUrl, attachment_type: file.type,
-      attachment_name: file.name, attachment_size: file.size,
-    }).select("id").single()
-    if (data) {
-      setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
-    }
-    setUploading(false)
+  function stagePendingAttachment(file: File) {
+    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
+    setPendingAttachment({ file, previewUrl: URL.createObjectURL(file) })
+  }
+
+  function clearPendingAttachment() {
+    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
+    setPendingAttachment(null)
   }
 
   async function handlePin(msgId: string) {
@@ -1593,7 +1575,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   async function handleSend() {
     const content = inputText.trim()
-    if (!content || sending || groupArchived) return
+    const pa = pendingAttachment
+    if (!content && !pa) return
+    if (sending || groupArchived) return
 
     // Clear own typing status
     if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
@@ -1602,18 +1586,50 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setSending(true)
     setInputText("")
     setMentionQuery(null)
+    setPendingAttachment(null)
+    if (pa) URL.revokeObjectURL(pa.previewUrl)
 
     const replyTarget = replyingTo
     setReplyingTo(null)
 
+    // Attachment message (with optional caption)
+    if (pa) {
+      setUploading(true)
+      const ext = pa.file.name.split(".").pop() ?? "bin"
+      const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: storageData, error } = await supabase.storage
+        .from("chat-attachments")
+        .upload(path, pa.file, { cacheControl: "3600", upsert: false })
+      if (!error && storageData) {
+        const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
+        const optimisticId = `optimistic-att-${Date.now()}`
+        const optimisticMsg: Message = {
+          id: optimisticId, group_id: groupId, sender_id: userId,
+          content, created_at: new Date().toISOString(), sender_name: userName,
+          reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget?.content ?? null,
+          reply_to_sender: replyTarget?.sender_name ?? null,
+          message_type: "user", attachment_url: publicUrl,
+          attachment_type: pa.file.type, attachment_name: pa.file.name, attachment_size: pa.file.size,
+        }
+        setMessages(prev => [...prev, optimisticMsg])
+        const { data } = await supabase.from("messages").insert({
+          group_id: groupId, sender_id: userId, content,
+          reply_to_id: replyTarget?.id ?? null,
+          attachment_url: publicUrl, attachment_type: pa.file.type,
+          attachment_name: pa.file.name, attachment_size: pa.file.size,
+        }).select("id").single()
+        if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+      }
+      setUploading(false)
+      setSending(false)
+      return
+    }
+
+    // Text-only message
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg: Message = {
-      id: optimisticId,
-      group_id: groupId,
-      sender_id: userId,
-      content,
-      created_at: new Date().toISOString(),
-      sender_name: userName,
+      id: optimisticId, group_id: groupId, sender_id: userId, content,
+      created_at: new Date().toISOString(), sender_name: userName,
       reply_to_id: replyTarget?.id ?? null,
       reply_to_content: replyTarget?.content ?? null,
       reply_to_sender: replyTarget?.sender_name ?? null,
@@ -2105,7 +2121,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       </div>
                     )}
 
-                    {/* Sender name + time — above first bubble only, incoming only */}
+                    {/* Pinned indicator */}
+                    {msg.id === pinnedMessageId && (
+                      <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
+                        <Pin className="w-3 h-3 text-[#C9A34B]" />
+                        <span className="text-[11px] text-[#C9A34B] font-medium">Pinned</span>
+                      </div>
+                    )}
+                    {/* Forwarded indicator */}
                     {msg.message_type === "forwarded" && (
                       <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
                         <Forward className="w-3 h-3 text-[#8A8497]" />
@@ -2346,6 +2369,43 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         </div>
       )}
 
+      {/* ── Attachment preview bar ── */}
+      {pendingAttachment && (
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
+          {pendingAttachment.file.type.startsWith("image/") ? (
+            <>
+              <div className="relative flex-shrink-0">
+                <img
+                  src={pendingAttachment.previewUrl}
+                  alt="Preview"
+                  className="w-16 h-16 rounded-xl object-cover border border-[#E8E2D2]"
+                />
+                <button
+                  onClick={clearPendingAttachment}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#13101A] flex items-center justify-center"
+                >
+                  <X className="w-2.5 h-2.5 text-white" />
+                </button>
+              </div>
+              <p className="text-[12px] text-[#8A8497] flex-1">Add a caption or press send</p>
+            </>
+          ) : (
+            <>
+              <div className="w-10 h-10 rounded-xl bg-[#F4F1E8] border border-[#E8E2D2] flex items-center justify-center flex-shrink-0">
+                <FileDown className="w-4 h-4 text-[#5A5466]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-[#13101A] truncate">{pendingAttachment.file.name}</p>
+                <p className="text-[11px] text-[#8A8497]">{formatFileSize(pendingAttachment.file.size)}</p>
+              </div>
+              <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Input bar ── */}
       {groupArchived ? (
         <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
@@ -2377,7 +2437,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               type="file"
               accept="image/*,application/pdf,.doc,.docx,.txt,.xlsx,.pptx"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = "" }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -2425,7 +2485,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               </div>
               <button
                 onClick={handleSend}
-                disabled={!inputText.trim() || sending}
+                disabled={(!inputText.trim() && !pendingAttachment) || sending}
                 className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
                 style={{ width: 34, height: 34, borderRadius: 10 }}
               >
