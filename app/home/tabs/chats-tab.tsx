@@ -1059,6 +1059,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [pollVotes, setPollVotes] = useState<Record<string, number>>({}) // poll_id → option_index user voted (-1 = none)
   const [pollCounts, setPollCounts] = useState<Record<string, number[]>>({}) // poll_id → counts per option
   const [changingVotePollIds, setChangingVotePollIds] = useState<Set<string>>(new Set())
+  const [votingPollId, setVotingPollId] = useState<string | null>(null)
   // GIFs
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [gifSearch, setGifSearch] = useState("")
@@ -2246,47 +2247,53 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               <p className="text-[15px] font-bold text-[#13101A] leading-snug">{poll.question}</p>
                               <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
                             </div>
-                            <div className="px-4 py-3 flex flex-col gap-3">
-                              {poll.options.map((opt, oi) => {
+                            {/* Preview — first 3 options, read-only */}
+                            <div className="px-4 pt-3 pb-2 flex flex-col gap-2.5">
+                              {poll.options.slice(0, 3).map((opt, oi) => {
                                 const count = counts[oi] ?? 0
                                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
                                 const isSelected = userVote === oi
                                 return (
-                                  <button
-                                    key={oi}
-                                    onClick={() => handleVote(msg.poll_id!, oi)}
-                                    disabled={hasVoted}
-                                    className="w-full text-left disabled:cursor-default"
-                                  >
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <span className={`text-[13px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
-                                      {hasVoted && (
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                          {isSelected && <Check className="w-3 h-3 text-[#3E1540]" />}
-                                          <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count}</span>
+                                  <div key={oi}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      {hasVoted ? (
+                                        <>
+                                          <span className={`text-[13px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            {isSelected && <Check className="w-3 h-3 text-[#3E1540]" />}
+                                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count}</span>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#D8D3C8] flex-shrink-0" />
+                                          <span className="text-[13px] text-[#13101A]">{opt}</span>
                                         </div>
                                       )}
                                     </div>
-                                    <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full transition-all duration-500"
-                                        style={{ width: hasVoted ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }}
-                                      />
-                                    </div>
-                                  </button>
+                                    {hasVoted && (
+                                      <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "#3E1540" : "#C4BDB8" }} />
+                                      </div>
+                                    )}
+                                  </div>
                                 )
                               })}
+                              {poll.options.length > 3 && (
+                                <p className="text-[12px] text-[#8A8497] mt-0.5">and {poll.options.length - 3} more option{poll.options.length - 3 !== 1 ? "s" : ""}…</p>
+                              )}
                             </div>
-                            {hasVoted && (
-                              <div className="px-4 pb-3">
-                                <button
-                                  onClick={() => setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))}
-                                  className="w-full py-2.5 rounded-xl bg-[#F4F1E8] hover:bg-[#ECE8DE] active:bg-[#E5E0D2] transition-colors text-[13px] font-semibold text-[#5A5466]"
-                                >
-                                  Change vote
-                                </button>
-                              </div>
-                            )}
+                            <div className="px-4 pb-4 pt-1">
+                              <button
+                                onClick={() => {
+                                  if (hasVoted) setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))
+                                  setVotingPollId(msg.poll_id!)
+                                }}
+                                className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[#F4F1E8] hover:bg-[#ECE8DE] text-[#5A5466]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-white"}`}
+                              >
+                                {hasVoted ? "Change vote" : "Vote"}
+                              </button>
+                            </div>
                           </>
                         ) : (
                           <div className="px-4 py-4 flex items-center justify-center gap-2">
@@ -2905,6 +2912,67 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false) }}
         />
       )}
+
+      {/* Vote modal */}
+      {votingPollId && (() => {
+        const vPoll = pollsData[votingPollId]
+        const vUserVote = pollVotes[votingPollId]
+        const vCounts = pollCounts[votingPollId] ?? []
+        const vTotal = vCounts.reduce((s, c) => s + c, 0)
+        return (
+          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
+                <div className="flex-1">
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Poll</p>
+                  {vPoll && <p className="text-[11px] text-[#8A8497] mt-0.5">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>}
+                </div>
+                <button onClick={() => { setVotingPollId(null); setChangingVotePollIds(prev => { const n = new Set(prev); n.delete(votingPollId); return n }) }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                  <X className="w-4 h-4 text-[#5A5466]" />
+                </button>
+              </div>
+              {vPoll ? (
+                <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
+                  <p className="text-[15px] font-bold text-[#13101A] leading-snug mb-2">{vPoll.question}</p>
+                  {vPoll.options.map((opt, oi) => {
+                    const count = vCounts[oi] ?? 0
+                    const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
+                    const isSelected = vUserVote === oi
+                    return (
+                      <button
+                        key={oi}
+                        onClick={async () => {
+                          await handleVote(votingPollId, oi)
+                          setVotingPollId(null)
+                        }}
+                        className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
+                        style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[#3E1540] bg-[#3E1540]" : "border-[#D8D3C8]"}`}>
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                            <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                          </div>
+                          <span className={`text-[12px] font-semibold ml-2 flex-shrink-0 ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }} />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-10">
+                  <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Poll creator modal */}
       {showPollCreator && !groupArchived && (
