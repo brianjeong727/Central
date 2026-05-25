@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -40,7 +40,6 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     { id: "chats", icon: MessageCircle },
     { id: "directory", icon: BookOpen },
     { id: "profile", icon: User },
-    { id: "giving", icon: Wallet },
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
   ]
 
@@ -168,25 +167,6 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
 
-    if (activeTab === "giving") {
-      const financeSections: { label: string; section: "give" | "reimbursements" | "budget" | "allocation"; show: boolean }[] = [
-        { label: "Give", section: "give", show: true },
-        { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
-        { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
-        { label: "Allocation", section: "allocation", show: !!(isTreasurer || isAdmin) },
-      ]
-      return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Finance</p>
-          {financeSections.filter(s => s.show).map(s => (
-            <button key={s.section} style={subItemStyle(financeSection === s.section)} onClick={() => onFinanceSectionChange(s.section)}>
-              <span style={{ flex: 1 }}>{s.label}</span>
-            </button>
-          ))}
-        </div>
-      )
-    }
-
     if (activeTab === "profile") {
       const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
         { label: "Profile", section: "spiritual-profile" },
@@ -209,10 +189,11 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    // Home panel — Home, Announcements, Forms, and Settings (admin-only)
-    const homeItems: { label: string; tab: "home" | "announcements" | "forms" | "settings" }[] = [
+    // Home panel — Home, Announcements, Give, Forms, and Settings (admin-only)
+    const homeItems: { label: string; tab: "home" | "announcements" | "giving" | "forms" | "settings" }[] = [
       { label: "Home", tab: "home" },
       { label: "Announcements", tab: "announcements" },
+      { label: "Give", tab: "giving" },
       { label: "Forms", tab: "forms" },
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
@@ -246,7 +227,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         </a>
 
         {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms"))
+          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "giving"))
           return (
             <button
               key={id}
