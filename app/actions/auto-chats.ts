@@ -580,3 +580,60 @@ export async function updateAutomationSettings(
     .eq("id", ministryId)
   return { error: error?.message }
 }
+
+// ── createTeamChatAction ──────────────────────────────────────────────────────
+// Creates a group chat named "<Team Name>" with all current team members.
+// Idempotent: if a group with that exact name already exists in the ministry,
+// adds any missing members and returns the existing group id.
+
+export async function createTeamChatAction(
+  teamId: string,
+  teamName: string,
+  ministryId: string,
+  createdBy: string,
+): Promise<{ groupId: string | null; error?: string }> {
+  const admin = createAdminClient()
+
+  const { data: memberRows } = await admin
+    .from("team_members")
+    .select("user_id")
+    .eq("team_id", teamId)
+
+  const memberIds: string[] = (memberRows ?? []).map((r: { user_id: string }) => r.user_id)
+  if (memberIds.length === 0) return { groupId: null, error: "Team has no members." }
+
+  const chatName = `${teamName}`
+
+  // Dedup: find existing group by name + ministry
+  const { data: existing } = await admin
+    .from("groups")
+    .select("id")
+    .eq("ministry_id", ministryId)
+    .eq("name", chatName)
+    .maybeSingle()
+
+  let groupId: string
+
+  if (existing) {
+    groupId = existing.id
+  } else {
+    const { data: group, error: gErr } = await admin
+      .from("groups")
+      .insert({ name: chatName, type: "my", ministry_id: ministryId, created_by: createdBy })
+      .select("id")
+      .single()
+    if (gErr || !group) return { groupId: null, error: "Failed to create group chat." }
+    groupId = group.id
+  }
+
+  // Add all team members (upsert so existing members are preserved)
+  const now = new Date().toISOString()
+  await admin
+    .from("group_members")
+    .upsert(
+      memberIds.map(uid => ({ group_id: groupId, user_id: uid, last_read_at: now })),
+      { onConflict: "group_id,user_id" },
+    )
+
+  return { groupId }
+}

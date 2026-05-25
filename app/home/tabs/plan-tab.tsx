@@ -7,7 +7,7 @@ import {
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
-  Shuffle, Download, GripVertical, Loader2,
+  Shuffle, Download, GripVertical, Loader2, MessageCircle,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -32,7 +32,7 @@ import {
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction, updateSmallGroupMembersAction } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
@@ -1716,7 +1716,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   )
 }
 
-export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated }: PlanTabProps) {
+export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const router = useRouter()
@@ -2151,6 +2151,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           isAdmin={isAdmin}
           onClose={closeSettings}
           onChanged={() => { closeSettings(); onTeamsChange() }}
+          onOpenChat={onOpenChat}
         />
       )}
 
@@ -9021,13 +9022,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
   isAdmin: boolean
   onClose: () => void
   onChanged: () => void
+  onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const [roles, setRoles] = useState<TeamRole[]>([])
@@ -9058,6 +9060,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const canDelete = isAdmin || isPresident
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
   const canManageTeam = isAdmin || myRolePerms.includes("can_manage_team")
+  const isTechTeam = /\btech\b/i.test(team.name)
+  const canCreateGroupChat = isTechTeam || isAdmin || isPresident
+
+  const [creatingChat, setCreatingChat] = useState(false)
+  const [chatCreated, setChatCreated] = useState<{ id: string; name: string } | null>(null)
+
+  async function handleCreateGroupChat() {
+    setCreatingChat(true)
+    const result = await createTeamChatAction(team.id, team.name, ministryId, userId)
+    setCreatingChat(false)
+    if (result.error || !result.groupId) { setError(result.error ?? "Failed to create chat."); return }
+    setChatCreated({ id: result.groupId, name: team.name })
+  }
 
   // inline team rename
   const [localTeamName, setLocalTeamName] = useState(team.name)
@@ -9490,11 +9505,35 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               >
                 {savingPerms ? "Saving…" : "Save"}
               </button>
-            ) : canDelete ? (
-              <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-                <Trash2 className="w-4 h-4 text-[#8A8497]" />
-              </button>
-            ) : null
+            ) : (
+              <div className="flex items-center gap-2">
+                {canCreateGroupChat && (
+                  chatCreated ? (
+                    <button
+                      onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
+                      className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[13px] font-semibold text-white"
+                      style={{ background: "#2D0F2E", border: "none", cursor: "pointer" }}
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" /> Open chat
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCreateGroupChat}
+                      disabled={creatingChat}
+                      className="size-9 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors"
+                      style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
+                    >
+                      <MessageCircle className="w-4 h-4 text-[#8A8497]" />
+                    </button>
+                  )
+                )}
+                {canDelete && (
+                  <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-4 h-4 text-[#8A8497]" />
+                  </button>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -9555,6 +9594,24 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               </>
             ) : (
               <>
+                {canCreateGroupChat && (
+                  chatCreated ? (
+                    <button
+                      onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                    >
+                      <MessageCircle style={{ width: 13, height: 13 }} /> Open chat
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCreateGroupChat}
+                      disabled={creatingChat}
+                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}
+                    >
+                      <MessageCircle style={{ width: 13, height: 13 }} /> {creatingChat ? "Creating…" : "Group chat"}
+                    </button>
+                  )
+                )}
                 {canDelete && (
                   <button
                     onClick={() => setConfirmDelete(true)}

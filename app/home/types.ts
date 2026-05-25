@@ -459,6 +459,7 @@ export interface PlanTabProps {
   onShowCreateTeam: (v: boolean) => void
   activeTeamId: string | null
   onTeamCreated: (teamId: string) => void
+  onOpenChat?: (id: string, name: string) => void
 }
 
 export interface WorshipWeek {

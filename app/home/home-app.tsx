@@ -524,6 +524,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
                 onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
+                onOpenChat={(id, name) => { setActiveTab("chats"); handleOpenChat(id, name) }}
               />
             </div>
           )}
