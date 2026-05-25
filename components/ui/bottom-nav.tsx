@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, Wallet, BookOpen } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
 
 type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms"
 
@@ -16,7 +16,6 @@ const TABS_BASE = [
   { id: "chats" as Tab,     label: "Chats",     icon: MessageCircle },
   { id: "directory" as Tab, label: "Directory", icon: BookOpen },
   { id: "profile" as Tab,   label: "You",       icon: User },
-  { id: "giving" as Tab,    label: "Finance",   icon: Wallet },
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
