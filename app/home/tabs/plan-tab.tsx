@@ -2008,7 +2008,29 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           </div>
         ) : (
           <div className="px-14 py-7">
-            {(() => {
+            {!activeTeamId ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "#8A8497", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                  {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
+                </div>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                  {isAdmin ? "Create your first team." : "You're not on a team yet."}
+                </h2>
+                <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
+                  {isAdmin
+                    ? "Teams keep your ministry organized — Praise, Small Groups, Student Org Board, and more."
+                    : "Ask a leader to add you to a team."}
+                </p>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowCreateTeam(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                  >
+                    <Plus style={{ width: 14, height: 14 }} /> Create a team
+                  </button>
+                )}
+              </div>
+            ) : (() => {
               const perms = activeUserTeam?.permissions ?? []
               const showCalendar = isAdmin || perms.includes("can_plan_events")
               if (!showCalendar) return null
