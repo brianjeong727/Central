@@ -230,6 +230,7 @@ export interface AnnouncementCardProps {
   onRsvpToggle: (id: string) => void
   onEdit: (ann: EnrichedAnnouncement) => void
   onDelete: (id: string) => void
+  onPinToggle?: (id: string, isPinned: boolean) => void
   onOpenForm: (formId: string, announcementId: string, title: string) => void
 }
 

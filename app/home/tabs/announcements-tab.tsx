@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp } from "lucide-react"
+import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp, Pin, PinOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
@@ -32,7 +32,7 @@ const AUDIENCE_OPTIONS = [
   { value: "group", label: "Specific Group" },
 ]
 
-type FilterType = "all" | "events" | "posts" | "pinned"
+type FilterType = "all" | "events" | "forms" | "pinned"
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -800,18 +800,32 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
   }
 
+  async function handlePinToggle(annId: string, currentlyPinned: boolean) {
+    const client = createClient()
+    if (!currentlyPinned) {
+      // Unpin any currently pinned announcement before pinning this one
+      await client.from("announcements").update({ is_pinned: false }).eq("ministry_id", ministryId).eq("is_pinned", true)
+    }
+    await client.from("announcements").update({ is_pinned: !currentlyPinned }).eq("id", annId).eq("ministry_id", ministryId)
+    setAnnouncements(prev => prev.map(a =>
+      a.id === annId
+        ? { ...a, is_pinned: !currentlyPinned }
+        : { ...a, is_pinned: currentlyPinned ? a.is_pinned : false }
+    ))
+  }
+
   const pinnedAnn = announcements.find(a => a.is_pinned)
   const unpinned = announcements.filter(a => !a.is_pinned)
   const desktopList = pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned
   const filteredDesktop = filter === "all" ? desktopList
     : filter === "events" ? desktopList.filter(a => a.is_event)
-    : filter === "posts" ? desktopList.filter(a => !a.is_event)
+    : filter === "forms" ? desktopList.filter(a => a.has_form)
     : desktopList.filter(a => a.is_pinned)
 
   const FILTERS: { id: FilterType; label: string }[] = [
     { id: "all", label: "All" },
     { id: "events", label: "Events" },
-    { id: "posts", label: "Posts" },
+    { id: "forms", label: "Forms" },
     { id: "pinned", label: "Pinned" },
   ]
 
@@ -882,6 +896,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 onRsvpToggle={handleRsvpToggle}
                 onEdit={handleOpenEditor}
                 onDelete={handleDeleteAnnouncement}
+                onPinToggle={handlePinToggle}
                 onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
               />
             ))}
@@ -957,6 +972,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         )}
                         {isLeaderOrAdmin && (
                           <>
+                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin" : "Pin"}>
+                              {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                            </button>
                             <button onClick={() => setEditingAnnouncement(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
                             <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                           </>
@@ -997,6 +1015,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             )}
                             {isLeaderOrAdmin && (
                               <>
+                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin" : "Pin"}>
+                                  {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                                </button>
                                 <button onClick={() => setEditingAnnouncement(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
                                 <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                               </>
@@ -1123,7 +1144,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onOpenForm }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -1184,6 +1205,10 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                     </button>
                     {showMenu && (
                       <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
+                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
+                          {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#3E1540]" />}
+                          {announcement.is_pinned ? "Unpin" : "Pin"}
+                        </button>
                         <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
                         <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
@@ -1270,6 +1295,10 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                 </button>
                 {showMenu && (
                   <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
+                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
+                      {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#3E1540]" />}
+                      {announcement.is_pinned ? "Unpin" : "Pin"}
+                    </button>
                     <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
                     <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                   </div>
