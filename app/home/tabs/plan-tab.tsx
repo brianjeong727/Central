@@ -11662,7 +11662,7 @@ type BSSheet = {
 }
 
 type BSAnnotation = { page: number; x: number; y: number; text: string }
-type BSProgress = { user_id: string; name: string; read_at: string | null }
+type BSProgress = { user_id: string; name: string; read_at: string | null; progress_note: string | null }
 
 function BibleStudySubTab({
   teamId, ministryId, userId, isPastor, isPresident, semester, onOpenChat,
@@ -11710,6 +11710,9 @@ function BibleStudySubTab({
 
   // Progress
   const [progress, setProgress] = useState<BSProgress[]>([])
+  const [myNote, setMyNote] = useState("")
+  const [editingNote, setEditingNote] = useState(false)
+  const [savingProgressNote, setSavingProgressNote] = useState(false)
 
   // Share
   const [sharing, setSharing] = useState(false)
@@ -11737,13 +11740,14 @@ function BibleStudySubTab({
 
     const s = data as BSSheet | null
     setSheet(s)
+    setMyNote("")
+    setEditingNote(false)
     if (s) {
       setNoteDraft(s.pastor_notes ?? "")
+      void loadProgress(s.id)
       if (s.status === "finalized" && s.pdf_url) {
         void renderPdf(s.pdf_url)
         void loadAnnotations(s.id)
-        void loadProgress(s.id)
-        void markRead(s.id)
       }
     }
     setLoading(false)
@@ -11791,25 +11795,32 @@ function BibleStudySubTab({
       .eq("team_id", teamId)
     const { data: reads } = await supabase
       .from("bible_study_progress")
-      .select("user_id, read_at")
+      .select("user_id, read_at, progress_note")
       .eq("sheet_id", sheetId)
 
-    const readMap = new Map<string, string>(
-      (reads ?? []).map((r: { user_id: string; read_at: string }) => [r.user_id, r.read_at])
+    type ReadRow = { user_id: string; read_at: string; progress_note: string | null }
+    const readMap = new Map<string, ReadRow>(
+      (reads ?? []).map((r: ReadRow) => [r.user_id, r])
     )
     type RawMember = { user_id: string; profiles: { name: string } | { name: string }[] | null }
-    setProgress(
-      (members ?? []).map((m: RawMember) => {
-        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-        return { user_id: m.user_id, name: p?.name ?? "Unknown", read_at: readMap.get(m.user_id) ?? null }
-      })
-    )
+    const rows = (members ?? []).map((m: RawMember) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+      const r = readMap.get(m.user_id)
+      return { user_id: m.user_id, name: p?.name ?? "Unknown", read_at: r?.read_at ?? null, progress_note: r?.progress_note ?? null }
+    })
+    setProgress(rows)
+    const mine = rows.find(r => r.user_id === userId)
+    if (mine) setMyNote(mine.progress_note ?? "")
   }
 
-  async function markRead(sheetId: string) {
+  async function saveProgressNote(sheetId: string, note: string) {
+    setSavingProgressNote(true)
     await supabase
       .from("bible_study_progress")
-      .upsert({ sheet_id: sheetId, user_id: userId }, { onConflict: "sheet_id,user_id" })
+      .upsert({ sheet_id: sheetId, user_id: userId, progress_note: note, read_at: new Date().toISOString() }, { onConflict: "sheet_id,user_id" })
+    setSavingProgressNote(false)
+    setEditingNote(false)
+    void loadProgress(sheetId)
   }
 
   async function handleCreate() {
@@ -12211,29 +12222,72 @@ function BibleStudySubTab({
             </div>
           )}
 
-          {/* Progress tracker */}
-          {sheet.status === "finalized" && progress.length > 0 && (
+          {/* Progress tracker — visible for any week once a sheet exists */}
+          {progress.length > 0 && (
             <div>
-              <PlanSectionHeader>Read Progress</PlanSectionHeader>
+              <PlanSectionHeader>Where We Left Off</PlanSectionHeader>
               <div style={{ background: "white", borderRadius: 14, border: "1px solid #E8E2D2", overflow: "hidden" }}>
-                {progress.map((p, i) => (
-                  <div key={p.user_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: i < progress.length - 1 ? "1px solid #F8F6F1" : "none" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                      {getInitials(p.name)}
-                    </div>
-                    <p style={{ flex: 1, fontSize: 13, color: "#13101A" }}>{p.name}</p>
-                    {p.read_at ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <CheckCircle2 style={{ width: 14, height: 14, color: "#2E7D32" }} />
-                        <span style={{ fontSize: 11, color: "#5A5466" }}>
-                          {new Date(p.read_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
+                {progress.map((p, i) => {
+                  const isMe = p.user_id === userId
+                  const isLast = i === progress.length - 1
+                  return (
+                    <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                          {getInitials(p.name)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, color: "#13101A", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
+                          {p.progress_note && !isMe && (
+                            <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.progress_note}</p>
+                          )}
+                        </div>
+                        {!isPastor && isMe ? (
+                          <button
+                            onClick={() => setEditingNote(true)}
+                            style={{ fontSize: 11, color: "#3E1540", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6 }}
+                          >
+                            {p.progress_note ? "Edit" : "Add note"}
+                          </button>
+                        ) : !isMe && !p.progress_note ? (
+                          <Circle style={{ width: 13, height: 13, color: "#C4C0B0", flexShrink: 0 }} />
+                        ) : null}
                       </div>
-                    ) : (
-                      <Circle style={{ width: 14, height: 14, color: "#C4C0B0" }} />
-                    )}
-                  </div>
-                ))}
+                      {/* Inline edit for current user's note */}
+                      {isMe && editingNote && (
+                        <div style={{ padding: "0 16px 12px 56px", display: "flex", flexDirection: "column", gap: 6 }}>
+                          <input
+                            autoFocus
+                            value={myNote}
+                            onChange={e => setMyNote(e.target.value)}
+                            placeholder="e.g. Finished through the intro questions"
+                            maxLength={120}
+                            style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "#13101A" }}
+                          />
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button
+                              onClick={() => void saveProgressNote(sheet.id, myNote)}
+                              disabled={savingProgressNote}
+                              style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "#3E1540", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
+                            >
+                              {savingProgressNote ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => { setEditingNote(false); setMyNote(progress.find(r => r.user_id === userId)?.progress_note ?? "") }}
+                              style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "#5A5466", cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Show own note when not editing */}
+                      {isMe && !editingNote && p.progress_note && (
+                        <p style={{ padding: "0 16px 10px 56px", fontSize: 12, color: "#5A5466" }}>{p.progress_note}</p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
