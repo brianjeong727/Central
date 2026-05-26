@@ -10453,6 +10453,19 @@ type DGLAssignmentRow = {
 
 const SLOT_ABBR: Record<DGLAvailSlot, string> = { wednesday: "WED", friday: "FRI", sunday: "SUN" }
 
+function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string; sub?: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      <div>
+        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase" as const }}>{eyebrow}</div>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", margin: "4px 0 0", letterSpacing: "-0.015em", lineHeight: 1.15 }}>{title}</h2>
+        {sub && <div style={{ fontSize: 13, color: "#5A5466", marginTop: 3 }}>{sub}</div>}
+      </div>
+      {right && <div style={{ flexShrink: 0, marginTop: 4 }}>{right}</div>}
+    </div>
+  )
+}
+
 function SmallGroupLeadersTab({
   teamId,
   ministryId,
@@ -10538,6 +10551,7 @@ function SmallGroupLeadersTab({
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [rotErr, setRotErr] = useState<string | null>(null)
+  const [openRotMonths, setOpenRotMonths] = useState<Set<string>>(new Set())
 
   useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -10975,11 +10989,14 @@ function SmallGroupLeadersTab({
 
       {/* ── Home Tab ──────────────────────────────────────────────────────── */}
       {activeSubTab === "home" && !isPastor && (
-        <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1.45fr_1fr] gap-6 md:gap-9 items-start">
+
+          {/* LEFT COLUMN — renewal banner + My Assignments */}
+          <div className="flex flex-col gap-6">
 
           {/* June 1 renewal banner (president only) */}
           {isPresident && rosterStatus?.needs_roster_renewal && (
-            <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 16, padding: "16px 18px" }}>
+            <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "16px 18px" }}>
               <p className="text-[14px] font-semibold text-[#92400E] mb-1">New semester — update your DGL roster?</p>
               <p className="text-[13px] text-[#92400E] mb-4">
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
@@ -11004,33 +11021,34 @@ function SmallGroupLeadersTab({
           )}
 
           {/* My Assignments */}
-          <div>
-            <PlanSectionHeader>My Assignments</PlanSectionHeader>
+          <section>
+            <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+              <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                 <p className="text-[13px] text-[#8A8497]">Your schedule hasn&apos;t been published yet.</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {myUpcoming.map(a => {
+              <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                {myUpcoming.map((a, i) => {
                   const sunday = new Date(a.week_date + "T12:00:00")
                   const slotOffset: Record<string, number> = { sunday_service: 0, wednesday_pm: 3, friday_sg: 5 }
                   const d = new Date(sunday)
                   d.setDate(sunday.getDate() + (slotOffset[a.slot] ?? 0))
+                  const dow = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+                  const dayNum = d.getDate()
+                  const monthStr = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
                   const isPraiseSlot = a.slot === "wednesday_pm" || a.slot === "friday_sg"
                   const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
                   return (
-                    <div key={a.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#F3F0F7] flex flex-col items-center justify-center flex-shrink-0">
-                        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.06em", color: "#8A8497", textTransform: "uppercase" as const }}>
-                          {d.toLocaleDateString("en-US", { weekday: "short" })}
-                        </span>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: "#3E1540", lineHeight: 1 }}>{d.getDate()}</span>
+                    <div key={a.id} className="flex items-center gap-4 px-5 py-4" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
+                      <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: "#F6F2E8", border: "1px solid #E8E2D2" }}>
+                        <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const }}>{dow}</span>
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#2D0F2E", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold text-[#13101A] truncate">{DGL_SLOT_LABELS[a.slot]}</p>
-                        <p className="text-[12px] text-[#8A8497]">
-                          {partner ? `Cooking with ${partner.split(" ")[0]}` : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A", letterSpacing: "-0.01em" }}>{DGL_SLOT_LABELS[a.slot]}</p>
+                        <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const, marginTop: 3 }}>
+                          {partner ? `w/ ${partner.split(" ")[0]}` : `${monthStr} ${dayNum}`}
                         </p>
                       </div>
                       {isPraiseSlot && (
@@ -11047,7 +11065,7 @@ function SmallGroupLeadersTab({
                               setActiveSubTabAndUrl("schedule")
                             }
                           }}
-                          style={{ padding: "6px 12px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
+                          style={{ padding: "7px 13px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
                         >
                           Prepare →
                         </button>
@@ -11057,15 +11075,31 @@ function SmallGroupLeadersTab({
                 })}
               </div>
             )}
-          </div>
+          </section>
+
+          </div>{/* end LEFT COLUMN */}
+
+          {/* RIGHT COLUMN — Roster + My Groups */}
+          <div className="flex flex-col gap-6">
 
           {/* SMALL GROUP LEADER ROSTER (president only) */}
           {isPresident && (
-            <div>
-              <PlanSectionHeader>Small Group Leader Roster</PlanSectionHeader>
+            <section>
+              <SglSH
+                eyebrow={rosterStatus?.confirmed ? `${rosterMembers.length} DGLs · ${semesterLabel}` : "SGL ROSTER"}
+                title="Small Group Leaders"
+                right={rosterStatus?.confirmed && !rosterAddMode && !editingRoster ? (
+                  <button
+                    onClick={() => { setPendingRosterIds(new Set(rosterMembers.map(m => m.user_id))); setEditingRoster(true) }}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                  >
+                    Edit
+                  </button>
+                ) : undefined}
+              />
 
               {rosterError && (
-                <div className="mb-2 px-3 py-2 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                <div className="mt-3 px-3 py-2 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
                   {rosterError}
                 </div>
               )}
@@ -11074,8 +11108,8 @@ function SmallGroupLeadersTab({
               {!rosterStatus?.confirmed && !rosterAddMode && (
                 <button
                   onClick={() => setRosterAddMode(true)}
-                  className="w-full"
-                  style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 16, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
+                  className="w-full mt-4"
+                  style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 14, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
                 >
                   <p className="text-[14px] font-semibold text-[#13101A] mb-1">No roster yet</p>
                   <p className="text-[13px] text-[#8A8497] mb-3">Add DGLs to the {semesterLabel} roster.</p>
@@ -11085,14 +11119,14 @@ function SmallGroupLeadersTab({
 
               {/* Add / Edit mode — member picker */}
               {(rosterAddMode || editingRoster) && (
-                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
-                  <div className="px-4 pt-4 pb-3 border-b border-[#F3F0F7]">
+                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                  <div className="px-4 pt-4 pb-3 border-b border-[#EFE9DA]">
                     <input
                       type="text"
                       placeholder="Search members…"
                       value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
-                      style={{ width: "100%", border: "1.5px solid #ECE8DE", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FAFAFA" }}
+                      style={{ width: "100%", border: "1px solid #E2DDCF", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2" }}
                     />
                   </div>
                   <div style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -11104,10 +11138,10 @@ function SmallGroupLeadersTab({
                           <div
                             key={m.id}
                             onClick={() => setPendingRosterIds(prev => { const n = new Set(prev); selected ? n.delete(m.id) : n.add(m.id); return n })}
-                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}
-                            style={{ background: selected ? "#F9F4FA" : "white" }}
+                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}
+                            style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
                           >
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.id), color: "white" }}>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.id), color: "white" }}>
                               {getInitials(m.name)}
                             </div>
                             <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
@@ -11116,10 +11150,10 @@ function SmallGroupLeadersTab({
                         )
                       })}
                   </div>
-                  <div className="flex gap-2 px-4 py-3 border-t border-[#F3F0F7]">
+                  <div className="flex gap-2 px-4 py-3 border-t border-[#EFE9DA]">
                     <button
                       onClick={() => { setRosterAddMode(false); setEditingRoster(false); setPendingRosterIds(new Set()); setMemberSearch("") }}
-                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Cancel
                     </button>
@@ -11136,29 +11170,18 @@ function SmallGroupLeadersTab({
 
               {/* Confirmed roster list */}
               {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
-                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#F3F0F7]">
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
-                      {rosterMembers.length} DGL{rosterMembers.length !== 1 ? "s" : ""} · {semesterLabel}
-                    </span>
-                    <button
-                      onClick={() => { setPendingRosterIds(new Set(rosterMembers.map(m => m.user_id))); setEditingRoster(true) }}
-                      style={{ fontSize: 12, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}
-                    >
-                      Edit
-                    </button>
-                  </div>
+                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {rosterMembers.map((m, i) => (
-                    <div key={m.user_id} className={`flex items-center gap-3 px-4 py-3 ${i < rosterMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>
+                    <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>
                         {getInitials(m.name)}
                       </div>
-                      <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
+                      <p className="flex-1 text-[14px] text-[#13101A]">{m.name}</p>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           )}
 
           {/* My Small Groups */}
@@ -11166,198 +11189,95 @@ function SmallGroupLeadersTab({
             const members = groupMembers.get(group.id) ?? []
             const pairedGroup = group.paired_group_id ? pairedGroups.get(group.paired_group_id) : undefined
             const pairedMs = group.paired_group_id ? (pairedMembers.get(group.paired_group_id) ?? []) : []
-            const mealCount = members.filter(m => m.meal_taken && m.meal_semester === semester).length
             const isEditing = editingGroupId === group.id
-
-            // Members that can be added (exclude current + pending add + pending remove)
             const existingUserIds = new Set(members.map(m => m.user_id))
             const addableMembers = allMembersForPicker.filter(p =>
-              !existingUserIds.has(p.id) &&
-              !pendingAddMemberIds.has(p.id)
+              !existingUserIds.has(p.id) && !pendingAddMemberIds.has(p.id)
             ).filter(p => p.name.toLowerCase().includes(sgAddPickerSearch.toLowerCase()))
 
             return (
-              <div key={group.id}>
-                <PlanSectionHeader>My Small Group</PlanSectionHeader>
-                <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
-                  <div className="px-4 pt-4 pb-3 border-b border-[#F3F0F7] flex items-center justify-between">
-                    <div>
-                      <p className="text-[14px] font-semibold text-[#13101A]">{group.name}</p>
-                      <p style={{ fontSize: 11, color: "#8A8497", textTransform: "capitalize" as const }}>
-                        {group.type} · {members.length} member{members.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    {isEditing ? (
-                      <button
-                        onClick={() => {
-                          setEditingGroupId(null)
-                          setPendingAddMemberIds(new Set())
-                          setPendingRemoveMemberIds(new Set())
-                          setConfirmRemoveSgMemberId(null)
-                          setShowSgAddPicker(false)
-                          setSgAddPickerSearch("")
-                          setEditError(null)
-                        }}
-                        style={{ fontSize: 12, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => { setEditingGroupId(group.id); setEditError(null) }}
-                        style={{ fontSize: 12, fontWeight: 600, color: "#3E1540", background: "none", border: "none", cursor: "pointer" }}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Member rows */}
+              <section key={group.id}>
+                <SglSH
+                  eyebrow="MY SMALL GROUP"
+                  title={group.name}
+                  sub={`${group.type.charAt(0).toUpperCase()}${group.type.slice(1)} · ${members.length} member${members.length !== 1 ? "s" : ""}`}
+                  right={isEditing ? (
+                    <button
+                      onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                    >Cancel</button>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingGroupId(group.id); setEditError(null) }}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#3E1540", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                    >Edit</button>
+                  )}
+                />
+                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {members.length === 0 && !pendingAddMemberIds.size ? (
-                    <div className="px-4 py-5 text-center">
-                      <p className="text-[13px] text-[#8A8497]">No members yet.</p>
-                    </div>
+                    <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
                   ) : (
                     <>
                       {members.map((m, i) => {
                         const mealDone = m.meal_taken && m.meal_semester === semester
                         const isPendingRemove = pendingRemoveMemberIds.has(m.user_id)
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
-                        const isLast = i === members.length - 1 && pendingAddMemberIds.size === 0
                         return (
-                          <div
-                            key={m.id}
-                            className={`flex items-center gap-3 px-4 py-3 ${!isLast ? "border-b border-[#F8F6F1]" : ""}`}
-                            style={{ background: isPendingRemove ? "#FDF8F8" : isConfirming ? "#FDF8F8" : "white" }}
-                          >
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
-                              style={{ background: getAvatarColor(m.user_id), color: "white" }}
-                            >
-                              {getInitials(m.name)}
-                            </div>
-                            <p className={`flex-1 text-[13px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
+                          <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>{getInitials(m.name)}</div>
+                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
-                                <button
-                                  onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })}
-                                  style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
-                                >
-                                  Undo
-                                </button>
+                                <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
                               ) : isConfirming ? (
                                 <div style={{ display: "flex", gap: 8 }}>
-                                  <button
-                                    onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }}
-                                    style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
-                                  >
-                                    Remove
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmRemoveSgMemberId(null)}
-                                    style={{ fontSize: 11, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}
-                                  >
-                                    Keep
-                                  </button>
+                                  <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
+                                  <button onClick={() => setConfirmRemoveSgMemberId(null)} style={{ fontSize: 11, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Keep</button>
                                 </div>
                               ) : (
-                                <button
-                                  onClick={() => setConfirmRemoveSgMemberId(m.user_id)}
-                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}
-                                >
-                                  <X style={{ width: 13, height: 13 }} />
-                                </button>
+                                <button onClick={() => setConfirmRemoveSgMemberId(m.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
                               )
                             ) : (
-                              <button
-                                onClick={() => toggleMeal(m)}
-                                style={{
-                                  padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                                  border: mealDone ? "none" : "1.5px solid #ECE8DE",
-                                  background: mealDone ? "#EDE5F0" : "transparent",
-                                  fontSize: 11, fontWeight: 600,
-                                  color: mealDone ? "#3E1540" : "#8A8497",
-                                  letterSpacing: "0.03em", textTransform: "uppercase" as const,
-                                  transition: "all 0.15s",
-                                }}
-                              >
+                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid #E2DDCF", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 600, color: mealDone ? "#3E1540" : "#8A8497", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
                                 {mealDone ? "Meal ✓" : "Meal"}
                               </button>
                             )}
                           </div>
                         )
                       })}
-
-                      {/* Pending-add rows */}
-                      {isEditing && Array.from(pendingAddMemberIds).map((uid, i) => {
+                      {isEditing && Array.from(pendingAddMemberIds).map((uid) => {
                         const person = allMembersForPicker.find(p => p.id === uid)
                         if (!person) return null
                         return (
-                          <div
-                            key={uid}
-                            className={`flex items-center gap-3 px-4 py-3 border-b border-[#F8F6F1]`}
-                            style={{ background: "rgba(62,21,64,0.03)" }}
-                          >
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(uid), color: "white" }}>
-                              {getInitials(person.name)}
-                            </div>
-                            <p className="flex-1 text-[13px] text-[#13101A]">{person.name}</p>
+                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[#EFE9DA]" style={{ background: "rgba(62,21,64,0.03)" }}>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(uid), color: "white" }}>{getInitials(person.name)}</div>
+                            <p className="flex-1 text-[14px] text-[#13101A]">{person.name}</p>
                             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
-                            <button
-                              onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })}
-                              style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}
-                            >
-                              <X style={{ width: 13, height: 13 }} />
-                            </button>
+                            <button onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
                           </div>
                         )
                       })}
                     </>
                   )}
-
-                  {/* Add member button + inline picker */}
                   {isEditing && (
-                    <div className="border-t border-[#F3F0F7]">
+                    <div className="border-t border-[#EFE9DA]">
                       {showSgAddPicker ? (
                         <div className="p-3">
-                          <input
-                            type="text"
-                            placeholder="Search members…"
-                            value={sgAddPickerSearch}
-                            onChange={e => setSgAddPickerSearch(e.target.value)}
-                            autoFocus
-                            style={{ width: "100%", border: "1.5px solid #ECE8DE", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FAFAFA", marginBottom: 6 }}
-                          />
-                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid #ECE8DE", background: "white" }}>
+                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid #E2DDCF", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2", marginBottom: 6 }} />
+                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid #E8E2D2", background: "#FBF8F2" }}>
                             {addableMembers.length === 0 ? (
-                              <div className="px-4 py-4 text-center">
-                                <p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p>
-                              </div>
+                              <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
-                              <div
-                                key={p.id}
-                                onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }}
-                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#F9F4FA] ${i < addableMembers.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}
-                              >
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(p.id), color: "white" }}>
-                                  {getInitials(p.name)}
-                                </div>
+                              <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}>
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(p.id), color: "white" }}>{getInitials(p.name)}</div>
                                 <p style={{ fontSize: 13, color: "#13101A" }}>{p.name}</p>
                               </div>
                             ))}
                           </div>
-                          <button
-                            onClick={() => { setShowSgAddPicker(false); setSgAddPickerSearch("") }}
-                            style={{ marginTop: 6, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                          >
-                            Cancel
-                          </button>
+                          <button onClick={() => { setShowSgAddPicker(false); setSgAddPickerSearch("") }} style={{ marginTop: 6, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setShowSgAddPicker(true)}
-                          style={{ width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", color: "#3E1540", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)" }}
-                        >
+                        <button onClick={() => setShowSgAddPicker(true)} style={{ width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", color: "#3E1540", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)" }}>
                           <Plus style={{ width: 13, height: 13 }} /> Add member
                         </button>
                       )}
@@ -11365,83 +11285,41 @@ function SmallGroupLeadersTab({
                   )}
                 </div>
 
-                {/* Edit action footer */}
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
-                    {editError && (
-                      <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>
-                        {editError}
-                      </div>
-                    )}
-                    <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 8, lineHeight: 1.5 }}>
-                      Changes sync to your group chat and will reflect immediately.
-                    </p>
+                    {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>{editError}</div>}
+                    <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingGroupId(null)
-                          setPendingAddMemberIds(new Set())
-                          setPendingRemoveMemberIds(new Set())
-                          setConfirmRemoveSgMemberId(null)
-                          setShowSgAddPicker(false)
-                          setSgAddPickerSearch("")
-                          setEditError(null)
-                        }}
-                        style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSgEditSave(group.id)}
-                        disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)}
-                        style={{
-                          flex: 1, padding: "9px 0", background: "#3E1540", color: "#F6F4EF", border: "none",
-                          borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer",
-                          opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1,
-                          fontFamily: "inherit"
-                        }}
-                      >
-                        {editSaving ? "Saving…" : "Save changes"}
-                      </button>
+                      <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
                     </div>
                   </div>
                 )}
 
                 {pairedGroup && (
                   <div className="mt-3">
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>
-                      Paired — {pairedGroup.name}
-                    </p>
-                    <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
+                    <div className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                       {pairedMs.length === 0 ? (
-                        <div className="px-4 py-5 text-center">
-                          <p className="text-[13px] text-[#8A8497]">No members yet.</p>
-                        </div>
+                        <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
-                        <div key={m.id} className={`flex items-center gap-3 px-4 py-3 ${i < pairedMs.length - 1 ? "border-b border-[#F8F6F1]" : ""}`}>
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0"
-                            style={{ background: getAvatarColor(m.user_id), color: "white" }}
-                          >
-                            {getInitials(m.name)}
-                          </div>
-                          <p className="text-[13px] text-[#13101A]">{m.name}</p>
+                        <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>{getInitials(m.name)}</div>
+                          <p className="text-[14px] text-[#13101A]">{m.name}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-              </div>
+              </section>
             )
           })}
 
           {myGroups.length === 0 && (
-            <EmptyState
-              icon={<Users className="w-6 h-6" />}
-              title="No small group assigned yet."
-              subtitle="Your team president will assign you to a group."
-            />
+            <EmptyState icon={<Users className="w-6 h-6" />} title="No small group assigned yet." subtitle="Your team president will assign you to a group." />
           )}
+
+          </div>{/* end RIGHT COLUMN */}
 
         </div>
       )}
@@ -11452,10 +11330,10 @@ function SmallGroupLeadersTab({
 
           {/* Availability Grid — hidden for pastors */}
           {!isPastor && <div>
-            <PlanSectionHeader>My Availability — {semesterLabel}</PlanSectionHeader>
+            <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
-              <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+              <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                 <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster not confirmed</p>
                 <p className="text-[13px] text-[#8A8497]">
                   The president needs to confirm the DGL roster before availability can be set.
@@ -11481,21 +11359,21 @@ function SmallGroupLeadersTab({
                 : scheduleRosterMembers.filter(m => m.user_id === userId)
               return (
                 <>
-                  <p className="text-[12px] text-[#8A8497] mb-3">
+                  <p className="text-[12px] text-[#8A8497] mb-3 mt-3">
                     Check dates when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span>. Changes save automatically.
                   </p>
-                  <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_4px_rgba(19,16,26,0.06)] overflow-hidden">
+                  <div className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                     <div className="overflow-x-auto">
                       <table style={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: nameColW + semesterDates.length * datColW }}>
                         <thead>
                           {/* Month eyebrow row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FDFCF8", zIndex: 2, borderBottom: "1px solid #ECE8DE" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid #E8E2D2" }} />
                             {monthGroups.map(group => (
                               <th
                                 key={group.label}
                                 colSpan={group.dates.length}
-                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid #ECE8DE", borderLeft: "1px solid #ECE8DE", background: "#FDFCF8", textAlign: "left", whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid #E8E2D2", borderLeft: "1px solid #E8E2D2", background: "#F6F2E8", textAlign: "left", whiteSpace: "nowrap" }}
                               >
                                 {group.label}
                               </th>
@@ -11503,12 +11381,12 @@ function SmallGroupLeadersTab({
                           </tr>
                           {/* Date header row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FDFCF8", zIndex: 2, borderBottom: "1px solid #ECE8DE", borderRight: "1px solid #ECE8DE" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid #E8E2D2", borderRight: "1px solid #E8E2D2" }} />
                             {semesterDates.map(({ date, slot }) => {
                               const [, m, d] = date.split("-")
                               const isPast = date < today
                               return (
-                                <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid #ECE8DE", textAlign: "center" }}>
+                                <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid #E8E2D2", textAlign: "center" }}>
                                   <div style={{ fontSize: 9, fontWeight: 700, color: isPast ? "#C5C0CC" : "#5A5466", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
                                   <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "#8A8497" }}>{parseInt(m)}/{parseInt(d)}</div>
                                 </th>
@@ -11518,8 +11396,8 @@ function SmallGroupLeadersTab({
                         </thead>
                         <tbody>
                           {displayMembers.map((member, i) => (
-                            <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #F8F6F1" : undefined }}>
-                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FFFFFF", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "#5A5466", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid #ECE8DE" }}>
+                            <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #EFE9DA" : undefined }}>
+                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FBF8F2", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "#5A5466", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid #E8E2D2" }}>
                                 {member.name.split(" ")[0]}
                               </td>
                               {semesterDates.map(({ date, slot }) => {
@@ -11562,16 +11440,18 @@ function SmallGroupLeadersTab({
           {/* Pastor: read-only view of published rotation */}
           {isPastor && (
             <div>
-              <PlanSectionHeader>Published Rotation — {semesterLabel}</PlanSectionHeader>
+              <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
-                <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                   <p className="text-[13px] text-[#8A8497]">The rotation hasn&apos;t been published yet.</p>
                 </div>
               ) : (
-                <DGLAssignmentTable
-                  assignments={existingAssignments.filter(a => a.published)}
-                  flaggedKeys={new Set()}
-                />
+                <div className="mt-4">
+                  <DGLAssignmentTable
+                    assignments={existingAssignments.filter(a => a.published)}
+                    flaggedKeys={new Set()}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -11579,10 +11459,30 @@ function SmallGroupLeadersTab({
           {/* Rotation Assigner (president only) */}
           {isPresident && !isPastor && (
             <div>
-              <PlanSectionHeader>Rotation Assigner</PlanSectionHeader>
+              <SglSH
+                eyebrow="ROTATION · WED PM · FRI SG · SUN SERVICE"
+                title="Rotation Assigner"
+                right={rotationPhase !== "idle" ? (
+                  <div className="flex items-center gap-2">
+                    {(rotationPhase === "saved" || rotationPhase === "published") && (
+                      <>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "#F4F1E8", color: "#3E1540", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                          {rotationPhase === "published" ? "Published" : "Draft"}
+                        </span>
+                        <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                          <Shuffle style={{ width: 11, height: 11 }} /> Re-generate
+                        </button>
+                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "#3E1540", color: rotationPhase === "published" ? "#3E1540" : "#F6F4EF", border: rotationPhase === "published" ? "1px solid #3E1540" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
+                          {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : undefined}
+              />
 
               {!rosterConfirmedForSchedule ? (
-                <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                   <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster required</p>
                   <p className="text-[13px] text-[#8A8497]">
                     Confirm the DGL roster on the Home tab first to generate a rotation.
@@ -11591,73 +11491,76 @@ function SmallGroupLeadersTab({
               ) : (
                 <>
                   {rotErr && (
-                    <div className="mb-3 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                    <div className="mt-3 mb-1 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
                       {rotErr}
                     </div>
                   )}
 
                   {rotationPhase === "idle" && (
-                    <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                    <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                       <p className="text-[14px] font-semibold text-[#13101A] mb-1">No rotation yet</p>
                       <p className="text-[13px] text-[#8A8497] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
                       </p>
-                      <button
-                        onClick={handleGenerate}
-                        disabled={isGenerating}
-                        style={{ padding: "10px 22px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
-                      >
-                        {isGenerating
-                          ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</>
-                          : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
+                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </button>
                     </div>
                   )}
 
-                  {(rotationPhase === "saved" || rotationPhase === "published") && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "4px 10px", background: rotationPhase === "published" ? "#EDE5F0" : "#F4F1E8", color: "#3E1540", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
-                          {rotationPhase === "published" ? "Published" : "Draft"}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleGenerate}
-                            disabled={isGenerating}
-                            style={{ padding: "7px 14px", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                          >
-                            <Shuffle style={{ width: 12, height: 12 }} /> Re-generate
-                          </button>
-                          <button
-                            onClick={() => handlePublish(rotationPhase !== "published")}
-                            disabled={isPublishing}
-                            style={{ padding: "7px 14px", background: rotationPhase === "published" ? "#F3F0F7" : "#3E1540", color: rotationPhase === "published" ? "#5A5466" : "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}
-                          >
-                            {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
-                          </button>
-                        </div>
+                  {(rotationPhase === "saved" || rotationPhase === "published") && (() => {
+                    // Group weeks by month for accordions
+                    const byMonth = new Map<string, DGLAssignmentRow[]>()
+                    for (const a of existingAssignments) {
+                      const label = new Date(a.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                      if (!byMonth.has(label)) byMonth.set(label, [])
+                      byMonth.get(label)!.push(a)
+                    }
+                    const months = [...byMonth.keys()]
+                    return (
+                      <div className="mt-4 flex flex-col gap-3">
+                        {months.map(month => {
+                          const rows = byMonth.get(month)!
+                          const weekDates = [...new Set(rows.map(r => r.week_date))].sort()
+                          const isOpen = openRotMonths.has(month)
+                          return (
+                            <div key={month} className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                              <button
+                                onClick={() => setOpenRotMonths(prev => { const n = new Set(prev); isOpen ? n.delete(month) : n.add(month); return n })}
+                                className="w-full flex items-center gap-3 px-5 py-4 text-left"
+                                style={{ background: isOpen ? "#F6F2E8" : "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                              >
+                                <ChevronDown style={{ width: 15, height: 15, color: "#5A5466", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
+                                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497" }}>{weekDates.length} WEEKS</span>
+                              </button>
+                              {isOpen && (
+                                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                                  <DGLAssignmentTable
+                                    assignments={rows}
+                                    flaggedKeys={new Set()}
+                                    rosterMembers={scheduleRosterMembers}
+                                    onSwap={(wd, slot, uid, name) => {
+                                      setExistingAssignments(prev => prev.map(a =>
+                                        a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
+                                      ))
+                                      if (rotationPhase === "published") {
+                                        const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
+                                        if (row) void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
-                      <DGLAssignmentTable
-                        assignments={existingAssignments}
-                        flaggedKeys={new Set()}
-                        rosterMembers={scheduleRosterMembers}
-                        onSwap={(wd, slot, uid, name) => {
-                          setExistingAssignments(prev => prev.map(a =>
-                            a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
-                          ))
-                          if (rotationPhase === "published") {
-                            const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
-                            if (row) {
-                              void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {rotationPhase === "generated" && (
-                    <div>
+                    <div className="mt-4">
                       {flagged.length > 0 && (
                         <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
                           <p style={{ fontSize: 12, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
@@ -11686,23 +11589,13 @@ function SmallGroupLeadersTab({
                       />
                       <div className="flex items-center justify-between mt-4">
                         <button
-                          onClick={() => {
-                            setProposedAssignments([])
-                            setFlagged([])
-                            setRotationPhase(existingAssignments.length === 0 ? "idle" : existingAssignments.some(r => r.published) ? "published" : "saved")
-                          }}
-                          style={{ padding: "9px 18px", background: "transparent", color: "#5A5466", border: "1.5px solid #ECE8DE", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
+                          onClick={() => { setProposedAssignments([]); setFlagged([]); setRotationPhase(existingAssignments.length === 0 ? "idle" : existingAssignments.some(r => r.published) ? "published" : "saved") }}
+                          style={{ padding: "9px 18px", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
                         >
                           Discard
                         </button>
-                        <button
-                          onClick={handleSave}
-                          disabled={isSaving}
-                          style={{ padding: "9px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}
-                        >
-                          {isSaving
-                            ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</>
-                            : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
+                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
+                          {isSaving ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</> : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
                         </button>
                       </div>
                     </div>
@@ -12361,8 +12254,8 @@ function DGLAssignmentTable({
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className={`bg-white rounded-2xl border overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)] ${hasFlagged ? "border-[#FDE68A]" : "border-[#ECE8DE]"}`}>
-            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#F3F0F7] bg-[#FDFBF7]"}`}>
+          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[#E8E2D2]"}`} style={{ background: "#FBF8F2" }}>
+            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#EFE9DA]"}`} style={hasFlagged ? {} : { background: "#F6F2E8" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "#5A5466" }}>{dateStr}</span>
               {hasFlagged && (
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
@@ -12378,7 +12271,7 @@ function DGLAssignmentTable({
               const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
-                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#F8F6F1]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
+                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#EFE9DA]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
