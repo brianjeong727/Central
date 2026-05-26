@@ -5,7 +5,6 @@ const MINISTRY_ID = "952066e9-d06e-4613-9d06-d3ce78c9f364"
 const SGL_TEAM_ID = "67056b8b-317c-48cd-9f73-9910d0b6b254"
 const PASTOR_ROLE_ID = "69ddad6e-63c1-4f6c-a01d-77fb7922db89"
 const BRIAN_ID = "df1a8c40-2047-45cf-be50-eb807c9fde06"
-const OLD_PASTOR_ID = "83e4388c-1c5e-4677-ba5e-09668a5d2941"
 
 export async function GET() {
   const supabase = createClient(
@@ -14,8 +13,10 @@ export async function GET() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // 1. Delete old broken user (ignore errors)
-  await supabase.auth.admin.deleteUser(OLD_PASTOR_ID)
+  // 1. Delete any existing user with this email (ignore errors)
+  const { data: existing } = await supabase.auth.admin.listUsers()
+  const existingUser = existing?.users?.find(u => u.email === "bjj46+pastor@pitt.edu")
+  if (existingUser) await supabase.auth.admin.deleteUser(existingUser.id)
 
   // 2. Create fresh user via admin API (uses Go bcrypt correctly)
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
