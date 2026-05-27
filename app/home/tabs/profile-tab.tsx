@@ -514,7 +514,7 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
   return (
     <>
       {/* ── Mobile: tab strip + single column ── */}
-      <div className="md:hidden" style={{ padding: "24px 24px 52px" }}>
+      <div className="md:hidden" style={{ paddingTop: 24, paddingBottom: 52 }}>
         <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
@@ -528,7 +528,7 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
       </div>
 
       {/* ── Desktop: two-column (devotionals left, prayers right) ── */}
-      <div className="hidden md:grid" style={{ padding: "28px 28px 52px", gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
+      <div className="hidden md:grid" style={{ paddingTop: 28, paddingBottom: 52, gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
         <JournalDevotionalsTab userId={userId} ministryId={ministryId} />
         <JournalPrayersTab userId={userId} ministryId={ministryId} />
       </div>
@@ -819,19 +819,22 @@ export function ProfileTab({
       />
 
       {activeSection === "journal" && (
-        <div className="pb-6 md:pb-0">
-          <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
-            <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-              <RingCrossLogo size={26} />
-              <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-            </a>
+        <div className="pb-28 md:pb-0">
+          {/* Mobile header */}
+          <div className="md:hidden px-5 pt-14 pb-5">
+            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Your Journal</p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
+            <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>Your prayers, reflections, and devotionals.</p>
           </div>
-          <div className="px-5 pt-6 pb-2 md:px-14 md:pt-11 md:pb-6">
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: "12px" }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(34px,4vw,52px)", fontWeight: 400, color: "#13101A", lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0 }}>Journal</h1>
-            <p style={{ fontSize: "14px", color: "#5A5466", marginTop: "12px", lineHeight: 1.5 }}>Your prayers, reflections, and devotionals.</p>
+
+          {/* Desktop header */}
+          <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
+            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Your Journal</p>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
+            <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
           </div>
-          <div className="md:px-6">
+
+          <div className="px-5 md:px-14">
             <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
           </div>
         </div>
