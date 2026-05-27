@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil } from "lucide-react"
+import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import {
   updateMinistryPublic,
@@ -101,6 +101,17 @@ export function SettingsTab({
   const [copied, setCopied] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+
+  // Calendar feed
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://joincentral.app"
+  const calFeedUrl = `${siteUrl}/api/calendar/${ministryId}`
+  const gcalSubscribeUrl = `https://calendar.google.com/calendar/r/settings/addbyurl?url=${encodeURIComponent(calFeedUrl)}`
+  const [calCopied, setCalCopied] = useState(false)
+  function copyCalUrl() {
+    navigator.clipboard.writeText(calFeedUrl)
+    setCalCopied(true)
+    setTimeout(() => setCalCopied(false), 2000)
+  }
 
   // Discovery
   const [isPublic, setIsPublic] = useState(initialIsPublic)
@@ -584,6 +595,51 @@ export function SettingsTab({
                       </div>
                     )
                   })}
+                </div>
+              </section>
+
+              {/* Calendar Integration */}
+              <section>
+                <p style={SECTION_LABEL} className="mb-3">Calendar integration</p>
+                <div style={CARD} className="p-5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Calendar className="w-4 h-4 text-[#3E1540] mt-0.5 flex-shrink-0" />
+                    <p style={{ fontSize: "13px", color: "#5A5466", lineHeight: 1.6 }}>
+                      Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central will sync automatically.
+                    </p>
+                  </div>
+
+                  {/* Feed URL */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div style={{ flex: 1, padding: "9px 12px", background: "#F1ECDE", borderRadius: "10px", border: "1px solid #E2DDCF", overflow: "hidden" }}>
+                      <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "12px", color: "#5A5466", whiteSpace: "nowrap", display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {calFeedUrl}
+                      </span>
+                    </div>
+                    <button
+                      onClick={copyCalUrl}
+                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
+                    >
+                      {calCopied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
+                      {calCopied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+
+                  {/* Google Calendar subscribe button */}
+                  <a
+                    href={gcalSubscribeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[10px] bg-[#3E1540] text-[#FBF8F2] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Add to Google Calendar
+                    <ExternalLink className="w-3 h-3 opacity-60" />
+                  </a>
+
+                  <p style={{ fontSize: "11px", color: "#A09A8C", marginTop: "10px", lineHeight: 1.5 }}>
+                    For Apple Calendar or Outlook, copy the URL above and use &quot;Subscribe to calendar&quot; or &quot;Add calendar from URL.&quot; Updates sync every few hours.
+                  </p>
                 </div>
               </section>
 

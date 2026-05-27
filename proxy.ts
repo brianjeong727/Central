@@ -41,7 +41,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/signup') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/update-password') ||
-    pathname.startsWith('/auth/')
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/api/calendar/')
 
   // No auth — gate protected paths to login/signup
   if (!user) {
