@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Plus, X, BarChart2, Archive, ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, MONO_STYLE } from "../components/shared"
+import { Spinner } from "../components/shared"
 import { DesktopTopbar } from "../components/desktop-nav"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
@@ -245,6 +245,14 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
     )
   }
 
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
+    fontSize: "11px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: "#8A8497",
+  }
+
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "6px 14px",
     borderRadius: 999,
@@ -259,13 +267,31 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar crumbs={["Central", "Congregation"]} />
+      <DesktopTopbar crumbs={["Central", "Congregation", view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"]} />
 
-      <div style={{ maxWidth: 560, margin: "0 auto", padding: "24px 20px" }}>
-        <div style={{ marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", marginBottom: 4 }}>Congregation</h2>
-          <p style={{ fontSize: 13, color: "#8A8497" }}>Ask your congregation — responses are anonymous.</p>
-        </div>
+      {/* Mobile header */}
+      <div className="md:hidden px-5 pt-14 pb-5">
+        <p style={monoStyle}>Congregation</p>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>
+          {view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"}
+        </h1>
+        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>
+          {view === "ask" ? "Send a question to your congregation." : view === "responses" ? "Anonymous responses from your congregation." : "Past questions and their results."}
+        </p>
+      </div>
+
+      {/* Desktop header */}
+      <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
+        <p style={monoStyle}>Congregation</p>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>
+          {view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"}
+        </h1>
+        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>
+          {view === "ask" ? "Send a question to your congregation — responses are anonymous." : view === "responses" ? "Anonymous responses from your congregation." : "Past questions and their results."}
+        </p>
+      </div>
+
+      <div className="px-5 md:px-14 pt-6 md:pt-8" style={{ maxWidth: 740 }}>
 
         {/* View switcher */}
         <div style={{ display: "flex", gap: 4, marginBottom: 24, padding: "4px", background: "#F4F1E8", borderRadius: 999, width: "fit-content" }}>
@@ -284,7 +310,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
               <div style={{ padding: "16px", borderRadius: 12, background: "rgba(62,21,64,0.06)", border: "1.5px solid rgba(62,21,64,0.15)", marginBottom: 24 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <span style={{ ...MONO_STYLE, color: "#3E1540", marginBottom: 6, display: "block" }}>Active · {TYPE_LABELS[activeQuestion.question_type]}</span>
+                    <span style={{ ...monoStyle, color: "#3E1540", marginBottom: 6, display: "block" }}>Active · {TYPE_LABELS[activeQuestion.question_type]}</span>
                     <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", lineHeight: 1.4 }}>{activeQuestion.question_text}</p>
                     <p style={{ fontSize: 12, color: "#8A8497", marginTop: 6 }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
                   </div>
@@ -312,7 +338,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
             {/* Create form */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <label style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Your question</label>
+                <label style={{ ...monoStyle, display: "block", marginBottom: 6 }}>Your question</label>
                 <textarea
                   value={questionText}
                   onChange={e => setQuestionText(e.target.value)}
@@ -323,7 +349,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
               </div>
 
               <div>
-                <label style={{ ...MONO_STYLE, display: "block", marginBottom: 8 }}>Response type</label>
+                <label style={{ ...monoStyle, display: "block", marginBottom: 8 }}>Response type</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {(["poll", "scale", "open", "prayer"] as const).map((t) => (
                     <button
@@ -347,7 +373,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
 
               {questionType === "poll" && (
                 <div>
-                  <label style={{ ...MONO_STYLE, display: "block", marginBottom: 8 }}>Poll options</label>
+                  <label style={{ ...monoStyle, display: "block", marginBottom: 8 }}>Poll options</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {pollOptions.map((opt, i) => (
                       <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -417,7 +443,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
             ) : (
               <div>
                 <div style={{ padding: "16px", borderRadius: 12, background: "white", border: "1px solid #E5E0D2", marginBottom: 20 }}>
-                  <span style={{ ...MONO_STYLE, color: "#3E1540", marginBottom: 6, display: "block" }}>{TYPE_LABELS[activeQuestion.question_type]}</span>
+                  <span style={{ ...monoStyle, color: "#3E1540", marginBottom: 6, display: "block" }}>{TYPE_LABELS[activeQuestion.question_type]}</span>
                   <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", lineHeight: 1.4, marginBottom: 4 }}>{activeQuestion.question_text}</p>
                   <p style={{ fontSize: 12, color: "#8A8497" }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
 
@@ -481,7 +507,7 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
             )}
           </div>
         )}
-      </div>
+      </div>{/* end content */}
     </div>
   )
 }
