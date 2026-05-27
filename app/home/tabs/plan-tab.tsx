@@ -82,18 +82,6 @@ function getVisiblePermissions(teamName: string): string[] {
 
 const TEAM_PRESETS = [
   {
-    id: "praise",
-    name: "Praise Team",
-    icon: "🎵",
-    description: "Worship and music ministry",
-    comingSoon: true,
-    roles: [
-      { name: "President", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
-      { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
-      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
-    ],
-  },
-  {
     id: "dgl",
     name: "Small Group Leaders",
     icon: "📖",
@@ -113,6 +101,18 @@ const TEAM_PRESETS = [
       { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
       { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
       { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
+    ],
+  },
+  {
+    id: "praise",
+    name: "Praise Team",
+    icon: "🎵",
+    description: "Worship and music ministry",
+    comingSoon: true,
+    roles: [
+      { name: "President", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
+      { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
+      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
     ],
   },
   {
@@ -10111,9 +10111,9 @@ const WIZARD_ICON_OPTIONS = [
 
 // Step 1 preset display data (icon keys, no emojis)
 const WIZARD_PRESETS_DISPLAY = [
-  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false, comingSoon: true  },
   { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false, comingSoon: false },
   { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false, comingSoon: false },
+  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false, comingSoon: true  },
   { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false, comingSoon: true  },
   { id: "dg_praise", iconKey: "music",    label: "DG Praise Team",      desc: "Lightweight praise team for a discipleship group.",        restricted: true,  comingSoon: true  },
   { id: "one_time",  iconKey: "music",    label: "One-Time Event",      desc: "Praise team for a one-time event (SSO, Welcome Week…).",  restricted: true,  comingSoon: true  },
