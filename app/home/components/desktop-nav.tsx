@@ -204,7 +204,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
               )}
               onClick={
                 s.tab ? () => onTabChange(s.tab!)
-                : s.section ? () => onProfileSectionChange(s.section!)
+                : s.section ? () => { if (activeTab !== "profile") onTabChange("profile"); onProfileSectionChange(s.section!) }
                 : s.onClick
               }
             >
