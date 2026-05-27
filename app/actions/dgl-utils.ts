@@ -63,6 +63,16 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+export function getSemesterOptions(): { value: string; label: string }[] {
+  const year = new Date().getFullYear()
+  const options: { value: string; label: string }[] = []
+  for (let y = year - 1; y <= year + 1; y++) {
+    options.push({ value: `spring_${y}`, label: `Spring ${y}` })
+    options.push({ value: `fall_${y}`, label: `Fall ${y}` })
+  }
+  return options
+}
+
 // Returns every Wed, Fri, Sun in the semester in chronological order.
 // Each Sunday from getSemesterWeeks anchors a triple: Wed (−4d), Fri (−2d), Sun.
 export function getSemesterDates(semesterLabel: string): { date: string; slot: DGLAvailSlot }[] {

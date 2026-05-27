@@ -32,7 +32,7 @@ import {
 } from "@/app/actions/generate-dgl-rotation"
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
-import { getSemesterLabel, getSemesterWeeks, getSemesterDates, type DGLAvailSlot } from "@/app/actions/dgl-utils"
+import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOptions, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
@@ -10521,7 +10521,7 @@ function SmallGroupLeadersTab({
     router.replace(`/home?${sp.toString()}`, { scroll: false })
   }
   const [loading, setLoading] = useState(true)
-  const semester = useMemo(() => getSemesterLabel(), [])
+  const [semester, setSemester] = useState(() => getSemesterLabel())
   const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
   const semesterDates = useMemo(() => getSemesterDates(semester), [semester])
 
@@ -10574,8 +10574,10 @@ function SmallGroupLeadersTab({
   const [isPublishing, setIsPublishing] = useState(false)
   const [rotErr, setRotErr] = useState<string | null>(null)
   const [openRotMonths, setOpenRotMonths] = useState<Set<string>>(new Set())
+  const [scheduleReady, setScheduleReady] = useState(false)
+  const [memberReadiness, setMemberReadiness] = useState<Map<string, boolean>>(new Map())
 
-  useEffect(() => { void init() }, [teamId, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void init() }, [teamId, userId, semester]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: refresh home assignments when president publishes
   useEffect(() => {
@@ -10770,18 +10772,23 @@ function SmallGroupLeadersTab({
     setRosterConfirmedForSchedule(confirmed)
     if (!confirmed) return
 
-    // Load all roster member IDs + names
+    // Load all roster member IDs + names + readiness
     const { data: rosterRows } = await supabase
       .from("dgl_roster")
-      .select("user_id")
+      .select("user_id, schedule_ready")
       .eq("team_id", teamId)
       .eq("semester", semester)
-    const uids = (rosterRows ?? []).map((r: { user_id: string }) => r.user_id)
+    const rosterTyped = (rosterRows ?? []) as { user_id: string; schedule_ready: boolean | null }[]
+    const uids = rosterTyped.map(r => r.user_id)
     if (uids.length > 0) {
       const { data: pData } = await supabase.from("profiles").select("id, name").in("id", uids)
       const nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
       setScheduleRosterMembers(uids.map(uid => ({ user_id: uid, name: nameMap.get(uid) ?? "Unknown" })))
     }
+    const readinessMap = new Map<string, boolean>()
+    for (const r of rosterTyped) readinessMap.set(r.user_id, r.schedule_ready ?? false)
+    setMemberReadiness(readinessMap)
+    setScheduleReady(readinessMap.get(userId) ?? false)
 
     // Load ALL availability (date-specific, all roster members)
     const { data: avData } = await supabase
@@ -10975,6 +10982,17 @@ function SmallGroupLeadersTab({
     setIsPublishing(false)
   }
 
+  async function handleMarkReady() {
+    setScheduleReady(true)
+    setMemberReadiness(prev => new Map(prev).set(userId, true))
+    await supabase
+      .from("dgl_roster")
+      .update({ schedule_ready: true })
+      .eq("team_id", teamId)
+      .eq("user_id", userId)
+      .eq("semester", semester)
+  }
+
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner /></div>
 
   const weekDateStrings = semesterWeeks.map(d => d.toISOString().split("T")[0])
@@ -11048,34 +11066,58 @@ function SmallGroupLeadersTab({
               <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
                 <p className="text-[13px] text-[#8A8497]">Your schedule hasn&apos;t been published yet.</p>
               </div>
-            ) : (
-              <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
-                {myUpcoming.map((a, i) => {
-                  const sunday = new Date(a.week_date + "T12:00:00")
-                  const slotOffset: Record<string, number> = { sunday_service: 0, wednesday_pm: 3, friday_sg: 5 }
-                  const d = new Date(sunday)
-                  d.setDate(sunday.getDate() + (slotOffset[a.slot] ?? 0))
-                  const dow = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
-                  const dayNum = d.getDate()
-                  const monthStr = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
-                  const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
-                  return (
-                    <div key={a.id} className="flex items-center gap-4 px-5 py-4" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                      <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: "#F6F2E8", border: "1px solid #E8E2D2" }}>
-                        <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const }}>{dow}</span>
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#2D0F2E", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
+            ) : (() => {
+              const todayStr = new Date().toISOString().split("T")[0]
+              const slotOffset: Record<string, number> = { sunday_service: 0, wednesday_pm: 3, friday_sg: 5 }
+              const getDateStr = (a: DGLAssignmentRow) => {
+                const sun = new Date(a.week_date + "T12:00:00")
+                sun.setDate(sun.getDate() + (slotOffset[a.slot] ?? 0))
+                return sun.toISOString().split("T")[0]
+              }
+              const firstUpcomingIdx = myUpcoming.findIndex(a => getDateStr(a) >= todayStr)
+              return (
+                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                  {myUpcoming.map((a, i) => {
+                    const sunday = new Date(a.week_date + "T12:00:00")
+                    const d = new Date(sunday)
+                    d.setDate(sunday.getDate() + (slotOffset[a.slot] ?? 0))
+                    const dow = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+                    const dayNum = d.getDate()
+                    const monthStr = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+                    const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
+                    const isPast = getDateStr(a) < todayStr
+                    const isNext = i === firstUpcomingIdx
+                    return (
+                      <div
+                        key={a.id}
+                        className="flex items-center gap-4 px-5 py-4"
+                        style={{
+                          borderTop: i === 0 ? "none" : "1px solid #EFE9DA",
+                          borderLeft: isNext ? "3px solid #3E1540" : "3px solid transparent",
+                          background: isNext ? "#F6F2E8" : "transparent",
+                          opacity: isPast ? 0.4 : 1,
+                          transition: "opacity 0.15s",
+                        }}
+                      >
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "#E8E2D2"}` }}>
+                          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const }}>{dow}</span>
+                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "#3E1540" : "#2D0F2E", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "#8A8497" : "#13101A", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
+                          <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const, marginTop: 3 }}>
+                            {partner ? `w/ ${partner.split(" ")[0]}` : `${monthStr} ${dayNum}`}
+                          </p>
+                        </div>
+                        {isNext && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "#3E1540", background: "#EDE5F5", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "#13101A", letterSpacing: "-0.01em" }}>{DGL_SLOT_LABELS[a.slot]}</p>
-                        <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const, marginTop: 3 }}>
-                          {partner ? `w/ ${partner.split(" ")[0]}` : `${monthStr} ${dayNum}`}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </section>
 
           </div>{/* end LEFT COLUMN */}
@@ -11329,6 +11371,22 @@ function SmallGroupLeadersTab({
       {activeSubTab === "schedule" && (
         <div className="flex flex-col gap-6">
 
+          {/* Semester selector — president/admin only */}
+          {isPresident && (
+            <div className="flex items-center gap-3">
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Semester</p>
+              <select
+                value={semester}
+                onChange={e => setSemester(e.target.value)}
+                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #E2DDCF", borderRadius: 9, background: "#FBF8F2", color: "#13101A", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+              >
+                {getSemesterOptions().map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Availability Grid — hidden for pastors */}
           {!isPastor && <div>
             <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
@@ -11433,6 +11491,23 @@ function SmallGroupLeadersTab({
                     </div>
                   </div>
                   <p className="text-[11px] text-[#8A8497] mt-2">Checked = unavailable. Changes save automatically.</p>
+                  {/* Done button — non-president DGLs only */}
+                  {!isPresident && (
+                    <div className="mt-4 flex items-center gap-3">
+                      {scheduleReady ? (
+                        <span style={{ fontSize: 13, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                          <Check style={{ width: 14, height: 14 }} /> Marked as done — the president will be notified.
+                        </span>
+                      ) : (
+                        <button
+                          onClick={handleMarkReady}
+                          style={{ padding: "9px 18px", background: "#2D0F2E", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Done filling out →
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               )
             })()}
@@ -11481,6 +11556,29 @@ function SmallGroupLeadersTab({
                   </div>
                 ) : undefined}
               />
+
+              {/* DGL readiness summary */}
+              {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
+                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                  <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", margin: 0 }}>
+                      Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 px-5 py-3">
+                    {scheduleRosterMembers.map(m => {
+                      const ready = memberReadiness.get(m.user_id) ?? false
+                      return (
+                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "rgba(46,125,50,0.08)" : "#F4F1E8", border: `1px solid ${ready ? "rgba(46,125,50,0.2)" : "#E8E2D2"}`, color: ready ? "#2E7D32" : "#8A8497", fontWeight: ready ? 500 : 400 }}>
+                          {ready && <Check style={{ width: 10, height: 10 }} />}
+                          {m.name.split(" ")[0]}
+                          {!ready && <span style={{ fontSize: 10, opacity: 0.6 }}>…</span>}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {!rosterConfirmedForSchedule ? (
                 <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
