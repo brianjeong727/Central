@@ -10440,9 +10440,9 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
 // ── SmallGroupLeadersTab ──────────────────────────────────────────────────────
 
 const DGL_SLOT_LABELS: Record<DGLSlot, string> = {
-  wednesday_pm: "Wed PM",
-  friday_sg: "Fri SG",
-  sunday_service: "Sun Service",
+  sunday_service: "Congregational Prayer / Dishes",
+  wednesday_pm: "Prayer Meeting",
+  friday_sg: "DG Cooking / Praise",
 }
 
 type SGGroup = {
@@ -11058,7 +11058,6 @@ function SmallGroupLeadersTab({
                   const dow = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
                   const dayNum = d.getDate()
                   const monthStr = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
-                  const isPraiseSlot = a.slot === "wednesday_pm" || a.slot === "friday_sg"
                   const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
                   return (
                     <div key={a.id} className="flex items-center gap-4 px-5 py-4" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
@@ -11072,25 +11071,6 @@ function SmallGroupLeadersTab({
                           {partner ? `w/ ${partner.split(" ")[0]}` : `${monthStr} ${dayNum}`}
                         </p>
                       </div>
-                      {isPraiseSlot && (
-                        <button
-                          onClick={() => {
-                            if (a.slot === "wednesday_pm" && praiseTeamId) {
-                              const sp = new URLSearchParams(window.location.search)
-                              sp.set("tab", "plan")
-                              sp.set("team", praiseTeamId)
-                              sp.set("ptab", "schedule")
-                              sp.set("week", a.week_date)
-                              router.replace(`/home?${sp.toString()}`, { scroll: false })
-                            } else {
-                              setActiveSubTabAndUrl("schedule")
-                            }
-                          }}
-                          style={{ padding: "7px 13px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
-                        >
-                          Prepare →
-                        </button>
-                      )}
                     </div>
                   )
                 })}
