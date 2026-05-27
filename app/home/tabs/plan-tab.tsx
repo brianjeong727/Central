@@ -11004,7 +11004,6 @@ function SmallGroupLeadersTab({
           userId={userId}
           isPastor={isPastor}
           isPresident={isPresident}
-          semester={semester}
           onOpenChat={onOpenChat}
         />
       )}
@@ -11652,7 +11651,8 @@ function getRecentFridays(n = 8): string[] {
 
 type BSSheet = {
   id: string
-  week_date: string
+  title: string
+  sort_order: number
   google_doc_url: string
   pdf_url: string | null
   pastor_notes: string | null
@@ -11662,27 +11662,30 @@ type BSSheet = {
 }
 
 type BSAnnotation = { page: number; x: number; y: number; text: string }
-type BSProgress = { user_id: string; name: string; read_at: string | null; progress_note: string | null }
+type BSProgress = { user_id: string; name: string; progress_note: string | null }
 
 function BibleStudySubTab({
-  teamId, ministryId, userId, isPastor, isPresident, semester, onOpenChat,
+  teamId, ministryId, userId, isPastor, isPresident, onOpenChat,
 }: {
   teamId: string
   ministryId: string
   userId: string
   isPastor: boolean
   isPresident: boolean
-  semester: string
   onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
-  const fridays = useMemo(() => getRecentFridays(8), [])
-  const [selectedWeek, setSelectedWeek] = useState(fridays[fridays.length - 1])
+
+  // Sheet list + selection
+  const [sheets, setSheets] = useState<BSSheet[]>([])
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<BSSheet | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadingSheets, setLoadingSheets] = useState(true)
+  const [loadingSheet, setLoadingSheet] = useState(false)
 
   // Create form
   const [creating, setCreating] = useState(false)
+  const [newTitle, setNewTitle] = useState("")
   const [newDocUrl, setNewDocUrl] = useState("")
   const [createError, setCreateError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -11708,7 +11711,7 @@ function BibleStudySubTab({
   const [savingAnnotation, setSavingAnnotation] = useState(false)
   const [hoveredAnnotation, setHoveredAnnotation] = useState<number | null>(null)
 
-  // Progress
+  // Progress — team-level, independent of selected sheet
   const [progress, setProgress] = useState<BSProgress[]>([])
   const [myNote, setMyNote] = useState("")
   const [editingNote, setEditingNote] = useState(false)
@@ -11718,39 +11721,70 @@ function BibleStudySubTab({
   const [sharing, setSharing] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
 
-  useEffect(() => { void loadSheet() }, [selectedWeek, teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Load sheet list once on mount; load team progress independently
+  useEffect(() => { void loadSheets() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void loadTeamProgress() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function loadSheet() {
-    setLoading(true)
-    setPdfPages([])
-    setAnnotations([])
-    setProgress([])
-    setSheet(null)
-    setCreating(false)
-    setFinalizeConfirm(false)
-    setFinalizeError(null)
-    setShareSuccess(false)
+  // Load individual sheet whenever selection changes
+  useEffect(() => {
+    if (selectedSheetId) void loadSheetById(selectedSheetId)
+    else { setSheet(null) }
+  }, [selectedSheetId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function loadSheets() {
+    setLoadingSheets(true)
     const { data } = await supabase
       .from("bible_study_sheets")
       .select("*")
       .eq("team_id", teamId)
-      .eq("week_date", selectedWeek)
-      .maybeSingle()
+      .order("sort_order", { ascending: true })
+    const list = (data ?? []) as BSSheet[]
+    setSheets(list)
+    if (list.length > 0 && !selectedSheetId) setSelectedSheetId(list[list.length - 1].id)
+    setLoadingSheets(false)
+  }
 
+  async function loadSheetById(id: string) {
+    setLoadingSheet(true)
+    setPdfPages([])
+    setAnnotations([])
+    setFinalizeConfirm(false)
+    setFinalizeError(null)
+    setShareSuccess(false)
+    const { data } = await supabase.from("bible_study_sheets").select("*").eq("id", id).maybeSingle()
     const s = data as BSSheet | null
     setSheet(s)
-    setMyNote("")
-    setEditingNote(false)
     if (s) {
       setNoteDraft(s.pastor_notes ?? "")
-      void loadProgress(s.id)
       if (s.status === "finalized" && s.pdf_url) {
         void renderPdf(s.pdf_url)
         void loadAnnotations(s.id)
       }
     }
-    setLoading(false)
+    setLoadingSheet(false)
+  }
+
+  async function loadTeamProgress() {
+    const { data: members } = await supabase
+      .from("team_members")
+      .select("user_id, profiles!user_id(name)")
+      .eq("team_id", teamId)
+    const { data: notes } = await supabase
+      .from("bible_study_team_progress")
+      .select("user_id, progress_note")
+      .eq("team_id", teamId)
+    type NoteRow = { user_id: string; progress_note: string | null }
+    const noteMap = new Map<string, string | null>(
+      (notes ?? []).map((r: NoteRow) => [r.user_id, r.progress_note])
+    )
+    type RawMember = { user_id: string; profiles: { name: string } | { name: string }[] | null }
+    const rows = (members ?? []).map((m: RawMember) => {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+      return { user_id: m.user_id, name: p?.name ?? "Unknown", progress_note: noteMap.has(m.user_id) ? noteMap.get(m.user_id)! : null }
+    })
+    setProgress(rows)
+    const mine = rows.find(r => r.user_id === userId)
+    if (mine) setMyNote(mine.progress_note ?? "")
   }
 
   async function renderPdf(url: string) {
@@ -11788,59 +11822,37 @@ function BibleStudySubTab({
     setAnnotations((data?.annotations as BSAnnotation[]) ?? [])
   }
 
-  async function loadProgress(sheetId: string) {
-    const { data: members } = await supabase
-      .from("team_members")
-      .select("user_id, profiles!user_id(name)")
-      .eq("team_id", teamId)
-    const { data: reads } = await supabase
-      .from("bible_study_progress")
-      .select("user_id, read_at, progress_note")
-      .eq("sheet_id", sheetId)
-
-    type ReadRow = { user_id: string; read_at: string; progress_note: string | null }
-    const readMap = new Map<string, ReadRow>(
-      (reads ?? []).map((r: ReadRow) => [r.user_id, r])
-    )
-    type RawMember = { user_id: string; profiles: { name: string } | { name: string }[] | null }
-    const rows = (members ?? []).map((m: RawMember) => {
-      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-      const r = readMap.get(m.user_id)
-      return { user_id: m.user_id, name: p?.name ?? "Unknown", read_at: r?.read_at ?? null, progress_note: r?.progress_note ?? null }
-    })
-    setProgress(rows)
-    const mine = rows.find(r => r.user_id === userId)
-    if (mine) setMyNote(mine.progress_note ?? "")
-  }
-
-  async function saveProgressNote(sheetId: string, note: string) {
+  async function saveProgressNote(note: string) {
     setSavingProgressNote(true)
     await supabase
-      .from("bible_study_progress")
-      .upsert({ sheet_id: sheetId, user_id: userId, progress_note: note, read_at: new Date().toISOString() }, { onConflict: "sheet_id,user_id" })
+      .from("bible_study_team_progress")
+      .upsert({ team_id: teamId, user_id: userId, ministry_id: ministryId, progress_note: note, updated_at: new Date().toISOString() }, { onConflict: "team_id,user_id" })
     setSavingProgressNote(false)
     setEditingNote(false)
-    void loadProgress(sheetId)
+    void loadTeamProgress()
   }
 
   async function handleCreate() {
+    if (!newTitle.trim()) { setCreateError("Enter a chapter name."); return }
     if (!newDocUrl.trim()) { setCreateError("Paste a Google Doc URL."); return }
     if (!newDocUrl.includes("docs.google.com/document")) { setCreateError("Please paste a Google Docs link."); return }
     setSaving(true)
     setCreateError(null)
-    const { error } = await supabase.from("bible_study_sheets").insert({
+    const { data: inserted, error } = await supabase.from("bible_study_sheets").insert({
       team_id: teamId,
       ministry_id: ministryId,
-      week_date: selectedWeek,
-      semester,
+      title: newTitle.trim(),
+      sort_order: sheets.length,
       google_doc_url: newDocUrl.trim(),
       status: "draft",
       created_by: userId,
-    })
+    }).select().maybeSingle()
     if (error) { setCreateError(error.message); setSaving(false); return }
     setCreating(false)
+    setNewTitle("")
     setNewDocUrl("")
-    void loadSheet()
+    await loadSheets()
+    if (inserted) setSelectedSheetId(inserted.id)
     setSaving(false)
   }
 
@@ -11867,7 +11879,6 @@ function BibleStudySubTab({
     if (result.publicUrl) {
       void renderPdf(result.publicUrl)
       void loadAnnotations(sheet.id)
-      void loadProgress(sheet.id)
     }
     setFinalizing(false)
   }
@@ -11897,35 +11908,24 @@ function BibleStudySubTab({
   async function handleShare() {
     if (!sheet?.pdf_url) return
     setSharing(true)
-    const dateLabel = new Date(selectedWeek + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    // Find existing team group chat (type "my", name contains team identifier)
-    const { data: groups } = await supabase
-      .from("groups")
-      .select("id, name")
-      .eq("ministry_id", ministryId)
-      .eq("type", "my")
-      .order("created_at", { ascending: false })
-    // Find a group whose members include this team's members
-    const { data: teamMembers } = await supabase
-      .from("team_members")
-      .select("user_id")
-      .eq("team_id", teamId)
+    const label = sheet.title
+    const { data: groups } = await supabase.from("groups").select("id, name").eq("ministry_id", ministryId).eq("type", "my").order("created_at", { ascending: false })
+    const { data: teamMembers } = await supabase.from("team_members").select("user_id").eq("team_id", teamId)
     const memberIds = new Set((teamMembers ?? []).map((m: { user_id: string }) => m.user_id))
     let targetGroup: { id: string; name: string } | null = null
     for (const g of groups ?? []) {
       const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", g.id)
       const gIds = new Set((gm ?? []).map((m: { user_id: string }) => m.user_id))
-      const overlap = [...memberIds].filter(id => gIds.has(id)).length
-      if (overlap >= Math.min(memberIds.size, 2)) { targetGroup = g; break }
+      if ([...memberIds].filter(id => gIds.has(id)).length >= Math.min(memberIds.size, 2)) { targetGroup = g; break }
     }
     if (targetGroup) {
       await supabase.from("messages").insert({
         group_id: targetGroup.id,
         sender_id: userId,
-        content: `Bible Study sheet for ${dateLabel}`,
+        content: `Bible Study: ${label}`,
         attachment_url: sheet.pdf_url,
         attachment_type: "application/pdf",
-        attachment_name: `Bible Study ${dateLabel}.pdf`,
+        attachment_name: `Bible Study — ${label}.pdf`,
         message_type: "attachment",
       })
       setShareSuccess(true)
@@ -11936,59 +11936,120 @@ function BibleStudySubTab({
     setSharing(false)
   }
 
-  const weekLabel = (d: string) =>
-    new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
-
-  if (loading) {
+  if (loadingSheets) {
     return <div style={{ display: "flex", justifyContent: "center", paddingTop: 48 }}><Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" /></div>
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Week selector */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" as const, paddingBottom: 2 }}>
-        {fridays.map(fri => (
+
+      {/* ── Where We Left Off — always visible, independent of selected chapter ── */}
+      {progress.length > 0 && (
+        <div>
+          <PlanSectionHeader>Where We Left Off</PlanSectionHeader>
+          <div style={{ background: "white", borderRadius: 14, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+            {progress.map((p, i) => {
+              const isMe = p.user_id === userId
+              const isLast = i === progress.length - 1
+              return (
+                <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                      {getInitials(p.name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, color: "#13101A", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
+                      {p.progress_note && !isMe && (
+                        <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{p.progress_note}</p>
+                      )}
+                      {isMe && !editingNote && p.progress_note && (
+                        <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1 }}>{p.progress_note}</p>
+                      )}
+                    </div>
+                    {!isPastor && isMe && !editingNote && (
+                      <button
+                        onClick={() => setEditingNote(true)}
+                        style={{ fontSize: 11, color: "#3E1540", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
+                      >
+                        {p.progress_note ? "Edit" : "Add note"}
+                      </button>
+                    )}
+                    {!isMe && !p.progress_note && (
+                      <Circle style={{ width: 13, height: 13, color: "#C4C0B0", flexShrink: 0 }} />
+                    )}
+                  </div>
+                  {isMe && editingNote && (
+                    <div style={{ padding: "0 16px 12px 56px", display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input
+                        autoFocus
+                        value={myNote}
+                        onChange={e => setMyNote(e.target.value)}
+                        placeholder="e.g. Finished through the intro questions"
+                        maxLength={120}
+                        style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "#13101A", width: "100%", boxSizing: "border-box" as const }}
+                      />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => void saveProgressNote(myNote)}
+                          disabled={savingProgressNote}
+                          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "#3E1540", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
+                        >
+                          {savingProgressNote ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => { setEditingNote(false); setMyNote(progress.find(r => r.user_id === userId)?.progress_note ?? "") }}
+                          style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "#5A5466", cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Chapter tab strip ─────────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" as const, paddingBottom: 2, alignItems: "center" }}>
+        {sheets.map(s => (
           <button
-            key={fri}
-            onClick={() => setSelectedWeek(fri)}
+            key={s.id}
+            onClick={() => setSelectedSheetId(s.id)}
             style={{
               padding: "6px 14px", borderRadius: 20, fontSize: 13,
-              fontWeight: selectedWeek === fri ? 600 : 400,
-              border: selectedWeek === fri ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
-              background: selectedWeek === fri ? "#3E1540" : "transparent",
-              color: selectedWeek === fri ? "#F6F4EF" : "#5A5466",
+              fontWeight: selectedSheetId === s.id ? 600 : 400,
+              border: selectedSheetId === s.id ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
+              background: selectedSheetId === s.id ? "#3E1540" : "transparent",
+              color: selectedSheetId === s.id ? "#F6F4EF" : "#5A5466",
               cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit",
             }}
           >
-            {weekLabel(fri)}
+            {s.title}
           </button>
         ))}
+        {isPastor && !creating && (
+          <button
+            onClick={() => setCreating(true)}
+            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 13, border: "1.5px dashed #C4B8CC", background: "transparent", color: "#8A8497", cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit" }}
+          >
+            + New chapter
+          </button>
+        )}
       </div>
-
-      {/* No sheet */}
-      {!sheet && !creating && (
-        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed #E8E2D2", padding: "32px 24px", textAlign: "center" as const }}>
-          <FileText style={{ width: 32, height: 32, color: "#C4C0B0", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No Bible Study for {weekLabel(selectedWeek)}</p>
-          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: isPastor ? 16 : 0 }}>
-            {isPastor ? "Paste a Google Doc link to set this week’s study." : "Check back when the pastor has added this week’s study."}
-          </p>
-          {isPastor && (
-            <button
-              onClick={() => setCreating(true)}
-              style={{ padding: "8px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              + Add Bible Study
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Create form */}
       {creating && (
         <div style={{ background: "white", borderRadius: 16, border: "1px solid #E8E2D2", padding: "20px" }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Set Google Doc for {weekLabel(selectedWeek)}</p>
-          <p style={{ fontSize: 12, color: "#8A8497", marginBottom: 12 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 12 }}>New chapter</p>
+          <input
+            value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            placeholder="Chapter name (e.g. Romans 1)"
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+          />
           <input
             type="url"
             value={newDocUrl}
@@ -11996,20 +12057,35 @@ function BibleStudySubTab({
             placeholder="https://docs.google.com/document/d/..."
             style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
+          <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
           {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { setCreating(false); setCreateError(null); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => { setCreating(false); setCreateError(null); setNewTitle(""); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* Sheet exists */}
-      {sheet && (
+      {/* Empty state (no chapters yet) */}
+      {sheets.length === 0 && !creating && (
+        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed #E8E2D2", padding: "32px 24px", textAlign: "center" as const }}>
+          <FileText style={{ width: 32, height: 32, color: "#C4C0B0", margin: "0 auto 12px" }} />
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No chapters yet</p>
+          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: isPastor ? 16 : 0 }}>
+            {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
+          </p>
+        </div>
+      )}
+
+      {/* Sheet content */}
+      {loadingSheet && (
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 32 }}><Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" /></div>
+      )}
+      {sheet && !loadingSheet && (
         <>
           {/* Header row: status badge + open-doc link */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -12022,7 +12098,6 @@ function BibleStudySubTab({
               }}>
                 {sheet.status === "finalized" ? "Finalized" : "Draft"}
               </span>
-              <span style={{ fontSize: 12, color: "#8A8497" }}>{weekLabel(sheet.week_date)}</span>
             </div>
             <a
               href={sheet.google_doc_url}
@@ -12222,75 +12297,6 @@ function BibleStudySubTab({
             </div>
           )}
 
-          {/* Progress tracker — visible for any week once a sheet exists */}
-          {progress.length > 0 && (
-            <div>
-              <PlanSectionHeader>Where We Left Off</PlanSectionHeader>
-              <div style={{ background: "white", borderRadius: 14, border: "1px solid #E8E2D2", overflow: "hidden" }}>
-                {progress.map((p, i) => {
-                  const isMe = p.user_id === userId
-                  const isLast = i === progress.length - 1
-                  return (
-                    <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                          {getInitials(p.name)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, color: "#13101A", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
-                          {p.progress_note && !isMe && (
-                            <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.progress_note}</p>
-                          )}
-                        </div>
-                        {!isPastor && isMe ? (
-                          <button
-                            onClick={() => setEditingNote(true)}
-                            style={{ fontSize: 11, color: "#3E1540", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6 }}
-                          >
-                            {p.progress_note ? "Edit" : "Add note"}
-                          </button>
-                        ) : !isMe && !p.progress_note ? (
-                          <Circle style={{ width: 13, height: 13, color: "#C4C0B0", flexShrink: 0 }} />
-                        ) : null}
-                      </div>
-                      {/* Inline edit for current user's note */}
-                      {isMe && editingNote && (
-                        <div style={{ padding: "0 16px 12px 56px", display: "flex", flexDirection: "column", gap: 6 }}>
-                          <input
-                            autoFocus
-                            value={myNote}
-                            onChange={e => setMyNote(e.target.value)}
-                            placeholder="e.g. Finished through the intro questions"
-                            maxLength={120}
-                            style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "#13101A" }}
-                          />
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button
-                              onClick={() => void saveProgressNote(sheet.id, myNote)}
-                              disabled={savingProgressNote}
-                              style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "#3E1540", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
-                            >
-                              {savingProgressNote ? "Saving…" : "Save"}
-                            </button>
-                            <button
-                              onClick={() => { setEditingNote(false); setMyNote(progress.find(r => r.user_id === userId)?.progress_note ?? "") }}
-                              style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "#5A5466", cursor: "pointer", fontFamily: "inherit" }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {/* Show own note when not editing */}
-                      {isMe && !editingNote && p.progress_note && (
-                        <p style={{ padding: "0 16px 10px 56px", fontSize: 12, color: "#5A5466" }}>{p.progress_note}</p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>
