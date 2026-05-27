@@ -12049,16 +12049,23 @@ function BibleStudySubTab({
     if (!sheet?.pdf_url) return
     setSharing(true)
     const label = sheet.title
-    const { data: groups } = await supabase.from("groups").select("id, name").eq("ministry_id", ministryId).eq("type", "my").order("created_at", { ascending: false })
-    const { data: teamMembers } = await supabase.from("team_members").select("user_id").eq("team_id", teamId)
-    const memberIds = new Set((teamMembers ?? []).map((m: { user_id: string }) => m.user_id))
-    let targetGroup: { id: string; name: string } | null = null
-    for (const g of groups ?? []) {
-      const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", g.id)
-      const gIds = new Set((gm ?? []).map((m: { user_id: string }) => m.user_id))
-      if ([...memberIds].filter(id => gIds.has(id)).length >= Math.min(memberIds.size, 2)) { targetGroup = g; break }
-    }
-    if (targetGroup) {
+
+    // Find the DG church chat via small_groups.chat_group_id for this user's group
+    const { data: sg } = await supabase
+      .from("small_groups")
+      .select("chat_group_id, groups!chat_group_id(id, name)")
+      .eq("team_id", teamId)
+      .eq("leader_id", userId)
+      .maybeSingle()
+
+    type SGRow = { chat_group_id: string | null; groups: { id: string; name: string } | { id: string; name: string }[] | null }
+    const row = sg as SGRow | null
+    const groupRaw = row?.groups
+    const targetGroup = groupRaw
+      ? Array.isArray(groupRaw) ? groupRaw[0] : groupRaw
+      : null
+
+    if (targetGroup?.id) {
       await supabase.from("messages").insert({
         group_id: targetGroup.id,
         sender_id: userId,
@@ -12070,7 +12077,7 @@ function BibleStudySubTab({
       })
       setShareSuccess(true)
     } else {
-      setFinalizeError("No group chat found. Create a group chat from the team settings first.")
+      setFinalizeError("No DG group chat found. Make sure your DG roster has been set up with auto-chats enabled.")
     }
     setSharing(false)
   }
