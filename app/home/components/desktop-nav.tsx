@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet, Megaphone } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
 import { Search } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -41,7 +41,6 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
     { id: "directory", icon: BookOpen },
     { id: "giving", icon: Wallet },
-    ...(isPastor ? [{ id: "congregation" as Tab, icon: Megaphone }] : []),
     { id: "profile", icon: User },
   ]
 
@@ -165,14 +164,6 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    if (activeTab === "congregation") {
-      return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Congregation</p>
-        </div>
-      )
-    }
-
     if (activeTab === "directory") {
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
@@ -194,10 +185,11 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    if (activeTab === "profile") {
-      const items: { label: string; section?: "spiritual-profile" | "journal"; danger?: boolean; onClick?: () => void }[] = [
+    if (activeTab === "profile" || activeTab === "congregation") {
+      const items: { label: string; section?: "spiritual-profile" | "journal"; tab?: Tab; danger?: boolean; onClick?: () => void }[] = [
         { label: "Profile", section: "spiritual-profile" },
         { label: "Journal", section: "journal" },
+        ...(isPastor ? [{ label: "Congregation", tab: "congregation" as Tab }] : []),
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
@@ -206,8 +198,15 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
           {items.map((s, i) => (
             <button
               key={i}
-              style={subItemStyle(s.section ? profileSection === s.section : undefined, s.danger)}
-              onClick={s.section ? () => onProfileSectionChange(s.section!) : s.onClick}
+              style={subItemStyle(
+                s.tab ? activeTab === s.tab : s.section ? profileSection === s.section : undefined,
+                s.danger
+              )}
+              onClick={
+                s.tab ? () => onTabChange(s.tab!)
+                : s.section ? () => onProfileSectionChange(s.section!)
+                : s.onClick
+              }
             >
               <span style={{ flex: 1 }}>{s.label}</span>
             </button>
@@ -273,7 +272,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         </a>
 
         {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "give")) || (id === "congregation" && activeTab === "congregation")
+          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "give")) || (id === "profile" && activeTab === "congregation")
           return (
             <button
               key={id}
@@ -309,8 +308,8 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         </div>
       </div>
 
-      {/* Context Panel — hidden for chats/directory/congregation (those tabs have their own layout) */}
-      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" || activeTab === "congregation" ? "" : "md:flex"}`}>
+      {/* Context Panel — hidden for chats/directory (those tabs have their own left panel) */}
+      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}>
         {/* Workspace header */}
         <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
           <p style={monoStyle}>Workspace</p>

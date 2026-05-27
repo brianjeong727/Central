@@ -652,7 +652,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           onTabChange={setActiveTab}
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
-          isPastor={isPastor}
         />
 
       </div>
