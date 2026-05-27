@@ -10710,6 +10710,31 @@ function SmallGroupLeadersTab({
           pmByGroup.get(m.group_id)!.push({ ...m, name: ppMap.get(m.user_id) ?? "Unknown" })
         }
         setPairedMembers(pmByGroup)
+
+        // Load partner DGL's friday_sg assignments — brother/sister DGs share responsibility
+        const partnerDglIds = [...pgMap.values()].map(pg => pg.leader_id).filter(Boolean) as string[]
+        if (partnerDglIds.length > 0) {
+          const { data: paData } = await supabase
+            .from("dgl_assignments")
+            .select("id, user_id, week_date, slot, semester, published")
+            .eq("team_id", teamId)
+            .eq("slot", "friday_sg")
+            .eq("published", true)
+            .eq("semester", semester)
+            .in("user_id", partnerDglIds)
+          if (paData && paData.length > 0) {
+            const myFridayWeeks = new Set(myAssignments.filter(a => a.slot === "friday_sg").map(a => a.week_date))
+            const newRows = (paData as { id: string; user_id: string; week_date: string; slot: DGLSlot; semester: string; published: boolean }[])
+              .filter(r => !myFridayWeeks.has(r.week_date))
+            if (newRows.length > 0) {
+              const pUids = [...new Set(newRows.map(r => r.user_id))]
+              const { data: pnData } = await supabase.from("profiles").select("id, name").in("id", pUids)
+              const pnMap = new Map((pnData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
+              const enriched: DGLAssignmentRow[] = newRows.map(r => ({ ...r, user_name: pnMap.get(r.user_id) ?? "Partner" }))
+              setMyUpcoming(prev => [...prev, ...enriched].sort((a, b) => a.week_date.localeCompare(b.week_date)))
+            }
+          }
+        }
       }
     }
 
@@ -11084,7 +11109,13 @@ function SmallGroupLeadersTab({
                     const dow = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
                     const dayNum = d.getDate()
                     const monthStr = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
-                    const partner = a.slot === "friday_sg" ? fridayPartners.get(a.week_date) : undefined
+                    const isPartnerAssignment = a.slot === "friday_sg" && a.user_id !== userId
+                    const partner = a.slot === "friday_sg" && !isPartnerAssignment ? fridayPartners.get(a.week_date) : undefined
+                    const subLabel = isPartnerAssignment
+                      ? `Lead: ${a.user_name.split(" ")[0]}`
+                      : partner
+                        ? `w/ ${partner.split(" ")[0]}`
+                        : `${monthStr} ${dayNum}`
                     const isPast = getDateStr(a) < todayStr
                     const isNext = i === firstUpcomingIdx
                     return (
@@ -11106,7 +11137,7 @@ function SmallGroupLeadersTab({
                         <div className="flex-1 min-w-0">
                           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "#8A8497" : "#13101A", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
                           <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const, marginTop: 3 }}>
-                            {partner ? `w/ ${partner.split(" ")[0]}` : `${monthStr} ${dayNum}`}
+                            {subLabel}
                           </p>
                         </div>
                         {isNext && (
