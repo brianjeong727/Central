@@ -22,19 +22,28 @@ function esc(s: string): string {
     .replace(/\r/g, "")
 }
 
-// Format a date string (YYYY-MM-DD) as an iCal DATE value
+// Format a date string (YYYY-MM-DD or ISO datetime) as an iCal DATE value
 function icalDate(dateStr: string): string {
-  return dateStr.replace(/-/g, "")
+  return dateStr.slice(0, 10).replace(/-/g, "")
 }
 
-// Format a date string as an iCal DATETIME value (UTC midnight)
+// Format a date string as an iCal DATETIME value in UTC
+// Handles both "YYYY-MM-DD" (treated as UTC midnight) and full ISO datetimes
 function icalDateTime(dateStr: string): string {
-  return `${dateStr.replace(/-/g, "")}T000000Z`
+  const d = new Date(dateStr.length === 10 ? dateStr + "T00:00:00Z" : dateStr)
+  if (isNaN(d.getTime())) return `${dateStr.slice(0, 10).replace(/-/g, "")}T000000Z`
+  const y = d.getUTCFullYear()
+  const mo = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  const h = String(d.getUTCHours()).padStart(2, "0")
+  const min = String(d.getUTCMinutes()).padStart(2, "0")
+  const s = String(d.getUTCSeconds()).padStart(2, "0")
+  return `${y}${mo}${day}T${h}${min}${s}Z`
 }
 
-// Add one day to a YYYY-MM-DD string (iCal all-day DTEND is exclusive)
+// Add one day to a date string (iCal all-day DTEND is exclusive)
 function addOneDay(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00Z")
+  const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z")
   d.setUTCDate(d.getUTCDate() + 1)
   const y = d.getUTCFullYear()
   const m = String(d.getUTCMonth() + 1).padStart(2, "0")
