@@ -103,14 +103,19 @@ export function SettingsTab({
   const [regenerating, setRegenerating] = useState(false)
 
   // Calendar feed
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://joincentral.app"
-  const calFeedUrl = `${siteUrl}/api/calendar/${ministryId}`
-  const gcalSubscribeUrl = `https://calendar.google.com/calendar/r/settings/addbyurl?url=${encodeURIComponent(calFeedUrl)}`
+  const calFeedUrl = `https://www.joincentral.app/api/calendar/${ministryId}`
+  const gcalUrl = `https://calendar.google.com/calendar/r/settings/addbyurl`
   const [calCopied, setCalCopied] = useState(false)
   function copyCalUrl() {
     navigator.clipboard.writeText(calFeedUrl)
     setCalCopied(true)
     setTimeout(() => setCalCopied(false), 2000)
+  }
+  function openGoogleCalendar() {
+    navigator.clipboard.writeText(calFeedUrl)
+    setCalCopied(true)
+    setTimeout(() => setCalCopied(false), 3000)
+    window.open(gcalUrl, "_blank", "noopener,noreferrer")
   }
 
   // Discovery
@@ -626,19 +631,17 @@ export function SettingsTab({
                   </div>
 
                   {/* Google Calendar subscribe button */}
-                  <a
-                    href={gcalSubscribeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={openGoogleCalendar}
                     className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[10px] bg-[#3E1540] text-[#FBF8F2] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
                   >
                     <Calendar className="w-3.5 h-3.5" />
-                    Add to Google Calendar
-                    <ExternalLink className="w-3 h-3 opacity-60" />
-                  </a>
+                    {calCopied ? "URL copied — paste in Google Calendar" : "Add to Google Calendar"}
+                    {!calCopied && <ExternalLink className="w-3 h-3 opacity-60" />}
+                  </button>
 
                   <p style={{ fontSize: "11px", color: "#A09A8C", marginTop: "10px", lineHeight: 1.5 }}>
-                    For Apple Calendar or Outlook, copy the URL above and use &quot;Subscribe to calendar&quot; or &quot;Add calendar from URL.&quot; Updates sync every few hours.
+                    Clicking the button copies the URL and opens Google Calendar — just paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button above. Updates sync every few hours.
                   </p>
                 </div>
               </section>
