@@ -10111,12 +10111,12 @@ const WIZARD_ICON_OPTIONS = [
 
 // Step 1 preset display data (icon keys, no emojis)
 const WIZARD_PRESETS_DISPLAY = [
-  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false },
-  { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false },
-  { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false },
-  { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false },
-  { id: "dg_praise", iconKey: "music",    label: "DG Praise Team",      desc: "Lightweight praise team for a discipleship group.",        restricted: true  },
-  { id: "one_time",  iconKey: "music",    label: "One-Time Event",      desc: "Praise team for a one-time event (SSO, Welcome Week…).",  restricted: true  },
+  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false, comingSoon: true  },
+  { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false, comingSoon: false },
+  { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false, comingSoon: false },
+  { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false, comingSoon: true  },
+  { id: "dg_praise", iconKey: "music",    label: "DG Praise Team",      desc: "Lightweight praise team for a discipleship group.",        restricted: true,  comingSoon: true  },
+  { id: "one_time",  iconKey: "music",    label: "One-Time Event",      desc: "Praise team for a one-time event (SSO, Welcome Week…).",  restricted: true,  comingSoon: true  },
 ]
 
 const WIZARD_MONO = {
@@ -10244,11 +10244,31 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {WIZARD_PRESETS_DISPLAY.filter(p => {
                 if (p.restricted) return isAdmin || isDGL || isPraiseTeamMember
-                return !!isAdmin  // non-restricted: admins only
+                return !!isAdmin
               }).map(p => {
                 const on = selectedPresetId === p.id
                 const roleCount = TEAM_PRESETS.find(t => t.id === p.id)?.roles.length ?? 0
                 const iconOpt = WIZARD_ICON_OPTIONS.find(o => o.key === p.iconKey)
+                if (p.comingSoon) {
+                  return (
+                    <div key={p.id} style={{
+                      display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
+                      border: "1px solid #E8E2D2", background: "#F8F6F2",
+                      opacity: 0.55, cursor: "not-allowed",
+                    }}>
+                      <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: "#EDE9E0", color: "#A09A8C", display: "grid", placeItems: "center" }}>
+                        {iconOpt && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconOpt.d}/></svg>}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#8A8497" }}>{p.label}</span>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#ECE8DE", color: "#8A8497", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
+                        </span>
+                        <span style={{ display: "block", fontSize: 12.5, color: "#C4C0B0", marginTop: 3 }}>{p.desc}</span>
+                      </span>
+                    </div>
+                  )
+                }
                 return (
                   <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
                     display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
@@ -10274,7 +10294,6 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   </button>
                 )
               })}
-
             </div>
           )}
 
