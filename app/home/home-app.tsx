@@ -8,7 +8,7 @@ import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion } from "./types"
 import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
 
 // Components
@@ -25,13 +25,14 @@ import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
 import { SettingsTab } from "./tabs/settings-tab"
 import { FormsTab } from "./tabs/forms-tab"
+import { CongregationTab } from "./tabs/congregation-tab"
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "give", "profile", "settings", "forms"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { finance: "giving", you: "profile" }
   const rawTab = searchParams.get("tab")
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
@@ -58,6 +59,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   const [allTeams, setAllTeams] = useState<Team[]>([])
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(null)
+  const [hasResponded, setHasResponded] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [showQuickCreateTeam, setShowQuickCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(searchParams.get("team"))
@@ -260,6 +263,28 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, ministryId])
 
+  const loadActiveQuestion = useCallback(async () => {
+    const { data: q } = await supabase
+      .from("congregation_questions")
+      .select("*")
+      .eq("ministry_id", ministryId)
+      .eq("is_active", true)
+      .maybeSingle()
+    setActiveQuestion(q ?? null)
+    if (q) {
+      const { data: r } = await supabase
+        .from("congregation_responses")
+        .select("id")
+        .eq("question_id", q.id)
+        .eq("user_id", userId)
+        .maybeSingle()
+      setHasResponded(!!r)
+    } else {
+      setHasResponded(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministryId, userId])
+
   // Initial load + reload after closing a chat
   useEffect(() => {
     loadRecentChats()
@@ -269,6 +294,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     loadUserTeams()
     loadAllTeams()
   }, [loadUserTeams, loadAllTeams])
+
+  useEffect(() => {
+    loadActiveQuestion()
+  }, [loadActiveQuestion])
 
   useEffect(() => {
     if (!isAdmin) return
@@ -420,6 +449,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         activeGroupId={globalOpenChat?.id}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        isPastor={isPastor}
         canCreateTeam={canCreateTeam}
         onCreateTeam={() => setShowQuickCreateTeam(true)}
         activeTeamId={activeTeamId}
@@ -451,6 +481,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
                 onOpenChat={handleOpenChat}
                 onGoToProfile={() => setActiveTab("profile")}
                 avatarUrl={avatarUrl}
+                activeQuestion={activeQuestion}
+                hasResponded={hasResponded}
+                onResponded={() => setHasResponded(true)}
               />
             </div>
           )}
@@ -602,6 +635,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             />
           )}
 
+          {activeTab === "congregation" && isPastor && (
+            <div className="md:h-full md:overflow-y-auto">
+              <CongregationTab
+                userId={userId}
+                ministryId={ministryId}
+                userRole={initialProfile.role}
+              />
+            </div>
+          )}
+
         </div>
 
         <BottomNav
@@ -609,6 +652,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           onTabChange={setActiveTab}
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
+          isPastor={isPastor}
         />
 
       </div>

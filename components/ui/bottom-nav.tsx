@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList, BookOpen, Megaphone } from "lucide-react"
 
 type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
 
@@ -9,6 +9,7 @@ interface BottomNavProps {
   onTabChange: (tab: Tab) => void
   chatsUnread?: number
   showPlan?: boolean
+  isPastor?: boolean
 }
 
 const TABS_BASE = [
@@ -19,13 +20,14 @@ const TABS_BASE = [
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
+const PULSE_TAB = { id: "congregation" as Tab, label: "Pulse", icon: Megaphone }
 
-export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false, isPastor = false }: BottomNavProps) {
   const base = TABS_BASE.filter(t => t.id !== "profile")
   const profile = TABS_BASE.find(t => t.id === "profile")!
   const tabs = showPlan
-    ? [...base, PLAN_TAB, profile]
-    : [...base, profile]
+    ? [...base, PLAN_TAB, ...(isPastor ? [PULSE_TAB] : []), profile]
+    : [...base, ...(isPastor ? [PULSE_TAB] : []), profile]
   const compact = tabs.length > 5
 
   return (

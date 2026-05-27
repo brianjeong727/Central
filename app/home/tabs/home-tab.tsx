@@ -8,11 +8,11 @@ import { Spinner, RingCrossLogo, MONO_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import type { HomeTabProps, Announcement } from "../types"
+import type { HomeTabProps, Announcement, CongregationQuestion } from "../types"
 
 export { HomeTabProps }
 
-export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl }: HomeTabProps) {
+export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl, activeQuestion, hasResponded, onResponded }: HomeTabProps) {
   const supabase = createClient()
 
   // Grad-check banner state (optimistic clear)
@@ -38,6 +38,32 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [eventCount, setEventCount] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  // Pastor Pulse card state
+  const [pulseInput, setPulseInput] = useState<string>("")
+  const [pulseScale, setPulseScale] = useState<number | null>(null)
+  const [pulseOption, setPulseOption] = useState<string | null>(null)
+  const [pulseSubmitting, setPulseSubmitting] = useState(false)
+  const [pulseSubmitted, setPulseSubmitted] = useState(false)
+
+  const isPastorRole = userRole.toLowerCase() === "pastor"
+
+  async function handlePulseSubmit() {
+    if (!activeQuestion || pulseSubmitting) return
+    setPulseSubmitting(true)
+    const payload: Record<string, unknown> = {
+      question_id: activeQuestion.id,
+      ministry_id: ministryId,
+      user_id: profile.id,
+    }
+    if (activeQuestion.question_type === "poll") payload.response_option = pulseOption
+    else if (activeQuestion.question_type === "scale") payload.response_scale = pulseScale
+    else payload.response_text = pulseInput.trim()
+    await supabase.from("congregation_responses").upsert(payload, { onConflict: "question_id,user_id" })
+    setPulseSubmitting(false)
+    setPulseSubmitted(true)
+    onResponded?.()
+  }
 
   const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
@@ -362,6 +388,54 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
               </div>
             </div>
 
+            {/* Pastor Pulse card — desktop */}
+            {activeQuestion && !hasResponded && !isPastorRole && (
+              <div className="mt-6 rounded-2xl px-8 py-7" style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 100%)", color: "#F6F4EF" }}>
+                {pulseSubmitted ? (
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <p style={{ fontSize: 22, marginBottom: 6 }}>🙏</p>
+                    <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Thanks for sharing</p>
+                    <p style={{ fontSize: 13, color: "rgba(246,244,239,0.65)" }}>Your response was received anonymously.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
+                    <div>
+                      <span style={{ fontSize: 10, letterSpacing: "0.8px", textTransform: "uppercase", fontWeight: 600, color: "rgba(246,244,239,0.6)", display: "block", marginBottom: 10 }}>
+                        Pastor Pulse · {activeQuestion.question_type === "poll" ? "Poll" : activeQuestion.question_type === "scale" ? "1–5 Scale" : activeQuestion.question_type === "prayer" ? "Prayer" : "Open"}
+                      </span>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, lineHeight: 1.15, color: "#F6F4EF", margin: 0 }}>{activeQuestion.question_text}</p>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {activeQuestion.question_type === "poll" && activeQuestion.options && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {activeQuestion.options.map((opt) => (
+                            <button key={opt} onClick={() => setPulseOption(opt)} style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${pulseOption === opt ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseOption === opt ? "rgba(246,244,239,0.15)" : "transparent", color: "#F6F4EF", fontSize: 14, fontWeight: pulseOption === opt ? 600 : 400, cursor: "pointer", textAlign: "left" }}>{opt}</button>
+                          ))}
+                        </div>
+                      )}
+                      {activeQuestion.question_type === "scale" && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button key={n} onClick={() => setPulseScale(n)} style={{ flex: 1, aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${pulseScale === n ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseScale === n ? "rgba(246,244,239,0.2)" : "transparent", color: "#F6F4EF", fontSize: 18, fontWeight: 600, cursor: "pointer" }}>{n}</button>
+                          ))}
+                        </div>
+                      )}
+                      {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
+                        <textarea value={pulseInput} onChange={e => setPulseInput(e.target.value)} placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"} rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid rgba(246,244,239,0.25)", background: "rgba(246,244,239,0.1)", color: "#F6F4EF", fontSize: 14, fontFamily: "var(--font-inter)", resize: "none", boxSizing: "border-box", outline: "none" }} />
+                      )}
+                      <button
+                        onClick={handlePulseSubmit}
+                        disabled={pulseSubmitting || (activeQuestion.question_type === "poll" && !pulseOption) || (activeQuestion.question_type === "scale" && !pulseScale) || ((activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && !pulseInput.trim())}
+                        style={{ padding: "11px 0", borderRadius: 10, background: "#F6F4EF", color: "#3E1540", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", opacity: pulseSubmitting ? 0.6 : 1 }}
+                      >
+                        {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* For You section */}
             {forYouItems.length > 0 && (
               <div className="mt-8">
@@ -495,6 +569,68 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                   </div>
                 )}
               </section>
+
+              {/* Pastor Pulse card — mobile */}
+              {activeQuestion && !hasResponded && !isPastorRole && (
+                <section>
+                  {pulseSubmitted ? (
+                    <div className="rounded-[22px] border border-[#E5E0D2] bg-[#FBF8F2] px-6 py-6 text-center">
+                      <p style={{ fontSize: 22, marginBottom: 6 }}>🙏</p>
+                      <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Thanks for sharing</p>
+                      <p style={{ fontSize: 12, color: "#8A8497" }}>Your response was received anonymously.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-[22px] px-6 py-6" style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 100%)", color: "#F6F4EF" }}>
+                      <span style={{ fontSize: 10, letterSpacing: "0.8px", textTransform: "uppercase", fontWeight: 600, color: "rgba(246,244,239,0.6)", display: "block", marginBottom: 10 }}>
+                        Pastor Pulse · {activeQuestion.question_type === "poll" ? "Poll" : activeQuestion.question_type === "scale" ? "1–5 Scale" : activeQuestion.question_type === "prayer" ? "Prayer" : "Open"}
+                      </span>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, lineHeight: 1.2, marginBottom: 16, color: "#F6F4EF" }}>{activeQuestion.question_text}</p>
+
+                      {activeQuestion.question_type === "poll" && activeQuestion.options && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {activeQuestion.options.map((opt) => (
+                            <button
+                              key={opt}
+                              onClick={() => setPulseOption(opt)}
+                              style={{ padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${pulseOption === opt ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseOption === opt ? "rgba(246,244,239,0.15)" : "transparent", color: "#F6F4EF", fontSize: 14, fontWeight: pulseOption === opt ? 600 : 400, cursor: "pointer", textAlign: "left" }}
+                            >{opt}</button>
+                          ))}
+                        </div>
+                      )}
+
+                      {activeQuestion.question_type === "scale" && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              onClick={() => setPulseScale(n)}
+                              style={{ flex: 1, aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${pulseScale === n ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseScale === n ? "rgba(246,244,239,0.2)" : "transparent", color: "#F6F4EF", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+                            >{n}</button>
+                          ))}
+                        </div>
+                      )}
+
+                      {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
+                        <textarea
+                          value={pulseInput}
+                          onChange={e => setPulseInput(e.target.value)}
+                          placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
+                          rows={3}
+                          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid rgba(246,244,239,0.25)", background: "rgba(246,244,239,0.1)", color: "#F6F4EF", fontSize: 14, fontFamily: "var(--font-inter)", resize: "none", boxSizing: "border-box", outline: "none" }}
+                        />
+                      )}
+
+                      <button
+                        onClick={handlePulseSubmit}
+                        disabled={pulseSubmitting || (activeQuestion.question_type === "poll" && !pulseOption) || (activeQuestion.question_type === "scale" && !pulseScale) || ((activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && !pulseInput.trim())}
+                        style={{ marginTop: 14, width: "100%", padding: "12px 0", borderRadius: 10, background: "#F6F4EF", color: "#3E1540", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", opacity: pulseSubmitting ? 0.6 : 1 }}
+                      >
+                        {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* For You - mobile */}
               {forYouItems.length > 0 && (

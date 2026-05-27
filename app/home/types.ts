@@ -1,6 +1,6 @@
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
 
 export interface Profile {
   id: string
@@ -182,6 +182,24 @@ export interface Reaction {
   emoji: string
 }
 
+export interface CongregationQuestion {
+  id: string
+  ministry_id: string
+  created_by: string
+  question_text: string
+  question_type: "poll" | "scale" | "open" | "prayer"
+  options: string[] | null
+  is_active: boolean
+  created_at: string
+  closed_at: string | null
+}
+
+export interface CongregationTabProps {
+  userId: string
+  ministryId: string
+  userRole: string
+}
+
 export interface HomeTabProps {
   profile: Profile
   userRole: string
@@ -193,6 +211,9 @@ export interface HomeTabProps {
   onOpenChat: (id: string, name: string) => void
   onGoToProfile: () => void
   avatarUrl?: string | null
+  activeQuestion?: CongregationQuestion | null
+  hasResponded?: boolean
+  onResponded?: () => void
 }
 
 export interface CreateAnnouncementModalProps {
@@ -567,6 +588,7 @@ export interface DesktopSidebarProps {
   activeGroupId?: string | null
   onLogout: () => void
   isAdmin?: boolean
+  isPastor?: boolean
   onCreateTeam?: () => void
   activeTeamId: string | null
   onActiveTeamChange: (id: string) => void
