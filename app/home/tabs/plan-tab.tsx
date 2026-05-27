@@ -12038,7 +12038,6 @@ function BibleStudySubTab({
         message_type: "attachment",
       })
       setShareSuccess(true)
-      if (onOpenChat) onOpenChat(targetGroup.id, targetGroup.name)
     } else {
       setFinalizeError("No group chat found. Create a group chat from the team settings first.")
     }

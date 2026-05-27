@@ -11,7 +11,8 @@ export async function finalizeBibleStudyAction(
     const match = googleDocUrl.match(/\/document\/d\/([a-zA-Z0-9_-]+)/)
     if (!match) return { error: "Invalid Google Doc URL — paste the full link from your browser." }
     const docId = match[1]
-    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`
+    // tab=t.0 exports only the first tab, avoiding Google Docs tab-divider cover pages in the PDF
+    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf&tab=t.0`
 
     const res = await fetch(exportUrl, { redirect: "follow" })
     if (!res.ok) {
