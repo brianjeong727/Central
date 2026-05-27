@@ -4,6 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
 export async function proxy(request: NextRequest) {
+  // API routes are always public — pass through before any auth check.
+  // The matcher pattern should exclude /api/ but Turbopack doesn't reliably honor it.
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
