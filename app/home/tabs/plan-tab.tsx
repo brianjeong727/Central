@@ -11697,6 +11697,15 @@ function BibleStudySubTab({
   const [editingNote, setEditingNote] = useState(false)
   const [savingProgressNote, setSavingProgressNote] = useState(false)
 
+  // Rename tab
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const [savingRename, setSavingRename] = useState(false)
+
+  // Delete tab
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+
   // Share
   const [sharing, setSharing] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
@@ -11885,6 +11894,28 @@ function BibleStudySubTab({
     await saveAnnotations(annotations.filter((_, i) => i !== idx))
   }
 
+  async function handleRename(id: string) {
+    if (!renameValue.trim()) { setRenamingId(null); return }
+    setSavingRename(true)
+    await supabase.from("bible_study_sheets").update({ title: renameValue.trim() }).eq("id", id)
+    setSavingRename(false)
+    setRenamingId(null)
+    await loadSheets()
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    await supabase.from("bible_study_sheets").delete().eq("id", id)
+    setDeletingId(null)
+    setConfirmingDeleteId(null)
+    const nextSheets = sheets.filter(s => s.id !== id)
+    setSheets(nextSheets)
+    if (selectedSheetId === id) {
+      setSelectedSheetId(nextSheets.length > 0 ? nextSheets[nextSheets.length - 1].id : null)
+    }
+    setSheet(null)
+  }
+
   async function handleShare() {
     if (!sheet?.pdf_url) return
     setSharing(true)
@@ -11994,22 +12025,76 @@ function BibleStudySubTab({
 
       {/* ── Chapter tab strip ─────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none" as const, paddingBottom: 2, alignItems: "center" }}>
-        {sheets.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setSelectedSheetId(s.id)}
-            style={{
-              padding: "6px 14px", borderRadius: 20, fontSize: 13,
-              fontWeight: selectedSheetId === s.id ? 600 : 400,
-              border: selectedSheetId === s.id ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
-              background: selectedSheetId === s.id ? "#3E1540" : "transparent",
-              color: selectedSheetId === s.id ? "#F6F4EF" : "#5A5466",
-              cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit",
-            }}
-          >
-            {s.title}
-          </button>
-        ))}
+        {sheets.map(s => {
+          const isActive = selectedSheetId === s.id
+          const isRenaming = renamingId === s.id
+          const isConfirmingDelete = confirmingDeleteId === s.id
+          return (
+            <div key={s.id} style={{ flexShrink: 0, position: "relative" as const }}>
+              {isRenaming ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1.5px solid #3E1540", borderRadius: 20, background: "#FBF8F2" }}>
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") void handleRename(s.id); if (e.key === "Escape") setRenamingId(null) }}
+                    style={{ fontSize: 13, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", color: "#13101A", width: 120 }}
+                  />
+                  <button onClick={() => void handleRename(s.id)} disabled={savingRename} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#2E7D32", display: "flex" }}>
+                    <Check style={{ width: 13, height: 13 }} />
+                  </button>
+                  <button onClick={() => setRenamingId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", display: "flex" }}>
+                    <X style={{ width: 13, height: 13 }} />
+                  </button>
+                </div>
+              ) : isConfirmingDelete ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", border: "1.5px solid #E57373", borderRadius: 20, background: "#FFF5F5" }}>
+                  <span style={{ fontSize: 12, color: "#9F3030", whiteSpace: "nowrap" as const }}>Delete?</span>
+                  <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#9F3030", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>
+                    {deletingId === s.id ? "…" : "Yes"}
+                  </button>
+                  <button onClick={() => setConfirmingDeleteId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", display: "flex" }}>
+                    <X style={{ width: 12, height: 12 }} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: isActive && isPastor ? 4 : 0 }}>
+                  <button
+                    onClick={() => setSelectedSheetId(s.id)}
+                    style={{
+                      padding: "6px 14px", borderRadius: 20, fontSize: 13,
+                      fontWeight: isActive ? 600 : 400,
+                      border: isActive ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
+                      background: isActive ? "#3E1540" : "transparent",
+                      color: isActive ? "#F6F4EF" : "#5A5466",
+                      cursor: "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit",
+                    }}
+                  >
+                    {s.title}
+                  </button>
+                  {isActive && isPastor && (
+                    <>
+                      <button
+                        onClick={() => { setRenamingId(s.id); setRenameValue(s.title) }}
+                        title="Rename"
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "#8A8497", display: "flex", flexShrink: 0 }}
+                      >
+                        <Pencil style={{ width: 12, height: 12 }} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmingDeleteId(s.id)}
+                        title="Delete"
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "#C4C0B0", display: "flex", flexShrink: 0 }}
+                      >
+                        <Trash2 style={{ width: 12, height: 12 }} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
         {isPastor && !creating && (
           <button
             onClick={() => setCreating(true)}
