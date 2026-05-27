@@ -86,6 +86,7 @@ const TEAM_PRESETS = [
     name: "Praise Team",
     icon: "🎵",
     description: "Worship and music ministry",
+    comingSoon: true,
     roles: [
       { name: "President", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
       { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
@@ -119,6 +120,7 @@ const TEAM_PRESETS = [
     name: "Tech Team",
     icon: "💻",
     description: "Technical support and media",
+    comingSoon: true,
     roles: [{ name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] }],
   },
   {
@@ -126,6 +128,7 @@ const TEAM_PRESETS = [
     name: "DG Praise Team",
     icon: "🎵",
     description: "Discipleship group praise and worship",
+    comingSoon: true,
     teamType: "dg_praise" as const,
     roles: [
       { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
@@ -137,6 +140,7 @@ const TEAM_PRESETS = [
     name: "One-Time Event",
     icon: "⭐",
     description: "Praise team for a one-time event (SSO, Welcome Week, etc.)",
+    comingSoon: true,
     teamType: "one_time" as const,
     roles: [
       { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
@@ -8842,7 +8846,26 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
             {/* Desktop: 2-col grid; mobile: stack */}
             <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {TEAM_PRESETS.map((preset) => (
+              {TEAM_PRESETS.map((preset) => {
+                const disabled = (preset as { comingSoon?: boolean }).comingSoon
+                return disabled ? (
+                  <div
+                    key={preset.id}
+                    className="w-full rounded-2xl border border-[#ECE8DE] p-4 text-left md:p-5"
+                    style={{ background: "#F8F6F2", opacity: 0.6, cursor: "not-allowed" }}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className="text-[22px] mt-0.5 grayscale">{preset.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[#8A8497] leading-tight">{preset.name}</p>
+                          <span className="text-[10px] font-semibold tracking-wide uppercase bg-[#ECE8DE] text-[#8A8497] px-2 py-0.5 rounded-full">Coming soon</span>
+                        </div>
+                        <p className="text-[12px] text-[#C4C0B0] mt-1">{preset.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <button
                   key={preset.id}
                   onClick={() => applyPreset(preset)}
@@ -8867,7 +8890,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                     </div>
                   </div>
                 </button>
-              ))}
+                )
+              })}
             </div>
 
             {/* Desktop: footer nav */}

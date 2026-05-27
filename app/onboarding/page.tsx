@@ -328,30 +328,56 @@ export default function OnboardingPage() {
           {/* ── Step 2: Structure ── */}
           {step === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {STRUCTURE_QUESTIONS.map((q) => (
-                <button key={q.id} type="button" onClick={() => toggleStructure(q.id)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%", cursor: "pointer",
-                    border: structure[q.id] ? "1.5px solid #3E1540" : "1.5px solid #ECE8DE",
-                    background: structure[q.id] ? "rgba(62,21,64,0.04)" : "white",
-                    transition: "all 0.15s",
-                  }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                    background: structure[q.id] ? "#3E1540" : "#F4F1E8",
-                    border: structure[q.id] ? "none" : "1.5px solid #E5E0D2",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.15s",
-                  }}>
-                    {structure[q.id] && <Check style={{ width: 11, height: 11, color: "white" }} />}
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>{q.label}</p>
-                    <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{q.desc}</p>
-                  </div>
-                </button>
-              ))}
+              {STRUCTURE_QUESTIONS.map((q) => {
+                const comingSoon = q.id === "worship" || q.id === "media"
+                if (comingSoon) {
+                  return (
+                    <div key={q.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 14,
+                        padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%",
+                        border: "1.5px solid #ECE8DE", background: "#F8F6F2",
+                        opacity: 0.6, cursor: "not-allowed",
+                      }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                        background: "#F4F1E8", border: "1.5px solid #E5E0D2",
+                      }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#8A8497", margin: "0 0 2px" }}>{q.label}</p>
+                          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", background: "#ECE8DE", color: "#8A8497", padding: "2px 7px", borderRadius: 99 }}>Coming soon</span>
+                        </div>
+                        <p style={{ fontSize: 12, color: "#C4C0B0", margin: 0 }}>{q.desc}</p>
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <button key={q.id} type="button" onClick={() => toggleStructure(q.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 14,
+                      padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%", cursor: "pointer",
+                      border: structure[q.id] ? "1.5px solid #3E1540" : "1.5px solid #ECE8DE",
+                      background: structure[q.id] ? "rgba(62,21,64,0.04)" : "white",
+                      transition: "all 0.15s",
+                    }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                      background: structure[q.id] ? "#3E1540" : "#F4F1E8",
+                      border: structure[q.id] ? "none" : "1.5px solid #E5E0D2",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.15s",
+                    }}>
+                      {structure[q.id] && <Check style={{ width: 11, height: 11, color: "white" }} />}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>{q.label}</p>
+                      <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{q.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
 
