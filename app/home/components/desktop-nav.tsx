@@ -199,7 +199,7 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
             <button
               key={i}
               style={subItemStyle(
-                s.tab ? activeTab === s.tab : s.section ? profileSection === s.section : undefined,
+                s.tab ? activeTab === s.tab : s.section ? (activeTab === "profile" && profileSection === s.section) : undefined,
                 s.danger
               )}
               onClick={
