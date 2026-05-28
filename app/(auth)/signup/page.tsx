@@ -50,14 +50,14 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
   )
 }
 
-// ─── sticky plum panel ─────────────────────────────────────────
+// ─── sticky plum panel (direct grid item — no wrapper) ────────
 function PlumPanel() {
   return (
-    <div style={{
+    <div className="hidden md:flex" style={{
       position: "sticky", top: 0, alignSelf: "start", height: "100vh",
       overflow: "hidden", color: "#FBF8F2",
       background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-      padding: "44px 56px", display: "flex", flexDirection: "column", justifyContent: "space-between",
+      padding: "44px 56px", flexDirection: "column", justifyContent: "space-between",
     }}>
       <div aria-hidden style={{
         position: "absolute", inset: 0, opacity: 0.18, pointerEvents: "none",
@@ -83,14 +83,14 @@ function PlumPanel() {
 function SplitShell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      width: "100%", minHeight: "100svh", display: "grid", gridTemplateColumns: "1.05fr 1fr",
-      alignItems: "start", background: "#FBF8F2", fontFamily: SANS,
-    }}
-      className="max-md:block"
-    >
-      <div className="hidden md:block"><PlumPanel/></div>
+      width: "100%", minHeight: "100svh",
+      display: "grid", gridTemplateColumns: "1.05fr 1fr", alignItems: "start",
+      background: "#FBF8F2", fontFamily: SANS,
+    }}>
+      {/* PlumPanel is a direct grid item — sticky works correctly */}
+      <PlumPanel/>
       <div style={{
-        position: "relative", minHeight: "100svh", padding: "64px 56px",
+        minHeight: "100svh", padding: "64px 56px",
         display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
       }}
         className="px-6 py-16 md:px-14"

@@ -1,62 +1,326 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Plus, X } from "lucide-react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
-import { RingCrossLogo } from "@/app/home/components/shared"
 
-const STEPS = 4
+// ─── design tokens ──────────────────────────────────────────────
+const SANS = "var(--font-inter), system-ui, sans-serif"
+const SERIF = "var(--font-instrument-serif)"
+
+const mono: React.CSSProperties = {
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+}
+const serif: React.CSSProperties = {
+  fontFamily: SERIF, fontWeight: 400, color: "#13101A", margin: 0,
+}
+
+// ─── icon helper ─────────────────────────────────────────────────
+function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={d}/>
+    </svg>
+  )
+}
+
+// ─── wordmark ────────────────────────────────────────────────────
+function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
+  const isInk = tone === "ink"
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: isInk ? "#3E1540" : "rgba(251,248,242,0.10)",
+        color: "#FBF8F2", display: "grid", placeItems: "center",
+        fontFamily: SERIF, fontSize: 15, flexShrink: 0,
+      }}>C</span>
+      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "#13101A" : "#FBF8F2" }}>
+        Central
+      </span>
+    </div>
+  )
+}
+
+// ─── stepper (cream circles on plum) ─────────────────────────────
+const STEP_LABELS = ["Basic info", "Structure", "Teams", "Review"]
+
+function Stepper({ step }: { step: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start" }}>
+      {STEP_LABELS.map((label, i) => {
+        const done = i < step, current = i === step
+        return (
+          <div key={label} style={{ display: "contents" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 72 }}>
+              <span style={{
+                width: 30, height: 30, borderRadius: 999, display: "grid", placeItems: "center",
+                fontFamily: SANS, fontSize: 13, fontWeight: 600,
+                background: (done || current) ? "#FBF8F2" : "rgba(251,248,242,0.08)",
+                color: done ? "#3E1540" : current ? "#2D0F2E" : "rgba(251,248,242,0.5)",
+                border: (done || current) ? "none" : "1px solid rgba(251,248,242,0.25)",
+              }}>
+                {done ? <Icon d="M5 12l5 5L20 7" size={14} stroke={2.4}/> : i + 1}
+              </span>
+              <span style={{
+                fontFamily: SANS, fontSize: 12, textAlign: "center",
+                color: current ? "#FBF8F2" : "rgba(251,248,242,0.55)",
+                fontWeight: current ? 600 : 400,
+              }}>{label}</span>
+            </div>
+            {i < STEP_LABELS.length - 1 && (
+              <span style={{ flex: 1, height: 1, background: "rgba(251,248,242,0.25)", marginTop: 15 }}/>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── checkbox ────────────────────────────────────────────────────
+function CheckBox({ on }: { on: boolean }) {
+  return (
+    <span style={{
+      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+      border: `1.5px solid ${on ? "#3E1540" : "#C4C0B0"}`,
+      background: on ? "#3E1540" : "transparent",
+      display: "grid", placeItems: "center", color: "#FBF8F2",
+    }}>
+      {on && <Icon d="M5 12l5 5L20 7" size={12} stroke={2.4}/>}
+    </span>
+  )
+}
+
+// ─── field ───────────────────────────────────────────────────────
+function Field({ label, value, onChange, placeholder, autoFocus, error }: {
+  label: string; value: string; onChange: (v: string) => void
+  placeholder?: string; autoFocus?: boolean; error?: boolean
+}) {
+  return (
+    <label style={{ display: "block" }}>
+      <div style={{ ...mono, marginBottom: 8 }}>{label}</div>
+      <div style={{
+        display: "flex", alignItems: "center",
+        background: "#FBF8F2",
+        border: `1px solid ${error ? "#E53E3E" : "#E2DDCF"}`,
+        borderRadius: 10, padding: "0 14px",
+      }}>
+        <input
+          value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder} autoFocus={autoFocus}
+          style={{
+            flex: 1, border: "none", outline: "none", background: "transparent",
+            padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A",
+          }}
+        />
+      </div>
+    </label>
+  )
+}
+
+// ─── select tile ─────────────────────────────────────────────────
+function SelectTile({ title, sub, on, onClick, big }: {
+  title: string; sub?: string; on: boolean; onClick: () => void; big?: boolean
+}) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      flex: 1, textAlign: "left", padding: "16px 18px", borderRadius: 12,
+      border: `1px solid ${on ? "#2D0F2E" : "#E2DDCF"}`,
+      background: on ? "#2D0F2E" : "#FBF8F2",
+      cursor: "pointer", transition: "all .12s ease",
+    }}>
+      <div style={{
+        fontFamily: SERIF, fontWeight: 400,
+        fontSize: big ? 26 : 20, letterSpacing: -0.3, lineHeight: 1.1,
+        color: on ? "#FBF8F2" : "#13101A",
+      }}>{title}</div>
+      {sub && (
+        <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "#8A8497" }}>{sub}</div>
+      )}
+    </button>
+  )
+}
+
+// ─── struct row ──────────────────────────────────────────────────
+function StructRow({ title, body, on, soon, onClick }: {
+  title: string; body: string; on?: boolean; soon?: boolean; onClick?: () => void
+}) {
+  return (
+    <button type="button" onClick={soon ? undefined : onClick} disabled={soon} style={{
+      width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 16,
+      padding: "18px 20px", borderRadius: 12,
+      border: `1px solid ${on ? "#3E1540" : "#E2DDCF"}`,
+      background: on ? "#F6F2E8" : "#FBF8F2",
+      cursor: soon ? "default" : "pointer",
+      opacity: soon ? 0.55 : 1,
+      transition: "all .12s ease",
+    }}>
+      <CheckBox on={!!on}/>
+      <span style={{ flex: 1 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontFamily: SERIF, fontSize: 20, letterSpacing: -0.2, color: "#13101A" }}>{title}</span>
+          {soon && (
+            <span style={{
+              ...mono, fontSize: 10, background: "#F1ECDE",
+              border: "1px solid #E2DDCF", borderRadius: 999, padding: "3px 8px",
+            }}>Coming soon</span>
+          )}
+        </span>
+        <span style={{ display: "block", fontSize: 13.5, color: "#8A8497", marginTop: 3 }}>{body}</span>
+      </span>
+    </button>
+  )
+}
+
+// ─── team row ────────────────────────────────────────────────────
+function TeamRow({ team, onRemove, onChangeName }: {
+  team: Team; onRemove: () => void; onChangeName: (name: string) => void
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 14, padding: "12px 14px",
+      borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
+    }}>
+      <span style={{
+        width: 38, height: 38, borderRadius: 10, background: "#F1ECDE", color: "#3E1540",
+        display: "grid", placeItems: "center", flexShrink: 0,
+        fontFamily: SERIF, fontSize: 18,
+      }}>
+        {team.name.charAt(0) || "T"}
+      </span>
+      <input
+        value={team.name}
+        onChange={(e) => onChangeName(e.target.value)}
+        style={{
+          flex: 1, border: "none", outline: "none", background: "transparent",
+          fontFamily: SANS, fontSize: 15, fontWeight: 500, color: "#13101A",
+        }}
+      />
+      <button type="button" onClick={onRemove} aria-label="Remove team" style={{
+        width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent",
+        color: "#8A8497", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0,
+      }}>
+        <Icon d="M18 6L6 18M6 6l12 12" size={14}/>
+      </button>
+    </div>
+  )
+}
+
+// ─── toggle ──────────────────────────────────────────────────────
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: 44, height: 26, borderRadius: 999, border: "none", padding: 0, cursor: "pointer",
+      background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0,
+      transition: "background .15s ease",
+    }}>
+      <span style={{
+        position: "absolute", width: 20, height: 20, borderRadius: 999, background: "#FBF8F2",
+        top: 3, left: on ? 21 : 3, transition: "left .15s ease",
+      }}/>
+    </button>
+  )
+}
+
+// ─── primary button ──────────────────────────────────────────────
+function Primary({ children, onClick, disabled }: {
+  children: React.ReactNode; onClick?: () => void; disabled?: boolean
+}) {
+  return (
+    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
+      width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
+      background: disabled ? "#E2DDCF" : "#2D0F2E",
+      color: disabled ? "#A09A8C" : "#FBF8F2",
+      fontSize: 15, fontWeight: 500, fontFamily: SANS,
+      cursor: disabled ? "not-allowed" : "pointer",
+      transition: "background .15s ease",
+      marginTop: 6,
+    }}>{children}</button>
+  )
+}
+
+// ─── back link ───────────────────────────────────────────────────
+function BackLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      background: "transparent", border: "none", cursor: "pointer", padding: 0,
+      display: "inline-flex", alignItems: "center", gap: 8,
+      fontFamily: SANS, fontSize: 14, color: "#8A8497",
+    }}>
+      <Icon d="M19 12H5M12 19l-7-7 7-7" size={15}/> Back
+    </button>
+  )
+}
+
+// ─── step head ───────────────────────────────────────────────────
+function StepHead({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={mono}>{eyebrow}</div>
+      <h2 style={{ ...serif, fontSize: 34, lineHeight: 1.1, letterSpacing: "-0.02em", marginTop: 4 }}>{title}</h2>
+      <p style={{ fontSize: 15, color: "#5A5466", marginTop: 8, marginBottom: 0 }}>{sub}</p>
+    </div>
+  )
+}
+
+// ─── review card ────────────────────────────────────────────────
+function ReviewCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ padding: 22, borderRadius: 14, border: "1px solid #E8E2D2", background: "#FBF8F2" }}>
+      {children}
+    </div>
+  )
+}
+
+// ─── soft pill (review teams) ────────────────────────────────────
+function SoftPill({ name }: { name: string }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px 6px 8px",
+      borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", color: "#2D0F2E",
+      fontSize: 13, fontWeight: 500,
+    }}>
+      <span style={{
+        width: 24, height: 24, borderRadius: 7, background: "#FBF8F2", color: "#3E1540",
+        display: "grid", placeItems: "center",
+        fontFamily: SERIF, fontSize: 14,
+      }}>
+        {name.charAt(0) || "T"}
+      </span>
+      {name}
+    </span>
+  )
+}
+
+// ─── data ────────────────────────────────────────────────────────
+const SIZE_OPTIONS = [
+  { value: "small" as const, label: "Under 50", sub: "Small fellowship" },
+  { value: "medium" as const, label: "50–100", sub: "Mid-size ministry" },
+  { value: "large" as const, label: "100+", sub: "Large campus group" },
+]
 
 const STRUCTURE_QUESTIONS = [
-  { id: "worship", label: "Worship / Music", desc: "Worship leading and music ministry" },
-  { id: "media", label: "Media & Tech", desc: "Sound, projection, and live streaming" },
-  { id: "smallGroups", label: "Small Groups", desc: "Bible study groups or cells" },
-  { id: "hospitality", label: "Hospitality", desc: "Welcoming guests and outreach" },
-  { id: "leadership", label: "Leadership Team", desc: "Core leadership board and oversight" },
+  { id: "worship",    label: "Worship / Music",   desc: "Worship leading and music ministry",       soon: true  },
+  { id: "media",      label: "Media & Tech",       desc: "Sound, projection, and live streaming",    soon: true  },
+  { id: "smallGroups",label: "Small Groups",       desc: "Bible study groups or cells",              soon: false },
+  { id: "hospitality",label: "Hospitality",        desc: "Welcoming guests and outreach",            soon: false },
+  { id: "leadership", label: "Leadership Team",    desc: "Core leadership board and oversight",      soon: false },
 ]
 
 const TEAM_PRESETS: Record<string, { name: string; icon: string }> = {
-  worship: { name: "Worship", icon: "🎵" },
-  media: { name: "Media & Tech", icon: "🎬" },
-  smallGroups: { name: "Small Groups", icon: "👥" },
-  hospitality: { name: "Hospitality", icon: "🤝" },
-  leadership: { name: "Leadership", icon: "✝️" },
+  worship:     { name: "Worship",        icon: "🎵" },
+  media:       { name: "Media & Tech",   icon: "🎬" },
+  smallGroups: { name: "Small Groups",   icon: "👥" },
+  hospitality: { name: "Hospitality",    icon: "🤝" },
+  leadership:  { name: "Leadership",     icon: "✝️" },
 }
-
-const SIZE_OPTIONS = [
-  { value: "small" as const, label: "Under 50", desc: "Small fellowship" },
-  { value: "medium" as const, label: "50–100", desc: "Mid-size ministry" },
-  { value: "large" as const, label: "100+", desc: "Large campus group" },
-]
-
-const STEP_TITLES = ["Basic info", "Structure", "Teams", "Review"]
-
-const STEP_HEADINGS = [
-  "Basic information",
-  "Ministry structure",
-  "Your teams",
-  "Review & submit",
-]
-
-const STEP_SUBTITLES = [
-  "Tell us the basics about your ministry.",
-  "Select everything that applies to your ministry.",
-  "We'll create these teams in your workspace.",
-  "Review your details before submitting.",
-]
-
-const EMOJI_OPTIONS = ["🙏","📖","💒","🌍","🎓","❤️","💜","⭐","📋","🎯","🎉","💡","🏠","🍞","🌱","🤲","🫶","🎤","🥁","🎸","🎵","🎬","👥","🤝","✝️"]
 
 function mapLandingSize(s: string): "small" | "medium" | "large" {
   if (s === "100+") return "large"
   if (s === "50–100") return "medium"
   return "small"
-}
-
-interface Team {
-  id: string
-  name: string
-  icon: string
 }
 
 function readPendingMinistry(): { name: string; university: string; size: "small" | "medium" | "large" } {
@@ -75,33 +339,13 @@ function readPendingMinistry(): { name: string; university: string; size: "small
   }
 }
 
-const inputClass =
-  "w-full px-4 py-3 rounded-[10px] border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
-
-const inputErrorClass =
-  "w-full px-4 py-3 rounded-[10px] border border-red-400 bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-red-200 transition-all"
-
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <div
-      onClick={onToggle}
-      style={{
-        width: 40, height: 24, borderRadius: 999,
-        background: on ? "#3E1540" : "#E5E0D2",
-        position: "relative", cursor: "pointer", flexShrink: 0,
-        transition: "background 0.2s",
-      }}
-    >
-      <div style={{
-        position: "absolute", top: 2, left: on ? 18 : 2,
-        width: 20, height: 20, borderRadius: "50%", background: "white",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-        transition: "left 0.2s",
-      }} />
-    </div>
-  )
+interface Team {
+  id: string
+  name: string
+  icon: string
 }
 
+// ─── page ────────────────────────────────────────────────────────
 export default function OnboardingPage() {
   const pendingMinistry = useState(readPendingMinistry)[0]
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
@@ -121,11 +365,8 @@ export default function OnboardingPage() {
 
   // Step 3
   const [teams, setTeams] = useState<Team[]>([])
-  const [showAdd, setShowAdd] = useState(false)
-  const [newName, setNewName] = useState("")
-  const [newIcon, setNewIcon] = useState("🙏")
 
-  // Discoverability
+  // Step 4
   const [isPublic, setIsPublic] = useState(false)
 
   // Submit
@@ -136,7 +377,7 @@ export default function OnboardingPage() {
     setStructure((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
-  function buildTeamsFromStructure() {
+  function buildTeamsFromStructure(): Team[] {
     const result: Team[] = [{ id: "prayer", name: "Prayer", icon: "🙏" }]
     for (const [key, yes] of Object.entries(structure)) {
       if (yes && TEAM_PRESETS[key]) {
@@ -144,6 +385,18 @@ export default function OnboardingPage() {
       }
     }
     return result
+  }
+
+  function addTeam() {
+    setTeams((prev) => [...prev, { id: `c-${Date.now()}`, name: "New team", icon: "🙏" }])
+  }
+
+  function removeTeam(id: string) {
+    setTeams((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  function updateTeamName(id: string, newName: string) {
+    setTeams((prev) => prev.map((t) => t.id === id ? { ...t, name: newName } : t))
   }
 
   function next() {
@@ -160,18 +413,6 @@ export default function OnboardingPage() {
 
   function back() {
     setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4)
-  }
-
-  function addTeam() {
-    if (!newName.trim()) return
-    setTeams((prev) => [...prev, { id: `c-${Date.now()}`, name: newName.trim(), icon: newIcon }])
-    setNewName("")
-    setNewIcon("🙏")
-    setShowAdd(false)
-  }
-
-  function removeTeam(id: string) {
-    setTeams((prev) => prev.filter((t) => t.id !== id))
   }
 
   async function handleSubmit() {
@@ -193,407 +434,261 @@ export default function OnboardingPage() {
   }
 
   const step1Valid = name.trim() && university.trim() && location.trim()
+  const stepIndex = step - 1
 
   return (
-    <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column", fontFamily: "var(--font-inter)" }}>
+    <div style={{ minHeight: "100svh", background: "#FBF8F2", fontFamily: SANS }}>
 
-      {/* ── Plum header ── */}
-      <div style={{ background: "#3E1540" }}>
-        <div className="px-6 sm:px-10" style={{ maxWidth: 580, margin: "0 auto", paddingTop: 36, paddingBottom: 40 }}>
+      {/* ── Plum hero band ── */}
+      <div style={{
+        position: "relative", overflow: "hidden", color: "#FBF8F2",
+        background: "radial-gradient(120% 130% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+        padding: "40px 0 44px",
+      }}>
+        {/* dot texture */}
+        <div aria-hidden style={{
+          position: "absolute", inset: 0, opacity: 0.16, pointerEvents: "none",
+          background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
+        }}/>
 
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 32 }}>
-            <RingCrossLogo size={24} color="#F6F4EF" />
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em", lineHeight: 1 }}>
-              Central
-            </span>
-          </div>
+        <div style={{ position: "relative", maxWidth: 760, margin: "0 auto", padding: "0 24px" }}>
+          <Wordmark tone="plum"/>
 
-          {/* Eyebrow + heading + subtitle */}
-          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.5)", margin: "0 0 12px" }}>
+          <div style={{ ...mono, color: "rgba(251,248,242,0.55)", marginTop: 28 }}>
             Register your ministry
-          </p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 10px" }}>
+          </div>
+          <h1 style={{
+            fontFamily: SERIF, fontWeight: 400, color: "#FBF8F2",
+            fontSize: 52, letterSpacing: "-0.03em", lineHeight: 1.04, margin: "10px 0 0",
+          }}>
             Set up your ministry workspace.
           </h1>
-          <p style={{ fontSize: 14, color: "rgba(246,244,239,0.7)", lineHeight: 1.5, margin: "0 0 6px" }}>
+          <p style={{ fontSize: 15, color: "rgba(251,248,242,0.78)", marginTop: 12, marginBottom: 0 }}>
             It only takes a few minutes. We&apos;ll get your team ready to go.
           </p>
-          <p style={{ fontSize: 12, color: "rgba(246,244,239,0.45)", margin: "0 0 32px" }}>
+          <div style={{
+            ...mono, color: "rgba(251,248,242,0.45)", marginTop: 8,
+            letterSpacing: "0.06em", textTransform: "none" as const,
+          }}>
             Approved within 24–48 hours · Free during beta
-          </p>
-
-          {/* Step indicator */}
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            {Array.from({ length: STEPS }, (_, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS - 1 ? 1 : undefined }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                    background: i + 1 <= step ? "#F6F4EF" : "rgba(246,244,239,0.12)",
-                    color: i + 1 <= step ? "#3E1540" : "rgba(246,244,239,0.3)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 700,
-                    transition: "all 0.2s",
-                  }}>
-                    {i + 1 < step
-                      ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} />
-                      : i + 1}
-                  </div>
-                  <span style={{
-                    fontSize: 10, letterSpacing: "0.04em", whiteSpace: "nowrap",
-                    color: i + 1 === step ? "rgba(246,244,239,0.95)" : i + 1 < step ? "rgba(246,244,239,0.55)" : "rgba(246,244,239,0.4)",
-                    fontWeight: i + 1 === step ? 600 : 400,
-                    transition: "color 0.2s",
-                  }}>
-                    {STEP_TITLES[i]}
-                  </span>
-                </div>
-                {i < STEPS - 1 && (
-                  <div style={{
-                    flex: 1, height: 1, marginTop: 14, marginLeft: 8, marginRight: 8,
-                    background: i + 1 < step ? "rgba(246,244,239,0.55)" : "rgba(246,244,239,0.15)",
-                    transition: "background 0.2s",
-                  }} />
-                )}
-              </div>
-            ))}
+          </div>
+          <div style={{ marginTop: 32 }}>
+            <Stepper step={stepIndex}/>
           </div>
         </div>
       </div>
 
-      {/* ── Form area ── */}
-      <div style={{ background: "#FBF8F2", flex: 1 }}>
-        <div className="px-6 pt-9 pb-12 sm:px-10" style={{ maxWidth: 580, margin: "0 auto" }}>
+      {/* ── Form body ── */}
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 72px" }}>
 
-          {/* Step heading */}
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", margin: "0 0 6px" }}>
-            {STEP_HEADINGS[step - 1]}
-          </h2>
-          <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 28px", lineHeight: 1.5 }}>
-            {STEP_SUBTITLES[step - 1]}
-          </p>
+        {/* Step 1 — Basic info */}
+        {step === 1 && (
+          <div>
+            <StepHead
+              eyebrow="Step 1 · Basic info"
+              title="Basic information"
+              sub="Tell us the basics about your ministry."
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              <Field
+                label="Ministry name"
+                value={name} onChange={setName}
+                placeholder="e.g. Central Student Fellowship"
+                autoFocus
+                error={step1Touched && !name.trim()}
+              />
+              <Field
+                label="University"
+                value={university} onChange={setUniversity}
+                placeholder="e.g. University of Pittsburgh"
+                error={step1Touched && !university.trim()}
+              />
+              <Field
+                label="Location"
+                value={location} onChange={setLocation}
+                placeholder="e.g. Pittsburgh, PA"
+                error={step1Touched && !location.trim()}
+              />
 
-          {/* ── Step 1: Basic Info ── */}
-          {step === 1 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Ministry name</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Central Student Fellowship"
-                  className={step1Touched && !name.trim() ? inputErrorClass : inputClass} />
-                {step1Touched && !name.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>University</label>
-                <input type="text" value={university} onChange={(e) => setUniversity(e.target.value)}
-                  placeholder="e.g. University of Pittsburgh"
-                  className={step1Touched && !university.trim() ? inputErrorClass : inputClass} />
-                {step1Touched && !university.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Location</label>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Pittsburgh, PA"
-                  className={step1Touched && !location.trim() ? inputErrorClass : inputClass} />
-                {step1Touched && !location.trim() && <p style={{ fontSize: 11, color: "#B91C1C", marginTop: -2 }}>Required</p>}
-              </div>
-
-              {/* Size cards */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Approximate size</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                  {SIZE_OPTIONS.map((opt) => {
-                    const selected = size === opt.value
-                    return (
-                      <button key={opt.value} type="button" onClick={() => setSize(opt.value)}
-                        style={{
-                          padding: "16px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                          border: selected ? "2px solid #3E1540" : "1.5px solid #ECE8DE",
-                          background: selected ? "#3E1540" : "white",
-                          transition: "all 0.15s",
-                        }}>
-                        <p style={{ fontSize: 15, fontWeight: 700, color: selected ? "#F6F4EF" : "#13101A", margin: "0 0 3px" }}>
-                          {opt.label}
-                        </p>
-                        <p style={{ fontSize: 11, color: selected ? "rgba(246,244,239,0.6)" : "#8A8497", margin: 0 }}>
-                          {opt.desc}
-                        </p>
-                      </button>
-                    )
-                  })}
+              <div>
+                <div style={{ ...mono, marginBottom: 10 }}>Approximate size</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {SIZE_OPTIONS.map((opt) => (
+                    <SelectTile
+                      key={opt.value} big
+                      title={opt.label} sub={opt.sub}
+                      on={size === opt.value}
+                      onClick={() => setSize(opt.value)}
+                    />
+                  ))}
                 </div>
               </div>
 
-              {/* Founder role */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Your role</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              <div>
+                <div style={{ ...mono, marginBottom: 10 }}>Your role</div>
+                <div style={{ display: "flex", gap: 10 }}>
                   {([
-                    { value: "pastor",  label: "Pastor",  desc: "Senior leader" },
-                    { value: "deacon",  label: "Deacon",  desc: "Servant leader" },
-                    { value: "elder",   label: "Elder",   desc: "Elder board" },
-                  ] as const).map((opt) => {
-                    const sel = founderRole === opt.value
-                    return (
-                      <button key={opt.value} type="button" onClick={() => setFounderRole(opt.value)}
-                        style={{
-                          padding: "16px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                          border: sel ? "2px solid #3E1540" : "1.5px solid #ECE8DE",
-                          background: sel ? "#3E1540" : "white",
-                          transition: "all 0.15s",
-                        }}>
-                        <p style={{ fontSize: 15, fontWeight: 700, color: sel ? "#F6F4EF" : "#13101A", margin: "0 0 3px" }}>
-                          {opt.label}
-                        </p>
-                        <p style={{ fontSize: 11, color: sel ? "rgba(246,244,239,0.6)" : "#8A8497", margin: 0 }}>
-                          {opt.desc}
-                        </p>
-                      </button>
-                    )
-                  })}
+                    { value: "pastor" as const,  label: "Pastor",  sub: "Senior leader"  },
+                    { value: "deacon" as const,  label: "Deacon",  sub: "Servant leader" },
+                    { value: "elder"  as const,  label: "Elder",   sub: "Elder board"    },
+                  ]).map((opt) => (
+                    <SelectTile
+                      key={opt.value}
+                      title={opt.label} sub={opt.sub}
+                      on={founderRole === opt.value}
+                      onClick={() => setFounderRole(opt.value)}
+                    />
+                  ))}
                 </div>
               </div>
+
+              <Primary onClick={next}>Continue</Primary>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ── Step 2: Structure ── */}
-          {step === 2 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {STRUCTURE_QUESTIONS.map((q) => {
-                const comingSoon = q.id === "worship" || q.id === "media"
-                if (comingSoon) {
-                  return (
-                    <div key={q.id}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%",
-                        border: "1.5px solid #ECE8DE", background: "#F8F6F2",
-                        opacity: 0.6, cursor: "not-allowed",
-                      }}>
-                      <div style={{
-                        width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                        background: "#F4F1E8", border: "1.5px solid #E5E0D2",
-                      }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <p style={{ fontSize: 14, fontWeight: 600, color: "#8A8497", margin: "0 0 2px" }}>{q.label}</p>
-                          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", background: "#ECE8DE", color: "#8A8497", padding: "2px 7px", borderRadius: 99 }}>Coming soon</span>
-                        </div>
-                        <p style={{ fontSize: 12, color: "#C4C0B0", margin: 0 }}>{q.desc}</p>
-                      </div>
-                    </div>
-                  )
-                }
-                return (
-                  <button key={q.id} type="button" onClick={() => toggleStructure(q.id)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 14,
-                      padding: "14px 16px", borderRadius: 10, textAlign: "left", width: "100%", cursor: "pointer",
-                      border: structure[q.id] ? "1.5px solid #3E1540" : "1.5px solid #ECE8DE",
-                      background: structure[q.id] ? "rgba(62,21,64,0.04)" : "white",
-                      transition: "all 0.15s",
-                    }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                      background: structure[q.id] ? "#3E1540" : "#F4F1E8",
-                      border: structure[q.id] ? "none" : "1.5px solid #E5E0D2",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      transition: "all 0.15s",
-                    }}>
-                      {structure[q.id] && <Check style={{ width: 11, height: 11, color: "white" }} />}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>{q.label}</p>
-                      <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>{q.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
+        {/* Step 2 — Structure */}
+        {step === 2 && (
+          <div>
+            <StepHead
+              eyebrow="Step 2 · Structure"
+              title="Ministry structure"
+              sub="Select everything that applies to your ministry."
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {STRUCTURE_QUESTIONS.map((q) => (
+                <StructRow
+                  key={q.id}
+                  title={q.label} body={q.desc}
+                  on={structure[q.id]}
+                  soon={q.soon}
+                  onClick={() => toggleStructure(q.id)}
+                />
+              ))}
+              <Primary onClick={next}>Continue</Primary>
+              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ── Step 3: Teams ── */}
-          {step === 3 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 4px" }}>
-                {teams.length === 0
-                  ? "Add your first team below."
-                  : `${teams.length} team${teams.length !== 1 ? "s" : ""} will be created in your workspace.`}
-              </p>
-
-              {teams.map((team) => (
-                <div key={team.id} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "12px 14px", borderRadius: 10,
-                  border: "1px solid #ECE8DE", background: "white",
-                }}>
-                  <span style={{ fontSize: 18 }}>{team.icon}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A", flex: 1 }}>{team.name}</span>
-                  <button type="button" onClick={() => removeTeam(team.id)}
-                    style={{
-                      width: 24, height: 24, borderRadius: "50%", border: "none", background: "#F4F1E8",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", color: "#8A8497", flexShrink: 0,
-                    }}>
-                    <X style={{ width: 12, height: 12 }} />
-                  </button>
-                </div>
+        {/* Step 3 — Teams */}
+        {step === 3 && (
+          <div>
+            <StepHead
+              eyebrow="Step 3 · Teams"
+              title="Your teams"
+              sub={`We'll create ${teams.length} ${teams.length === 1 ? "team" : "teams"} in your workspace.`}
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {teams.map((t) => (
+                <TeamRow
+                  key={t.id}
+                  team={t}
+                  onRemove={() => removeTeam(t.id)}
+                  onChangeName={(n) => updateTeamName(t.id, n)}
+                />
               ))}
 
-              {showAdd ? (
-                <div style={{ padding: 16, borderRadius: 10, border: "1px solid #ECE8DE", background: "white", display: "flex", flexDirection: "column", gap: 12 }}>
-                  {/* Emoji grid picker */}
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.04em", marginBottom: 8 }}>Choose an icon</p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-                      {EMOJI_OPTIONS.map((e) => (
-                        <button
-                          key={e}
-                          type="button"
-                          onClick={() => setNewIcon(e)}
-                          style={{
-                            width: 36, height: 36, fontSize: 18,
-                            borderRadius: 8, border: newIcon === e ? "1.5px solid #3E1540" : "1.5px solid transparent",
-                            background: newIcon === e ? "rgba(62,21,64,0.08)" : "transparent",
-                            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                            transition: "all 0.12s",
-                          }}
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Team name" className={inputClass}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeam() } }} />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" onClick={addTeam} disabled={!newName.trim()}
-                      style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newName.trim() ? 0.5 : 1 }}>
-                      Add
-                    </button>
-                    <button type="button" onClick={() => { setShowAdd(false); setNewName("") }}
-                      style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#8A8497", cursor: "pointer" }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" onClick={() => setShowAdd(true)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "12px 14px", borderRadius: 10,
-                    border: "1.5px dashed #E5E0D2", background: "transparent",
-                    fontSize: 13, color: "#8A8497", cursor: "pointer",
-                  }}>
-                  <Plus style={{ width: 15, height: 15 }} /> Add team
-                </button>
-              )}
-            </div>
-          )}
+              <button type="button" onClick={addTeam} style={{
+                padding: "14px 16px", borderRadius: 12, border: "1px dashed #C4C0B0",
+                background: "transparent", color: "#5A5466", fontSize: 14, fontFamily: SANS,
+                cursor: "pointer", display: "flex", alignItems: "center",
+                justifyContent: "center", gap: 8, width: "100%",
+              }}>
+                <Icon d="M12 5v14M5 12h14" size={16}/> Add team
+              </button>
 
-          {/* ── Step 4: Review & Submit ── */}
-          {step === 4 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Primary onClick={next}>Continue</Primary>
+              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4 — Review & Submit */}
+        {step === 4 && (
+          <div>
+            <StepHead
+              eyebrow="Step 4 · Review"
+              title="Review & submit"
+              sub="Review your details before submitting."
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {error && (
-                <div style={{ borderRadius: 10, background: "rgba(220,38,38,0.08)", padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500 }}>
+                <div style={{
+                  borderRadius: 10, background: "rgba(220,38,38,0.08)",
+                  padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500,
+                }}>
                   {error}
                 </div>
               )}
 
-              <div style={{ padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE" }}>
-                <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px" }}>Ministry</p>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", fontWeight: 400, margin: "0 0 3px" }}>{name}</p>
-                <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>{university}</p>
-                <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 2px" }}>{location}</p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: "0 0 2px" }}>
+              <ReviewCard>
+                <div style={mono}>Ministry</div>
+                <div style={{
+                  fontFamily: SERIF, fontSize: 26, letterSpacing: -0.3,
+                  color: "#13101A", marginTop: 8,
+                }}>
+                  {name}
+                </div>
+                <div style={{ fontSize: 14, color: "#5A5466", marginTop: 8, lineHeight: 1.7 }}>
+                  {university}<br/>
+                  {location}<br/>
                   {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
-                </p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: 0, textTransform: "capitalize" }}>
-                  Your role: {founderRole}
-                </p>
-              </div>
+                  &nbsp;·&nbsp;
+                  Your role: <span style={{ textTransform: "capitalize" }}>{founderRole}</span>
+                </div>
+              </ReviewCard>
 
               {teams.length > 0 && (
-                <div style={{ padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px" }}>
-                    Teams ({teams.length})
-                  </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <ReviewCard>
+                  <div style={mono}>Teams · {teams.length}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
                     {teams.map((t) => (
-                      <span key={t.id} style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "4px 12px", borderRadius: 9999,
-                        background: "#F4F1E8", border: "1px solid #ECE8DE",
-                        fontSize: 13, color: "#13101A",
-                      }}>
-                        {t.icon} {t.name}
-                      </span>
+                      <SoftPill key={t.id} name={t.name}/>
                     ))}
                   </div>
-                </div>
+                </ReviewCard>
               )}
 
-              {/* Discoverability toggle */}
+              <ReviewCard>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: "#13101A" }}>List in public directory</div>
+                    <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>Anyone can find and request to join.</div>
+                  </div>
+                  <Toggle on={isPublic} onClick={() => setIsPublic((v) => !v)}/>
+                </div>
+              </ReviewCard>
+
+              {/* Beta banner */}
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "16px 18px", borderRadius: 10, background: "white", border: "1px solid #ECE8DE",
+                display: "flex", alignItems: "center", gap: 14, padding: "16px 20px",
+                borderRadius: 14, background: "#F6F2E8", border: "1px solid #E8E2D2",
               }}>
+                <span style={{
+                  width: 28, height: 28, borderRadius: 999,
+                  background: "#2D0F2E", color: "#FBF8F2",
+                  display: "grid", placeItems: "center", flexShrink: 0,
+                }}>
+                  <Icon d="M5 12l5 5L20 7" size={14} stroke={2.2}/>
+                </span>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>List in public directory</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Anyone can find and request to join</p>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>
+                    Free during beta · No credit card required
+                  </div>
+                  <div style={{ fontSize: 13, color: "#8A8497", marginTop: 2 }}>
+                    Your application will be reviewed within 24–48 hours.
+                  </div>
                 </div>
-                <Toggle on={isPublic} onToggle={() => setIsPublic((v) => !v)} />
               </div>
 
-              {/* Free beta banner */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 10, background: "#F4F1E8", border: "1px solid #ECE8DE" }}>
-                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Check style={{ width: 11, height: 11, color: "white" }} />
-                </div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", margin: "0 0 2px" }}>Free during beta · No credit card required</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Your application will be reviewed within 24–48 hours.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 36 }}>
-            {step < STEPS ? (
-              <button type="button" onClick={next}
-                className="active:scale-[0.97]"
-                style={{
-                  width: "100%", padding: "14px 0", background: "#3E1540", color: "#F6F4EF",
-                  border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "opacity 0.15s, transform 0.15s",
-                }}>
-                Continue
-              </button>
-            ) : (
-              <button type="button" onClick={handleSubmit} disabled={submitting}
-                className="active:scale-[0.97]"
-                style={{
-                  width: "100%", padding: "14px 0", background: "#3E1540", color: "#F6F4EF",
-                  border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.5 : 1,
-                  transition: "opacity 0.15s, transform 0.15s",
-                }}>
+              <Primary onClick={handleSubmit} disabled={submitting}>
                 {submitting ? "Submitting…" : "Submit application"}
-              </button>
-            )}
-            {step > 1 && (
-              <button type="button" onClick={back}
-                style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "6px 0", fontWeight: 500, textAlign: "center" }}>
-                ← Back
-              </button>
-            )}
+              </Primary>
+              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
