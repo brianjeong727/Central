@@ -62,6 +62,13 @@ function JoinContent() {
   const [myMinistryIds, setMyMinistryIds] = useState<Set<string>>(new Set())
   const [switching, setSwitching] = useState<string | null>(null)
 
+  // Staff code role picker — shown when a staff invite code is entered
+  const [needsStaffRole, setNeedsStaffRole] = useState(false)
+  const [staffMinistryName, setStaffMinistryName] = useState<string | null>(null)
+  const [staffRole, setStaffRole] = useState<"pastor" | "deacon" | "elder" | "">("")
+  const [joiningStaff, setJoiningStaff] = useState(false)
+  const [staffRoleError, setStaffRoleError] = useState<string | null>(null)
+
   // Gender collection — shown before join if profile has no gender set
   const [needsGender, setNeedsGender] = useState(false)
   const [gender, setGender] = useState<string>("")
@@ -131,12 +138,34 @@ function JoinContent() {
     setJoining(true)
     setCodeError(null)
     try {
-      const { error } = await joinMinistryByCode(inviteCode)
+      const { error, isStaffCode, ministryName } = await joinMinistryByCode(inviteCode)
+      if (isStaffCode) {
+        // Staff code detected — show role picker before completing join
+        setStaffMinistryName(ministryName)
+        setNeedsStaffRole(true)
+        setJoining(false)
+        return
+      }
       if (error) { setCodeError(error); setJoining(false); return }
       await checkAndShowSchoolPicker(() => window.location.assign("/home"))
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoining(false)
+    }
+  }
+
+  async function doStaffCodeJoin() {
+    if (!staffRole) return
+    setJoiningStaff(true)
+    setStaffRoleError(null)
+    try {
+      const { error } = await joinMinistryByCode(inviteCode, staffRole)
+      if (error) { setStaffRoleError(error); setJoiningStaff(false); return }
+      setNeedsStaffRole(false)
+      await checkAndShowSchoolPicker(() => window.location.assign("/home"))
+    } catch {
+      setStaffRoleError("Something went wrong. Please try again.")
+      setJoiningStaff(false)
     }
   }
 
@@ -230,6 +259,41 @@ function JoinContent() {
           </button>
           <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }} style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}>
             Skip for now
+          </button>
+        </div>
+      </div>
+    )}
+    {needsStaffRole && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>Staff invite code</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>
+            {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
+          </h2>
+          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>Select your staff role to join.</p>
+          {staffRoleError && (
+            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{staffRoleError}</div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {([
+              { value: "pastor",  label: "Pastor",  desc: "Senior leader" },
+              { value: "deacon",  label: "Deacon",  desc: "Servant leader" },
+              { value: "elder",   label: "Elder",   desc: "Elder board" },
+            ] as const).map(({ value, label, desc }) => {
+              const active = staffRole === value
+              return (
+                <button key={value} type="button" onClick={() => setStaffRole(value)} style={{ padding: "11px 16px", borderRadius: 12, border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: active ? "#3E1540" : "#FBF8F2", color: active ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>{label}</span>
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>{desc}</span>
+                </button>
+              )
+            })}
+          </div>
+          <button onClick={doStaffCodeJoin} disabled={!staffRole || joiningStaff} style={{ width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600, fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none", cursor: staffRole && !joiningStaff ? "pointer" : "not-allowed", opacity: !staffRole || joiningStaff ? 0.5 : 1, transition: "opacity 0.15s" }}>
+            {joiningStaff ? "Joining…" : "Join as " + (staffRole || "…")}
+          </button>
+          <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }} style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}>
+            Cancel
           </button>
         </div>
       </div>

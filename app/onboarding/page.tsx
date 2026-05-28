@@ -111,6 +111,7 @@ export default function OnboardingPage() {
   const [university, setUniversity] = useState(pendingMinistry.university)
   const [location, setLocation] = useState("")
   const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
+  const [founderRole, setFounderRole] = useState<"pastor" | "deacon" | "elder">("pastor")
   const [step1Touched, setStep1Touched] = useState(false)
 
   // Step 2
@@ -180,6 +181,7 @@ export default function OnboardingPage() {
       name, university, location, size,
       teams: teams.map((t) => ({ name: t.name, icon: t.icon })),
       isPublic,
+      founderRole,
     })
     if (err) {
       setError(err)
@@ -315,6 +317,36 @@ export default function OnboardingPage() {
                           {opt.label}
                         </p>
                         <p style={{ fontSize: 11, color: selected ? "rgba(246,244,239,0.6)" : "#8A8497", margin: 0 }}>
+                          {opt.desc}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Founder role */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Your role</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {([
+                    { value: "pastor",  label: "Pastor",  desc: "Senior leader" },
+                    { value: "deacon",  label: "Deacon",  desc: "Servant leader" },
+                    { value: "elder",   label: "Elder",   desc: "Elder board" },
+                  ] as const).map((opt) => {
+                    const sel = founderRole === opt.value
+                    return (
+                      <button key={opt.value} type="button" onClick={() => setFounderRole(opt.value)}
+                        style={{
+                          padding: "16px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                          border: sel ? "2px solid #3E1540" : "1.5px solid #ECE8DE",
+                          background: sel ? "#3E1540" : "white",
+                          transition: "all 0.15s",
+                        }}>
+                        <p style={{ fontSize: 15, fontWeight: 700, color: sel ? "#F6F4EF" : "#13101A", margin: "0 0 3px" }}>
+                          {opt.label}
+                        </p>
+                        <p style={{ fontSize: 11, color: sel ? "rgba(246,244,239,0.6)" : "#8A8497", margin: 0 }}>
                           {opt.desc}
                         </p>
                       </button>
@@ -475,8 +507,11 @@ export default function OnboardingPage() {
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", fontWeight: 400, margin: "0 0 3px" }}>{name}</p>
                 <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>{university}</p>
                 <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 2px" }}>{location}</p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: "0 0 2px" }}>
                   {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
+                </p>
+                <p style={{ fontSize: 12, color: "#8A8497", margin: 0, textTransform: "capitalize" }}>
+                  Your role: {founderRole}
                 </p>
               </div>
 

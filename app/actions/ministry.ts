@@ -20,29 +20,59 @@ async function uniqueInviteCode(supabase: ReturnType<typeof createAdminClient>):
   return code
 }
 
+async function uniqueStaffCode(supabase: ReturnType<typeof createAdminClient>): Promise<string> {
+  let code = generateInviteCode()
+  for (let i = 0; i < 5; i++) {
+    const { data } = await supabase.from("ministries").select("id").eq("staff_invite_code", code).maybeSingle()
+    if (!data) break
+    code = generateInviteCode()
+  }
+  return code
+}
+
 export async function joinMinistryByCode(
-  inviteCode: string
-): Promise<{ ministryName: string | null; error: string | null }> {
+  inviteCode: string,
+  adminRole?: "pastor" | "deacon" | "elder"
+): Promise<{ ministryName: string | null; error: string | null; isStaffCode?: boolean }> {
   const supabase = await createClient()
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { ministryName: null, error: "Not authenticated." }
 
   const admin = createAdminClient()
+  const code = inviteCode.trim().toUpperCase()
 
-  const { data: ministry, error: findErr } = await admin
+  // Check member code first
+  const { data: byMember } = await admin
     .from("ministries")
     .select("id, name, status")
-    .eq("invite_code", inviteCode.trim().toUpperCase())
+    .eq("invite_code", code)
     .maybeSingle()
 
-  if (findErr) return { ministryName: null, error: findErr.message }
+  // Check staff code if member code didn't match
+  const { data: byStaff } = !byMember ? await admin
+    .from("ministries")
+    .select("id, name, status")
+    .eq("staff_invite_code", code)
+    .maybeSingle() : { data: null }
+
+  const ministry = byMember ?? byStaff
+  const isStaff = !byMember && !!byStaff
+
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
   if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
   if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
+
+  // Staff code detected but no role chosen yet — signal the client to show the role picker
+  if (isStaff && !adminRole) {
+    return { ministryName: ministry.name, error: null, isStaffCode: true }
+  }
+
+  const role = isStaff ? (adminRole as string) : "member"
+
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministry.id })
+    .update({ ministry_id: ministry.id, ...(isStaff ? { role } : {}) })
     .eq("id", user.id)
     .select("id")
 
@@ -52,7 +82,7 @@ export async function joinMinistryByCode(
   }
 
   await admin.from("user_ministries").upsert(
-    { user_id: user.id, ministry_id: ministry.id, role: "member" },
+    { user_id: user.id, ministry_id: ministry.id, role },
     { onConflict: "user_id,ministry_id" }
   )
 
@@ -149,6 +179,7 @@ export async function submitMinistryApplication(data: {
   size: "small" | "medium" | "large"
   teams: Array<{ name: string; icon: string }>
   isPublic?: boolean
+  founderRole?: "pastor" | "deacon" | "elder"
 }): Promise<{ error: string | null }> {
   const supabase = await createClient()
 
@@ -157,6 +188,8 @@ export async function submitMinistryApplication(data: {
 
   const admin = createAdminClient()
   const inviteCode = await uniqueInviteCode(admin)
+  const staffCode = await uniqueStaffCode(admin)
+  const founderRole = data.founderRole ?? "pastor"
 
   const { data: ministry, error: createErr } = await admin
     .from("ministries")
@@ -166,6 +199,7 @@ export async function submitMinistryApplication(data: {
       location: data.location.trim(),
       size: data.size,
       invite_code: inviteCode,
+      staff_invite_code: staffCode,
       created_by: user.id,
       status: "pending",
       is_public: data.isPublic ?? false,
@@ -175,10 +209,10 @@ export async function submitMinistryApplication(data: {
 
   if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create application." }
 
-  // Link user to ministry as admin
+  // Link user to ministry with their specific founder role
   const { data: updatedRows, error: profileErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministry.id, role: "admin" })
+    .update({ ministry_id: ministry.id, role: founderRole })
     .eq("id", user.id)
     .select("id")
 
@@ -188,7 +222,7 @@ export async function submitMinistryApplication(data: {
   }
 
   await admin.from("user_ministries").upsert(
-    { user_id: user.id, ministry_id: ministry.id, role: "admin" },
+    { user_id: user.id, ministry_id: ministry.id, role: founderRole },
     { onConflict: "user_id,ministry_id" }
   )
 
@@ -424,6 +458,23 @@ export async function regenerateInviteCode(): Promise<{ code: string | null; err
   const admin = createAdminClient()
   const newCode = await uniqueInviteCode(admin)
   const { error } = await admin.from("ministries").update({ invite_code: newCode }).eq("id", profile.ministry_id)
+  if (error) return { code: null, error: error.message }
+  return { code: newCode, error: null }
+}
+
+// ─── Admin: regenerate staff invite code ────────────────────────────────────
+export async function regenerateStaffCode(): Promise<{ code: string | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { code: null, error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { code: null, error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { code: null, error: "Only admins can regenerate staff codes." }
+
+  const admin = createAdminClient()
+  const newCode = await uniqueStaffCode(admin)
+  const { error } = await admin.from("ministries").update({ staff_invite_code: newCode }).eq("id", profile.ministry_id)
   if (error) return { code: null, error: error.message }
   return { code: newCode, error: null }
 }

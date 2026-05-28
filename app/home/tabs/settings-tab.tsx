@@ -7,6 +7,7 @@ import {
   updateMinistryPublic,
   updateMinistryInfo,
   regenerateInviteCode,
+  regenerateStaffCode,
   updateMemberRole,
   removeMember,
   archiveMinistry,
@@ -106,6 +107,12 @@ export function SettingsTab({
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
+  // Staff invite code
+  const [staffCode, setStaffCode] = useState<string | null>(null)
+  const [staffCopied, setStaffCopied] = useState(false)
+  const [showStaffRegenerateConfirm, setShowStaffRegenerateConfirm] = useState(false)
+  const [regeneratingStaff, setRegeneratingStaff] = useState(false)
+
   // Calendar feed
   const calFeedUrl = `https://www.joincentral.app/api/calendar/${ministryId}`
   const gcalUrl = `https://calendar.google.com/calendar/r/settings/addbyurl`
@@ -176,7 +183,7 @@ export function SettingsTab({
   useEffect(() => {
     async function load() {
       const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses] = await Promise.all([
-        supabase.from("ministries").select("name, university, size, invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
+        supabase.from("ministries").select("name, university, size, invite_code, staff_invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
@@ -186,6 +193,7 @@ export function SettingsTab({
       if (min) {
         setMinistryInfo({ name: min.name, university: min.university, size: min.size })
         setInviteCode(min.invite_code)
+        setStaffCode(min.staff_invite_code ?? null)
         setIsPublic(min.is_public ?? false)
         if (min.automation_settings) {
           setAutomationSettings(s => ({ ...s, ...(min.automation_settings as Record<string, boolean>) }))
@@ -247,6 +255,21 @@ export function SettingsTab({
     const { code, error } = await regenerateInviteCode()
     if (!error && code) setInviteCode(code)
     setRegenerating(false)
+  }
+
+  function copyStaffCode() {
+    if (!staffCode) return
+    navigator.clipboard.writeText(staffCode)
+    setStaffCopied(true)
+    setTimeout(() => setStaffCopied(false), 2000)
+  }
+
+  async function handleRegenerateStaff() {
+    setRegeneratingStaff(true)
+    setShowStaffRegenerateConfirm(false)
+    const { code, error } = await regenerateStaffCode()
+    if (!error && code) setStaffCode(code)
+    setRegeneratingStaff(false)
   }
 
   // ── Automation toggle ────────────────────────────────────────────────────────
@@ -886,6 +909,54 @@ export function SettingsTab({
                   )}
                 </div>
               </section>
+
+              {/* Staff Code */}
+              {isAdmin && (
+                <section>
+                  <p style={SECTION_LABEL} className="mb-3">Staff code</p>
+                  <div style={CARD} className="p-5">
+                    <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "12px" }}>
+                      Share only with pastors, deacons, and elders. Joining with this code assigns an admin-tier role.
+                    </p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div style={{ flex: 1, padding: "10px 14px", background: "#F1ECDE", borderRadius: "10px", border: "1px solid #E2DDCF" }}>
+                        <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "16px", fontWeight: 600, color: "#13101A", letterSpacing: "0.15em" }}>
+                          {staffCode ?? "———"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={copyStaffCode}
+                        disabled={!staffCode}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
+                      >
+                        {staffCopied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
+                        {staffCopied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+
+                    {showStaffRegenerateConfirm ? (
+                      <div className="rounded-[10px] border border-[#E8E2D2] bg-[#FBF8F2] p-3">
+                        <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "8px" }}>
+                          The old staff code will stop working immediately.
+                        </p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setShowStaffRegenerateConfirm(false)} className="px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[11px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">Cancel</button>
+                          <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} className="px-3 py-1.5 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[11px] font-semibold hover:bg-[#13101A] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150">
+                            {regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowStaffRegenerateConfirm(true)}
+                        className="flex items-center gap-1.5 text-[11px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />Regenerate staff code
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
           </div>
         )}
