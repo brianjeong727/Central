@@ -72,6 +72,9 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
   const roleBadge = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+  const firstName = profile.name.split(" ")[0]
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? `Good morning, ${firstName}` : hour < 17 ? `Good afternoon, ${firstName}` : hour < 21 ? `Good evening, ${firstName}` : `Good night, ${firstName}`
 
   useEffect(() => {
     async function load() {
@@ -273,7 +276,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
             <div style={{ maxWidth: "640px" }}>
               <p style={MONO_STYLE}>{dateLabel}</p>
               <h1 style={{ margin: "14px 0 8px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
-                {profile.name.split(" ")[0]}
+                {greeting}
               </h1>
               <span style={{ display: "inline-block", fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
                 {roleBadge}
@@ -520,7 +523,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
             <div className="mb-6">
               <p style={MONO_STYLE} className="mb-2">{dateLabel}</p>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
-                {profile.name.split(" ")[0]}
+                {greeting}
               </p>
               <div className="flex items-center gap-2 mt-2.5">
                 <span style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
