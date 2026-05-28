@@ -500,19 +500,15 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
               </div>
             )}
 
-            {/* Pray with us */}
-            {featuredPrayer && (
-              <div className="mt-6 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2]" style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", alignItems: "center", gap: "24px" }}>
+            {/* Daily verse */}
+            {homeVerse && (
+              <div className="mt-6 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2]" style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr 2fr", alignItems: "center", gap: "32px" }}>
                 <div>
-                  <p style={MONO_STYLE}>Pray with us</p>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", marginTop: "4px", color: "#13101A" }}>This week&apos;s heart</p>
+                  <p style={MONO_STYLE}>Today&apos;s verse</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", marginTop: "4px", color: "#13101A" }}>{homeVerse.reference}</p>
                 </div>
-                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.4, color: "#13101A" }}>
-                  &ldquo;{featuredPrayer.text}&rdquo;{" "}
-                  <span style={{ fontStyle: "normal", fontFamily: "inherit", color: "#8A8497", fontSize: "12px" }}>— {featuredPrayer.name}</span>
-                </div>
-                <div className="flex justify-end">
-                  <span style={{ fontSize: "13px", color: "#8A8497" }}>🙏 Praying</span>
+                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.5, color: "#13101A" }}>
+                  &ldquo;{homeVerse.text}&rdquo;
                 </div>
               </div>
             )}
