@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
+import { getHomeVerses } from "@/app/actions/home-verses"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { RoleDescriptionEditor } from "./plan-tab"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
@@ -20,7 +21,7 @@ function fmtJournalDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void }) {
   const supabase = createClient()
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [entries, setEntries] = useState<Devotional[]>([])
@@ -38,7 +39,7 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
     async function load() {
       setLoading(true)
       const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
-      if (data) setEntries(data)
+      if (data) { setEntries(data); onCountChange?.(data.length, data.map((d: Devotional) => d.created_at)) }
       setLoading(false)
     }
     load()
@@ -59,17 +60,17 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
     setSaving(true)
     if (editingEntry) {
       const { data, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Devotional) : e))
+      if (!error && data) { setEntries(prev => { const updated = prev.map(e => e.id === editingEntry.id ? (data as Devotional) : e); onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
     } else {
       const { data, error } = await supabase.from("devotionals").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).select().single()
-      if (!error && data) setEntries(prev => [data as Devotional, ...prev])
+      if (!error && data) { setEntries(prev => { const updated = [data as Devotional, ...prev]; onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("devotionals").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
-    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    if (!error) { setEntries(prev => { const updated = prev.filter(e => e.id !== id); onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
     setOpenMenuId(null)
   }
 
@@ -88,6 +89,10 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
   return (
     <div>
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+      <div style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", letterSpacing: "1.4px", textTransform: "uppercase", fontWeight: 400, margin: "0 0 6px" }}>Devotionals · {entries.length}</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: 32, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>Reflections</h2>
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
@@ -184,11 +189,12 @@ export function JournalDevotionalsTab({ userId, ministryId }: { userId: string; 
   )
 }
 
-export function JournalPrayersTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number) => void }) {
   const supabase = createClient()
   const [entries, setEntries] = useState<Prayer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [filterStatus, setFilterStatus] = useState<PrayerStatus | "all">("all")
   const [showEditor, setShowEditor] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Prayer | null>(null)
   const [draft, setDraft] = useState({ title: "", content: "", status: "praying" as PrayerStatus })
@@ -201,7 +207,7 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
     async function load() {
       setLoading(true)
       const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
-      if (data) setEntries(data)
+      if (data) { setEntries(data); onCountChange?.(data.length) }
       setLoading(false)
     }
     load()
@@ -209,10 +215,12 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
   }, [userId, ministryId])
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return entries
+    let base = entries
+    if (filterStatus !== "all") base = base.filter(e => e.status === filterStatus)
+    if (!searchQuery.trim()) return base
     const q = searchQuery.toLowerCase()
-    return entries.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
-  }, [entries, searchQuery])
+    return base.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
+  }, [entries, searchQuery, filterStatus])
 
   function openNew() { setEditingEntry(null); setDraft({ title: "", content: "", status: "praying" }); setShowEditor(true); setOpenMenuId(null) }
   function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content, status: entry.status }); setShowEditor(true); setOpenMenuId(null) }
@@ -222,17 +230,17 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
     setSaving(true)
     if (editingEntry) {
       const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e))
+      if (!error && data) { setEntries(prev => { const updated = prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e); onCountChange?.(updated.length); return updated }) }
     } else {
       const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
-      if (!error && data) setEntries(prev => [data as Prayer, ...prev])
+      if (!error && data) { setEntries(prev => { const updated = [data as Prayer, ...prev]; onCountChange?.(updated.length); return updated }) }
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("prayers").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
-    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    if (!error) { setEntries(prev => { const updated = prev.filter(e => e.id !== id); onCountChange?.(updated.length); return updated }) }
     setOpenMenuId(null)
   }
 
@@ -270,6 +278,21 @@ export function JournalPrayersTab({ userId, ministryId }: { userId: string; mini
 
   return (
     <div>
+      <div style={{ marginBottom: 20 }}>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", letterSpacing: "1.4px", textTransform: "uppercase", fontWeight: 400, margin: "0 0 6px" }}>Prayers · {entries.length}</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: 32, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>What you&apos;re praying</h2>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {(["all", "praying", "answered", "ongoing"] as const).map(f => {
+          const isActive = filterStatus === f
+          const label = f === "all" ? "All" : STATUS_CONFIG[f].label
+          return (
+            <button key={f} onClick={() => setFilterStatus(f)} style={{ padding: "4px 12px", borderRadius: 20, border: "none", background: isActive ? "#3E1540" : "#F0EDE8", color: isActive ? "#F6F4EF" : "#5A5466", fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: "pointer", transition: "background 150ms" }}>
+              {label}
+            </button>
+          )
+        })}
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
@@ -504,17 +527,119 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   )
 }
 
-export function JournalSection({ userId, ministryId }: { userId: string; ministryId: string }) {
-  const [journalTab, setJournalTab] = useState<'devotionals' | 'prayers' | 'verses'>('devotionals')
-  const tabs: { id: 'devotionals' | 'prayers' | 'verses'; label: string }[] = [
-    { id: 'devotionals', label: 'Devotionals' },
-    { id: 'prayers', label: 'Prayers' },
-    { id: 'verses', label: 'Verses' },
+export function JournalSection({
+  userId,
+  ministryId,
+  showEntries,
+  showStreak,
+  onToggleEntries,
+  onToggleStreak,
+}: {
+  userId: string
+  ministryId: string
+  showEntries: boolean
+  showStreak: boolean
+  onToggleEntries: (v: boolean) => void
+  onToggleStreak: (v: boolean) => void
+}) {
+  const [journalTab, setJournalTab] = useState<"devotionals" | "prayers" | "verses">("devotionals")
+  const [entryCount, setEntryCount] = useState(0)
+  const [entryDates, setEntryDates] = useState<string[]>([])
+  const [prayerCount, setPrayerCount] = useState(0)
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
+
+  useEffect(() => {
+    getHomeVerses(ministryId).then(verses => {
+      if (verses.length > 0) {
+        const now = new Date()
+        const start = new Date(now.getFullYear(), 0, 0)
+        const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000)
+        const v = verses[dayOfYear % verses.length]
+        setHomeVerse({ reference: v.reference, text: v.text })
+      }
+    })
+  }, [ministryId])
+
+  function computeStreak(dates: string[]): number {
+    if (dates.length === 0) return 0
+    const daySet = new Set(dates.map(d => d.slice(0, 10)))
+    const today = new Date()
+    const todayKey = today.toISOString().slice(0, 10)
+    const startOffset = daySet.has(todayKey) ? 0 : 1
+    let streak = 0
+    for (let i = startOffset; i < 365; i++) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      if (daySet.has(d.toISOString().slice(0, 10))) streak++
+      else break
+    }
+    return streak
+  }
+
+  const streak = computeStreak(entryDates)
+  const showStats = showEntries || showStreak
+  const monoSm: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase" as const, fontWeight: 400 }
+
+  const statsItems = [
+    ...(showEntries ? [{ label: "Entries", value: entryCount }] : []),
+    { label: "Prayers", value: prayerCount },
+    ...(showStreak ? [{ label: "Streak", value: streak }] : []),
   ]
+
+  const tabs = [
+    { id: "devotionals" as const, label: "Devotionals" },
+    { id: "prayers" as const, label: "Prayers" },
+    { id: "verses" as const, label: "Verses" },
+  ]
+
+  function VerseCard() {
+    if (!homeVerse) return null
+    return (
+      <div style={{ marginTop: 32, padding: "20px 24px", background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 14 }}>
+        <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 10px" }}>Today&apos;s Verse</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 16, color: "#13101A", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 13, color: "#3E1540", margin: 0 }}>— {homeVerse.reference}</p>
+      </div>
+    )
+  }
+
   return (
     <>
-      {/* ── Mobile: tab strip + single column ── */}
-      <div className="md:hidden" style={{ paddingTop: 24, paddingBottom: 52 }}>
+      {/* Settings gear + stats bar */}
+      <div style={{ position: "relative", paddingTop: 4 }}>
+        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
+          <button onClick={() => setShowSettingsMenu(v => !v)} style={{ width: 28, height: 28, borderRadius: 7, background: showSettingsMenu ? "#ECE8DE" : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497" }}>
+            <Settings size={14} />
+          </button>
+          {showSettingsMenu && (
+            <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
+              <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 12px" }}>Display settings</p>
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
+                <span style={{ fontSize: 13, color: "#13101A" }}>Show entry count</span>
+                <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#3E1540" }} />
+              </label>
+              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+                <span style={{ fontSize: 13, color: "#13101A" }}>Show streak</span>
+                <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#3E1540" }} />
+              </label>
+            </div>
+          )}
+        </div>
+        {showStats && (
+          <div style={{ display: "flex", background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+            {statsItems.map((item, i) => (
+              <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid #ECE8DE" : "none" }}>
+                <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 4px" }}>{item.label}</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", margin: 0, lineHeight: 1 }}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile: tab strip + single column */}
+      <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
         <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
           {tabs.map(t => (
             <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
@@ -522,15 +647,19 @@ export function JournalSection({ userId, ministryId }: { userId: string; ministr
             </button>
           ))}
         </div>
-        {journalTab === 'devotionals' && <JournalDevotionalsTab userId={userId} ministryId={ministryId} />}
-        {journalTab === 'prayers' && <JournalPrayersTab userId={userId} ministryId={ministryId} />}
-        {journalTab === 'verses' && <JournalVersesTab userId={userId} ministryId={ministryId} />}
+        {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
+        {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
+        {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
+        <VerseCard />
       </div>
 
-      {/* ── Desktop: two-column (devotionals left, prayers right) ── */}
-      <div className="hidden md:grid" style={{ paddingTop: 28, paddingBottom: 52, gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
-        <JournalDevotionalsTab userId={userId} ministryId={ministryId} />
-        <JournalPrayersTab userId={userId} ministryId={ministryId} />
+      {/* Desktop: two-column */}
+      <div className="hidden md:block">
+        <div style={{ display: "grid", paddingTop: showStats ? 0 : 28, paddingBottom: 52, gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
+          <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />
+          <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />
+        </div>
+        <VerseCard />
       </div>
     </>
   )
@@ -671,6 +800,16 @@ export function ProfileTab({
     setEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, initialProfile.ministry_id, userId])
+
+  async function handleToggleEntries(v: boolean) {
+    await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId)
+    setProfile(p => ({ ...p, show_journal_entries: v }))
+  }
+
+  async function handleToggleStreak(v: boolean) {
+    await supabase.from("profiles").update({ show_journal_streak: v }).eq("id", userId)
+    setProfile(p => ({ ...p, show_journal_streak: v }))
+  }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -835,7 +974,14 @@ export function ProfileTab({
           </div>
 
           <div className="px-5 md:px-14">
-            <JournalSection userId={userId} ministryId={initialProfile.ministry_id ?? ""} />
+            <JournalSection
+                userId={userId}
+                ministryId={initialProfile.ministry_id ?? ""}
+                showEntries={profile.show_journal_entries ?? false}
+                showStreak={profile.show_journal_streak ?? false}
+                onToggleEntries={handleToggleEntries}
+                onToggleStreak={handleToggleStreak}
+              />
           </div>
         </div>
       )}
