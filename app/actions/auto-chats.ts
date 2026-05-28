@@ -15,22 +15,6 @@ const GRADE_CHAT_NAMES: Record<string, string> = {
 
 const ALL_GRADE_CHATS = Object.values(GRADE_CHAT_NAMES)
 
-// ── getMinistryAdminIds ───────────────────────────────────────────────────────
-// Returns user IDs of all admins in a ministry.
-
-async function getMinistryAdminIds(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: any,
-  ministryId: string,
-): Promise<string[]> {
-  const { data } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("ministry_id", ministryId)
-    .in("role", ["admin", "deacon", "elder"])
-  return (data ?? []).map((p: { id: string }) => p.id)
-}
-
 // ── ensureMinistryChats ───────────────────────────────────────────────────────
 // Idempotent: creates the 6 standard church chats for a ministry if missing.
 // Returns a name→id map for all standard chats.
@@ -55,8 +39,6 @@ export async function ensureMinistryChats(
     (existing ?? []).map((g: { id: string; name: string }) => [g.name, g.id])
   )
 
-  const adminIds = await getMinistryAdminIds(admin, ministryId)
-
   for (const name of allNames) {
     if (!chatMap.has(name)) {
       const { data } = await admin
@@ -64,25 +46,8 @@ export async function ensureMinistryChats(
         .insert({ name, type: "church", ministry_id: ministryId, created_by: createdBy })
         .select("id, name")
         .single()
-      if (data) {
-        chatMap.set(data.name, data.id)
-        if (adminIds.length > 0) {
-          await admin.from("group_members").upsert(
-            adminIds.map(uid => ({ group_id: data.id, user_id: uid })),
-            { onConflict: "group_id,user_id", ignoreDuplicates: true }
-          )
-        }
-      }
+      if (data) chatMap.set(data.name, data.id)
     }
-  }
-
-  // Ensure admins are in ALL standard chats (existing + new)
-  if (adminIds.length > 0) {
-    const allGroupIds = Array.from(chatMap.values())
-    await admin.from("group_members").upsert(
-      adminIds.flatMap(uid => allGroupIds.map(gid => ({ group_id: gid, user_id: uid }))),
-      { onConflict: "group_id,user_id", ignoreDuplicates: true }
-    )
   }
 
   return chatMap
@@ -201,12 +166,10 @@ export async function createPraiseTeamChatAction(
     groupId = group.id
   }
 
-  // Collect all member ids (roles + leader + admins), deduplicated
-  const adminIds = await getMinistryAdminIds(admin, ministryId)
+  // Collect all member ids (roles + leader), deduplicated
   const memberIds = Array.from(new Set([
     ...(roleRows ?? []).map((r: { user_id: string }) => r.user_id),
     ...(week.leader_id ? [week.leader_id] : []),
-    ...adminIds,
   ]))
 
   await admin
@@ -257,8 +220,6 @@ export async function confirmSmallGroupChatsAction(
   if (sgErr) return { created: 0, updated: 0, error: `Failed to fetch small groups: ${sgErr.message}` }
   if (!smallGroups || smallGroups.length === 0) return { created: 0, updated: 0, error: "No small groups found for this team." }
 
-  // Collect all relevant user ids (leaders + members + admins)
-  const adminIds = await getMinistryAdminIds(admin, ministryId)
   const groupIds = smallGroups.map((g: { id: string }) => g.id)
   const leaderIds = smallGroups
     .map((g: { leader_id: string | null }) => g.leader_id)
@@ -350,7 +311,7 @@ export async function confirmSmallGroupChatsAction(
 
     // Individual group chat
     const chatName = `${firstName(leaderName)}'s Group`
-    const members = Array.from(new Set([sg.leader_id, ...(membersByGroup.get(sg.id) ?? []), ...adminIds]))
+    const members = Array.from(new Set([sg.leader_id, ...(membersByGroup.get(sg.id) ?? [])]))
     const { result, groupId: chatGroupId } = await upsertChat(chatName, members)
     if (result === "created") created++
     else if (result === "updated") updated++
@@ -377,7 +338,6 @@ export async function confirmSmallGroupChatsAction(
       paired.leader_id,
       ...(membersByGroup.get(sg.id) ?? []),
       ...(membersByGroup.get(sg.paired_group_id) ?? []),
-      ...adminIds,
     ]))
     const { result: pairedResult } = await upsertChat(pairedChatName, pairedMembers)
     if (pairedResult === "created") created++
