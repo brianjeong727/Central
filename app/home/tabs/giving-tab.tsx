@@ -405,8 +405,8 @@ function FormPanel({
   form: ReimbursementForm
   canEditForm: boolean
   savedSignature: string | null
-  onDraft: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => void
-  onSubmit: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => void
+  onDraft: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => Promise<string | null>
+  onSubmit: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => Promise<string | null>
 }) {
   const [expensePurpose, setExpensePurpose] = useState(form.expense_purpose ?? "")
   const [items, setItems] = useState<ItemizedExpense[]>(
@@ -438,7 +438,8 @@ function FormPanel({
 
   async function handleDraft() {
     setSaving(true); setError(null)
-    onDraft({ expensePurpose, items, notes, signature, signatureSaved })
+    const err = await onDraft({ expensePurpose, items, notes, signature, signatureSaved })
+    if (err) setError(err)
     setSaving(false)
   }
 
@@ -446,7 +447,8 @@ function FormPanel({
     if (!signature.trim()) { setError("Please sign the form."); return }
     if (items.filter(it => it.description.trim()).length === 0) { setError("Add at least one line item."); return }
     setSubmitting(true); setError(null)
-    onSubmit({ expensePurpose, items, notes, signature, signatureSaved })
+    const err = await onSubmit({ expensePurpose, items, notes, signature, signatureSaved })
+    if (err) setError(err)
     setSubmitting(false)
   }
 
@@ -615,15 +617,19 @@ function ReimbursementCard({
     })
   }, [expanded, form.id, receiptData, onReceiptCached])
 
-  async function handleDraft(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) {
-    await saveFormDraft({ formId: form.id, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: params.items.reduce((s, it) => s + Number(it.cost), 0), notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved })
+  async function handleDraft(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }): Promise<string | null> {
+    const { error } = await saveFormDraft({ formId: form.id, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: params.items.reduce((s, it) => s + Number(it.cost), 0), notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved })
+    if (error) return error
     onFormUpdate({ ...form, status: "in_progress", expense_purpose: params.expensePurpose, itemized_expenses: params.items, total_amount: params.items.reduce((s, it) => s + Number(it.cost), 0), notes: params.notes, signature: params.signature })
+    return null
   }
 
-  async function handleSubmit(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) {
+  async function handleSubmit(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }): Promise<string | null> {
     const total = params.items.reduce((s, it) => s + Number(it.cost), 0)
-    await submitReimbursementForm({ formId: form.id, ministryId, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: total, notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved, category: form.category })
+    const { error } = await submitReimbursementForm({ formId: form.id, ministryId, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: total, notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved, category: form.category })
+    if (error) return error
     onFormUpdate({ ...form, status: "complete", expense_purpose: params.expensePurpose, itemized_expenses: params.items, total_amount: total, notes: params.notes, signature: params.signature })
+    return null
   }
 
   async function handleDismiss(reason: string) {
