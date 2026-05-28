@@ -478,7 +478,7 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
   const [fillState, setFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
   const [responsesState, setResponsesState] = useState<{ formId: string; title: string } | null>(null)
 
-  const isAdmin = ['admin', 'leader'].includes(userRole.toLowerCase())
+  const isAdmin = ['admin', 'leader', 'deacon', 'elder'].includes(userRole.toLowerCase())
 
   const load = useCallback(async () => {
     const { data: forms } = await supabase

@@ -14,7 +14,7 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
     .select("ministry_id, role")
     .eq("id", user.id)
     .single()
-  if (!profile?.ministry_id || !["admin", "leader"].includes(profile.role.toLowerCase())) {
+  if (!profile?.ministry_id || !["admin", "deacon", "elder", "leader"].includes(profile.role.toLowerCase())) {
     return { error: "Insufficient permissions." }
   }
 

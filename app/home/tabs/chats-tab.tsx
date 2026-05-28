@@ -291,7 +291,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
 
-  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -517,7 +517,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       <p className="text-[13px] font-semibold text-[#13101A] truncate">{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {profile.role && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(profile.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(profile.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>
                             {profile.role}
                           </span>
                         )}
@@ -697,8 +697,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       {member.role && (
                         <span style={{
                           fontSize: 11, padding: "3px 10px", borderRadius: 999,
-                          background: ["admin","leader"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : member.role.toLowerCase() === "visitor" ? "white" : "#FBF8F2",
-                          color: ["admin","leader"].includes(member.role.toLowerCase()) ? "#3E1540" : "#8A8497",
+                          background: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : member.role.toLowerCase() === "visitor" ? "white" : "#FBF8F2",
+                          color: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "#3E1540" : "#8A8497",
                           border: member.role.toLowerCase() === "visitor" ? "1px solid #D8D3C8" : "none",
                           letterSpacing: "0.04em", textTransform: "uppercase" as const,
                         }}>
@@ -913,7 +913,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         {isPendingAdd && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>{member.role}</span>}
+                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>{member.role}</span>}
                         {member.graduation_year && <span className="text-[11px] text-[#8A8497]/50">Class of {member.graduation_year}</span>}
                       </div>
                     </div>
@@ -1087,7 +1087,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     return mentionMembers.filter(m => m.name.split(" ")[0].toLowerCase().startsWith(q)).slice(0, 5)
   }, [mentionQuery, mentionMembers])
 
-  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
 
   function formatFileSize(bytes: number): string {
@@ -3323,7 +3323,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
-  const isAdminOrLeader = ["admin", "leader"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
   useEffect(() => {
     async function load() {

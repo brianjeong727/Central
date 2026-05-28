@@ -131,7 +131,7 @@ export async function updateMinistryPublic(isPublic: boolean): Promise<{ error: 
     .maybeSingle()
 
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!["admin", "leader"].includes(profile.role.toLowerCase())) return { error: "Unauthorized." }
+  if (!["admin", "deacon", "elder", "leader"].includes(profile.role.toLowerCase())) return { error: "Unauthorized." }
 
   const admin = createAdminClient()
   const { error } = await admin
@@ -404,7 +404,7 @@ export async function updateMinistryInfo(data: { name: string; university: strin
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can update ministry info." }
+  if (!["admin", "deacon", "elder"].includes(profile.role.toLowerCase())) return { error: "Only admins can update ministry info." }
 
   const admin = createAdminClient()
   const { error } = await admin.from("ministries").update({ name: data.name.trim(), university: data.university.trim() }).eq("id", profile.ministry_id)
@@ -419,7 +419,7 @@ export async function regenerateInviteCode(): Promise<{ code: string | null; err
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { code: null, error: "No ministry found." }
-  if (profile.role.toLowerCase() !== "admin") return { code: null, error: "Only admins can regenerate invite codes." }
+  if (!["admin", "deacon", "elder"].includes(profile.role.toLowerCase())) return { code: null, error: "Only admins can regenerate invite codes." }
 
   const admin = createAdminClient()
   const newCode = await uniqueInviteCode(admin)
@@ -429,14 +429,14 @@ export async function regenerateInviteCode(): Promise<{ code: string | null; err
 }
 
 // ─── Admin: change a member's role ──────────────────────────────────────────
-export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin"): Promise<{ error: string | null }> {
+export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder"): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can change member roles." }
+  if (!["admin", "deacon", "elder"].includes(profile.role.toLowerCase())) return { error: "Only admins can change member roles." }
 
   const admin = createAdminClient()
   const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
@@ -453,7 +453,7 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can remove members." }
+  if (!["admin", "deacon", "elder"].includes(profile.role.toLowerCase())) return { error: "Only admins can remove members." }
 
   const admin = createAdminClient()
   const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
@@ -468,7 +468,7 @@ export async function archiveMinistry(): Promise<{ error: string | null }> {
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (profile.role.toLowerCase() !== "admin") return { error: "Only admins can archive the ministry." }
+  if (!["admin", "deacon", "elder"].includes(profile.role.toLowerCase())) return { error: "Only admins can archive the ministry." }
 
   const admin = createAdminClient()
   const { error } = await admin.from("ministries").update({ status: "archived" }).eq("id", profile.ministry_id)

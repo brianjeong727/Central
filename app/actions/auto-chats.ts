@@ -27,7 +27,7 @@ async function getMinistryAdminIds(
     .from("profiles")
     .select("id")
     .eq("ministry_id", ministryId)
-    .eq("role", "admin")
+    .in("role", ["admin", "deacon", "elder"])
   return (data ?? []).map((p: { id: string }) => p.id)
 }
 
