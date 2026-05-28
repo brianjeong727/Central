@@ -123,7 +123,14 @@ function SignupContent() {
       password: adminPassword,
       metadata: { name: adminName, role: founderRole },
     })
-    if (signUpError) { setAdminError(signUpError); setAdminLoading(false); return }
+    if (signUpError) {
+      const msg = signUpError.toLowerCase().includes("rate limit")
+        ? "Too many attempts with this email. Please wait a few minutes and try again, or use a different email address."
+        : signUpError
+      setAdminError(msg)
+      setAdminLoading(false)
+      return
+    }
     const supabase = createClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword })
     if (signInError) { setAdminError(signInError.message); setAdminLoading(false); return }
@@ -148,7 +155,14 @@ function SignupContent() {
       password: memberPassword,
       metadata: { name: memberName, grade, gender },
     })
-    if (signUpError) { setMemberError(signUpError); setMemberLoading(false); return }
+    if (signUpError) {
+      const msg = signUpError.toLowerCase().includes("rate limit")
+        ? "Too many attempts with this email. Please wait a few minutes and try again, or use a different email address."
+        : signUpError
+      setMemberError(msg)
+      setMemberLoading(false)
+      return
+    }
     const supabase = createClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: memberEmail, password: memberPassword })
     if (signInError) { setMemberError(signInError.message); setMemberLoading(false); return }
