@@ -127,8 +127,8 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
       const forYou = list
         .filter((a) => a.id !== heroId)
         .sort((a, b) => {
-          const aScore = (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0) + (a.is_pinned ? 5 : 0)
-          const bScore = (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0) + (b.is_pinned ? 5 : 0)
+          const aScore = (a.is_pinned ? 100 : 0) + (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0)
+          const bScore = (b.is_pinned ? 100 : 0) + (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0)
           return bScore - aScore
         })
         .slice(0, 3)
