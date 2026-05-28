@@ -272,7 +272,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
             <div style={{ maxWidth: "640px" }}>
               <p style={MONO_STYLE}>{dateLabel}</p>
-              <h1 style={{ margin: "14px 0 4px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
+              <h1 style={{ margin: "14px 0 4px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: homeVerse ? "32px" : "52px", lineHeight: 1.2, color: "#13101A", letterSpacing: "-0.01em" }}>
                 {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
               </h1>
               {homeVerse && (
@@ -522,7 +522,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           <div className="md:hidden px-5 pb-4">
             <div className="mb-6">
               <p style={MONO_STYLE} className="mb-2">{dateLabel}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: homeVerse ? "26px" : "34px", fontWeight: 400, letterSpacing: "-0.01em", color: "#13101A", lineHeight: 1.25, margin: 0 }}>
                 {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
               </p>
               {homeVerse && (
