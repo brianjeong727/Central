@@ -46,7 +46,11 @@ function LoginContent() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError(error.message)
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setError("This account's email isn't confirmed. Please sign up again to create a new account.")
+      } else {
+        setError(error.message)
+      }
       setLoading(false)
       return
     }

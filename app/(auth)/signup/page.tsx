@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { RingCrossLogo, Spinner } from "@/app/home/components/shared"
 import { GoogleIcon, PasswordToggle } from "../shared"
+import { signUpWithAutoConfirm } from "@/app/actions/auth"
 
 const SERIF = "var(--font-instrument-serif)"
 
@@ -117,13 +118,15 @@ function SignupContent() {
     if (!founderRole) return
     setAdminLoading(true)
     setAdminError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { error: signUpError } = await signUpWithAutoConfirm({
       email: adminEmail,
       password: adminPassword,
-      options: { data: { name: adminName, role: founderRole } },
+      metadata: { name: adminName, role: founderRole },
     })
-    if (error) { setAdminError(error.message); setAdminLoading(false); return }
+    if (signUpError) { setAdminError(signUpError); setAdminLoading(false); return }
+    const supabase = createClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword })
+    if (signInError) { setAdminError(signInError.message); setAdminLoading(false); return }
     window.location.replace("/onboarding")
   }
 
@@ -140,13 +143,15 @@ function SignupContent() {
     e.preventDefault()
     setMemberLoading(true)
     setMemberError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { error: signUpError } = await signUpWithAutoConfirm({
       email: memberEmail,
       password: memberPassword,
-      options: { data: { name: memberName, grade, gender } },
+      metadata: { name: memberName, grade, gender },
     })
-    if (error) { setMemberError(error.message); setMemberLoading(false); return }
+    if (signUpError) { setMemberError(signUpError); setMemberLoading(false); return }
+    const supabase = createClient()
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: memberEmail, password: memberPassword })
+    if (signInError) { setMemberError(signInError.message); setMemberLoading(false); return }
     window.location.replace("/join")
   }
 
