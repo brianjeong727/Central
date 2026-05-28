@@ -599,6 +599,7 @@ export interface DesktopSidebarProps {
   isTreasurer: boolean
   isDGL: boolean
   canCreateTeam?: boolean
+  userId: string
 }
 
 export interface HomeAppProps {

@@ -461,6 +461,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
         onFinanceSectionChange={handleFinanceSectionChange}
         isTreasurer={isTreasurer}
         isDGL={isDGL}
+        userId={userId}
       />
 
       {/* Content + bottom nav wrapper */}

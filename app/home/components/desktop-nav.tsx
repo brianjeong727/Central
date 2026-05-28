@@ -1,7 +1,9 @@
 "use client"
 
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
 import { Search } from "lucide-react"
+import { createClient } from "@/lib/supabase"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChatsSection } from "@/components/ui/chats-section"
 import { PlanLineIcon } from "./shared"
@@ -33,7 +35,30 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   )
 }
 
-export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL, canCreateTeam }: DesktopSidebarProps) {
+export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL, canCreateTeam, userId }: DesktopSidebarProps) {
+  const supabase = createClient()
+  const [note, setNote] = useState("")
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    supabase.from("profiles").select("sidebar_note").eq("id", userId).maybeSingle().then(({ data }) => {
+      if (data?.sidebar_note) setNote(data.sidebar_note)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const saveNote = useCallback((value: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    setSaveStatus("saving")
+    saveTimer.current = setTimeout(async () => {
+      await supabase.from("profiles").update({ sidebar_note: value || null }).eq("id", userId)
+      setSaveStatus("saved")
+      flashTimer.current = setTimeout(() => setSaveStatus("idle"), 1500)
+    }, 600)
+  }, [userId, supabase])
 
   const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
     { id: "home", icon: Home },
@@ -320,12 +345,26 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
 
         {renderPanelBody()}
 
-        {/* Verse card */}
-        <div className="mx-3 mb-4 p-3 border border-[#E5E0D2] rounded-[10px] bg-[#F4F1E8] flex-shrink-0">
-          <p style={{ ...monoStyle, marginBottom: "6px" }}>Verse · Psalm 46:10</p>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "14px", lineHeight: 1.4, color: "#13101A" }}>
-            &ldquo;Be still, and know that I am God.&rdquo;
-          </p>
+        {/* Sticky note */}
+        <div className="mx-3 mb-4 flex-shrink-0" style={{ padding: "10px 12px", border: "1px solid #DDD9C8", borderRadius: 10, background: "#FAF6E4", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <p style={{ ...monoStyle, color: "#A09A6A" }}>Note</p>
+            {saveStatus === "saved" && (
+              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 9, letterSpacing: "0.05em", color: "#A0BA8A" }}>SAVED</span>
+            )}
+          </div>
+          <textarea
+            value={note}
+            onChange={e => { setNote(e.target.value); saveNote(e.target.value) }}
+            placeholder="Jot something down…"
+            rows={3}
+            style={{
+              width: "100%", resize: "none", border: "none", outline: "none",
+              background: "transparent", fontFamily: "var(--font-inter)",
+              fontSize: "12px", lineHeight: 1.55, color: "#2D2A1E",
+              padding: 0, boxSizing: "border-box",
+            }}
+          />
         </div>
       </div>
     </>
