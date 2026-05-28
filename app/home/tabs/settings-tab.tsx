@@ -80,7 +80,7 @@ export function SettingsTab({
   userId: string
 }) {
   const supabase = createClient()
-  const isAdmin = ["admin", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)

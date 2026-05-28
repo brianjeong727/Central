@@ -109,7 +109,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     return () => mq.removeEventListener("change", handler)
   }, [])
 
-  const isAdmin = ["admin", "deacon", "elder", "leader"].includes(initialProfile.role.toLowerCase())
+  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
