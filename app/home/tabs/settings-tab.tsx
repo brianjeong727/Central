@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink } from "lucide-react"
+import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import {
   updateMinistryPublic,
@@ -14,6 +14,8 @@ import {
 import { updateAutomationSettings } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
+import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
+import type { HomeVerse } from "@/app/actions/home-verses"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { getInitials } from "../utils"
 
@@ -153,16 +155,30 @@ export function SettingsTab({
   const [savingLimit, setSavingLimit] = useState(false)
   const [limitError, setLimitError] = useState<string | null>(null)
 
+  // Daily verse rotation
+  const [homeVerses, setHomeVerses] = useState<HomeVerse[]>([])
+  const [addingVerse, setAddingVerse] = useState(false)
+  const [newVerseRef, setNewVerseRef] = useState("")
+  const [newVerseText, setNewVerseText] = useState("")
+  const [savingVerse, setSavingVerse] = useState(false)
+  const [editingVerseId, setEditingVerseId] = useState<string | null>(null)
+  const [verseRefDraft, setVerseRefDraft] = useState("")
+  const [verseTextDraft, setVerseTextDraft] = useState("")
+  const [confirmDeleteVerseId, setConfirmDeleteVerseId] = useState<string | null>(null)
+  const [deletingVerseId, setDeletingVerseId] = useState<string | null>(null)
+  const [dragOverVerseIdx, setDragOverVerseIdx] = useState<number | null>(null)
+
   // Loading
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes] = await Promise.all([
+      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses] = await Promise.all([
         supabase.from("ministries").select("name, university, size, invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
+        getHomeVerses(ministryId),
       ])
 
       if (min) {
@@ -176,6 +192,7 @@ export function SettingsTab({
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setReceiptLimits(limitsRes.data)
       setMembers(profiles ?? [])
+      setHomeVerses(verses)
       setLoading(false)
     }
     load()
@@ -296,6 +313,59 @@ export function SettingsTab({
   async function handleDeleteLimit(id: string) {
     const { error } = await deleteReceiptLimit(id)
     if (!error) setReceiptLimits(prev => prev.filter(l => l.id !== id))
+  }
+
+  // ── Verse handlers ──────────────────────────────────────────────────────────
+  async function handleAddVerse() {
+    if (!newVerseRef.trim() || !newVerseText.trim() || savingVerse) return
+    setSavingVerse(true)
+    const { data, error } = await addHomeVerse(ministryId, newVerseRef.trim(), newVerseText.trim(), userId)
+    setSavingVerse(false)
+    if (!error && data) {
+      setHomeVerses(prev => [...prev, data])
+      setNewVerseRef("")
+      setNewVerseText("")
+      setAddingVerse(false)
+    }
+  }
+
+  async function handleUpdateVerse(id: string) {
+    if (!verseRefDraft.trim() || !verseTextDraft.trim() || savingVerse) return
+    setSavingVerse(true)
+    const { error } = await updateHomeVerse(id, verseRefDraft.trim(), verseTextDraft.trim())
+    setSavingVerse(false)
+    if (!error) {
+      setHomeVerses(prev => prev.map(v => v.id === id ? { ...v, reference: verseRefDraft.trim(), text: verseTextDraft.trim() } : v))
+      setEditingVerseId(null)
+    }
+  }
+
+  async function handleDeleteVerse(id: string) {
+    setDeletingVerseId(id)
+    const { error } = await deleteHomeVerse(id)
+    setDeletingVerseId(null)
+    if (!error) {
+      setHomeVerses(prev => prev.filter(v => v.id !== id))
+      setConfirmDeleteVerseId(null)
+    }
+  }
+
+  function handleVerseDragStart(e: React.DragEvent, idx: number) {
+    e.dataTransfer.setData("verseIdx", String(idx))
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  async function handleVerseDrop(e: React.DragEvent, targetIdx: number) {
+    e.preventDefault()
+    const fromIdx = parseInt(e.dataTransfer.getData("verseIdx"), 10)
+    if (isNaN(fromIdx) || fromIdx === targetIdx) { setDragOverVerseIdx(null); return }
+    const reordered = [...homeVerses]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(targetIdx, 0, moved)
+    const updated = reordered.map((v, i) => ({ ...v, order_index: i }))
+    setHomeVerses(updated)
+    setDragOverVerseIdx(null)
+    await reorderHomeVerses(ministryId, updated.map(v => v.id))
   }
 
   return (
@@ -573,6 +643,126 @@ export function SettingsTab({
                   )}
                 </div>
               </section>
+
+              {/* Daily Verse Rotation */}
+              {isAdmin && (
+                <section>
+                  <p style={SECTION_LABEL} className="mb-3">Daily verse rotation</p>
+                  <div style={CARD} className="overflow-hidden">
+
+                    {/* Today's verse preview */}
+                    {homeVerses.length > 0 && (() => {
+                      const now = new Date()
+                      const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000)
+                      const todayVerse = homeVerses[dayOfYear % homeVerses.length]
+                      return (
+                        <div className="px-5 py-3 border-b border-[#F0EBE0] flex items-center gap-2">
+                          <BookOpen className="w-3.5 h-3.5 text-[#3E1540] flex-shrink-0" />
+                          <p style={{ fontSize: 12, color: "#5A5466" }}>
+                            Today&apos;s verse: <span style={{ fontWeight: 600, color: "#3E1540" }}>{todayVerse.reference}</span>
+                          </p>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Verse list */}
+                    {homeVerses.map((v, idx) => (
+                      <div
+                        key={v.id}
+                        className="group relative border-b border-[#F0EBE0] last:border-b-0"
+                        style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : undefined, transition: "background 100ms" }}
+                        draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id}
+                        onDragStart={e => handleVerseDragStart(e, idx)}
+                        onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }}
+                        onDragLeave={() => setDragOverVerseIdx(null)}
+                        onDrop={e => handleVerseDrop(e, idx)}
+                      >
+                        {editingVerseId === v.id ? (
+                          <div className="px-5 py-3.5 flex flex-col gap-2">
+                            <input
+                              autoFocus
+                              value={verseRefDraft}
+                              onChange={e => setVerseRefDraft(e.target.value)}
+                              placeholder="Reference (e.g. John 3:16)"
+                              style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                            />
+                            <textarea
+                              value={verseTextDraft}
+                              onChange={e => setVerseTextDraft(e.target.value)}
+                              placeholder="Verse text"
+                              rows={3}
+                              style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                              <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
+                            </div>
+                          </div>
+                        ) : confirmDeleteVerseId === v.id ? (
+                          <div className="px-5 py-3.5">
+                            <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
+                            <div className="flex gap-2">
+                              <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                              <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "#9D2D2D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2 px-4 py-3.5">
+                            <GripVertical className="w-3.5 h-3.5 text-[#C4C4C4] mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing" />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{v.reference}</p>
+                              <p style={{ fontSize: 12, color: "#5A5466", marginTop: 2, lineHeight: 1.5 }} className="line-clamp-2">{v.text}</p>
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <button
+                                onClick={() => { setEditingVerseId(v.id); setVerseRefDraft(v.reference); setVerseTextDraft(v.text) }}
+                                className="p-1.5 rounded-md hover:bg-[#F0EBE0] transition-colors"
+                              >
+                                <Pencil className="w-3 h-3 text-[#8A8497]" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteVerseId(v.id)}
+                                className="p-1.5 rounded-md hover:bg-[#F0EBE0] transition-colors"
+                              >
+                                <X className="w-3 h-3 text-[#8A8497]" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Add verse */}
+                    {addingVerse ? (
+                      <div className="px-5 py-4 flex flex-col gap-2">
+                        <input
+                          autoFocus
+                          value={newVerseRef}
+                          onChange={e => setNewVerseRef(e.target.value)}
+                          placeholder="Reference (e.g. John 3:16)"
+                          style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                        />
+                        <textarea
+                          value={newVerseText}
+                          onChange={e => setNewVerseText(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }}
+                          placeholder="Verse text"
+                          rows={3}
+                          style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-5 py-3">
+                        <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {/* Automations */}
               <section>

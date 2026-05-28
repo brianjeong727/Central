@@ -38,6 +38,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [eventCount, setEventCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
   // Pastor Pulse card state
   const [pulseInput, setPulseInput] = useState<string>("")
@@ -152,6 +153,21 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         setFeaturedPrayer({ name: prayerProfile.name, text: prayerProfile.pray_for_me })
       }
 
+      // Daily verse rotation — deterministic by day_of_year % count
+      const { data: verses } = await supabase
+        .from("home_verses")
+        .select("reference, text")
+        .eq("ministry_id", ministryId)
+        .order("order_index", { ascending: true })
+      if (verses && verses.length > 0) {
+        const now = new Date()
+        const dayOfYear = Math.floor(
+          (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
+        )
+        const v = verses[dayOfYear % verses.length] as { reference: string; text: string }
+        setHomeVerse(v)
+      }
+
       setLoading(false)
     }
     load()
@@ -256,9 +272,12 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
             <div style={{ maxWidth: "640px" }}>
               <p style={MONO_STYLE}>{dateLabel}</p>
-              <h1 style={{ margin: "14px 0 8px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
-                Today in {ministryName}
+              <h1 style={{ margin: "14px 0 4px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
+                {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
               </h1>
+              {homeVerse && (
+                <p style={{ fontSize: "13px", color: "#8A8497", marginBottom: "8px", fontStyle: "italic" }}>— {homeVerse.reference}</p>
+              )}
               <span style={{ display: "inline-block", fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
                 {roleBadge}
               </span>
@@ -502,9 +521,13 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           {/* ── Mobile content ── */}
           <div className="md:hidden px-5 pb-4">
             <div className="mb-6">
+              <p style={MONO_STYLE} className="mb-2">{dateLabel}</p>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
-                Today in<br />{ministryName}
+                {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
               </p>
+              {homeVerse && (
+                <p style={{ fontSize: "12px", color: "#8A8497", marginTop: "4px", fontStyle: "italic" }}>— {homeVerse.reference}</p>
+              )}
               <div className="flex items-center gap-2 mt-2.5">
                 <span style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
                   {roleBadge}
