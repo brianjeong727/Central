@@ -23,6 +23,8 @@ export interface Profile {
   ministry_id?: string | null
   avatar_url?: string | null
   school_id?: string | null
+  show_journal_entries?: boolean
+  show_journal_streak?: boolean
 }
 
 export interface Devotional {
