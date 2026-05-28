@@ -66,7 +66,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
     onResponded?.()
   }
 
-  const isLeaderOrAdmin = ["leader", "admin"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
   const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
@@ -272,11 +272,17 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
             <div style={{ maxWidth: "640px" }}>
               <p style={MONO_STYLE}>{dateLabel}</p>
-              <h1 style={{ margin: "14px 0 4px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: homeVerse ? "32px" : "52px", lineHeight: 1.2, color: "#13101A", letterSpacing: "-0.01em" }}>
-                {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
-              </h1>
-              {homeVerse && (
-                <p style={{ fontSize: "13px", color: "#8A8497", marginBottom: "8px", fontStyle: "italic" }}>— {homeVerse.reference}</p>
+              {homeVerse ? (
+                <div style={{ margin: "10px 0 10px", borderLeft: "2px solid #3E1540", paddingLeft: "14px", maxWidth: "520px" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "22px", fontStyle: "italic", lineHeight: 1.45, color: "#13101A", letterSpacing: "-0.005em", margin: 0 }}>
+                    {homeVerse.text}
+                  </p>
+                  <p style={{ fontSize: "12px", color: "#8A8497", marginTop: "6px", fontFamily: "var(--font-instrument-serif)", fontStyle: "normal", letterSpacing: "0.01em" }}>— {homeVerse.reference}</p>
+                </div>
+              ) : (
+                <h1 style={{ margin: "14px 0 8px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
+                  Today in {ministryName}
+                </h1>
               )}
               <span style={{ display: "inline-block", fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
                 {roleBadge}
@@ -522,11 +528,17 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
           <div className="md:hidden px-5 pb-4">
             <div className="mb-6">
               <p style={MONO_STYLE} className="mb-2">{dateLabel}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: homeVerse ? "26px" : "34px", fontWeight: 400, letterSpacing: "-0.01em", color: "#13101A", lineHeight: 1.25, margin: 0 }}>
-                {homeVerse ? homeVerse.text : `Today in ${ministryName}`}
-              </p>
-              {homeVerse && (
-                <p style={{ fontSize: "12px", color: "#8A8497", marginTop: "4px", fontStyle: "italic" }}>— {homeVerse.reference}</p>
+              {homeVerse ? (
+                <div style={{ borderLeft: "2px solid #3E1540", paddingLeft: "12px", margin: "0 0 2px" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "19px", fontStyle: "italic", lineHeight: 1.45, color: "#13101A", letterSpacing: "-0.005em", margin: 0 }}>
+                    {homeVerse.text}
+                  </p>
+                  <p style={{ fontSize: "11px", color: "#8A8497", marginTop: "5px", fontFamily: "var(--font-instrument-serif)", fontStyle: "normal" }}>— {homeVerse.reference}</p>
+                </div>
+              ) : (
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
+                  Today in<br />{ministryName}
+                </p>
               )}
               <div className="flex items-center gap-2 mt-2.5">
                 <span style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
