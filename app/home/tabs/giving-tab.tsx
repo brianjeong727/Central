@@ -108,6 +108,26 @@ function FormStatusBadge({ status }: { status: string }) {
   )
 }
 
+function RPersonChip({ name }: { name: string }) {
+  const parts = name.trim().split(" ")
+  const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 3px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>
+      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#3E1540", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 7.5, fontWeight: 600, flexShrink: 0, letterSpacing: 0.3 }}>{initials.toUpperCase()}</span>
+      {name}
+    </span>
+  )
+}
+
+function RStatusPill({ status }: { status: string }) {
+  const m = FORM_STATUS_META[status] ?? FORM_STATUS_META.not_started
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", borderRadius: 999, background: "#FBF8F2", border: "1px solid #E2DDCF", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase" as const, whiteSpace: "nowrap" }}>
+      {m.label}
+    </span>
+  )
+}
+
 function Initials({ name, size = 28 }: { name: string; size?: number }) {
   const parts = name.trim().split(" ")
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
@@ -561,7 +581,7 @@ function DismissButton({
 
 function ReimbursementCard({
   form, dglNames, userId, isTreasurer, isAdmin, isDGLPair, ministryId, dgDinnerLimit,
-  savedSignature, receiptCache, onFormUpdate, onReceiptCached,
+  savedSignature, receiptCache, onFormUpdate, onReceiptCached, inline,
 }: {
   form: ReimbursementForm
   dglNames: Map<string, string>
@@ -575,6 +595,7 @@ function ReimbursementCard({
   receiptCache: Map<string, ReceiptData | null>
   onFormUpdate: (updated: ReimbursementForm) => void
   onReceiptCached: (formId: string, data: ReceiptData) => void
+  inline?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [pendingDismiss, setPendingDismiss] = useState<string | null>(null)
@@ -625,43 +646,40 @@ function ReimbursementCard({
   const dgl2Name = form.assigned_dgl_ids[1] ? (dglNames.get(form.assigned_dgl_ids[1]) ?? "DGL") : null
 
   return (
-    <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 14, overflow: "hidden", opacity: isDismissed ? 0.65 : 1 }}>
+    <div style={{ background: "#FBF8F2", border: inline ? "none" : "1px solid #E8E2D2", borderRadius: inline ? 0 : 12, overflow: "hidden", opacity: isDismissed ? 0.65 : 1 }}>
       {/* Card header — click to expand */}
-      <button onClick={() => setExpanded(v => !v)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-        <ChevronRight size={14} color="#8A8497" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", lineHeight: 1.2, textDecoration: isDismissed ? "line-through" : "none" }}>{fridayHeader}</p>
-          {(dgl1Name || dgl2Name) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {dgl1Name && (
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", background: "#F4F1E8", borderRadius: 999 }}>
-                  <Initials name={dgl1Name} size={18} />
-                  <span style={{ fontSize: 11.5, color: "#13101A", fontWeight: 500 }}>{dgl1Name}</span>
-                </div>
-              )}
-              {dgl2Name && (
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 8px", background: "#F4F1E8", borderRadius: 999 }}>
-                  <Initials name={dgl2Name} size={18} />
-                  <span style={{ fontSize: 11.5, color: "#13101A", fontWeight: 500 }}>{dgl2Name}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+      <button
+        onClick={() => setExpanded(v => !v)}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F8F4EA" }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
+        style={{ width: "100%", padding: "15px 14px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto 20px", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer", textAlign: "left", transition: "background 120ms ease" }}
+      >
+        {/* Date */}
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, fontWeight: 400, letterSpacing: -0.2, color: isDismissed ? "#8A8497" : "#13101A", textDecoration: isDismissed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {fridayHeader}
+        </span>
+        {/* Assignee chip(s) or dismissal pill */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {isDismissed ? (
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: 999, background: "#F2F0F5", color: "#8A8497", textTransform: "uppercase" }}>
               {DISMISSAL_REASONS.find(d => d.value === form.dismissal_reason)?.label ?? form.dismissal_reason}
             </span>
           ) : (
-            <FormStatusBadge status={form.status} />
+            <>
+              {dgl1Name && <RPersonChip name={dgl1Name} />}
+              {dgl2Name && <RPersonChip name={dgl2Name} />}
+            </>
           )}
         </div>
+        {/* Status pill */}
+        {isDismissed ? <span /> : <RStatusPill status={form.status} />}
+        {/* Chevron */}
+        <ChevronRight size={15} color="#A09A8C" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
       </button>
 
       {/* Expanded content */}
       {expanded && (
-        <div style={{ borderTop: "1px solid #ECE8DE", padding: "18px 16px", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ borderTop: "1px solid #EFE9DA", padding: "18px 16px", background: "#F8F4EA", display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Two-panel layout on desktop */}
           <div className="md:grid md:gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
             {/* Form panel — Treasurer/Admin only */}
@@ -1037,80 +1055,113 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
             {/* ── Reimbursements ── */}
             {activeSection === "reimbursements" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
                 {/* DG DINNERS */}
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div>
-                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }}>DG Dinners</p>
-                      <p style={{ fontSize: 12.5, color: "#5A5466", marginTop: 2 }}>One form per assigned Friday — auto-generated from the rotation</p>
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={monoStyle}>{`DG DINNERS · ${dgForms.length} FORMS`}</div>
+                    <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, letterSpacing: -0.3, color: "#13101A", marginTop: 4 }}>
+                      Spring semester rotation
+                    </div>
+                    <div style={{ fontSize: 14, color: "#5A5466", marginTop: 6 }}>
+                      One form per assigned Friday — auto-generated from the rotation.
                     </div>
                   </div>
 
                   {reimburseLoading ? <Spinner /> : dgForms.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "32px 20px", background: "white", border: "1px solid #ECE8DE", borderRadius: 12 }}>
-                      <FileText size={24} style={{ margin: "0 auto 10px", opacity: 0.3 }} color="#8A8497" />
-                      <p style={{ fontSize: 14, color: "#8A8497" }}>No DG dinner forms yet</p>
-                      <p style={{ fontSize: 12, color: "#8A8497", marginTop: 4 }}>Forms are auto-created when the DGL rotation is published.</p>
+                    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed #C4C0B0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>No DG dinner forms yet</div>
+                      <div style={{ fontSize: 13, color: "#8A8497", maxWidth: 360, lineHeight: 1.5 }}>Forms are auto-created when the DGL rotation is published.</div>
                     </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {dgForms.map(form => (
-                        <ReimbursementCard
-                          key={form.id}
-                          form={form}
-                          dglNames={dglNames}
-                          userId={userId}
-                          isTreasurer={isTreasurer}
-                          isAdmin={isAdmin}
-                          isDGLPair={isInDGLPair(form)}
-                          ministryId={ministryId}
-                          dgDinnerLimit={dgDinnerLimit}
-                          savedSignature={savedSignature}
-                          receiptCache={receiptCache}
-                          onFormUpdate={updated => setDgForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                          onReceiptCached={handleReceiptCached}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  ) : (() => {
+                    const byMonth = new Map<string, ReimbursementForm[]>()
+                    for (const f of dgForms) {
+                      const label = f.friday_date
+                        ? new Date(f.friday_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                        : "Other"
+                      if (!byMonth.has(label)) byMonth.set(label, [])
+                      byMonth.get(label)!.push(f)
+                    }
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                        {[...byMonth.entries()].map(([month, forms]) => (
+                          <div key={month}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 6 }}>
+                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "#8A8497" }}>{month.toUpperCase()}</span>
+                              <span style={{ height: 1, background: "#E8E2D2", flex: 1 }} />
+                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "#A09A8C" }}>{forms.length} {forms.length === 1 ? "FORM" : "FORMS"}</span>
+                            </div>
+                            <div style={{ borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+                              {forms.map((form, i) => (
+                                <div key={form.id} style={{ borderTop: i > 0 ? "1px solid #EFE9DA" : "none" }}>
+                                  <ReimbursementCard
+                                    form={form}
+                                    dglNames={dglNames}
+                                    userId={userId}
+                                    isTreasurer={isTreasurer}
+                                    isAdmin={isAdmin}
+                                    isDGLPair={isInDGLPair(form)}
+                                    ministryId={ministryId}
+                                    dgDinnerLimit={dgDinnerLimit}
+                                    savedSignature={savedSignature}
+                                    receiptCache={receiptCache}
+                                    onFormUpdate={updated => setDgForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                                    onReceiptCached={handleReceiptCached}
+                                    inline
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* OTHERS */}
                 {(isTreasurer || isAdmin) && (
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18, gap: 24 }}>
                       <div>
-                        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }}>Others</p>
-                        <p style={{ fontSize: 12.5, color: "#5A5466", marginTop: 2 }}>Manual reimbursement forms for other expenses</p>
+                        <div style={monoStyle}>OTHERS</div>
+                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, letterSpacing: -0.3, color: "#13101A", marginTop: 4 }}>
+                          Other expenses
+                        </div>
+                        <div style={{ fontSize: 14, color: "#5A5466", marginTop: 6 }}>
+                          Manual reimbursement forms for one-off ministry expenses.
+                        </div>
                       </div>
-                      <button onClick={handleCreateOtherForm} disabled={creatingOther} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: creatingOther ? 0.6 : 1 }}>
+                      <button onClick={handleCreateOtherForm} disabled={creatingOther} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: creatingOther ? 0.6 : 1, fontFamily: "var(--font-inter)" }}>
                         <Plus size={14} />New form
                       </button>
                     </div>
 
                     {otherForms.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "28px 20px", background: "white", border: "1px solid #ECE8DE", borderRadius: 12 }}>
-                        <p style={{ fontSize: 14, color: "#8A8497" }}>No other forms yet</p>
+                      <div style={{ padding: "44px 24px", borderRadius: 14, border: "1px dashed #C4C0B0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>No other forms yet</div>
+                        <div style={{ fontSize: 13, color: "#8A8497", maxWidth: 360, lineHeight: 1.5 }}>Manual reimbursements you create will appear here.</div>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {otherForms.map(form => (
-                          <ReimbursementCard
-                            key={form.id}
-                            form={form}
-                            dglNames={dglNames}
-                            userId={userId}
-                            isTreasurer={isTreasurer}
-                            isAdmin={isAdmin}
-                            isDGLPair={isInDGLPair(form)}
-                            ministryId={ministryId}
-                            dgDinnerLimit={null}
-                            savedSignature={savedSignature}
-                            receiptCache={receiptCache}
-                            onFormUpdate={updated => setOtherForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                            onReceiptCached={handleReceiptCached}
-                          />
+                      <div style={{ borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+                        {otherForms.map((form, i) => (
+                          <div key={form.id} style={{ borderTop: i > 0 ? "1px solid #EFE9DA" : "none" }}>
+                            <ReimbursementCard
+                              form={form}
+                              dglNames={dglNames}
+                              userId={userId}
+                              isTreasurer={isTreasurer}
+                              isAdmin={isAdmin}
+                              isDGLPair={isInDGLPair(form)}
+                              ministryId={ministryId}
+                              dgDinnerLimit={null}
+                              savedSignature={savedSignature}
+                              receiptCache={receiptCache}
+                              onFormUpdate={updated => setOtherForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                              onReceiptCached={handleReceiptCached}
+                              inline
+                            />
+                          </div>
                         ))}
                       </div>
                     )}
