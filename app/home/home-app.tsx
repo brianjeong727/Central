@@ -422,7 +422,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     window.location.assign("/login")
   }
 
-  const showPlanTab = isAdmin || userTeams.length > 0
+  const isDeaconOrElder = ["deacon", "elder"].includes(initialProfile.role.toLowerCase())
+  const showPlanTab = !isDeaconOrElder && (isAdmin || userTeams.length > 0)
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {
@@ -542,7 +543,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
             </div>
           )}
 
-          {activeTab === "plan" && (
+          {activeTab === "plan" && showPlanTab && (
             <div className="md:h-full md:overflow-y-auto">
               <PlanTab
                 userId={userId}
