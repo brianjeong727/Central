@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import {
@@ -35,11 +36,13 @@ interface MinistryInfo {
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
+type ActiveSettingsTab = "general" | "people" | "automations" | "workspace"
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
   admin:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Admin"   },
   deacon:  { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Deacon"  },
   elder:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Elder"   },
+  pastor:  { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Pastor"  },
   leader:  { bg: "#F1ECDE",  color: "#3E1540", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
   member:  { bg: "#F1ECDE",  color: "#8A8497", border: "#E2DDCF",              label: "Member"  },
   visitor: { bg: "white",    color: "#8A8497", border: "#D8D3C8",              label: "Visitor" },
@@ -61,7 +64,7 @@ const SECTION_LABEL: React.CSSProperties = {
 }
 
 const CARD: React.CSSProperties = {
-  background: "#FBF8F2", borderRadius: "12px", border: "1px solid #E8E2D2",
+  background: "#FBF8F2", borderRadius: "14px", border: "1px solid #E8E2D2",
 }
 
 export function SettingsTab({
@@ -80,7 +83,28 @@ export function SettingsTab({
   userId: string
 }) {
   const supabase = createClient()
+  const router = useRouter()
   const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+
+  const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
+    if (typeof window === "undefined") return "general"
+    const p = new URLSearchParams(window.location.search).get("stab")
+    return (["general", "people", "automations", "workspace"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
+  })
+  function goToSettingsTab(t: ActiveSettingsTab) {
+    setActiveSettingsTab(t)
+    const params = new URLSearchParams(window.location.search)
+    params.set("stab", t)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
+
+  // People tab state
+  const [peopleSearch, setPeopleSearch] = useState("")
+  const [peopleFilter, setPeopleFilter] = useState<RoleFilter>("all")
+  const [peopleRoleMenuOpen, setPeopleRoleMenuOpen] = useState<string | null>(null)
+  const [peopleChangingRole, setPeopleChangingRole] = useState<string | null>(null)
+  const [peopleRemoveConfirmId, setPeopleRemoveConfirmId] = useState<string | null>(null)
+  const [peopleRemoving, setPeopleRemoving] = useState(false)
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
@@ -393,13 +417,33 @@ export function SettingsTab({
     await reorderHomeVerses(ministryId, updated.map(v => v.id))
   }
 
+  const now = new Date()
+  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000)
+  const todayVerseId = homeVerses.length > 0 ? homeVerses[dayOfYear % homeVerses.length]?.id : null
+
+  const peopleFiltered = members.filter(m => {
+    const role = m.role.toLowerCase()
+    const roleMatch = peopleFilter === "all"
+      || (peopleFilter === "admin" && ["admin", "deacon", "elder", "pastor"].includes(role))
+      || (peopleFilter !== "admin" && role === peopleFilter)
+    const s = peopleSearch.toLowerCase().trim()
+    return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
+  })
+
+  const TABS: { key: ActiveSettingsTab; label: string }[] = [
+    { key: "general", label: "General" },
+    { key: "people", label: "People" },
+    { key: "automations", label: "Automations" },
+    { key: "workspace", label: "Workspace" },
+  ]
+
   return (
     <div className="md:h-full md:overflow-y-auto">
       <DesktopTopbar crumbs={["Central", "Church Settings"]} />
 
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
-        <div className="mb-5 md:mb-7">
+        <div>
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 400, letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>
             {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
           </p>
@@ -408,244 +452,481 @@ export function SettingsTab({
           </h1>
         </div>
 
+        {/* ── Tab strip ── */}
+        <div style={{ marginTop: 28, display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2" }}>
+          {TABS.map(({ key, label }) => {
+            const on = activeSettingsTab === key
+            return (
+              <button key={key} onClick={() => goToSettingsTab(key)} style={{ background: "none", border: "none", cursor: "pointer", padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--font-inter)", color: on ? "#2D0F2E" : "#8A8497", fontWeight: on ? 600 : 400, borderBottom: on ? "2px solid #3E1540" : "2px solid transparent", marginBottom: -1 }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
         {loading ? (
-          <div style={{ color: "#8A8497", fontSize: "14px" }}>Loading…</div>
+          <div style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
-          <div className="flex flex-col gap-8 md:grid md:items-stretch" style={{ gridTemplateColumns: "1fr 300px" }}>
-            {/* ── LEFT COLUMN ── */}
-            <div className="flex flex-col gap-8">
+          <>
+
+          {/* ══════════════════ GENERAL TAB ══════════════════ */}
+          {activeSettingsTab === "general" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Ministry Profile */}
               <section>
-                <p style={SECTION_LABEL} className="mb-3">Ministry profile</p>
-                <div style={CARD} className="p-6">
-                  <div className="flex items-center gap-3">
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#FBF8F2" }}>{(ministryInfo?.name ?? ministryName)[0]}</span>
+                <div style={{ marginBottom: 20 }}>
+                  <p style={SECTION_LABEL}>Ministry Identity</p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Profile</h2>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
+                </div>
+                <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 14, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, color: "#FBF8F2" }}>{(ministryInfo?.name ?? ministryName)[0]}</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {editingName ? (
+                      <input autoFocus value={nameDraft} onChange={e => setNameDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }} onBlur={() => saveMinistryField("name", nameDraft)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }} />
+                    ) : (
+                      <div className="group flex items-center gap-2" style={{ cursor: isAdmin ? "text" : "default" }} onClick={isAdmin ? () => { setNameDraft(ministryInfo?.name ?? ministryName); setEditingName(true) } : undefined}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "#13101A", lineHeight: 1.1 }}>{ministryInfo?.name ?? ministryName}</p>
+                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0 }} />}
+                      </div>
+                    )}
+                    {editingUniversity ? (
+                      <input autoFocus value={universityDraft} onChange={e => setUniversityDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }} onBlur={() => saveMinistryField("university", universityDraft)} style={{ fontSize: "14px", color: "#5A5466", marginTop: 4, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }} />
+                    ) : (
+                      <div className="group flex items-center gap-1" style={{ cursor: isAdmin ? "text" : "default", marginTop: 4 }} onClick={isAdmin ? () => { setUniversityDraft(ministryInfo?.university ?? ""); setEditingUniversity(true) } : undefined}>
+                        <p style={{ fontSize: "14px", color: "#5A5466" }}>{ministryInfo?.university ?? "—"}</p>
+                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />}
+                      </div>
+                    )}
+                    {infoError && <p style={{ fontSize: "12px", color: "#DC2626", marginTop: 4 }}>{infoError}</p>}
+                  </div>
+                </div>
+              </section>
+
+              {/* Discovery + Schools 2-col */}
+              <section>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+                  {/* Discovery */}
+                  <div>
+                    <div style={{ marginBottom: 16 }}>
+                      <p style={SECTION_LABEL}>Discovery</p>
+                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Who can find {ministryInfo?.name ?? ministryName}</h2>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      {editingName ? (
-                        <input
-                          autoFocus
-                          value={nameDraft}
-                          onChange={e => setNameDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }}
-                          onBlur={() => saveMinistryField("name", nameDraft)}
-                          style={{ fontSize: "16px", fontWeight: 600, color: "#13101A", lineHeight: 1.2, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
-                        />
-                      ) : (
-                        <div
-                          className="group flex items-center gap-1.5"
-                          style={{ cursor: isAdmin ? "text" : "default" }}
-                          onClick={isAdmin ? () => { setNameDraft(ministryInfo?.name ?? ministryName); setEditingName(true) } : undefined}
-                        >
-                          <p style={{ fontSize: "16px", fontWeight: 600, color: "#13101A", lineHeight: 1.2 }}>{ministryInfo?.name ?? ministryName}</p>
-                          {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "#8A8497", flexShrink: 0 }} />}
+                    <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: isPublic ? 19 : 3, transition: "left 0.15s" }} />
+                      </button>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Public discovery</div>
+                        <div style={{ marginTop: 4, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>{isPublic ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Schools */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
+                      <div>
+                        <p style={SECTION_LABEL}>Schools</p>
+                        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Linked campuses</h2>
+                      </div>
+                      {isAdmin && !addingSchool && (
+                        <button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>
+                      )}
+                    </div>
+                    <div style={{ ...CARD, overflow: "hidden" }}>
+                      {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No schools added yet.</p></div>}
+                      {schools.length > 0 && (
+                        <div style={{ padding: "16px 18px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {schools.map(s => (
+                            <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "#F1ECDE", color: "#2D0F2E", border: "1px solid #E2DDCF", fontSize: 13 }}>
+                              <span style={{ fontWeight: 500 }}>{s.name}</span>
+                              <span style={{ color: "#8A8497", fontSize: 12 }}>({s.abbreviation})</span>
+                              {isAdmin && <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", padding: 0, color: "#8A8497", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
+                            </span>
+                          ))}
                         </div>
                       )}
-                      {editingUniversity ? (
-                        <input
-                          autoFocus
-                          value={universityDraft}
-                          onChange={e => setUniversityDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }}
-                          onBlur={() => saveMinistryField("university", universityDraft)}
-                          style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
-                        />
-                      ) : (
-                        <div
-                          className="group flex items-center gap-1"
-                          style={{ cursor: isAdmin ? "text" : "default", marginTop: "2px" }}
-                          onClick={isAdmin ? () => { setUniversityDraft(ministryInfo?.university ?? ""); setEditingUniversity(true) } : undefined}
-                        >
-                          <p style={{ fontSize: "12px", color: "#8A8497" }}>{ministryInfo?.university ?? "—"}</p>
-                          {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />}
+                      {isAdmin && addingSchool && (
+                        <div style={{ padding: "16px 18px", borderTop: schools.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                          {schoolError && <p style={{ fontSize: 12, color: "#E53E3E", marginBottom: 8 }}>{schoolError}</p>}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                            <input autoFocus type="text" placeholder="School name (e.g. University of Pittsburgh)" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                            <input type="text" placeholder="Abbreviation (e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                          </div>
                         </div>
                       )}
-                      {infoError && <p style={{ fontSize: "12px", color: "#DC2626", marginTop: 4 }}>{infoError}</p>}
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Member Preview */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Members <span style={{ fontWeight: 400, opacity: 0.7 }}>({totalMembers})</span></p>
-                <div style={CARD}>
-                  <div>
-                    {members.length === 0 ? (
-                      <p style={{ fontSize: "13px", color: "#8A8497", padding: "20px", textAlign: "center" }}>No members yet.</p>
-                    ) : (
-                      members.slice(0, 6).map((m, i) => (
-                        <div
-                          key={m.id}
-                          className="flex items-center gap-3 px-4 py-3.5"
-                          style={{ borderTop: i ? "1px solid #EFE9DA" : undefined }}
-                        >
-                          <div style={{ width: 34, height: 34, borderRadius: 9, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#FBF8F2" }}>{getInitials(m.name)}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="flex items-center gap-2">
-                              <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</p>
-                              {m.id === userId && <span style={{ fontSize: "10px", color: "#8A8497" }}>you</span>}
+              {/* Daily Verse Rotation */}
+              {isAdmin && (
+                <section>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+                    <div>
+                      <p style={SECTION_LABEL}>Daily Verse Rotation</p>
+                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Verses on the sidebar</h2>
+                      <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
+                    </div>
+                    {!addingVerse && <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button>}
+                  </div>
+                  <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                    {homeVerses.length === 0 && !addingVerse && (
+                      <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No verses yet. Add one to start the daily rotation.</p></div>
+                    )}
+                    {homeVerses.map((v, idx) => {
+                      const isToday = v.id === todayVerseId
+                      return (
+                        <div key={v.id} style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : isToday ? "#F6F2E8" : undefined, borderBottom: "1px solid #EFE9DA", transition: "background 100ms" }} draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id} onDragStart={e => handleVerseDragStart(e, idx)} onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }} onDragLeave={() => setDragOverVerseIdx(null)} onDrop={e => handleVerseDrop(e, idx)}>
+                          {editingVerseId === v.id ? (
+                            <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
+                              <input autoFocus value={verseRefDraft} onChange={e => setVerseRefDraft(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                              <textarea value={verseTextDraft} onChange={e => setVerseTextDraft(e.target.value)} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
+                              </div>
                             </div>
-                            <p style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</p>
-                          </div>
-                          {roleBadge(m.role)}
+                          ) : confirmDeleteVerseId === v.id ? (
+                            <div style={{ padding: "16px 22px" }}>
+                              <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                                <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "#9D2D2D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="group" style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 22px" }}>
+                              <span style={{ color: "#A09A8C", cursor: "grab", fontSize: 16, marginTop: 2, userSelect: "none", fontFamily: "ui-monospace, Menlo, monospace", flexShrink: 0 }}>⋮⋮</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{v.reference}</span>
+                                  {isToday && <span style={{ padding: "2px 8px", borderRadius: 999, background: "#3E1540", color: "#FBF8F2", fontSize: 10, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 500 }}>Today</span>}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 13, color: "#8A8497", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.text}</div>
+                              </div>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                                <button onClick={() => { setEditingVerseId(v.id); setVerseRefDraft(v.reference); setVerseTextDraft(v.text) }} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><Pencil style={{ width: 13, height: 13, color: "#8A8497" }} /></button>
+                                <button onClick={() => setConfirmDeleteVerseId(v.id)} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><X style={{ width: 13, height: 13, color: "#8A8497" }} /></button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))
+                      )
+                    })}
+                    {addingVerse ? (
+                      <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8, borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                        <input autoFocus value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                        <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: "14px 22px", borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                        <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
+                      </div>
                     )}
                   </div>
-                  {members.length > 6 && (
-                    <button
-                      onClick={() => setShowMembersOverlay(true)}
-                      className="w-full text-left px-4 py-3 text-[13px] text-[#A09A8C] hover:text-[#3E1540] transition-colors"
-                      style={{ borderTop: "1px solid #EFE9DA" }}
-                    >
-                      View all {totalMembers} members →
-                    </button>
-                  )}
-                </div>
-              </section>
+                </section>
+              )}
+
+              {/* Danger Zone */}
+              {isAdmin && (
+                <section>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 22 }}>
+                    <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "#9F3030", whiteSpace: "nowrap" }}>Danger Zone</p>
+                    <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", marginBottom: 6 }}>Archive ministry</p>
+                      <p style={{ fontSize: "13px", color: "#5A5466", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
+                    </div>
+                    {!showArchiveConfirm ? (
+                      <button onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 10, border: "1px solid #9F3030", color: "#9F3030", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Archive</button>
+                    ) : (
+                      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                        <p style={{ fontSize: "12px", color: "#8A8497", textAlign: "right" }}>Type <strong style={{ color: "#13101A" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
+                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "#13101A", outline: "none", background: "#FBF8F2", width: 192, fontFamily: "inherit" }} />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                          <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #9F3030", fontSize: 12, fontWeight: 600, color: "#9F3030", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
+          )}
 
-            {/* ── RIGHT COLUMN ── */}
-            <div className="flex flex-col gap-5">
+          {/* ══════════════════ PEOPLE TAB ══════════════════ */}
+          {activeSettingsTab === "people" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+              <div>
+                <p style={SECTION_LABEL}>People · {totalMembers}</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Members and roles</h2>
+                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
+              </div>
 
-              {/* Ministry Overview — clickable stat cards, 2×2 grid */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Overview</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: totalMembers, label: "Members", filter: "all" as RoleFilter },
-                    { value: totalLeaders, label: "Leaders", filter: "leader" as RoleFilter },
-                    { value: totalAdmins, label: "Admins", filter: "admin" as RoleFilter },
-                    { value: totalMembers - totalLeaders - totalAdmins - totalVisitors, label: "Regular", filter: "member" as RoleFilter },
-                    { value: totalVisitors, label: "Visitors", filter: "visitor" as RoleFilter },
-                  ].map(({ value, label, filter }) => (
-                    <button
-                      key={label}
-                      onClick={() => { setOverlayInitialFilter(filter); setShowMembersOverlay(true) }}
-                      className="text-left transition-all"
-                      style={{ ...CARD, padding: "16px 18px", cursor: "pointer" }}
-                    >
-                      <p style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: "6px" }}>{label}</p>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
+              {/* Stat tiles */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 14 }}>
+                {([
+                  { label: "Members",  value: totalMembers,                                              filter: "all" as RoleFilter },
+                  { label: "Admins",   value: totalAdmins,                                               filter: "admin" as RoleFilter },
+                  { label: "Leaders",  value: totalLeaders,                                              filter: "leader" as RoleFilter },
+                  { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" as RoleFilter },
+                  { label: "Visitors", value: totalVisitors,                                             filter: "visitor" as RoleFilter },
+                ] as { label: string; value: number; filter: RoleFilter }[]).map(({ value, label, filter }) => (
+                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", borderColor: peopleFilter === filter ? "#3E1540" : "#E8E2D2" }}>
+                    <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>{label}</p>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search + filter */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2" }}>
+                  <Search style={{ width: 15, height: 15, color: "#8A8497", flexShrink: 0 }} />
+                  <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)" }} />
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
+                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "#3E1540" : "#E2DDCF"}`, background: peopleFilter === f ? "#2D0F2E" : "#FBF8F2", color: peopleFilter === f ? "#FBF8F2" : "#5A5466", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                      {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
                 </div>
-              </section>
+              </div>
 
-              {/* Discovery */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Discovery</p>
-                <div style={CARD} className="p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <p style={{ fontSize: "13px", fontWeight: 500, color: "#13101A" }}>Public discovery</p>
-                      <p style={{ fontSize: "12px", color: "#5A5466", marginTop: "3px", lineHeight: 1.5 }}>
-                        {isPublic ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}
-                      </p>
-                    </div>
-                    <button
-                      onClick={isAdmin ? handleToggle : undefined}
-                      disabled={toggling || !isAdmin}
-                      className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${!isAdmin ? "opacity-50 cursor-not-allowed" : ""}`}
-                      style={{ background: isPublic ? "#3E1540" : "#D6D0C0" }}
-                    >
-                      <div className="absolute top-0.5 w-5 h-5 rounded-full bg-[#FBF8F2] transition-transform duration-200" style={{ transform: isPublic ? "translateX(21px)" : "translateX(2px)" }} />
+              {/* Remove confirm banner */}
+              {peopleRemoveConfirmId && (() => {
+                const target = members.find(m => m.id === peopleRemoveConfirmId)
+                return (
+                  <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
+                    <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>Remove <strong style={{ color: "#13101A" }}>{target?.name}</strong> from this ministry?</p>
+                    <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "#9F3030", border: "1px solid #9F3030", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
+                      {peopleRemoving ? "Removing…" : "Remove"}
                     </button>
                   </div>
-                </div>
-              </section>
+                )
+              })()}
 
-              {/* Schools */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Schools</p>
-                <div style={CARD} className="overflow-hidden">
-                  {schools.length === 0 && !addingSchool && (
-                    <div className="px-5 py-4">
-                      <p style={{ fontSize: 13, color: "#8A8497" }}>No schools added yet. Schools appear as options when members join.</p>
-                    </div>
-                  )}
-                  {schools.map(s => (
-                    <div key={s.id} className="flex items-center justify-between px-5 py-3 border-b border-[#F0EBE0] last:border-0">
-                      <div>
-                        <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{s.name}</span>
-                        <span style={{ fontSize: 12, color: "#8A8497", marginLeft: 8 }}>({s.abbreviation})</span>
+              {/* Member list */}
+              <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                {peopleFiltered.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#8A8497", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
+                ) : peopleFiltered.map((m, i) => {
+                  const isMe = m.id === userId
+                  const menuOpen = peopleRoleMenuOpen === m.id
+                  return (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid #EFE9DA" : "none", position: "relative" }}>
+                      <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: ["admin","deacon","elder","pastor"].includes(m.role.toLowerCase()) ? "#3E1540" : "#13101A", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600 }}>{getInitials(m.name)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{m.name}</span>
+                          {isMe && <span style={{ fontSize: 12, color: "#8A8497" }}>you</span>}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: 13, color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                       </div>
-                      {isAdmin && (
-                        <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8497", padding: "2px 6px", borderRadius: 6, fontSize: 12 }}>
-                          <X style={{ width: 13, height: 13 }} />
+                      {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "#8A8497" }}>Saving…</span> : roleBadge(m.role)}
+                      {isAdmin && !isMe && (
+                        <div style={{ position: "relative" }}>
+                          {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setPeopleRoleMenuOpen(null)} />}
+                          <button onClick={() => setPeopleRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
+                            <MoreHorizontal style={{ width: 16, height: 16, color: "#A09A8C" }} />
+                          </button>
+                          {menuOpen && (
+                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #E8E2D2", padding: "6px 0", minWidth: 160 }}>
+                              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
+                              {(["visitor", "member", "leader", "admin", "deacon", "elder"] as const).map(r => (
+                                <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
+                                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                                  {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
+                                </button>
+                              ))}
+                              <div style={{ margin: "6px 12px", borderTop: "1px solid #EFE9DA" }} />
+                              <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════ AUTOMATIONS TAB ══════════════════ */}
+          {activeSettingsTab === "automations" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+              <div>
+                <p style={SECTION_LABEL}>Automations</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Chat &amp; membership rules</h2>
+                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Turn any off and they stop running immediately.</p>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {([
+                  { key: "auto_praise_chat",    label: "Auto-create praise team chats",       sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
+                  { key: "auto_archive_praise", label: "Auto-archive praise team chats",      sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
+                  { key: "auto_sg_chats",       label: "Auto-create small group chats",       sub: "When groups are finalized for the semester, a chat is opened per group." },
+                  { key: "auto_grade_chats",    label: "Auto-add new members to grade chats", sub: "New members are added to their class-year chat based on their profile." },
+                  { key: "auto_central_chat",   label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`, sub: "Joining the workspace adds the member to the main Central Chat." },
+                ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
+                  const on = automationSettings[key] !== false
+                  return (
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: on ? 19 : 3, transition: "left 0.15s" }} />
+                      </button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{label}</div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>{sub}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════ WORKSPACE TAB ══════════════════ */}
+          {activeSettingsTab === "workspace" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+
+              {/* Join codes */}
+              <section>
+                <div style={{ marginBottom: 20 }}>
+                  <p style={SECTION_LABEL}>Join Codes</p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>How people get in</h2>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Share these codes to let people join {ministryInfo?.name ?? ministryName}. Staff codes assign admin-tier roles automatically.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: isAdmin && staffCode ? "1fr 1fr" : "1fr", gap: 18, maxWidth: isAdmin && staffCode ? undefined : 480 }}>
+                  {/* Invite code */}
+                  <div style={{ ...CARD, padding: 22 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Invite code</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
+                    <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "#13101A", fontWeight: 600, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
+                      <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                        {copied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    {isAdmin && (showRegenerateConfirm ? (
+                      <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid #E8E2D2", background: "#F7F4EF", padding: "12px 14px" }}>
+                        <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>The old code will stop working immediately.</p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "#2D0F2E", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setShowRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "#8A8497", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <RefreshCw style={{ width: 12, height: 12 }} /> Regenerate code
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Staff code — admin only */}
+                  {isAdmin && staffCode && (
+                    <div style={{ ...CARD, padding: 22 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Staff code</div>
+                      <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
+                      <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "#13101A", fontWeight: 600, textAlign: "center", display: "block" }}>{staffCode}</span>
+                        <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                          {staffCopied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                          {staffCopied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                      {showStaffRegenerateConfirm ? (
+                        <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid #E8E2D2", background: "#F7F4EF", padding: "12px 14px" }}>
+                          <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "#2D0F2E", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowStaffRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "#8A8497", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <RefreshCw style={{ width: 12, height: 12 }} /> Regenerate staff code
                         </button>
                       )}
                     </div>
-                  ))}
-                  {isAdmin && (
-                    addingSchool ? (
-                      <div className="px-5 py-4 border-t border-[#F0EBE0]">
-                        {schoolError && <p style={{ fontSize: 12, color: "#E53E3E", marginBottom: 8 }}>{schoolError}</p>}
-                        <div className="flex flex-col gap-2 mb-3">
-                          <input
-                            autoFocus
-                            type="text"
-                            placeholder="School name (e.g. University of Pittsburgh)"
-                            value={newSchoolName}
-                            onChange={e => setNewSchoolName(e.target.value)}
-                            style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Abbreviation (e.g. Pitt)"
-                            value={newSchoolAbbr}
-                            onChange={e => setNewSchoolAbbr(e.target.value)}
-                            style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                          <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="px-5 py-3 border-t border-[#F0EBE0]">
-                        <button onClick={() => setAddingSchool(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add school</button>
-                      </div>
-                    )
                   )}
                 </div>
               </section>
 
-              {/* Receipt Limits */}
+              {/* Calendar integration */}
               <section>
-                <p style={SECTION_LABEL} className="mb-3">Receipt limits</p>
-                <div style={CARD} className="divide-y divide-[#F0EBE0]">
-                  {receiptLimits.length === 0 && !addingLimit && (
-                    <div className="px-5 py-4">
-                      <p style={{ fontSize: 13, color: "#8A8497" }}>No limits set. Add a limit to flag over-budget receipts.</p>
+                <div style={{ marginBottom: 20 }}>
+                  <p style={SECTION_LABEL}>Calendar Integration</p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Sync events to your calendar</h2>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
+                </div>
+                <div style={{ ...CARD, padding: 22 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, color: "#5A5466", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{calFeedUrl}</div>
+                    <button onClick={copyCalUrl} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      {calCopied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                      {calCopied ? "Copied" : "Copy"}
+                    </button>
+                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "#2D0F2E", border: "none", color: "#FBF8F2", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
+                      <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
+                    </button>
+                  </div>
+                  <p style={{ marginTop: 14, fontSize: 12, color: "#8A8497", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
+                </div>
+              </section>
+
+              {/* Receipt limits */}
+              {isAdmin && (
+                <section>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+                    <div>
+                      <p style={SECTION_LABEL}>Receipt Limits</p>
+                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Per-event reimbursement caps</h2>
+                      <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                     </div>
-                  )}
-                  {receiptLimits.map(l => {
-                    const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
-                    const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
-                    return (
-                      <div key={l.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                        <div>
-                          <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{catLabel}</p>
-                          <p style={{ fontSize: 12, color: "#8A8497" }}>{fundLabel} fund</p>
+                    {!addingLimit && <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button>}
+                  </div>
+                  <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                    {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
+                    {receiptLimits.map((l, i) => {
+                      const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
+                      const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
+                      return (
+                        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < receiptLimits.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{catLabel}</div>
+                            <div style={{ marginTop: 2, fontSize: 13, color: "#8A8497" }}>{fundLabel} fund</div>
+                          </div>
+                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
+                          <button style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "default" }}>Edit</button>
+                          <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <p style={{ fontSize: 14, fontWeight: 600, color: "#3E1540" }}>${Number(l.max_amount).toFixed(0)}</p>
-                          {isAdmin && <button onClick={() => handleDeleteLimit(l.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8497", padding: "2px 6px", borderRadius: 6, fontSize: 12 }}>Remove</button>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {isAdmin && (
-                    addingLimit ? (
-                      <div className="px-5 py-4 flex flex-col gap-3">
-                        <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 80px" }}>
+                      )
+                    })}
+                    {addingLimit && (
+                      <div style={{ padding: "16px 22px", borderTop: receiptLimits.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 10 }}>
                           <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
                             {[["dg_dinner","DG Dinner"],["welcoming_week","Welcoming Week"],["coffeehouse","Coffeehouse"],["turkeybowl","Turkey Bowl"],["supplies","Supplies"],["other","Other"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
@@ -654,392 +935,27 @@ export function SettingsTab({
                           </select>
                           <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
                         </div>
-                        {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", margin: 0 }}>{limitError}</p>}
-                        <div className="flex gap-2">
+                        {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", marginBottom: 8 }}>{limitError}</p>}
+                        <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
                           <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>
-                    ) : (
-                      <div className="px-5 py-3 border-t border-[#F0EBE0]">
-                        <button onClick={() => setAddingLimit(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add limit</button>
-                      </div>
-                    )
-                  )}
-                </div>
-              </section>
-
-              {/* Daily Verse Rotation */}
-              {isAdmin && (
-                <section>
-                  <p style={SECTION_LABEL} className="mb-3">Daily verse rotation</p>
-                  <div style={CARD} className="overflow-hidden">
-
-                    {/* Today's verse preview */}
-                    {homeVerses.length > 0 && (() => {
-                      const now = new Date()
-                      const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000)
-                      const todayVerse = homeVerses[dayOfYear % homeVerses.length]
-                      return (
-                        <div className="px-5 py-3 border-b border-[#F0EBE0] flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-[#3E1540] flex-shrink-0" />
-                          <p style={{ fontSize: 12, color: "#5A5466" }}>
-                            Today&apos;s verse: <span style={{ fontWeight: 600, color: "#3E1540" }}>{todayVerse.reference}</span>
-                          </p>
-                        </div>
-                      )
-                    })()}
-
-                    {/* Verse list */}
-                    {homeVerses.map((v, idx) => (
-                      <div
-                        key={v.id}
-                        className="group relative border-b border-[#F0EBE0] last:border-b-0"
-                        style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : undefined, transition: "background 100ms" }}
-                        draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id}
-                        onDragStart={e => handleVerseDragStart(e, idx)}
-                        onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }}
-                        onDragLeave={() => setDragOverVerseIdx(null)}
-                        onDrop={e => handleVerseDrop(e, idx)}
-                      >
-                        {editingVerseId === v.id ? (
-                          <div className="px-5 py-3.5 flex flex-col gap-2">
-                            <input
-                              autoFocus
-                              value={verseRefDraft}
-                              onChange={e => setVerseRefDraft(e.target.value)}
-                              placeholder="Reference (e.g. John 3:16)"
-                              style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
-                            />
-                            <textarea
-                              value={verseTextDraft}
-                              onChange={e => setVerseTextDraft(e.target.value)}
-                              placeholder="Verse text"
-                              rows={3}
-                              style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                            />
-                            <div className="flex gap-2">
-                              <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                              <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
-                            </div>
-                          </div>
-                        ) : confirmDeleteVerseId === v.id ? (
-                          <div className="px-5 py-3.5">
-                            <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
-                            <div className="flex gap-2">
-                              <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                              <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "#9D2D2D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start gap-2 px-4 py-3.5">
-                            <GripVertical className="w-3.5 h-3.5 text-[#C4C4C4] mt-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{v.reference}</p>
-                              <p style={{ fontSize: 12, color: "#5A5466", marginTop: 2, lineHeight: 1.5 }} className="line-clamp-2">{v.text}</p>
-                            </div>
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                              <button
-                                onClick={() => { setEditingVerseId(v.id); setVerseRefDraft(v.reference); setVerseTextDraft(v.text) }}
-                                className="p-1.5 rounded-md hover:bg-[#F0EBE0] transition-colors"
-                              >
-                                <Pencil className="w-3 h-3 text-[#8A8497]" />
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteVerseId(v.id)}
-                                className="p-1.5 rounded-md hover:bg-[#F0EBE0] transition-colors"
-                              >
-                                <X className="w-3 h-3 text-[#8A8497]" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Add verse */}
-                    {addingVerse ? (
-                      <div className="px-5 py-4 flex flex-col gap-2">
-                        <input
-                          autoFocus
-                          value={newVerseRef}
-                          onChange={e => setNewVerseRef(e.target.value)}
-                          placeholder="Reference (e.g. John 3:16)"
-                          style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
-                        />
-                        <textarea
-                          value={newVerseText}
-                          onChange={e => setNewVerseText(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }}
-                          placeholder="Verse text"
-                          rows={3}
-                          style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="px-5 py-3">
-                        <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {/* Automations */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Automations</p>
-                <div style={CARD} className="divide-y divide-[#F0EBE0]">
-                  {([
-                    { key: "auto_praise_chat",    label: "Auto-create praise team chats when a week is confirmed" },
-                    { key: "auto_archive_praise", label: "Auto-archive praise team chats after Sunday" },
-                    { key: "auto_sg_chats",       label: "Auto-create small group chats when groups are confirmed" },
-                    { key: "auto_grade_chats",    label: "Auto-add new members to grade chats" },
-                    { key: "auto_central_chat",   label: `Auto-add new members to ${ministryName} Chat` },
-                  ] as { key: string; label: string }[]).map(({ key, label }) => {
-                    const on = automationSettings[key] !== false
-                    return (
-                      <div key={key} className="flex items-center justify-between gap-4 px-5 py-4">
-                        <p style={{ fontSize: "13px", color: "#13101A", lineHeight: 1.5 }}>{label}</p>
-                        <button
-                          onClick={() => handleAutomationToggle(key)}
-                          disabled={!isAdmin}
-                          className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors duration-200 ${!isAdmin ? "opacity-50 cursor-not-allowed" : ""}`}
-                          style={{ background: on ? "#3E1540" : "#D6D0C0" }}
-                        >
-                          <div className="absolute top-0.5 w-5 h-5 rounded-full bg-[#FBF8F2] transition-transform duration-200" style={{ transform: on ? "translateX(21px)" : "translateX(2px)" }} />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-
-              {/* Calendar Integration */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Calendar integration</p>
-                <div style={CARD} className="p-5">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Calendar className="w-4 h-4 text-[#3E1540] mt-0.5 flex-shrink-0" />
-                    <p style={{ fontSize: "13px", color: "#5A5466", lineHeight: 1.6 }}>
-                      Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central will sync automatically.
-                    </p>
-                  </div>
-
-                  {/* Feed URL */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <div style={{ flex: 1, padding: "9px 12px", background: "#F1ECDE", borderRadius: "10px", border: "1px solid #E2DDCF", overflow: "hidden" }}>
-                      <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "12px", color: "#5A5466", whiteSpace: "nowrap", display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {calFeedUrl}
-                      </span>
-                    </div>
-                    <button
-                      onClick={copyCalUrl}
-                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
-                    >
-                      {calCopied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
-                      {calCopied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-
-                  {/* Google Calendar subscribe button */}
-                  <button
-                    onClick={openGoogleCalendar}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-[10px] bg-[#3E1540] text-[#FBF8F2] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    {calCopied ? "URL copied — paste in Google Calendar" : "Add to Google Calendar"}
-                    {!calCopied && <ExternalLink className="w-3 h-3 opacity-60" />}
-                  </button>
-
-                  <p style={{ fontSize: "11px", color: "#A09A8C", marginTop: "10px", lineHeight: 1.5 }}>
-                    Clicking the button copies the URL and opens Google Calendar — just paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button above. Updates sync every few hours.
-                  </p>
-                </div>
-              </section>
-
-              {/* Invite Code */}
-              <section>
-                <p style={SECTION_LABEL} className="mb-3">Invite code</p>
-                <div style={CARD} className="p-5">
-                  <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "12px" }}>
-                    Share with members to let them join directly.
-                  </p>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div style={{ flex: 1, padding: "10px 14px", background: "#F1ECDE", borderRadius: "10px", border: "1px solid #E2DDCF" }}>
-                      <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "16px", fontWeight: 600, color: "#13101A", letterSpacing: "0.15em" }}>
-                        {inviteCode ?? "———"}
-                      </span>
-                    </div>
-                    <button
-                      onClick={copyInviteCode}
-                      disabled={!inviteCode}
-                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-
-                  {/* Regenerate */}
-                  {isAdmin && (
-                    showRegenerateConfirm ? (
-                      <div className="rounded-[10px] border border-[#E8E2D2] bg-[#FBF8F2] p-3">
-                        <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "8px" }}>
-                          The old code will stop working immediately. Anyone with it won&apos;t be able to join.
-                        </p>
-                        <div className="flex gap-2">
-                          <button onClick={() => setShowRegenerateConfirm(false)} className="px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[11px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} className="px-3 py-1.5 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[11px] font-semibold hover:bg-[#13101A] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150">
-                            {regenerating ? "Regenerating…" : "Yes, regenerate"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowRegenerateConfirm(true)}
-                        className="flex items-center gap-1.5 text-[11px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
-                      >
-                        <RefreshCw className="w-3 h-3" />Regenerate code
-                      </button>
-                    )
-                  )}
-                </div>
-              </section>
-
-              {/* Staff Code */}
-              {isAdmin && (
-                <section>
-                  <p style={SECTION_LABEL} className="mb-3">Staff code</p>
-                  <div style={CARD} className="p-5">
-                    <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "12px" }}>
-                      Share only with pastors, deacons, and elders. Joining with this code assigns an admin-tier role.
-                    </p>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div style={{ flex: 1, padding: "10px 14px", background: "#F1ECDE", borderRadius: "10px", border: "1px solid #E2DDCF" }}>
-                        <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "16px", fontWeight: 600, color: "#13101A", letterSpacing: "0.15em" }}>
-                          {staffCode ?? "———"}
-                        </span>
-                      </div>
-                      <button
-                        onClick={copyStaffCode}
-                        disabled={!staffCode}
-                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-[10px] border border-[#E2DDCF] text-[12px] font-medium text-[#5A5466] hover:bg-[#F1ECDE] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150 flex-shrink-0"
-                      >
-                        {staffCopied ? <Check className="w-3.5 h-3.5 text-[#3E1540]" /> : <Copy className="w-3.5 h-3.5" />}
-                        {staffCopied ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-
-                    {showStaffRegenerateConfirm ? (
-                      <div className="rounded-[10px] border border-[#E8E2D2] bg-[#FBF8F2] p-3">
-                        <p style={{ fontSize: "12px", color: "#5A5466", marginBottom: "8px" }}>
-                          The old staff code will stop working immediately.
-                        </p>
-                        <div className="flex gap-2">
-                          <button onClick={() => setShowStaffRegenerateConfirm(false)} className="px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[11px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">Cancel</button>
-                          <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} className="px-3 py-1.5 rounded-[10px] bg-[#2D0F2E] text-[#FBF8F2] text-[11px] font-semibold hover:bg-[#13101A] disabled:opacity-50 active:scale-[0.97] transition-[transform,background-color] duration-150">
-                            {regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowStaffRegenerateConfirm(true)}
-                        className="flex items-center gap-1.5 text-[11px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
-                      >
-                        <RefreshCw className="w-3 h-3" />Regenerate staff code
-                      </button>
                     )}
                   </div>
                 </section>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── Danger Zone — editorial inline rule ── */}
-        {isAdmin && !loading && (
-          <div className="mt-16">
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-              <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "#9F3030", whiteSpace: "nowrap" }}>
-                Danger Zone
-              </p>
-              <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", fontWeight: 400, color: "#13101A", marginBottom: 4 }}>Archive ministry</p>
-                <p style={{ fontSize: "13px", color: "#8A8497", lineHeight: 1.6, maxWidth: "480px" }}>
-                  Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.
-                </p>
-              </div>
-              {!showArchiveConfirm ? (
-                <button
-                  onClick={() => setShowArchiveConfirm(true)}
-                  className="flex-shrink-0 px-4 py-2 rounded-[10px] text-[13px] transition-colors"
-                  style={{ border: "1px solid #9F3030", color: "#9F3030", background: "transparent" }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "#FDF5F5" }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent" }}
-                >
-                  Archive
-                </button>
-              ) : (
-                <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                  <p style={{ fontSize: "12px", color: "#8A8497", textAlign: "right" }}>
-                    Type <strong style={{ color: "#13101A" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm
-                  </p>
-                  <input
-                    value={archiveConfirmText}
-                    onChange={e => setArchiveConfirmText(e.target.value)}
-                    placeholder="Ministry name…"
-                    className="px-3 py-2 rounded-[10px] border text-[13px] text-[#13101A] focus:outline-none bg-[#FBF8F2] w-48"
-                    style={{ borderColor: "#9F3030" }}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }}
-                      className="px-3 py-1.5 rounded-[10px] border border-[#E2DDCF] text-[12px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleArchive}
-                      disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}
-                      className="px-3 py-1.5 rounded-[10px] text-[12px] font-semibold disabled:opacity-50 active:scale-[0.97] transition-[transform,opacity] duration-150"
-                      style={{ border: "1px solid #9F3030", color: "#9F3030", background: "transparent" }}
-                    >
-                      {archiving ? "Archiving…" : "Archive ministry"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          </>
         )}
       </div>
-
-      {showMembersOverlay && (
-        <MembersFullOverlay
-          members={members}
-          userId={userId}
-          isAdmin={isAdmin}
-          initialFilter={overlayInitialFilter}
-          onClose={() => setShowMembersOverlay(false)}
-          onRoleChange={handleRoleChange}
-          onRemoveMember={handleRemoveMember}
-        />
-      )}
     </div>
   )
 }
 
-// ── MembersFullOverlay ────────────────────────────────────────────────────────
+// ── MembersFullOverlay (kept for potential future use) ─────────────────────────
 
 function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, onRoleChange, onRemoveMember }: {
   members: MemberRow[]
