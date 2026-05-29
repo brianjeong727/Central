@@ -672,7 +672,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
   const loadAnnouncements = useCallback(async () => {
     let annQuery = supabase
@@ -1089,7 +1089,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
   async function handleRsvp() {
     if (rsvping) return
