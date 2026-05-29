@@ -42,10 +42,13 @@ export async function ensureMinistryChats(
 // Adds a user to their ministry's central chat and (if grade is set) grade chat.
 // Respects automation_settings flags.
 
+const STAFF_ROLES = ["pastor", "deacon", "elder"]
+
 export async function autoAddUserToChats(
   userId: string,
   ministryId: string,
   graduationYear: number | null,
+  userRole?: string | null,
 ): Promise<void> {
   const admin = createAdminClient()
 
@@ -66,7 +69,6 @@ export async function autoAddUserToChats(
 
   if (settings.auto_grade_chats === true && graduationYear) {
     const className = `Class of ${graduationYear}`
-    // Ensure the class chat exists (create on demand)
     const { data: existingChat } = await admin
       .from("groups")
       .select("id")
@@ -85,6 +87,26 @@ export async function autoAddUserToChats(
     namesToJoin.push(className)
   }
 
+  if (settings.auto_staff_chat === true && userRole && STAFF_ROLES.includes(userRole.toLowerCase())) {
+    const staffChatName = `${ministry.name} Staff`
+    const { data: existingStaff } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("name", staffChatName)
+      .maybeSingle()
+
+    if (!existingStaff) {
+      await admin.from("groups").insert({
+        name: staffChatName,
+        type: "church",
+        ministry_id: ministryId,
+        created_by: ministry.created_by,
+      })
+    }
+    namesToJoin.push(staffChatName)
+  }
+
   if (namesToJoin.length === 0) return
 
   const { data: groups } = await admin
@@ -101,6 +123,107 @@ export async function autoAddUserToChats(
       groups.map((g: { id: string }) => ({ group_id: g.id, user_id: userId })),
       { onConflict: "group_id,user_id", ignoreDuplicates: true }
     )
+}
+
+// ── retroactivelyApplyToggle ──────────────────────────────────────────────────
+// Called when an admin turns ON a chat automation toggle. Backfills all existing
+// members who should have been in those chats but weren't (because the toggle was off).
+export async function retroactivelyApplyToggle(
+  ministryId: string,
+  toggleKey: string,
+): Promise<{ added: number; error?: string }> {
+  const admin = createAdminClient()
+
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("name, created_by")
+    .eq("id", ministryId)
+    .single()
+
+  if (!ministry) return { added: 0, error: "Ministry not found." }
+
+  if (toggleKey === "auto_central_chat") {
+    const { data: profiles } = await admin
+      .from("profiles").select("id").eq("ministry_id", ministryId)
+
+    const centralName = `${ministry.name} Chat`
+    const { data: group } = await admin
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", centralName).maybeSingle()
+    if (!group) return { added: 0 }
+
+    const ids = (profiles ?? []).map((p: { id: string }) => p.id)
+    if (ids.length === 0) return { added: 0 }
+
+    await admin.from("group_members").upsert(
+      ids.map((id: string) => ({ group_id: group.id, user_id: id })),
+      { onConflict: "group_id,user_id", ignoreDuplicates: true }
+    )
+    return { added: ids.length }
+  }
+
+  if (toggleKey === "auto_grade_chats") {
+    const { data: profiles } = await admin
+      .from("profiles").select("id, graduation_year").eq("ministry_id", ministryId).not("graduation_year", "is", null)
+
+    const byYear = new Map<number, string[]>()
+    for (const p of profiles ?? []) {
+      if (!p.graduation_year) continue
+      const arr = byYear.get(p.graduation_year) ?? []
+      arr.push(p.id)
+      byYear.set(p.graduation_year, arr)
+    }
+
+    let totalAdded = 0
+    for (const [year, ids] of byYear) {
+      const className = `Class of ${year}`
+      let { data: chat } = await admin
+        .from("groups").select("id").eq("ministry_id", ministryId).eq("name", className).maybeSingle()
+      if (!chat) {
+        const { data: newChat } = await admin
+          .from("groups")
+          .insert({ name: className, type: "church", ministry_id: ministryId, created_by: ministry.created_by })
+          .select("id").single()
+        chat = newChat
+      }
+      if (!chat) continue
+      await admin.from("group_members").upsert(
+        ids.map((id: string) => ({ group_id: chat!.id, user_id: id })),
+        { onConflict: "group_id,user_id", ignoreDuplicates: true }
+      )
+      totalAdded += ids.length
+    }
+    return { added: totalAdded }
+  }
+
+  if (toggleKey === "auto_staff_chat") {
+    const { data: profiles } = await admin
+      .from("profiles").select("id")
+      .eq("ministry_id", ministryId)
+      .in("role", STAFF_ROLES)
+
+    const staffChatName = `${ministry.name} Staff`
+    let { data: chat } = await admin
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", staffChatName).maybeSingle()
+    if (!chat) {
+      const { data: newChat } = await admin
+        .from("groups")
+        .insert({ name: staffChatName, type: "church", ministry_id: ministryId, created_by: ministry.created_by })
+        .select("id").single()
+      chat = newChat
+    }
+    if (!chat) return { added: 0, error: "Failed to create staff chat." }
+
+    const ids = (profiles ?? []).map((p: { id: string }) => p.id)
+    if (ids.length === 0) return { added: 0 }
+
+    await admin.from("group_members").upsert(
+      ids.map((id: string) => ({ group_id: chat!.id, user_id: id })),
+      { onConflict: "group_id,user_id", ignoreDuplicates: true }
+    )
+    return { added: ids.length }
+  }
+
+  return { added: 0 }
 }
 
 // ── runAnnualClassMaintenance ─────────────────────────────────────────────────

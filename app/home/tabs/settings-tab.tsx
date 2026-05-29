@@ -15,7 +15,7 @@ import {
   getBannedMembers,
   archiveMinistry,
 } from "@/app/actions/ministry"
-import { updateAutomationSettings, runAnnualClassMaintenance } from "@/app/actions/auto-chats"
+import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
@@ -113,6 +113,7 @@ export function SettingsTab({
   const [loadingBanned, setLoadingBanned] = useState(false)
   const [maintenanceRunning, setMaintenanceRunning] = useState(false)
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null)
+  const [retroactiveMsg, setRetroactiveMsg] = useState<string | null>(null)
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
@@ -348,11 +349,21 @@ export function SettingsTab({
   }
 
   // ── Automation toggle ────────────────────────────────────────────────────────
+  const CHAT_TOGGLES = ["auto_central_chat", "auto_grade_chats", "auto_staff_chat"]
   async function handleAutomationToggle(key: string) {
     if (!isAdmin) return
-    const next = { ...automationSettings, [key]: !automationSettings[key] }
+    const wasOff = !automationSettings[key]
+    const next = { ...automationSettings, [key]: wasOff }
     setAutomationSettings(next)
     updateAutomationSettings(ministryId, next)
+
+    // Backfill existing members when turning a chat toggle ON
+    if (wasOff && CHAT_TOGGLES.includes(key)) {
+      setRetroactiveMsg("Adding existing members…")
+      const { added } = await retroactivelyApplyToggle(ministryId, key)
+      setRetroactiveMsg(added > 0 ? `Added ${added} existing member${added === 1 ? "" : "s"}.` : "All members already in the right chats.")
+      setTimeout(() => setRetroactiveMsg(null), 4000)
+    }
   }
 
   // ── Discovery toggle ─────────────────────────────────────────────────────────
@@ -877,8 +888,10 @@ export function SettingsTab({
                   { key: "auto_sg_chats",       label: "Auto-create small group chats",       sub: "When groups are finalized for the semester, a chat is opened per group." },
                   { key: "auto_grade_chats",    label: "Grade & Young Adult chats", sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
                   { key: "auto_central_chat",   label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`, sub: "Joining the workspace adds the member to the main ministry chat." },
+                  { key: "auto_staff_chat",     label: "Staff chat",                                                        sub: "Pastors, deacons, and elders are auto-added to a private staff chat when they join. Off by default." },
                 ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
-                  const on = automationSettings[key] === true || (key !== "auto_grade_chats" && automationSettings[key] !== false)
+                  const OPT_IN_KEYS = ["auto_grade_chats", "auto_staff_chat"]
+                  const on = OPT_IN_KEYS.includes(key) ? automationSettings[key] === true : automationSettings[key] !== false
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
@@ -892,6 +905,12 @@ export function SettingsTab({
                   )
                 })}
               </div>
+
+              {retroactiveMsg && (
+                <div style={{ padding: "10px 16px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontSize: 13, color: "#5A5466" }}>
+                  {retroactiveMsg}
+                </div>
+              )}
 
               {/* Annual class maintenance */}
               {isAdmin && (

@@ -96,7 +96,7 @@ export async function joinMinistryByCode(
   )
 
   const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, profile?.graduation_year ?? null)
+  await autoAddUserToChats(user.id, ministry.id, profile?.graduation_year ?? null, role)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -155,7 +155,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
   )
 
   const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministryId, profile?.graduation_year ?? null)
+  await autoAddUserToChats(user.id, ministryId, profile?.graduation_year ?? null, "member")
 
   return { error: null }
 }
@@ -262,7 +262,7 @@ export async function submitMinistryApplication(data: {
   await ensureMinistryChats(ministry.id, data.name.trim(), user.id)
 
   const { data: founderProfile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null)
+  await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null, founderRole)
 
   // Create teams
   if (data.teams.length > 0) {
