@@ -355,7 +355,6 @@ export default function OnboardingPage() {
   const [university, setUniversity] = useState(pendingMinistry.university)
   const [location, setLocation] = useState("")
   const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
-  const [founderRole, setFounderRole] = useState<"pastor" | "deacon" | "elder">("pastor")
   const [step1Touched, setStep1Touched] = useState(false)
 
   // Step 2
@@ -422,7 +421,6 @@ export default function OnboardingPage() {
       name, university, location, size,
       teams: teams.map((t) => ({ name: t.name, icon: t.icon })),
       isPublic,
-      founderRole,
     })
     if (err) {
       setError(err)
@@ -442,7 +440,7 @@ export default function OnboardingPage() {
       {/* ── Plum hero band ── */}
       <div style={{
         position: "relative", overflow: "hidden", color: "#FBF8F2",
-        background: "radial-gradient(120% 130% at 0% 0%, #7A4080 0%, #5A2860 50%, #3E1540 100%)",
+        background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, #3E1540 55%, #2A0E2C 100%)",
         padding: "40px 0 44px",
       }}>
         {/* dot texture */}
@@ -519,24 +517,6 @@ export default function OnboardingPage() {
                       title={opt.label} sub={opt.sub}
                       on={size === opt.value}
                       onClick={() => setSize(opt.value)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ ...mono, marginBottom: 10 }}>Your role</div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {([
-                    { value: "pastor" as const,  label: "Pastor",  sub: "Senior leader"  },
-                    { value: "deacon" as const,  label: "Deacon",  sub: "Servant leader" },
-                    { value: "elder"  as const,  label: "Elder",   sub: "Elder board"    },
-                  ]).map((opt) => (
-                    <SelectTile
-                      key={opt.value}
-                      title={opt.label} sub={opt.sub}
-                      on={founderRole === opt.value}
-                      onClick={() => setFounderRole(opt.value)}
                     />
                   ))}
                 </div>
@@ -634,8 +614,6 @@ export default function OnboardingPage() {
                   {university}<br/>
                   {location}<br/>
                   {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
-                  &nbsp;·&nbsp;
-                  Your role: <span style={{ textTransform: "capitalize" }}>{founderRole}</span>
                 </div>
               </ReviewCard>
 

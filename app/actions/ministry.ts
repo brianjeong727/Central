@@ -189,7 +189,11 @@ export async function submitMinistryApplication(data: {
   const admin = createAdminClient()
   const inviteCode = await uniqueInviteCode(admin)
   const staffCode = await uniqueStaffCode(admin)
-  const founderRole = data.founderRole ?? "pastor"
+
+  // Read role from the founder's existing profile (stored during signup).
+  // Fall back to the passed-in value, then "pastor" as a last resort.
+  const { data: founderRoleRow } = await admin.from("profiles").select("role").eq("id", user.id).single()
+  const founderRole = founderRoleRow?.role ?? data.founderRole ?? "pastor"
 
   const { data: ministry, error: createErr } = await admin
     .from("ministries")
