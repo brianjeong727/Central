@@ -25,6 +25,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
 
   // Hero event state
   const [heroAnn, setHeroAnn] = useState<Announcement | null>(null)
+  const [latestAnn, setLatestAnn] = useState<Announcement | null>(null)
   const [userHasRsvped, setUserHasRsvped] = useState(false)
   const [rsvping, setRsvping] = useState(false)
   const [rsvpCount, setRsvpCount] = useState(0)
@@ -88,9 +89,10 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         .limit(10)
       const list = anns ?? []
 
-      // Hero = first event announcement
+      // Hero = first event announcement; fallback = most recent announcement of any type
       const hero = list.find((a) => a.is_event) ?? null
       setHeroAnn(hero)
+      setLatestAnn(list[0] ?? null)
       setEventCount(list.filter((a) => a.is_event).length)
 
       // User's RSVPs across all fetched announcements
@@ -348,6 +350,32 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                     )}
                   </div>
                 </div>
+              ) : latestAnn ? (
+                <div
+                  className="relative overflow-hidden rounded-2xl"
+                  style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "32px 32px 28px", minHeight: "320px" }}
+                >
+                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+                  <div className="relative flex justify-between items-start">
+                    <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Latest</span>
+                    <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>Post</span>
+                  </div>
+                  <h2 className="relative" style={{ margin: "28px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 0.98, letterSpacing: "-0.01em", color: "#F6F4EF" }}>
+                    {latestAnn.title}
+                  </h2>
+                  <p className="relative mt-2.5 text-[13px] leading-relaxed line-clamp-3" style={{ opacity: 0.78, maxWidth: "420px", color: "#F6F4EF" }}>
+                    {latestAnn.body}
+                  </p>
+                  <div className="relative mt-auto pt-9">
+                    <button
+                      onClick={onSeeAnnouncements}
+                      style={{ background: "#F6F4EF", color: "#13101A", border: 0, padding: "9px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}
+                    >
+                      See announcement
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] flex flex-col items-center justify-center gap-3 text-center" style={{ minHeight: "320px", padding: "40px 32px" }}>
                   <Calendar className="w-8 h-8 text-[#C4C4C4]" />
@@ -575,6 +603,20 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                           {rsvpAttendees.length > 6 && <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{rsvpAttendees.length - 6} more</span>}
                         </div>
                       )}
+                    </div>
+                  </div>
+                ) : latestAnn ? (
+                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
+                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)]" />
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Latest</span>
+                      </div>
+                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>{latestAnn.title}</h3>
+                      <p className="text-[13px] leading-relaxed mb-5 line-clamp-3" style={{ color: "rgba(246,244,239,0.75)" }}>{latestAnn.body}</p>
+                      <button onClick={onSeeAnnouncements} className="font-bold py-3 px-7 rounded-full text-[14px] bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97] transition-colors">
+                        See announcement
+                      </button>
                     </div>
                   </div>
                 ) : (
