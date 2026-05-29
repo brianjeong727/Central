@@ -376,7 +376,7 @@ export default function OnboardingPage() {
   }
 
   function buildTeamsFromStructure(): Team[] {
-    const result: Team[] = [{ id: "prayer", name: "Prayer", icon: "🙏" }]
+    const result: Team[] = []
     for (const [key, yes] of Object.entries(structure)) {
       if (yes && TEAM_PRESETS[key]) {
         result.push({ id: key, name: TEAM_PRESETS[key].name, icon: TEAM_PRESETS[key].icon })
