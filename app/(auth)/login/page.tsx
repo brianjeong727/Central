@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
-import { Spinner } from "@/app/home/components/shared"
 import { GoogleIcon, PasswordToggle } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
@@ -335,7 +334,7 @@ function LoginContent() {
                   transition: "opacity 150ms",
                 }}
               >
-                {loading && <Spinner />}
+                {loading && <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(246,244,239,0.3)", borderTopColor: "#FBF8F2", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
                 {loading ? "Signing in…" : "Sign in"}
               </button>
             </form>
