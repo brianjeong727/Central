@@ -56,7 +56,7 @@ function PlumPanel() {
     <div className="hidden md:flex" style={{
       position: "sticky", top: 0, alignSelf: "start", height: "100vh",
       overflow: "hidden", color: "#FBF8F2",
-      background: "radial-gradient(120% 100% at 0% 0%, #7A4080 0%, #5A2860 50%, #3E1540 100%)",
+      background: "radial-gradient(120% 100% at 0% 0%, #5A2860 0%, #3E1540 55%, #2A0E2C 100%)",
       padding: "44px 56px", flexDirection: "column", justifyContent: "space-between",
     }}>
       <div aria-hidden style={{
