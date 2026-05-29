@@ -101,7 +101,7 @@ export default function LandingPage() {
 
   function handleOpenApp() {
     if (ministryCount === 0) {
-      router.push("/join")
+      router.push("/ministries")
     } else if (ministryCount !== null && ministryCount > 1) {
       router.push("/pick-ministry")
     } else {
