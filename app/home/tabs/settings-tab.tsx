@@ -11,9 +11,11 @@ import {
   regenerateStaffCode,
   updateMemberRole,
   removeMember,
+  excommunicateMember,
+  getBannedMembers,
   archiveMinistry,
 } from "@/app/actions/ministry"
-import { updateAutomationSettings } from "@/app/actions/auto-chats"
+import { updateAutomationSettings, runAnnualClassMaintenance } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
@@ -105,6 +107,12 @@ export function SettingsTab({
   const [peopleChangingRole, setPeopleChangingRole] = useState<string | null>(null)
   const [peopleRemoveConfirmId, setPeopleRemoveConfirmId] = useState<string | null>(null)
   const [peopleRemoving, setPeopleRemoving] = useState(false)
+  const [peopleExcomConfirmId, setPeopleExcomConfirmId] = useState<string | null>(null)
+  const [excomming, setExcomming] = useState(false)
+  const [bannedMembers, setBannedMembers] = useState<Array<{ user_id: string; name: string | null; email: string | null; created_at: string }>>([])
+  const [loadingBanned, setLoadingBanned] = useState(false)
+  const [maintenanceRunning, setMaintenanceRunning] = useState(false)
+  const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null)
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
@@ -233,6 +241,13 @@ export function SettingsTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId])
 
+  useEffect(() => {
+    if (activeSettingsTab === "people" && isAdmin && bannedMembers.length === 0) {
+      loadBannedMembers()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSettingsTab])
+
   // ── Ministry info edit ──────────────────────────────────────────────────────
   async function saveMinistryField(field: "name" | "university", val: string) {
     const trimmed = val.trim()
@@ -263,6 +278,42 @@ export function SettingsTab({
   async function handleRemoveMember(memberId: string) {
     const { error } = await removeMember(memberId)
     if (!error) setMembers(prev => prev.filter(m => m.id !== memberId))
+  }
+
+  // ── Excommunicate member ─────────────────────────────────────────────────────
+  async function handleExcommunicate(memberId: string) {
+    setExcomming(true)
+    const { error } = await excommunicateMember(memberId)
+    if (!error) {
+      setMembers(prev => prev.filter(m => m.id !== memberId))
+      const target = members.find(m => m.id === memberId)
+      if (target) setBannedMembers(prev => [{ user_id: memberId, name: target.name, email: target.email, created_at: new Date().toISOString() }, ...prev])
+    }
+    setExcomming(false)
+    setPeopleExcomConfirmId(null)
+  }
+
+  // ── Load banned members ──────────────────────────────────────────────────────
+  async function loadBannedMembers() {
+    setLoadingBanned(true)
+    const { data } = await getBannedMembers(ministryId)
+    if (data) setBannedMembers(data)
+    setLoadingBanned(false)
+  }
+
+  // ── Annual maintenance ───────────────────────────────────────────────────────
+  async function handleRunMaintenance() {
+    setMaintenanceRunning(true)
+    setMaintenanceResult(null)
+    const { created, graduated, error } = await runAnnualClassMaintenance(ministryId)
+    if (error) { setMaintenanceResult(`Error: ${error}`) }
+    else {
+      const parts = []
+      if (created) parts.push(`Created: ${created}`)
+      if (graduated) parts.push(`Graduated: ${graduated}`)
+      setMaintenanceResult(parts.length ? parts.join(" · ") : "Nothing to do for this cycle.")
+    }
+    setMaintenanceRunning(false)
   }
 
   // ── Invite code ─────────────────────────────────────────────────────────────
@@ -762,6 +813,7 @@ export function SettingsTab({
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid #EFE9DA" }} />
                               <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
+                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 600 }}>Excommunicate</button>
                             </div>
                           )}
                         </div>
@@ -770,6 +822,43 @@ export function SettingsTab({
                   )
                 })}
               </div>
+
+              {/* Excommunicate confirm banner */}
+              {peopleExcomConfirmId && (() => {
+                const target = members.find(m => m.id === peopleExcomConfirmId)
+                return (
+                  <div style={{ borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <AlertTriangle style={{ width: 16, height: 16, color: "#9F3030", flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "#13101A" }}>{target?.name}</strong>?</p>
+                      <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
+                    </div>
+                    <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "#FBF8F2", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                      {excomming ? "Banning…" : "Excommunicate"}
+                    </button>
+                  </div>
+                )
+              })()}
+
+              {/* Banned members */}
+              {isAdmin && bannedMembers.length > 0 && (
+                <div>
+                  <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Excommunicated</p>
+                  <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                    {bannedMembers.map((b, i) => (
+                      <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
+                        <span style={{ width: 36, height: 36, borderRadius: 9, background: "#7A1010", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{getInitials(b.name ?? "?")}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{b.name ?? "Unknown"}</div>
+                          <div style={{ fontSize: 12, color: "#8A8497", marginTop: 1 }}>{b.email ?? ""}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: "#9F3030", fontFamily: "ui-monospace, Menlo, monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>Banned</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -803,6 +892,20 @@ export function SettingsTab({
                   )
                 })}
               </div>
+
+              {/* Annual class maintenance */}
+              {isAdmin && (
+                <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Run annual class maintenance</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
+                    {maintenanceResult && <div style={{ marginTop: 8, fontSize: 12, color: maintenanceResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{maintenanceResult}</div>}
+                  </div>
+                  <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: maintenanceRunning ? "#E2DDCF" : "#FBF8F2", color: maintenanceRunning ? "#8A8497" : "#13101A", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
+                    {maintenanceRunning ? "Running…" : "Run now"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -957,7 +1060,7 @@ export function SettingsTab({
 
 // ── MembersFullOverlay (kept for potential future use) ─────────────────────────
 
-function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, onRoleChange, onRemoveMember }: {
+function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, onRoleChange, onRemoveMember, onExcommunicate }: {
   members: MemberRow[]
   userId: string
   isAdmin: boolean
@@ -965,6 +1068,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
   onClose: () => void
   onRoleChange: (id: string, role: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder") => Promise<void>
   onRemoveMember: (id: string) => Promise<void>
+  onExcommunicate?: (id: string) => Promise<void>
 }) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<RoleFilter>(initialFilter)
@@ -972,6 +1076,8 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
   const [changingRole, setChangingRole] = useState<string | null>(null)
   const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [excomConfirmId, setExcomConfirmId] = useState<string | null>(null)
+  const [excomming, setExcomming] = useState(false)
 
   const filtered = members.filter(m => {
     const role = m.role.toLowerCase()
@@ -995,6 +1101,14 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
     await onRemoveMember(removeConfirmId)
     setRemoving(false)
     setRemoveConfirmId(null)
+  }
+
+  async function handleExcom() {
+    if (!excomConfirmId || !onExcommunicate) return
+    setExcomming(true)
+    await onExcommunicate(excomConfirmId)
+    setExcomming(false)
+    setExcomConfirmId(null)
   }
 
   return (
@@ -1048,6 +1162,22 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
             </div>
           )
         })()}
+        {excomConfirmId && (() => {
+          const target = members.find(m => m.id === excomConfirmId)
+          return (
+            <div style={{ margin: "12px 0", borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+              <AlertTriangle style={{ width: 16, height: 16, color: "#9F3030", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "#13101A" }}>{target?.name}</strong>?</p>
+                <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>Permanent — they can never rejoin this ministry.</p>
+              </div>
+              <button onClick={() => setExcomConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+              <button onClick={handleExcom} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "#FBF8F2", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                {excomming ? "Banning…" : "Excommunicate"}
+              </button>
+            </div>
+          )
+        })()}
 
         <div style={{ background: "#FBF8F2", borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
           {filtered.length === 0 ? (
@@ -1093,6 +1223,11 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
                           <button onClick={() => { setRemoveConfirmId(m.id); setRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
                             Remove from ministry
                           </button>
+                          {onExcommunicate && (
+                            <button onClick={() => { setExcomConfirmId(m.id); setRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", fontWeight: 600, background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+                              Excommunicate
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

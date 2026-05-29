@@ -63,6 +63,15 @@ export async function joinMinistryByCode(
   if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
   if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
 
+  // Check if user is banned from this ministry
+  const { data: ban } = await admin
+    .from("ministry_bans")
+    .select("id")
+    .eq("ministry_id", ministry.id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (ban) return { ministryName: null, error: "You are not permitted to join this ministry." }
+
   // Staff code detected but no role chosen yet — signal the client to show the role picker
   if (isStaff && !adminRole) {
     return { ministryName: ministry.name, error: null, isStaffCode: true }
@@ -86,8 +95,8 @@ export async function joinMinistryByCode(
     { onConflict: "user_id,ministry_id" }
   )
 
-  const { data: profile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, profile?.grade ?? null)
+  const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
+  await autoAddUserToChats(user.id, ministry.id, profile?.graduation_year ?? null)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -129,6 +138,10 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
   if (ministry.status !== "active") return { error: "This ministry is not currently active." }
   if (!ministry.is_public) return { error: "This ministry is not publicly joinable." }
 
+  const { data: ban } = await admin
+    .from("ministry_bans").select("id").eq("ministry_id", ministryId).eq("user_id", user.id).maybeSingle()
+  if (ban) return { error: "You are not permitted to join this ministry." }
+
   const { error: updateErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministryId })
@@ -141,8 +154,8 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     { onConflict: "user_id,ministry_id" }
   )
 
-  const { data: profile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministryId, profile?.grade ?? null)
+  const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
+  await autoAddUserToChats(user.id, ministryId, profile?.graduation_year ?? null)
 
   return { error: null }
 }
@@ -248,8 +261,8 @@ export async function submitMinistryApplication(data: {
   // Create standard grade + central chats for the new ministry
   await ensureMinistryChats(ministry.id, data.name.trim(), user.id)
 
-  const { data: founderProfile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, founderProfile?.grade ?? null)
+  const { data: founderProfile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
+  await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null)
 
   // Create teams
   if (data.teams.length > 0) {
@@ -572,6 +585,90 @@ export async function archiveMinistry(): Promise<{ error: string | null }> {
   const admin = createAdminClient()
   const { error } = await admin.from("ministries").update({ status: "archived" }).eq("id", profile.ministry_id)
   return { error: error?.message ?? null }
+}
+
+// ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
+export async function excommunicateMember(targetUserId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  if (targetUserId === user.id) return { error: "You cannot excommunicate yourself." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can excommunicate members." }
+
+  const admin = createAdminClient()
+
+  // Insert the ban record first
+  const { error: banErr } = await admin.from("ministry_bans").upsert(
+    { ministry_id: profile.ministry_id, user_id: targetUserId, banned_by: user.id },
+    { onConflict: "ministry_id,user_id" }
+  )
+  if (banErr) return { error: banErr.message }
+
+  // Then remove them from the ministry
+  await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
+  await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+
+  return { error: null }
+}
+
+// ─── Member: voluntarily leave the ministry ──────────────────────────────────
+export async function selfLeaveMinistry(): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { error: "You are not in a ministry." }
+
+  const admin = createAdminClient()
+  const ministryId = profile.ministry_id
+
+  await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", user.id)
+  await admin.from("user_ministries").delete().eq("user_id", user.id).eq("ministry_id", ministryId)
+
+  return { error: null }
+}
+
+// ─── Admin: list banned members ──────────────────────────────────────────────
+export async function getBannedMembers(ministryId: string): Promise<{
+  data: Array<{ user_id: string; name: string | null; email: string | null; created_at: string }> | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { data: null, error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { data: null, error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { data: null, error: "Unauthorized." }
+
+  const admin = createAdminClient()
+  const { data: bans, error: bansErr } = await admin
+    .from("ministry_bans")
+    .select("user_id, created_at")
+    .eq("ministry_id", ministryId)
+    .order("created_at", { ascending: false })
+
+  if (bansErr) return { data: null, error: bansErr.message }
+  if (!bans || bans.length === 0) return { data: [], error: null }
+
+  const userIds = bans.map(b => b.user_id)
+  const { data: profiles } = await admin.from("profiles").select("id, name, email").in("id", userIds)
+  const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
+
+  return {
+    data: bans.map(b => ({
+      user_id: b.user_id,
+      name: profileMap[b.user_id]?.name ?? null,
+      email: profileMap[b.user_id]?.email ?? null,
+      created_at: b.created_at,
+    })),
+    error: null,
+  }
 }
 
 // Sets the user's currently active ministry

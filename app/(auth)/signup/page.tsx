@@ -298,14 +298,14 @@ function SignupContent() {
   const [adminLoading,  setAdminLoading]  = useState(false)
 
   // member state
-  const [memberName,     setMemberName]     = useState("")
-  const [memberEmail,    setMemberEmail]    = useState("")
-  const [memberPassword, setMemberPassword] = useState("")
-  const [memberShowPw,   setMemberShowPw]   = useState(false)
-  const [grade,          setGrade]          = useState("")
-  const [gender,         setGender]         = useState("")
-  const [memberError,    setMemberError]    = useState<string|null>(null)
-  const [memberLoading,  setMemberLoading]  = useState(false)
+  const [memberName,       setMemberName]       = useState("")
+  const [memberEmail,      setMemberEmail]       = useState("")
+  const [memberPassword,   setMemberPassword]   = useState("")
+  const [memberShowPw,     setMemberShowPw]     = useState(false)
+  const [graduationYear,   setGraduationYear]   = useState("")
+  const [gender,           setGender]           = useState("")
+  const [memberError,      setMemberError]      = useState<string|null>(null)
+  const [memberLoading,    setMemberLoading]    = useState(false)
 
   async function handleAdminSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -327,10 +327,15 @@ function SignupContent() {
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register" } })
   }
 
+  const currentYear = new Date().getFullYear()
+  const gradYearNum = parseInt(graduationYear, 10)
+  const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
+
   async function handleMemberSignup(e: React.FormEvent) {
     e.preventDefault()
+    if (!gradYearValid) { setMemberError("Please enter a valid graduation year."); return }
     setMemberLoading(true); setMemberError(null)
-    const { error: signUpError } = await signUpWithAutoConfirm({ email: memberEmail, password: memberPassword, metadata: { name: memberName, grade, gender } })
+    const { error: signUpError } = await signUpWithAutoConfirm({ email: memberEmail, password: memberPassword, metadata: { name: memberName, graduation_year: String(gradYearNum), gender } })
     if (signUpError) {
       setMemberError(signUpError.toLowerCase().includes("rate limit") ? "Too many attempts with this email. Please wait a few minutes or use a different address." : signUpError)
       setMemberLoading(false); return
@@ -346,7 +351,6 @@ function SignupContent() {
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback" } })
   }
 
-  const YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Young Adult"]
   const ROLES = [
     { key: "pastor" as const, title: "Pastor",  sub: "Senior leader" },
     { key: "deacon" as const, title: "Deacon",  sub: "Servant leader" },
@@ -490,21 +494,21 @@ function SignupContent() {
           trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}
           helper="At least 6 characters."/>
 
-        <div>
-          <div style={{ ...mono, marginBottom: 10 }}>YEAR</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {YEARS.map(y => (
-              <Pill key={y} label={y} on={grade === y.toLowerCase().replace(" ", "_")} onClick={() => setGrade(y.toLowerCase().replace(" ", "_"))}/>
-            ))}
-          </div>
-        </div>
+        <Field
+          label="GRADUATION YEAR"
+          placeholder={String(currentYear + 2)}
+          type="number"
+          value={graduationYear}
+          onChange={(e) => setGraduationYear(e.target.value)}
+          helper={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}
+        />
 
-        <Primary disabled={!grade || !gender || memberLoading} loading={memberLoading}>
+        <Primary disabled={!gradYearValid || !gender || memberLoading} loading={memberLoading}>
           {memberLoading ? "Creating account…" : "Create account"}
         </Primary>
-        {(!grade || !gender) && !memberLoading && (
+        {(!gradYearValid || !gender) && !memberLoading && (
           <div style={{ fontSize: 13, color: "#8A8497", textAlign: "center", marginTop: -6 }}>
-            Select your year and gender to continue.
+            {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
           </div>
         )}
       </form>

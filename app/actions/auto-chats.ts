@@ -3,21 +3,9 @@
 import { createAdminClient } from "@/lib/supabase-admin"
 import { getSemesterLabel } from "@/app/actions/dgl-utils"
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const GRADE_CHAT_NAMES: Record<string, string> = {
-  freshman:    "Freshman Chat",
-  sophomore:   "Sophomore Chat",
-  junior:      "Junior Chat",
-  senior:      "Senior Chat",
-  young_adult: "Young Adult Chat",
-}
-
-const ALL_GRADE_CHATS = Object.values(GRADE_CHAT_NAMES)
-
 // ── ensureMinistryChats ───────────────────────────────────────────────────────
-// Idempotent: creates the 6 standard church chats for a ministry if missing.
-// Returns a name→id map for all standard chats.
+// Creates only the central church chat (e.g. "Central Chat").
+// Class-year chats are created on-demand when members join.
 
 export async function ensureMinistryChats(
   ministryId: string,
@@ -26,28 +14,25 @@ export async function ensureMinistryChats(
 ): Promise<Map<string, string>> {
   const admin = createAdminClient()
   const centralName = `${ministryName} Chat`
-  const allNames = [...ALL_GRADE_CHATS, centralName]
 
   const { data: existing } = await admin
     .from("groups")
     .select("id, name")
     .eq("ministry_id", ministryId)
     .eq("type", "church")
-    .in("name", allNames)
+    .eq("name", centralName)
+    .maybeSingle()
 
-  const chatMap = new Map<string, string>(
-    (existing ?? []).map((g: { id: string; name: string }) => [g.name, g.id])
-  )
-
-  for (const name of allNames) {
-    if (!chatMap.has(name)) {
-      const { data } = await admin
-        .from("groups")
-        .insert({ name, type: "church", ministry_id: ministryId, created_by: createdBy })
-        .select("id, name")
-        .single()
-      if (data) chatMap.set(data.name, data.id)
-    }
+  const chatMap = new Map<string, string>()
+  if (existing) {
+    chatMap.set(existing.name, existing.id)
+  } else {
+    const { data } = await admin
+      .from("groups")
+      .insert({ name: centralName, type: "church", ministry_id: ministryId, created_by: createdBy })
+      .select("id, name")
+      .single()
+    if (data) chatMap.set(data.name, data.id)
   }
 
   return chatMap
@@ -60,13 +45,13 @@ export async function ensureMinistryChats(
 export async function autoAddUserToChats(
   userId: string,
   ministryId: string,
-  grade: string | null,
+  graduationYear: number | null,
 ): Promise<void> {
   const admin = createAdminClient()
 
   const { data: ministry } = await admin
     .from("ministries")
-    .select("name, automation_settings")
+    .select("name, automation_settings, created_by")
     .eq("id", ministryId)
     .single()
 
@@ -78,8 +63,26 @@ export async function autoAddUserToChats(
   if (settings.auto_central_chat !== false) {
     namesToJoin.push(`${ministry.name} Chat`)
   }
-  if (settings.auto_grade_chats === true && grade && GRADE_CHAT_NAMES[grade]) {
-    namesToJoin.push(GRADE_CHAT_NAMES[grade])
+
+  if (settings.auto_grade_chats === true && graduationYear) {
+    const className = `Class of ${graduationYear}`
+    // Ensure the class chat exists (create on demand)
+    const { data: existingChat } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("name", className)
+      .maybeSingle()
+
+    if (!existingChat) {
+      await admin.from("groups").insert({
+        name: className,
+        type: "church",
+        ministry_id: ministryId,
+        created_by: ministry.created_by,
+      })
+    }
+    namesToJoin.push(className)
   }
 
   if (namesToJoin.length === 0) return
@@ -88,7 +91,6 @@ export async function autoAddUserToChats(
     .from("groups")
     .select("id")
     .eq("ministry_id", ministryId)
-    .eq("type", "church")
     .in("name", namesToJoin)
 
   if (!groups || groups.length === 0) return
@@ -99,6 +101,57 @@ export async function autoAddUserToChats(
       groups.map((g: { id: string }) => ({ group_id: g.id, user_id: userId })),
       { onConflict: "group_id,user_id", ignoreDuplicates: true }
     )
+}
+
+// ── runAnnualClassMaintenance ─────────────────────────────────────────────────
+// Call every June. Creates the incoming class chat, graduates the current class
+// (converts "Class of {year}" from church → my type).
+export async function runAnnualClassMaintenance(ministryId: string): Promise<{
+  created: string | null
+  graduated: string | null
+  error?: string
+}> {
+  const admin = createAdminClient()
+  const now = new Date()
+  const currentYear = now.getFullYear()
+
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("name, created_by, automation_settings")
+    .eq("id", ministryId)
+    .single()
+
+  if (!ministry) return { created: null, graduated: null, error: "Ministry not found." }
+
+  const settings = (ministry.automation_settings ?? {}) as Record<string, boolean>
+  let created: string | null = null
+  let graduated: string | null = null
+
+  // Create incoming class chat (4 years out)
+  if (settings.auto_grade_chats === true) {
+    const incomingYear = currentYear + 4
+    const incomingName = `Class of ${incomingYear}`
+    const { data: existingIncoming } = await admin
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", incomingName).maybeSingle()
+    if (!existingIncoming) {
+      await admin.from("groups").insert({
+        name: incomingName, type: "church",
+        ministry_id: ministryId, created_by: ministry.created_by,
+      })
+      created = incomingName
+    }
+  }
+
+  // Graduate current class: convert "Class of {currentYear}" from church → my
+  const graduatingName = `Class of ${currentYear}`
+  const { data: graduatingChat } = await admin
+    .from("groups").select("id, type").eq("ministry_id", ministryId).eq("name", graduatingName).maybeSingle()
+  if (graduatingChat && graduatingChat.type === "church") {
+    await admin.from("groups").update({ type: "my" }).eq("id", graduatingChat.id)
+    graduated = graduatingName
+  }
+
+  return { created, graduated }
 }
 
 // ── createPraiseTeamChatAction ────────────────────────────────────────────────
