@@ -443,7 +443,7 @@ function JoinContent() {
         {/* ── Plum hero band ── */}
         <div style={{
           flexShrink: 0, position: "relative", overflow: "hidden", color: "#FBF8F2",
-          background: "radial-gradient(120% 130% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+          background: "radial-gradient(120% 130% at 0% 0%, #7A4080 0%, #5A2860 50%, #3E1540 100%)",
           padding: "28px 0 32px",
         }}>
           <div aria-hidden style={{
