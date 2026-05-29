@@ -86,9 +86,8 @@ export async function joinMinistryByCode(
     { onConflict: "user_id,ministry_id" }
   )
 
-  // Auto-add to grade + central chat (fire-and-forget)
   const { data: profile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  autoAddUserToChats(user.id, ministry.id, profile?.grade ?? null)
+  await autoAddUserToChats(user.id, ministry.id, profile?.grade ?? null)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -142,9 +141,8 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     { onConflict: "user_id,ministry_id" }
   )
 
-  // Auto-add to grade + central chat (fire-and-forget)
   const { data: profile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  autoAddUserToChats(user.id, ministryId, profile?.grade ?? null)
+  await autoAddUserToChats(user.id, ministryId, profile?.grade ?? null)
 
   return { error: null }
 }
@@ -250,9 +248,8 @@ export async function submitMinistryApplication(data: {
   // Create standard grade + central chats for the new ministry
   await ensureMinistryChats(ministry.id, data.name.trim(), user.id)
 
-  // Auto-add founding admin to central + grade chat
   const { data: founderProfile } = await admin.from("profiles").select("grade").eq("id", user.id).single()
-  autoAddUserToChats(user.id, ministry.id, founderProfile?.grade ?? null)
+  await autoAddUserToChats(user.id, ministry.id, founderProfile?.grade ?? null)
 
   // Create teams
   if (data.teams.length > 0) {

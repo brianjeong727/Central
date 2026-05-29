@@ -162,7 +162,7 @@ export function SettingsTab({
     auto_praise_chat: true,
     auto_archive_praise: true,
     auto_sg_chats: true,
-    auto_grade_chats: true,
+    auto_grade_chats: false,
     auto_central_chat: true,
   })
 
@@ -786,10 +786,10 @@ export function SettingsTab({
                   { key: "auto_praise_chat",    label: "Auto-create praise team chats",       sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
                   { key: "auto_archive_praise", label: "Auto-archive praise team chats",      sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   { key: "auto_sg_chats",       label: "Auto-create small group chats",       sub: "When groups are finalized for the semester, a chat is opened per group." },
-                  { key: "auto_grade_chats",    label: "Auto-add new members to grade chats", sub: "New members are added to their class-year chat based on their profile." },
-                  { key: "auto_central_chat",   label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`, sub: "Joining the workspace adds the member to the main Central Chat." },
+                  { key: "auto_grade_chats",    label: "Grade & Young Adult chats", sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
+                  { key: "auto_central_chat",   label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`, sub: "Joining the workspace adds the member to the main ministry chat." },
                 ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
-                  const on = automationSettings[key] !== false
+                  const on = automationSettings[key] === true || (key !== "auto_grade_chats" && automationSettings[key] !== false)
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>

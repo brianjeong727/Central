@@ -78,7 +78,7 @@ export async function autoAddUserToChats(
   if (settings.auto_central_chat !== false) {
     namesToJoin.push(`${ministry.name} Chat`)
   }
-  if (settings.auto_grade_chats !== false && grade && GRADE_CHAT_NAMES[grade]) {
+  if (settings.auto_grade_chats === true && grade && GRADE_CHAT_NAMES[grade]) {
     namesToJoin.push(GRADE_CHAT_NAMES[grade])
   }
 
