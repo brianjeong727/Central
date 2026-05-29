@@ -2427,7 +2427,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     {/* Emoji picker */}
                     {emojiPickerFor === msg.id && (
                       <div
-                        className={`absolute bottom-[calc(100%-4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
+                        className={`absolute z-[160] ${i === 0 ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
                         <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
@@ -2451,7 +2451,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           </button>
                         </div>
                         {fullReactionPickerFor === msg.id && (
-                          <div className={`absolute bottom-[calc(100%+4px)] z-[161] ${isOwn ? "right-0" : "left-0"}`} onPointerDown={(e) => e.stopPropagation()}>
+                          <div className={`absolute z-[161] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`} onPointerDown={(e) => e.stopPropagation()}>
                             <Picker data={data} onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} theme="light" previewPosition="none" skinTonePosition="none" />
                           </div>
                         )}
@@ -2461,7 +2461,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     {/* Context menu */}
                     {contextMenuFor === msg.id && (
                       <div
-                        className={`absolute bottom-[calc(100%+4px)] z-[160] ${isOwn ? "right-0" : "left-0"}`}
+                        className={`absolute z-[160] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
                         <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
