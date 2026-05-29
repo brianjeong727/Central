@@ -197,10 +197,15 @@ export async function submitMinistryApplication(data: {
   const inviteCode = await uniqueInviteCode(admin)
   const staffCode = await uniqueStaffCode(admin)
 
-  // Read role from the founder's existing profile (stored during signup).
-  // Fall back to the passed-in value, then "pastor" as a last resort.
+  // Determine founder role. If the profile already carries an admin-level role
+  // (set during signup via metadata), use that. If it's a basic role like "member"
+  // (e.g. existing account, Google OAuth), fall back to the passed-in role or "pastor".
   const { data: founderRoleRow } = await admin.from("profiles").select("role").eq("id", user.id).single()
-  const founderRole = founderRoleRow?.role ?? data.founderRole ?? "pastor"
+  const profileRole = founderRoleRow?.role?.toLowerCase()
+  const adminLevelRoles = ["admin", "pastor", "deacon", "elder", "leader"]
+  const founderRole = (profileRole && adminLevelRoles.includes(profileRole))
+    ? profileRole
+    : (data.founderRole ?? "pastor")
 
   const universitiesList = data.universities && data.universities.length > 0
     ? data.universities.map(u => u.trim()).filter(Boolean)
