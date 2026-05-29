@@ -172,9 +172,16 @@ export async function updateMinistryPublic(isPublic: boolean): Promise<{ error: 
   return { error: error?.message ?? null }
 }
 
+function toAbbreviation(name: string): string {
+  const skip = new Set(["of", "at", "the", "a", "an", "and", "in", "for"])
+  const initials = name.split(/\s+/).filter(w => !skip.has(w.toLowerCase())).map(w => w[0]?.toUpperCase() ?? "").join("")
+  return initials.slice(0, 6) || name.slice(0, 4).toUpperCase()
+}
+
 export async function submitMinistryApplication(data: {
   name: string
   university: string
+  universities?: string[]
   location: string
   size: "small" | "medium" | "large"
   teams: Array<{ name: string; icon: string }>
@@ -195,11 +202,16 @@ export async function submitMinistryApplication(data: {
   const { data: founderRoleRow } = await admin.from("profiles").select("role").eq("id", user.id).single()
   const founderRole = founderRoleRow?.role ?? data.founderRole ?? "pastor"
 
+  const universitiesList = data.universities && data.universities.length > 0
+    ? data.universities.map(u => u.trim()).filter(Boolean)
+    : [data.university.trim()].filter(Boolean)
+
   const { data: ministry, error: createErr } = await admin
     .from("ministries")
     .insert({
       name: data.name.trim(),
-      university: data.university.trim(),
+      university: universitiesList[0] ?? data.university.trim(),
+      universities: universitiesList,
       location: data.location.trim(),
       size: data.size,
       invite_code: inviteCode,
@@ -370,7 +382,37 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
     .update({ status: "active" })
     .eq("id", ministryId)
 
-  return { error: error?.message ?? null }
+  if (error) return { error: error.message }
+
+  // Seed ministry_schools from the universities array collected during onboarding
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("universities")
+    .eq("id", ministryId)
+    .single()
+
+  const unis: string[] = Array.isArray(ministry?.universities) ? ministry.universities : []
+  if (unis.length > 0) {
+    // Only insert schools that don't already exist for this ministry
+    const { data: existing } = await admin
+      .from("ministry_schools")
+      .select("name")
+      .eq("ministry_id", ministryId)
+    const existingNames = new Set((existing ?? []).map((r: { name: string }) => r.name.toLowerCase()))
+    const toInsert = unis
+      .filter(u => !existingNames.has(u.toLowerCase()))
+      .map((u, i) => ({
+        ministry_id: ministryId,
+        name: u,
+        abbreviation: toAbbreviation(u),
+        sort_order: (existing?.length ?? 0) + i,
+      }))
+    if (toInsert.length > 0) {
+      await admin.from("ministry_schools").insert(toInsert)
+    }
+  }
+
+  return { error: null }
 }
 
 export async function rejectMinistry(ministryId: string): Promise<{ error: string | null }> {

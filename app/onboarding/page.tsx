@@ -323,19 +323,19 @@ function mapLandingSize(s: string): "small" | "medium" | "large" {
   return "small"
 }
 
-function readPendingMinistry(): { name: string; university: string; size: "small" | "medium" | "large" } {
-  if (typeof window === "undefined") return { name: "", university: "", size: "small" }
+function readPendingMinistry(): { name: string; universities: string[]; size: "small" | "medium" | "large" } {
+  if (typeof window === "undefined") return { name: "", universities: [], size: "small" }
   try {
     const raw = sessionStorage.getItem("pending_ministry")
-    if (!raw) return { name: "", university: "", size: "small" }
+    if (!raw) return { name: "", universities: [], size: "small" }
     const saved = JSON.parse(raw) as { name?: string; university?: string; size?: string }
     return {
       name: saved.name ?? "",
-      university: saved.university ?? "",
+      universities: saved.university ? [saved.university] : [],
       size: saved.size ? mapLandingSize(saved.size) : "small",
     }
   } catch {
-    return { name: "", university: "", size: "small" }
+    return { name: "", universities: [], size: "small" }
   }
 }
 
@@ -352,7 +352,8 @@ export default function OnboardingPage() {
 
   // Step 1
   const [name, setName] = useState(pendingMinistry.name)
-  const [university, setUniversity] = useState(pendingMinistry.university)
+  const [universities, setUniversities] = useState<string[]>(pendingMinistry.universities)
+  const [uniInput, setUniInput] = useState("")
   const [location, setLocation] = useState("")
   const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
   const [step1Touched, setStep1Touched] = useState(false)
@@ -418,7 +419,10 @@ export default function OnboardingPage() {
     setSubmitting(true)
     setError(null)
     const { error: err } = await submitMinistryApplication({
-      name, university, location, size,
+      name,
+      university: universities[0] ?? "",
+      universities,
+      location, size,
       teams: teams.map((t) => ({ name: t.name, icon: t.icon })),
       isPublic,
     })
@@ -431,7 +435,18 @@ export default function OnboardingPage() {
     window.location.assign("/pending")
   }
 
-  const step1Valid = name.trim() && university.trim() && location.trim()
+  const step1Valid = name.trim() && universities.length > 0 && location.trim()
+
+  function addUniversity() {
+    const val = uniInput.trim()
+    if (!val || universities.includes(val)) { setUniInput(""); return }
+    setUniversities(prev => [...prev, val])
+    setUniInput("")
+  }
+
+  function removeUniversity(uni: string) {
+    setUniversities(prev => prev.filter(u => u !== uni))
+  }
   const stepIndex = step - 1
 
   return (
@@ -495,12 +510,39 @@ export default function OnboardingPage() {
                 autoFocus
                 error={step1Touched && !name.trim()}
               />
-              <Field
-                label="University"
-                value={university} onChange={setUniversity}
-                placeholder="e.g. University of Pittsburgh"
-                error={step1Touched && !university.trim()}
-              />
+              {/* Multi-university input */}
+              <div>
+                <div style={{ ...mono, marginBottom: 8 }}>Universities</div>
+                {universities.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    {universities.map(u => (
+                      <span key={u} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px 5px 12px", background: "#F1ECDE", border: "1px solid #E2DDCF", borderRadius: 999, fontSize: 13, color: "#2D0F2E", fontFamily: SANS }}>
+                        {u}
+                        <button type="button" onClick={() => removeUniversity(u)} style={{ width: 16, height: 16, borderRadius: "50%", border: "none", background: "rgba(62,21,64,0.12)", color: "#3E1540", cursor: "pointer", display: "grid", placeItems: "center", padding: 0, flexShrink: 0 }}>
+                          <Icon d="M18 6L6 18M6 6l12 12" size={9} stroke={2.2}/>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#FBF8F2", border: `1px solid ${step1Touched && universities.length === 0 ? "#E53E3E" : "#E2DDCF"}`, borderRadius: 10, padding: "0 14px" }}>
+                    <input
+                      value={uniInput}
+                      onChange={e => setUniInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addUniversity() } }}
+                      placeholder="e.g. University of Pittsburgh"
+                      style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A" }}
+                    />
+                  </div>
+                  <button type="button" onClick={addUniversity} disabled={!uniInput.trim()} style={{ padding: "0 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: uniInput.trim() ? "#2D0F2E" : "#E2DDCF", color: uniInput.trim() ? "#FBF8F2" : "#A09A8C", fontSize: 13, fontWeight: 500, fontFamily: SANS, cursor: uniInput.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
+                    Add
+                  </button>
+                </div>
+                {step1Touched && universities.length === 0 && (
+                  <p style={{ fontSize: 12, color: "#E53E3E", marginTop: 5, marginBottom: 0 }}>Add at least one university.</p>
+                )}
+              </div>
               <Field
                 label="Location"
                 value={location} onChange={setLocation}
@@ -611,7 +653,7 @@ export default function OnboardingPage() {
                   {name}
                 </div>
                 <div style={{ fontSize: 14, color: "#5A5466", marginTop: 8, lineHeight: 1.7 }}>
-                  {university}<br/>
+                  {universities.join(" · ")}<br/>
                   {location}<br/>
                   {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
                 </div>
