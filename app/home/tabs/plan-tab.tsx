@@ -8643,6 +8643,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
   const [memberSearch, setMemberSearch] = useState("")
   const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
+  const [presidentPick, setPresidentPick] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -8719,6 +8720,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   async function handleSave() {
     if (!teamName.trim()) { setError("Team name is required."); return }
     if (roles.some((r) => !r.name.trim())) { setError("All roles need a name."); return }
+    if (presidentRoleIdx >= 0 && !presidentPick) { setError("Please select a president."); return }
     setSaving(true)
     setError(null)
 
@@ -8737,18 +8739,20 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
     if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
 
-    // Build members list — always include creator as president (or first role), then others
-    const creatorRoleIdx = presidentRoleIdx >= 0 ? presidentRoleIdx : 0
-    const creatorAlreadySelected = selectedMembers.some((m) => m.userId === userId)
-    const allMembers = creatorAlreadySelected
-      ? selectedMembers
-      : [{ userId, roleIdx: creatorRoleIdx }, ...selectedMembers]
+    // Creator always added with default non-president role.
+    // President is whoever was explicitly picked from the ministry.
+    const allMembersMap = new Map<string, number>()
+    allMembersMap.set(userId, defaultMemberRoleIdx)
+    if (presidentPick) allMembersMap.set(presidentPick, presidentRoleIdx >= 0 ? presidentRoleIdx : 0)
+    for (const m of selectedMembers) {
+      if (!allMembersMap.has(m.userId)) allMembersMap.set(m.userId, m.roleIdx)
+    }
 
     const { error: membersErr } = await supabase.from("team_members").insert(
-      allMembers.map((m) => ({
+      Array.from(allMembersMap.entries()).map(([user_id, roleIdx]) => ({
         team_id: team.id,
-        user_id: m.userId,
-        role_id: createdRoles[m.roleIdx]?.id ?? createdRoles[0].id,
+        user_id,
+        role_id: createdRoles[roleIdx]?.id ?? createdRoles[0].id,
         added_by: userId,
       }))
     )
@@ -8758,7 +8762,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   }
 
   const filteredMembers = ministryMembers.filter((m) =>
-    m.name.toLowerCase().includes(memberSearch.toLowerCase())
+    m.name.toLowerCase().includes(memberSearch.toLowerCase()) &&
+    m.id !== presidentPick
   )
 
   const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
@@ -8791,7 +8796,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             </button>
           )}
           {step === "members" && (
-            <button onClick={handleSave} disabled={saving} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
+            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && !presidentPick)} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
               {saving ? "Saving…" : "Create"}
             </button>
           )}
@@ -9001,9 +9006,40 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
         {/* Step 3: Members */}
         {step === "members" && (
           <div className="flex flex-col gap-4">
-            <p className="text-[13px] text-[#8A8497]">Add members now, or share the invite code later.</p>
+            <p className="text-[13px] text-[#8A8497]">Select a president, then add other members.</p>
 
-            {/* Creator row — always shown, always president */}
+            {/* ── Required: President picker ── */}
+            {presidentRoleIdx >= 0 && (
+              <div className="rounded-xl border-2 border-[#3E1540]/25 bg-[#F8F5FF] p-3 flex flex-col gap-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-[#3E1540] uppercase tracking-wider">{roles[presidentRoleIdx].name}</span>
+                  <span className="text-[10px] font-medium text-[#EF4444] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">Required</span>
+                </div>
+                {presidentPick ? (
+                  <div className="flex items-center gap-3 bg-[#3E1540] rounded-lg px-3 py-2.5">
+                    <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
+                      {ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}
+                    </span>
+                    <button onClick={() => setPresidentPick(null)} className="text-[#F6F4EF]/60 hover:text-[#F6F4EF] transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value=""
+                    onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
+                    className="w-full bg-white border border-[#ECE8DE] rounded-lg px-3 py-2.5 text-[13px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                  >
+                    <option value="" disabled>Select a person…</option>
+                    {ministryMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Creator row — always added with non-president role */}
             <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[#ECE8DE] p-3">
               <div className="w-5 h-5 rounded-md bg-[#3E1540] border-[#3E1540] border-2 flex items-center justify-center flex-shrink-0">
                 <Check className="w-3 h-3 text-white" />
@@ -9012,7 +9048,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 {userName} <span className="text-[#8A8497] font-normal">(you)</span>
               </span>
               <span className="text-[12px] text-[#5A5466] font-medium">
-                {presidentRoleIdx >= 0 ? roles[presidentRoleIdx].name : roles[0]?.name}
+                {roles[defaultMemberRoleIdx]?.name ?? roles[0]?.name}
               </span>
             </div>
 
@@ -9028,11 +9064,10 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             </div>
             <div className="flex flex-col gap-1.5">
               {filteredMembers.length === 0 && (
-                <p className="text-[13px] text-[#8A8497] text-center py-6">No members found.</p>
+                <p className="text-[13px] text-[#8A8497] text-center py-6">No other members to add.</p>
               )}
               {filteredMembers.map((member) => {
                 const sel = selectedMembers.find((m) => m.userId === member.id)
-                // Roles available to non-creator members: exclude president roles
                 const assignableRoles = roles
                   .map((r, i) => ({ ...r, i }))
                   .filter(({ name }) => !name.toLowerCase().includes("president"))
