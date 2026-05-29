@@ -58,7 +58,7 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [authUser, setAuthUser] = useState<boolean | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [ministryCount, setMinistryCount] = useState<number>(1)
+  const [ministryCount, setMinistryCount] = useState<number | null>(null)
   const [heroVisible, setHeroVisible] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -83,7 +83,7 @@ export default function LandingPage() {
       setAuthChecked(true)
       if (user) {
         const { data } = await getUserMinistries()
-        setMinistryCount(data?.length ?? 1)
+        setMinistryCount(data?.length ?? 0)
       }
     })
   }, [])
@@ -97,6 +97,16 @@ export default function LandingPage() {
     const supabase = createClient()
     await supabase.auth.signOut()
     window.location.assign("/")
+  }
+
+  function handleOpenApp() {
+    if (ministryCount === 0) {
+      router.push("/join")
+    } else if (ministryCount !== null && ministryCount > 1) {
+      router.push("/pick-ministry")
+    } else {
+      router.push("/home")
+    }
   }
 
   const navColor = scrolled ? C.ink : C.ivory
@@ -140,19 +150,19 @@ export default function LandingPage() {
           <div className="cl-nav-right" style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
             {authChecked && authUser ? (
               <>
-                <a
-                  href={ministryCount > 1 ? "/pick-ministry" : "/home"}
-                  className="cl-nav-cta-outline"
-                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, textDecoration: "none", border: scrolled ? `1px solid ${C.border}` : "1px solid rgba(246,244,239,0.5)", color: navColor, background: "transparent", fontFamily: SANS }}
-                >
-                  Open app
-                </a>
                 <button
                   onClick={handleSignOut}
                   className="cl-nav-sign-out cl-desktop-only"
                   style={{ background: "transparent", border: 0, color: navMuted, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}
                 >
                   Sign out
+                </button>
+                <button
+                  onClick={handleOpenApp}
+                  className="cl-nav-cta-outline"
+                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.border}` : "1px solid rgba(246,244,239,0.5)", color: navColor, background: "transparent", cursor: "pointer", fontFamily: SANS }}
+                >
+                  Open app
                 </button>
               </>
             ) : (
@@ -218,9 +228,9 @@ export default function LandingPage() {
         ))}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
           {authChecked && authUser ? (
-            <a href={ministryCount > 1 ? "/pick-ministry" : "/home"} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+            <button onClick={() => { setMenuOpen(false); handleOpenApp() }} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: SANS, width: "100%" }}>
               Open app
-            </a>
+            </button>
           ) : (
             <>
               <a href="/ministries" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
