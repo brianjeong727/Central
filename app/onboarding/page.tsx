@@ -302,18 +302,16 @@ const SIZE_OPTIONS = [
 ]
 
 const STRUCTURE_QUESTIONS = [
-  { id: "worship",    label: "Worship / Music",   desc: "Worship leading and music ministry",       soon: true  },
-  { id: "media",      label: "Media & Tech",       desc: "Sound, projection, and live streaming",    soon: true  },
   { id: "smallGroups",label: "Small Groups",       desc: "Bible study groups or cells",              soon: false },
-  { id: "hospitality",label: "Hospitality",        desc: "Welcoming guests and outreach",            soon: false },
   { id: "leadership", label: "Leadership Team",    desc: "Core leadership board and oversight",      soon: false },
+  { id: "worship",    label: "Worship / Music",    desc: "Worship leading and music ministry",       soon: true  },
+  { id: "media",      label: "Media & Tech",       desc: "Sound, projection, and live streaming",    soon: true  },
 ]
 
 const TEAM_PRESETS: Record<string, { name: string; icon: string }> = {
   worship:     { name: "Worship",        icon: "🎵" },
   media:       { name: "Media & Tech",   icon: "🎬" },
   smallGroups: { name: "Small Groups",   icon: "👥" },
-  hospitality: { name: "Hospitality",    icon: "🤝" },
   leadership:  { name: "Leadership",     icon: "✝️" },
 }
 
@@ -360,7 +358,7 @@ export default function OnboardingPage() {
 
   // Step 2
   const [structure, setStructure] = useState<Record<string, boolean>>({
-    worship: false, media: false, smallGroups: false, hospitality: false, leadership: false,
+    worship: false, media: false, smallGroups: false, leadership: false,
   })
 
   // Step 3
