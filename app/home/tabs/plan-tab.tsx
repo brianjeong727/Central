@@ -8644,6 +8644,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const [memberSearch, setMemberSearch] = useState("")
   const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
   const [presidentPick, setPresidentPick] = useState<string | null>(null)
+  const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
+  const [coPresidency, setCoPresidency] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -8720,7 +8722,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   async function handleSave() {
     if (!teamName.trim()) { setError("Team name is required."); return }
     if (roles.some((r) => !r.name.trim())) { setError("All roles need a name."); return }
-    if (presidentRoleIdx >= 0 && !presidentPick) { setError("Please select a president."); return }
+    if (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2))) { setError(coPresidency ? "Please select both co-presidents." : "Please select a president."); return }
     setSaving(true)
     setError(null)
 
@@ -8744,6 +8746,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     const allMembersMap = new Map<string, number>()
     allMembersMap.set(userId, defaultMemberRoleIdx)
     if (presidentPick) allMembersMap.set(presidentPick, presidentRoleIdx >= 0 ? presidentRoleIdx : 0)
+    if (coPresidency && presidentPick2) allMembersMap.set(presidentPick2, presidentRoleIdx >= 0 ? presidentRoleIdx : 0)
     for (const m of selectedMembers) {
       if (!allMembersMap.has(m.userId)) allMembersMap.set(m.userId, m.roleIdx)
     }
@@ -8763,7 +8766,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
   const filteredMembers = ministryMembers.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase()) &&
-    m.id !== presidentPick
+    m.id !== presidentPick &&
+    m.id !== presidentPick2
   )
 
   const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
@@ -8796,7 +8800,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             </button>
           )}
           {step === "members" && (
-            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && !presidentPick)} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
+            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
               {saving ? "Saving…" : "Create"}
             </button>
           )}
@@ -9006,7 +9010,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
         {/* Step 3: Members */}
         {step === "members" && (
           <div className="flex flex-col gap-4">
-            <p className="text-[13px] text-[#8A8497]">Select a president, then add other members.</p>
+            <p className="text-[13px] text-[#8A8497]">Select {coPresidency ? "two co-presidents" : "a president"}, then add other members.</p>
 
             {/* ── Required: President picker ── */}
             {presidentRoleIdx >= 0 && (
@@ -9014,7 +9018,20 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold text-[#3E1540] uppercase tracking-wider">{roles[presidentRoleIdx].name}</span>
                   <span className="text-[10px] font-medium text-[#EF4444] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">Required</span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
+                      className="flex items-center gap-1.5 text-[11px] text-[#5A5466] hover:text-[#3E1540] transition-colors"
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${coPresidency ? "bg-[#3E1540] border-[#3E1540]" : "border-[#C4C4C4]"}`}>
+                        {coPresidency && <Check className="w-2.5 h-2.5 text-white" />}
+                      </span>
+                      Co-presidency
+                    </button>
+                  </div>
                 </div>
+                {/* First president */}
                 {presidentPick ? (
                   <div className="flex items-center gap-3 bg-[#3E1540] rounded-lg px-3 py-2.5">
                     <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
@@ -9031,10 +9048,34 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                     className="w-full bg-white border border-[#ECE8DE] rounded-lg px-3 py-2.5 text-[13px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                   >
                     <option value="" disabled>Select a person…</option>
-                    {ministryMembers.map(m => (
+                    {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                   </select>
+                )}
+                {/* Second president (co-presidency only) */}
+                {coPresidency && (
+                  presidentPick2 ? (
+                    <div className="flex items-center gap-3 bg-[#3E1540] rounded-lg px-3 py-2.5">
+                      <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
+                        {ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}
+                      </span>
+                      <button onClick={() => setPresidentPick2(null)} className="text-[#F6F4EF]/60 hover:text-[#F6F4EF] transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value=""
+                      onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
+                      className="w-full bg-white border border-[#ECE8DE] rounded-lg px-3 py-2.5 text-[13px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                    >
+                      <option value="" disabled>Select second person…</option>
+                      {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  )
                 )}
               </div>
             )}
