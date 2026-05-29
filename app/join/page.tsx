@@ -3,9 +3,61 @@
 import { Suspense, useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
-import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
+import { Spinner } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
+// ─── design tokens ──────────────────────────────────────────────
+const SANS = "var(--font-inter), system-ui, sans-serif"
+const SERIF = "var(--font-instrument-serif)"
+
+const mono: React.CSSProperties = {
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+}
+
+function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={d}/>
+    </svg>
+  )
+}
+
+function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
+  const isInk = tone === "ink"
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <span style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: isInk ? "#3E1540" : "rgba(251,248,242,0.10)",
+        color: "#FBF8F2", display: "grid", placeItems: "center",
+        fontFamily: SERIF, fontSize: 15, flexShrink: 0,
+      }}>C</span>
+      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "#13101A" : "#FBF8F2" }}>
+        Central
+      </span>
+    </div>
+  )
+}
+
+// ─── modal action button ─────────────────────────────────────────
+function ModalAction({ children, onClick, disabled }: {
+  children: React.ReactNode; onClick?: () => void; disabled?: boolean
+}) {
+  return (
+    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
+      width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+      background: disabled ? "#E2DDCF" : "#2D0F2E",
+      color: disabled ? "#A09A8C" : "#FBF8F2",
+      fontSize: 15, fontWeight: 500, fontFamily: SANS,
+      cursor: disabled ? "not-allowed" : "pointer",
+      transition: "background .15s ease",
+    }}>{children}</button>
+  )
+}
+
+// ─── data ────────────────────────────────────────────────────────
 const GENDERS = [
   { value: "male",   label: "Male" },
   { value: "female", label: "Female" },
@@ -46,12 +98,10 @@ function JoinContent() {
   const pendingJoin = useState(readPendingJoinState)[0]
   const [tab, setTab] = useState<Tab>(pendingJoin.tab)
 
-  // Invite code state
   const [inviteCode, setInviteCode] = useState(pendingJoin.inviteCode)
   const [joining, setJoining] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
 
-  // Browse state
   const [search, setSearch] = useState("")
   const [ministries, setMinistries] = useState<Ministry[]>([])
   const [browsing, setBrowsing] = useState(false)
@@ -62,22 +112,18 @@ function JoinContent() {
   const [myMinistryIds, setMyMinistryIds] = useState<Set<string>>(new Set())
   const [switching, setSwitching] = useState<string | null>(null)
 
-  // Staff code role picker — shown when a staff invite code is entered
   const [needsStaffRole, setNeedsStaffRole] = useState(false)
   const [staffMinistryName, setStaffMinistryName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<"pastor" | "deacon" | "elder" | "">("")
   const [joiningStaff, setJoiningStaff] = useState(false)
   const [staffRoleError, setStaffRoleError] = useState<string | null>(null)
 
-  // Gender collection — shown before join if profile has no gender set
   const [needsGender, setNeedsGender] = useState(false)
   const [gender, setGender] = useState<string>("")
   const [savingGender, setSavingGender] = useState(false)
   const [genderError, setGenderError] = useState<string | null>(null)
-  // Pending action to run after gender is saved
   const [pendingAction, setPendingAction] = useState<"code" | "browse" | null>(null)
 
-  // School collection — shown after join if the ministry has schools defined
   const [needsSchool, setNeedsSchool] = useState(false)
   const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>("")
@@ -85,7 +131,6 @@ function JoinContent() {
   const [schoolError, setSchoolError] = useState<string | null>(null)
   const [pendingSchoolRedirect, setPendingSchoolRedirect] = useState<(() => void) | null>(null)
 
-  // Clear consumed sessionStorage handoff + load user's existing memberships + check gender
   useEffect(() => {
     sessionStorage.removeItem("pending_invite_code")
     sessionStorage.removeItem("pending_browse_ministry")
@@ -96,10 +141,7 @@ function JoinContent() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("gender")
-        .eq("id", user.id)
-        .single()
+        .from("profiles").select("gender").eq("id", user.id).single()
       if (profile && !profile.gender) setNeedsGender(true)
     })
   }, [])
@@ -140,7 +182,6 @@ function JoinContent() {
     try {
       const { error, isStaffCode, ministryName } = await joinMinistryByCode(inviteCode)
       if (isStaffCode) {
-        // Staff code detected — show role picker before completing join
         setStaffMinistryName(ministryName)
         setNeedsStaffRole(true)
         setJoining(false)
@@ -229,351 +270,404 @@ function JoinContent() {
     else setPendingAction(null)
   }
 
+  const joinLabel = switching ? "Switching…" : confirming ? "Joining…"
+    : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →`
+    : selected ? `Join ${selected.name} →`
+    : "Select a ministry"
+
   return (
     <>
-    {needsSchool && (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
-        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>One more thing</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>Which school?</h2>
-          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>This helps us organize groups and events by campus.</p>
-          {schoolError && (
-            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{schoolError}</div>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-            {schoolOptions.map(s => {
-              const active = selectedSchoolId === s.id
-              return (
-                <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{ padding: "11px 16px", fontSize: 14, fontWeight: active ? 600 : 400, borderRadius: 12, border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: active ? "#3E1540" : "#FBF8F2", color: active ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
-                  {s.name}
-                  <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>({s.abbreviation})</span>
-                </button>
-              )
-            })}
-            <button type="button" onClick={() => setSelectedSchoolId("other")} style={{ padding: "11px 16px", fontSize: 14, fontWeight: selectedSchoolId === "other" ? 600 : 400, borderRadius: 12, border: selectedSchoolId === "other" ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: selectedSchoolId === "other" ? "#3E1540" : "#FBF8F2", color: selectedSchoolId === "other" ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
-              Other / Not a student
-            </button>
-          </div>
-          <button onClick={handleSaveSchool} disabled={!selectedSchoolId || savingSchool} style={{ width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600, fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none", cursor: selectedSchoolId && !savingSchool ? "pointer" : "not-allowed", opacity: !selectedSchoolId || savingSchool ? 0.5 : 1, transition: "opacity 0.15s" }}>
-            {savingSchool ? "Saving…" : "Continue"}
-          </button>
-          <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }} style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}>
-            Skip for now
-          </button>
-        </div>
-      </div>
-    )}
-    {needsStaffRole && (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
-        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>Staff invite code</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>
-            {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
-          </h2>
-          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>Select your staff role to join.</p>
-          {staffRoleError && (
-            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{staffRoleError}</div>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-            {([
-              { value: "pastor",  label: "Pastor",  desc: "Senior leader" },
-              { value: "deacon",  label: "Deacon",  desc: "Servant leader" },
-              { value: "elder",   label: "Elder",   desc: "Elder board" },
-            ] as const).map(({ value, label, desc }) => {
-              const active = staffRole === value
-              return (
-                <button key={value} type="button" onClick={() => setStaffRole(value)} style={{ padding: "11px 16px", borderRadius: 12, border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF", background: active ? "#3E1540" : "#FBF8F2", color: active ? "#F6F4EF" : "#5A5466", cursor: "pointer", textAlign: "left", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 14, fontWeight: active ? 600 : 400 }}>{label}</span>
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>{desc}</span>
-                </button>
-              )
-            })}
-          </div>
-          <button onClick={doStaffCodeJoin} disabled={!staffRole || joiningStaff} style={{ width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600, fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none", cursor: staffRole && !joiningStaff ? "pointer" : "not-allowed", opacity: !staffRole || joiningStaff ? 0.5 : 1, transition: "opacity 0.15s" }}>
-            {joiningStaff ? "Joining…" : "Join as " + (staffRole || "…")}
-          </button>
-          <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }} style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    )}
-    {needsGender && pendingAction !== null && (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
-        <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>One more thing</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", margin: "0 0 6px", fontWeight: 400 }}>What&apos;s your gender?</h2>
-          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20, lineHeight: 1.5 }}>This helps us place you in the right small group.</p>
-          {genderError && (
-            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>{genderError}</div>
-          )}
-          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            {GENDERS.map(({ value, label }) => {
-              const active = gender === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setGender(value)}
-                  style={{
-                    flex: 1, padding: "10px 0", fontSize: 14, fontWeight: active ? 600 : 400,
-                    borderRadius: 12,
-                    border: active ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
-                    background: active ? "#3E1540" : "#FBF8F2",
-                    color: active ? "#F6F4EF" : "#5A5466",
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <button
-            onClick={handleSaveGender}
-            disabled={!gender || savingGender}
-            style={{
-              width: "100%", background: "#3E1540", color: "#F6F4EF", fontWeight: 600,
-              fontSize: 14, padding: "13px 0", borderRadius: 12, border: "none",
-              cursor: gender && !savingGender ? "pointer" : "not-allowed",
-              opacity: !gender || savingGender ? 0.5 : 1, transition: "opacity 0.15s",
-            }}
-          >
-            {savingGender ? "Saving…" : "Continue"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPendingAction(null)}
-            style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer" }}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    )}
-    <div className="flex flex-col bg-[#FBF8F2]" style={{ height: "100svh" }}>
-
-      {/* ── Plum header strip ── */}
-      <div className="flex-shrink-0" style={{ background: "#3E1540", position: "relative", overflow: "hidden" }}>
-        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.08) 1px, transparent 1px)", backgroundSize: "20px 20px", pointerEvents: "none" }} />
-        <div className="max-w-[520px] mx-auto w-full px-6" style={{ padding: "28px 24px 32px", position: "relative" }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 22 }}>
-            <RingCrossLogo size={20} color="#F6F4EF" />
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
-          </div>
-          <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(246,244,239,0.45)", marginBottom: 8 }}>
-            Find your ministry
-          </p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", color: "#F6F4EF", fontWeight: 400, lineHeight: 1.1, margin: 0 }}>
-            Choose a ministry.
-          </h1>
-        </div>
-      </div>
-
-      {/* ── Tab bar ── */}
-      <div className="border-b border-[#E8E2D2] flex-shrink-0 mt-6">
-        <div className="max-w-[520px] mx-auto flex px-6">
-          {(["browse", "code"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="py-3.5 mr-8 text-[14px] transition-colors"
-              style={{
-                color: tab === t ? "#2D0F2E" : "#8A8497",
-                fontWeight: tab === t ? 600 : 400,
-                borderBottom: tab === t ? "2px solid #3E1540" : "2px solid transparent",
-                background: "none",
-                marginBottom: -1,
-              }}
-            >
-              {t === "browse" ? "Find ministry" : "I have a code"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Tab content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden max-w-[520px] mx-auto w-full">
-
-        {/* Browse tab */}
-        {tab === "browse" && (
-          <div className="flex flex-col flex-1 overflow-hidden px-6 pt-5 gap-3">
-
-            {/* Search */}
-            <div className="relative flex-shrink-0">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497] pointer-events-none" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or university…"
-                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
-                autoComplete="off"
-              />
-            </div>
-
-            {browseError && (
-              <div className="flex-shrink-0 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
-                {browseError}
+      {/* ── School picker modal ── */}
+      {needsSchool && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(19,16,26,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
+        }}>
+          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+            <div style={mono}>One more thing</div>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+              Which school?
+            </h2>
+            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+              This helps us organize groups and events by campus.
+            </p>
+            {schoolError && (
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+                {schoolError}
               </div>
             )}
-            {confirmError && (
-              <div className="flex-shrink-0 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
-                {confirmError}
-              </div>
-            )}
-
-            {/* Scrollable list */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {browsing && (
-                <div className="flex justify-center py-10"><Spinner /></div>
-              )}
-
-              {!browsing && ministries.length === 0 && !browseError && (
-                <div className="flex flex-col items-center py-14">
-                  <div className="w-12 h-12 rounded-full bg-[#F4F1E8] flex items-center justify-center mb-3">
-                    <Search className="w-5 h-5 text-[#8A8497]" />
-                  </div>
-                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">No ministries found</p>
-                  <p className="text-[13px] text-[#8A8497] text-center">
-                    {search ? "Try a different search." : "Your ministry might be private."}
-                  </p>
-                  {!search && (
-                    <button
-                      type="button"
-                      onClick={() => setTab("code")}
-                      style={{ fontSize: 13, color: "#3E1540", fontWeight: 600, marginTop: 8, background: "none", border: "none", cursor: "pointer" }}
-                    >
-                      Try an invite code instead →
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {!browsing && ministries.length > 0 && (
-                <div className="flex flex-col gap-3 pb-2">
-                  {ministries.map((m) => {
-                    const isSelected = selected?.id === m.id
-                    const isMember = myMinistryIds.has(m.id)
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }}
-                        className="flex items-center gap-4 rounded-2xl border transition-all text-left w-full active:scale-[0.99]"
-                        style={{
-                          padding: "18px 20px",
-                          borderColor: isSelected ? "#3E1540" : "#E8E2D2",
-                          borderWidth: isSelected ? "1.5px" : "1px",
-                          background: isSelected ? "#F9F5FF" : "#FBF8F2",
-                        }}
-                      >
-                        {/* Plum icon chip */}
-                        <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 12, background: "#3E1540" }}>
-                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", color: "#F6F4EF", fontWeight: 400 }}>
-                            {getInitials(m.name)}
-                          </span>
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p style={{ fontWeight: 600, fontSize: "15px", color: "#13101A" }} className="truncate">{m.name}</p>
-                          <p style={{ fontSize: "12px", color: "#8A8497", marginTop: 2 }} className="truncate">
-                            {m.university} · {SIZE_LABELS[m.size] ?? m.size}
-                          </p>
-                        </div>
-
-                        {/* Role pill or member badge */}
-                        {isMember && (
-                          <span style={{ padding: "3px 10px", borderRadius: 999, background: "rgba(62,21,64,0.08)", color: "#3E1540", fontSize: "12px", fontWeight: 500, flexShrink: 0 }}>
-                            Member
-                          </span>
-                        )}
-
-                        {/* Chevron */}
-                        <svg width="7" height="12" viewBox="0 0 7 12" fill="none" className="flex-shrink-0" style={{ color: "#C4C4C4" }}>
-                          <path d="M1 1l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Join button pinned at bottom of content area */}
-            <div className="flex-shrink-0 pt-4 pb-5 border-t border-[#E8E2D2]">
-              <p className="text-center text-[14px] mb-3">
-                Starting a new ministry?{" "}
-                <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
-                  Register here
-                </a>
-              </p>
-              <button
-                onClick={handleBrowseJoin}
-                disabled={!selected || confirming || !!switching}
-                className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
-              >
-                {switching ? "Switching…" : confirming ? "Joining…" : selected && myMinistryIds.has(selected.id) ? `Go to ${selected.name} →` : selected ? `Join ${selected.name} →` : "Select a ministry"}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {schoolOptions.map(s => {
+                const active = selectedSchoolId === s.id
+                return (
+                  <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{
+                    padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                    border: `1px solid ${active ? "#2D0F2E" : "#E2DDCF"}`,
+                    background: active ? "#2D0F2E" : "#FBF8F2",
+                    transition: "all .12s ease",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}>
+                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "#FBF8F2" : "#13101A" }}>
+                      {s.name}
+                    </span>
+                    <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "#8A8497" }}>
+                      {s.abbreviation}
+                    </span>
+                  </button>
+                )
+              })}
+              <button type="button" onClick={() => setSelectedSchoolId("other")} style={{
+                padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                border: `1px solid ${selectedSchoolId === "other" ? "#2D0F2E" : "#E2DDCF"}`,
+                background: selectedSchoolId === "other" ? "#2D0F2E" : "#FBF8F2",
+                transition: "all .12s ease",
+              }}>
+                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "#FBF8F2" : "#13101A" }}>
+                  Other / Not a student
+                </span>
               </button>
             </div>
+            <ModalAction onClick={handleSaveSchool} disabled={!selectedSchoolId || savingSchool}>
+              {savingSchool ? "Saving…" : "Continue"}
+            </ModalAction>
+            <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }}
+              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              Skip for now
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Invite code tab */}
-        {tab === "code" && (
-          <form onSubmit={handleCodeJoin} className="flex flex-col items-center overflow-y-auto px-6 pt-10 pb-8 gap-5">
-            <p className="text-[13px] text-[#8A8497] text-center max-w-[280px] leading-relaxed">
-              Enter the invite code shared by your ministry leader.
+      {/* ── Staff role picker modal ── */}
+      {needsStaffRole && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(19,16,26,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
+        }}>
+          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+            <div style={mono}>Staff invite code</div>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+              {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
+            </h2>
+            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+              Select your staff role to continue.
             </p>
-
-            {codeError && (
-              <div className="w-full rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium text-center">
-                {codeError}
+            {staffRoleError && (
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+                {staffRoleError}
               </div>
             )}
-
-            <div className="w-full">
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                placeholder="ENTER CODE"
-                autoComplete="off"
-                autoCapitalize="characters"
-                className="w-full px-4 py-4 rounded-2xl border border-[#E8E2D2] bg-[#FBF8F2] text-[18px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all text-center"
-                style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" }}
-              />
-              <p className="text-[11px] text-[#8A8497] text-center mt-2">Codes are usually 6–8 characters</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {([
+                { value: "pastor" as const,  label: "Pastor",  desc: "Senior leader"  },
+                { value: "deacon" as const,  label: "Deacon",  desc: "Servant leader" },
+                { value: "elder"  as const,  label: "Elder",   desc: "Elder board"    },
+              ]).map(({ value, label, desc }) => {
+                const active = staffRole === value
+                return (
+                  <button key={value} type="button" onClick={() => setStaffRole(value)} style={{
+                    padding: "14px 18px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                    border: `1px solid ${active ? "#2D0F2E" : "#E2DDCF"}`,
+                    background: active ? "#2D0F2E" : "#FBF8F2",
+                    transition: "all .12s ease",
+                  }}>
+                    <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "#FBF8F2" : "#13101A" }}>{label}</div>
+                    <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "#8A8497", marginTop: 4 }}>{desc}</div>
+                  </button>
+                )
+              })}
             </div>
-
-            <button
-              type="submit"
-              disabled={joining || inviteCode.trim().length < 4}
-              className="w-full bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold py-3.5 rounded-[12px] active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
-            >
-              {joining ? "Joining…" : "Join ministry"}
+            <ModalAction onClick={doStaffCodeJoin} disabled={!staffRole || joiningStaff}>
+              {joiningStaff ? "Joining…" : `Join as ${staffRole || "…"}`}
+            </ModalAction>
+            <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
+              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              Cancel
             </button>
+          </div>
+        </div>
+      )}
 
-            <button
-              type="button"
-              onClick={() => setTab("browse")}
-              className="text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
-            >
-              Don&apos;t have a code?{" "}
-              <span className="font-semibold text-[#3E1540]">Browse ministries</span>
-            </button>
-
-            <p className="text-[13px] text-[#8A8497]">
-              Starting a new ministry?{" "}
-              <a href="/onboarding" className="font-semibold text-[#3E1540] hover:underline underline-offset-2">
-                Register here
-              </a>
+      {/* ── Gender picker modal ── */}
+      {needsGender && pendingAction !== null && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(19,16,26,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
+        }}>
+          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+            <div style={mono}>One more thing</div>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+              What&apos;s your gender?
+            </h2>
+            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+              Helps us place you in the right small group.
             </p>
-          </form>
-        )}
+            {genderError && (
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+                {genderError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {GENDERS.map(({ value, label }) => {
+                const active = gender === value
+                return (
+                  <button key={value} type="button" onClick={() => setGender(value)} style={{
+                    flex: 1, padding: "10px 16px", borderRadius: 999,
+                    border: `1px solid ${active ? "#3E1540" : "#E2DDCF"}`,
+                    background: active ? "#2D0F2E" : "#FBF8F2",
+                    color: active ? "#FBF8F2" : "#5A5466",
+                    fontSize: 14, fontWeight: active ? 500 : 400, cursor: "pointer",
+                    transition: "all .12s ease", fontFamily: SANS,
+                  }}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <ModalAction onClick={handleSaveGender} disabled={!gender || savingGender}>
+              {savingGender ? "Saving…" : "Continue"}
+            </ModalAction>
+            <button type="button" onClick={() => setPendingAction(null)}
+              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", background: "#FBF8F2", height: "100svh", fontFamily: SANS }}>
+
+        {/* ── Plum hero band ── */}
+        <div style={{
+          flexShrink: 0, position: "relative", overflow: "hidden", color: "#FBF8F2",
+          background: "radial-gradient(120% 130% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
+          padding: "28px 0 32px",
+        }}>
+          <div aria-hidden style={{
+            position: "absolute", inset: 0, opacity: 0.16, pointerEvents: "none",
+            background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
+          }}/>
+          <div style={{ position: "relative", maxWidth: 520, margin: "0 auto", padding: "0 24px" }}>
+            <Wordmark tone="plum"/>
+            <div style={{ ...mono, color: "rgba(251,248,242,0.55)", marginTop: 22, marginBottom: 8 }}>
+              Find your ministry
+            </div>
+            <h1 style={{
+              fontFamily: SERIF, fontWeight: 400, color: "#FBF8F2",
+              fontSize: 40, letterSpacing: "-0.03em", lineHeight: 1.04, margin: 0,
+            }}>
+              Choose a ministry.
+            </h1>
+          </div>
+        </div>
+
+        {/* ── Tab bar ── */}
+        <div style={{ borderBottom: "1px solid #E8E2D2", flexShrink: 0, background: "#FBF8F2" }}>
+          <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", padding: "0 24px" }}>
+            {(["browse", "code"] as Tab[]).map((t) => (
+              <button key={t} onClick={() => setTab(t)} style={{
+                paddingTop: 14, paddingBottom: 14, marginRight: 32,
+                fontSize: 14, fontFamily: SANS, background: "none",
+                color: tab === t ? "#2D0F2E" : "#8A8497",
+                fontWeight: tab === t ? 600 : 400,
+                borderBottom: tab === t ? "2px solid #2D0F2E" : "2px solid transparent",
+                border: "none", borderBottomWidth: 2,
+                borderBottomStyle: "solid",
+                borderBottomColor: tab === t ? "#2D0F2E" : "transparent",
+                marginBottom: -1, cursor: "pointer", transition: "color .15s",
+              }}>
+                {t === "browse" ? "Find ministry" : "I have a code"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Tab content ── */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", maxWidth: 520, margin: "0 auto", width: "100%" }}>
+
+          {/* Browse tab */}
+          {tab === "browse" && (
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", padding: "20px 24px 0", gap: 12 }}>
+
+              {/* Search */}
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "#8A8497", pointerEvents: "none" }}/>
+                <input
+                  type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name or university…"
+                  autoComplete="off"
+                  style={{
+                    width: "100%", paddingLeft: 42, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
+                    borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
+                    fontSize: 14, color: "#13101A", fontFamily: SANS, outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              {browseError && (
+                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                  {browseError}
+                </div>
+              )}
+              {confirmError && (
+                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                  {confirmError}
+                </div>
+              )}
+
+              {/* Scrollable list */}
+              <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                {browsing && (
+                  <div style={{ display: "flex", justifyContent: "center", paddingTop: 40 }}><Spinner /></div>
+                )}
+                {!browsing && ministries.length === 0 && !browseError && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 999, background: "#F1ECDE", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                      <Search style={{ width: 20, height: 20, color: "#8A8497" }}/>
+                    </div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No ministries found</p>
+                    <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center" }}>
+                      {search ? "Try a different search." : "Your ministry might be private."}
+                    </p>
+                    {!search && (
+                      <button type="button" onClick={() => setTab("code")} style={{
+                        fontSize: 13, color: "#2D0F2E", fontWeight: 600, marginTop: 8,
+                        background: "none", border: "none", cursor: "pointer",
+                      }}>
+                        Try an invite code instead →
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {!browsing && ministries.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingBottom: 8 }}>
+                    {ministries.map((m) => {
+                      const isSelected = selected?.id === m.id
+                      const isMember = myMinistryIds.has(m.id)
+                      return (
+                        <button key={m.id} onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }} style={{
+                          display: "flex", alignItems: "center", gap: 16, borderRadius: 14,
+                          padding: "16px 18px", textAlign: "left", width: "100%", cursor: "pointer",
+                          border: `1px solid ${isSelected ? "#3E1540" : "#E2DDCF"}`,
+                          background: isSelected ? "#F6F2E8" : "#FBF8F2",
+                          transition: "all .12s ease",
+                        }}>
+                          <div style={{
+                            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                            background: "#F1ECDE", color: "#3E1540",
+                            display: "grid", placeItems: "center",
+                          }}>
+                            <span style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 400 }}>
+                              {getInitials(m.name)}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                            <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {m.university} · {SIZE_LABELS[m.size] ?? m.size}
+                            </p>
+                          </div>
+                          {isMember && (
+                            <span style={{
+                              padding: "3px 10px", borderRadius: 999, flexShrink: 0,
+                              background: "#F1ECDE", color: "#3E1540", fontSize: 12, fontWeight: 500,
+                            }}>Member</span>
+                          )}
+                          <Icon d="M9 18l6-6-6-6" size={16} stroke={1.5}/>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom CTA */}
+              <div style={{ flexShrink: 0, paddingTop: 14, paddingBottom: 20, borderTop: "1px solid #E8E2D2" }}>
+                <p style={{ textAlign: "center", fontSize: 14, marginBottom: 12, color: "#5A5466" }}>
+                  Starting a new ministry?{" "}
+                  <a href="/onboarding" style={{ fontWeight: 600, color: "#2D0F2E", textDecoration: "none" }}>Register here</a>
+                </p>
+                <button onClick={handleBrowseJoin} disabled={!selected || confirming || !!switching} style={{
+                  width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+                  background: (!selected || confirming || !!switching) ? "#E2DDCF" : "#2D0F2E",
+                  color: (!selected || confirming || !!switching) ? "#A09A8C" : "#FBF8F2",
+                  fontSize: 15, fontWeight: 500, fontFamily: SANS,
+                  cursor: (!selected || confirming || !!switching) ? "not-allowed" : "pointer",
+                  transition: "background .15s ease",
+                }}>
+                  {joinLabel}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Code tab */}
+          {tab === "code" && (
+            <form onSubmit={handleCodeJoin} style={{
+              display: "flex", flexDirection: "column", alignItems: "center",
+              overflowY: "auto", padding: "40px 24px 32px", gap: 20,
+            }}>
+              <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
+                Enter the invite code shared by your ministry leader.
+              </p>
+
+              {codeError && (
+                <div style={{ width: "100%", borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500, textAlign: "center" }}>
+                  {codeError}
+                </div>
+              )}
+
+              <div style={{ width: "100%" }}>
+                <input
+                  type="text" value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="ENTER CODE"
+                  autoComplete="off" autoCapitalize="characters"
+                  style={{
+                    width: "100%", padding: "16px 0", textAlign: "center",
+                    borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
+                    fontSize: 22, color: "#13101A",
+                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                    letterSpacing: "0.18em", textTransform: "uppercase",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                />
+                <p style={{ fontSize: 11, color: "#8A8497", textAlign: "center", marginTop: 8 }}>
+                  Codes are usually 6–8 characters
+                </p>
+              </div>
+
+              <button type="submit" disabled={joining || inviteCode.trim().length < 4} style={{
+                width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+                background: (joining || inviteCode.trim().length < 4) ? "#E2DDCF" : "#2D0F2E",
+                color: (joining || inviteCode.trim().length < 4) ? "#A09A8C" : "#FBF8F2",
+                fontSize: 15, fontWeight: 500, fontFamily: SANS,
+                cursor: (joining || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
+                transition: "background .15s ease",
+              }}>
+                {joining ? "Joining…" : "Join ministry"}
+              </button>
+
+              <button type="button" onClick={() => setTab("browse")} style={{
+                fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", fontFamily: SANS,
+              }}>
+                Don&apos;t have a code?{" "}
+                <span style={{ fontWeight: 600, color: "#2D0F2E" }}>Browse ministries</span>
+              </button>
+
+              <p style={{ fontSize: 13, color: "#8A8497" }}>
+                Starting a new ministry?{" "}
+                <a href="/onboarding" style={{ fontWeight: 600, color: "#2D0F2E", textDecoration: "none" }}>Register here</a>
+              </p>
+            </form>
+          )}
+        </div>
       </div>
-    </div>
     </>
   )
 }
