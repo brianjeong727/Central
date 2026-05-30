@@ -15,7 +15,7 @@ import {
   getBannedMembers,
   archiveMinistry,
 } from "@/app/actions/ministry"
-import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle } from "@/app/actions/auto-chats"
+import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
@@ -113,7 +113,7 @@ export function SettingsTab({
   const [loadingBanned, setLoadingBanned] = useState(false)
   const [maintenanceRunning, setMaintenanceRunning] = useState(false)
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null)
-  const [retroactiveMsg, setRetroactiveMsg] = useState<string | null>(null)
+  // retroactiveMsg removed — replaced by automationSaveMsg in Automations state block below
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
@@ -167,13 +167,20 @@ export function SettingsTab({
   const [toggling, setToggling] = useState(false)
 
   // Automations
-  const [automationSettings, setAutomationSettings] = useState<Record<string, boolean>>({
-    auto_praise_chat: true,
-    auto_archive_praise: true,
+  const AUTOMATION_DEFAULTS: Record<string, boolean> = {
     auto_sg_chats: true,
     auto_grade_chats: false,
     auto_central_chat: true,
-  })
+    auto_staff_chat: false,
+    auto_praise_chat: true,
+    auto_archive_praise: true,
+  }
+  const [automationSettings, setAutomationSettings] = useState<Record<string, boolean>>(AUTOMATION_DEFAULTS)
+  const [pendingAutomationSettings, setPendingAutomationSettings] = useState<Record<string, boolean>>(AUTOMATION_DEFAULTS)
+  const [savingAutomations, setSavingAutomations] = useState(false)
+  const [automationSaveMsg, setAutomationSaveMsg] = useState<string | null>(null)
+  const [showArchiveWarning, setShowArchiveWarning] = useState(false)
+  const [pendingArchiveLabels, setPendingArchiveLabels] = useState<string[]>([])
 
   // Danger Zone
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
@@ -229,7 +236,9 @@ export function SettingsTab({
         setStaffCode(min.staff_invite_code ?? null)
         setIsPublic(min.is_public ?? false)
         if (min.automation_settings) {
-          setAutomationSettings(s => ({ ...s, ...(min.automation_settings as Record<string, boolean>) }))
+          const merged = { ...AUTOMATION_DEFAULTS, ...(min.automation_settings as Record<string, boolean>) }
+          setAutomationSettings(merged)
+          setPendingAutomationSettings(merged)
         }
       }
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
@@ -349,21 +358,61 @@ export function SettingsTab({
   }
 
   // ── Automation toggle ────────────────────────────────────────────────────────
-  const CHAT_TOGGLES = ["auto_central_chat", "auto_grade_chats", "auto_staff_chat"]
-  async function handleAutomationToggle(key: string) {
-    if (!isAdmin) return
-    const wasOff = !automationSettings[key]
-    const next = { ...automationSettings, [key]: wasOff }
-    setAutomationSettings(next)
-    updateAutomationSettings(ministryId, next)
+  const CHAT_TOGGLES = ["auto_central_chat", "auto_grade_chats", "auto_staff_chat", "auto_sg_chats"]
+  const OPT_IN_KEYS = ["auto_grade_chats", "auto_staff_chat"]
+  const ARCHIVE_ON_OFF_KEYS = ["auto_staff_chat", "auto_grade_chats"]
 
-    // Backfill existing members when turning a chat toggle ON
-    if (wasOff && CHAT_TOGGLES.includes(key)) {
-      setRetroactiveMsg("Adding existing members…")
-      const { added } = await retroactivelyApplyToggle(ministryId, key)
-      setRetroactiveMsg(added > 0 ? `Added ${added} existing member${added === 1 ? "" : "s"}.` : "All members already in the right chats.")
-      setTimeout(() => setRetroactiveMsg(null), 4000)
+  function isToggleOn(key: string, settings: Record<string, boolean>) {
+    return OPT_IN_KEYS.includes(key) ? settings[key] === true : settings[key] !== false
+  }
+
+  function handleAutomationToggle(key: string) {
+    if (!isAdmin) return
+    setPendingAutomationSettings(prev => ({ ...prev, [key]: !isToggleOn(key, prev) }))
+  }
+
+  const hasAutomationChanges = JSON.stringify(pendingAutomationSettings) !== JSON.stringify(automationSettings)
+
+  async function commitSaveAutomations() {
+    setSavingAutomations(true)
+    setShowArchiveWarning(false)
+    await updateAutomationSettings(ministryId, pendingAutomationSettings)
+
+    const allKeys = new Set([...Object.keys(automationSettings), ...Object.keys(pendingAutomationSettings)])
+    for (const key of allKeys) {
+      const wasOn = isToggleOn(key, automationSettings)
+      const isNowOn = isToggleOn(key, pendingAutomationSettings)
+      if (!isNowOn && wasOn) {
+        await archiveToggleChats(ministryId, key)
+      } else if (isNowOn && !wasOn && CHAT_TOGGLES.includes(key)) {
+        setAutomationSaveMsg("Adding existing members…")
+        await retroactivelyApplyToggle(ministryId, key)
+      }
     }
+
+    setAutomationSettings(pendingAutomationSettings)
+    setSavingAutomations(false)
+    setAutomationSaveMsg("Changes saved.")
+    setTimeout(() => setAutomationSaveMsg(null), 4000)
+  }
+
+  async function handleSaveAutomations() {
+    // Collect which destructive toggles are being turned OFF
+    const archiveLabels: string[] = []
+    for (const key of ARCHIVE_ON_OFF_KEYS) {
+      const wasOn = isToggleOn(key, automationSettings)
+      const isNowOn = isToggleOn(key, pendingAutomationSettings)
+      if (!isNowOn && wasOn) {
+        if (key === "auto_staff_chat") archiveLabels.push(`${ministryInfo?.name ?? ministryName} Staff chat`)
+        if (key === "auto_grade_chats") archiveLabels.push("all Class of {year} chats")
+      }
+    }
+    if (archiveLabels.length > 0) {
+      setPendingArchiveLabels(archiveLabels)
+      setShowArchiveWarning(true)
+      return
+    }
+    await commitSaveAutomations()
   }
 
   // ── Discovery toggle ─────────────────────────────────────────────────────────
@@ -879,21 +928,21 @@ export function SettingsTab({
               <div>
                 <p style={SECTION_LABEL}>Automations</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Chat &amp; membership rules</h2>
-                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Turn any off and they stop running immediately.</p>
+                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
               </div>
+
+              {/* Active toggles */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {([
-                  { key: "auto_praise_chat",    label: "Auto-create praise team chats",       sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
-                  { key: "auto_archive_praise", label: "Auto-archive praise team chats",      sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
-                  { key: "auto_sg_chats",       label: "Auto-create small group chats",       sub: "When groups are finalized for the semester, a chat is opened per group." },
-                  { key: "auto_grade_chats",    label: "Grade & Young Adult chats", sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
-                  { key: "auto_central_chat",   label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`, sub: "Joining the workspace adds the member to the main ministry chat." },
-                  { key: "auto_staff_chat",     label: "Staff chat",                                                        sub: "Pastors, deacons, and elders are auto-added to a private staff chat when they join. Off by default." },
+                  { key: "auto_sg_chats",     label: "Auto-create small group chats",                                                         sub: "When groups are finalized for the semester, a chat is opened per group." },
+                  { key: "auto_grade_chats",  label: "Grade & Young Adult chats",                                                             sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
+                  { key: "auto_central_chat", label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`,                    sub: "Joining the workspace adds the member to the main ministry chat." },
+                  { key: "auto_staff_chat",   label: "Staff chat",                                                                            sub: "Pastors, deacons, and elders are auto-added to a private staff chat when they join. Off by default." },
                 ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
-                  const OPT_IN_KEYS = ["auto_grade_chats", "auto_staff_chat"]
-                  const on = OPT_IN_KEYS.includes(key) ? automationSettings[key] === true : automationSettings[key] !== false
+                  const on = isToggleOn(key, pendingAutomationSettings)
+                  const changed = isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
                   return (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid #3E1540" : "none", outlineOffset: -2 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: on ? 19 : 3, transition: "left 0.15s" }} />
                       </button>
@@ -906,9 +955,64 @@ export function SettingsTab({
                 })}
               </div>
 
-              {retroactiveMsg && (
+              {/* Coming soon */}
+              <div>
+                <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {([
+                    { key: "auto_praise_chat",    label: "Auto-create praise team chats", sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
+                    { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
+                  ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "#F7F4EF", opacity: 0.6, pointerEvents: "none" }}>
+                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: 3 }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A", display: "flex", alignItems: "center", gap: 8 }}>
+                          {label}
+                          <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#8A8497" }}>Soon</span>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>{sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Archive warning */}
+              {showArchiveWarning && (
+                <div style={{ ...CARD, padding: 20, borderColor: "#FECACA", background: "#FFF5F5" }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <AlertTriangle style={{ width: 18, height: 18, color: "#DC2626", flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 6 }}>This will archive chats</div>
+                      <div style={{ fontSize: 13, color: "#5A5466", lineHeight: 1.55, marginBottom: 14 }}>
+                        Turning these off will archive: <strong>{pendingArchiveLabels.join(", ")}</strong>. Members will lose access from their active list.
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#DC2626", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                          {savingAutomations ? "Saving…" : "Archive & Save"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Save / discard bar */}
+              {hasAutomationChanges && !showArchiveWarning && (
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
+                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                    {savingAutomations ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              )}
+
+              {automationSaveMsg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontSize: 13, color: "#5A5466" }}>
-                  {retroactiveMsg}
+                  {automationSaveMsg}
                 </div>
               )}
 

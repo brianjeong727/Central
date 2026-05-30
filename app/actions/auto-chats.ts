@@ -717,6 +717,61 @@ export async function updateAutomationSettings(
   return { error: error?.message }
 }
 
+// ── archiveToggleChats ────────────────────────────────────────────────────────
+// Called when an admin turns OFF a chat automation. Archives the associated chats.
+// auto_staff_chat  → archives "${ministry.name} Staff"
+// auto_grade_chats → archives all "Class of {year}" church groups
+// Other keys       → no-op (central chat is too critical; SG chats too deeply linked to teams)
+
+export async function archiveToggleChats(
+  ministryId: string,
+  key: string,
+): Promise<{ archived: number; error?: string }> {
+  const admin = createAdminClient()
+
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("name")
+    .eq("id", ministryId)
+    .single()
+
+  if (!ministry) return { archived: 0, error: "Ministry not found." }
+
+  if (key === "auto_staff_chat") {
+    const staffChatName = `${ministry.name} Staff`
+    const { error } = await admin
+      .from("groups")
+      .update({ archived: true })
+      .eq("ministry_id", ministryId)
+      .eq("name", staffChatName)
+      .eq("type", "church")
+    if (error) return { archived: 0, error: error.message }
+    return { archived: 1 }
+  }
+
+  if (key === "auto_grade_chats") {
+    const { data: chats, error: fetchErr } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("type", "church")
+      .eq("archived", false)
+      .like("name", "Class of %")
+    if (fetchErr) return { archived: 0, error: fetchErr.message }
+    if (!chats || chats.length === 0) return { archived: 0 }
+    const ids = chats.map((g: { id: string }) => g.id)
+    const { error: archiveErr } = await admin
+      .from("groups")
+      .update({ archived: true })
+      .in("id", ids)
+    if (archiveErr) return { archived: 0, error: archiveErr.message }
+    return { archived: ids.length }
+  }
+
+  // auto_central_chat, auto_sg_chats, auto_praise_chat, auto_archive_praise — no-op
+  return { archived: 0 }
+}
+
 // ── createTeamChatAction ──────────────────────────────────────────────────────
 // Creates a group chat named "<Team Name>" with all current team members.
 // Idempotent: if a group with that exact name already exists in the ministry,
