@@ -3431,18 +3431,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Desktop Plan C header */}
       <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
       </div>
 
       {/* Desktop search */}
-      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3 py-2 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] flex-shrink-0">
-        <Search className="w-3.5 h-3.5 flex-shrink-0" />
+      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3.5 py-2.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] flex-shrink-0">
+        <Search className="w-4 h-4 flex-shrink-0" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search messages"
-          className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
+          className="flex-1 text-[13px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
         />
       </div>
 
@@ -3510,7 +3510,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           {subTab === "church" ? "Church chats" : "My chats"}
         </h3>
         {/* Desktop mono section label */}
-        <p className="hidden md:block mx-1 mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
+        <p className="hidden md:block mx-2 mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
           {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
         </p>
         {showPlusButton && (
@@ -3538,7 +3538,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           }
         />
       ) : (
-        <div className="flex flex-col gap-2.5 md:gap-0.5">
+        <div className="flex flex-col gap-2.5 md:gap-1">
           {active.map((group, i) => (
             <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
           ))}
@@ -3636,32 +3636,32 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
         </div>
       </div>
 
-      {/* Desktop Plan C panel item style */}
+      {/* Desktop panel item style */}
       <div
-        className="hidden md:flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[#F4F1E8] transition-colors"
+        className="hidden md:flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F4F1E8] transition-colors"
         style={{
           background: isActive ? "#EFEAE0" : "transparent",
-          borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
+          borderLeft: isActive ? "3px solid #3E1540" : "3px solid transparent",
         }}
       >
         <div style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          width: 38, height: 38, borderRadius: 11, flexShrink: 0,
           background: avatarBg, color: "#F6F4EF",
           display: "grid", placeItems: "center",
-          fontFamily: "var(--font-instrument-serif)", fontSize: "13px",
+          fontFamily: "var(--font-instrument-serif)", fontSize: "17px",
         }}>
           {firstInitial}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "13px", fontWeight: group.unread_count ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.name}</div>
+          <div style={{ fontSize: "14px", fontWeight: group.unread_count ? 700 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#13101A" }}>{group.name}</div>
           {group.last_message && (
-            <div style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: "12px", color: group.unread_count ? "#5A5466" : "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: group.unread_count ? 500 : 400, marginTop: 1 }}>
               {group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message}
             </div>
           )}
         </div>
         {group.unread_count > 0 && (
-          <span style={{ fontSize: "10px", fontWeight: 700, color: "#13101A", background: "#C9A34B", padding: "1px 6px", borderRadius: 999 }}>{group.unread_count}</span>
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "#13101A", background: "#C9A34B", minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{group.unread_count}</span>
         )}
       </div>
     </button>

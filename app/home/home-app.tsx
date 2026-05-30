@@ -517,7 +517,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           {activeTab === "chats" && (
             <div className="md:flex md:h-full md:overflow-hidden">
               {/* Left: chat list */}
-              <div className="md:w-[232px] md:flex-shrink-0 md:border-r md:border-[#E5E0D2] md:overflow-y-auto md:h-full md:bg-[#FBF8F2]">
+              <div className="md:w-[300px] md:flex-shrink-0 md:border-r md:border-[#E5E0D2] md:overflow-y-auto md:h-full md:bg-[#FBF8F2]">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}
