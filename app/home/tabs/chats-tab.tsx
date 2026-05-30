@@ -2902,7 +2902,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-2.5">
+          <div className="flex items-center gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3" style={{ minHeight: 44 }}>
             <input
               ref={fileInputRef}
               type="file"
