@@ -1070,6 +1070,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [gifResults, setGifResults] = useState<{ id: string; previewUrl: string; fullUrl: string }[]>([])
   const [gifLoading, setGifLoading] = useState(false)
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Departed members — show "left" indicator on their messages
+  const [departedIds, setDepartedIds] = useState<Set<string>>(new Set())
   // Link previews
   const [linkPreviews, setLinkPreviews] = useState<Record<string, { title: string | null; description: string | null; image: string | null; hostname: string; url: string }>>({})
 
@@ -1481,6 +1483,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+
+  // Load departed members for this ministry — drives the "left" indicator
+  useEffect(() => {
+    supabase
+      .from("ministry_departures")
+      .select("user_id")
+      .eq("ministry_id", ministryId)
+      .then(({ data }) => {
+        setDepartedIds(new Set((data ?? []).map((d: { user_id: string }) => d.user_id)))
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
 
   // Fetch group type + archived status + pinned message
   useEffect(() => {
@@ -2537,7 +2551,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     )}
                     {!isOwn && isFirstInGroup && (
                       <div className="flex items-baseline gap-1.5 mb-1 ml-9">
-                        <span className="text-[13px] font-semibold text-[#13101A]">{msg.sender_name}</span>
+                        <span className="text-[13px] font-semibold text-[#13101A]">{msg.sender_name || "Former Member"}</span>
+                        {msg.sender_id && departedIds.has(msg.sender_id) && (
+                          <span className="text-[11px] text-[#A09A8C] italic">· left the ministry</span>
+                        )}
                         <span className="text-[12px] text-[#8A8497]">{formatMessageTime(msg.created_at)}</span>
                       </div>
                     )}
@@ -2547,12 +2564,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       {/* Avatar — shown for every incoming message */}
                       {!isOwn && (
                         <div
-                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name)}`}
-                          style={{ borderRadius: "10px", alignSelf: "flex-end" }}
+                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name || "?")}`}
+                          style={{ borderRadius: "10px", alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1 }}
                         >
-                          {msg.sender_avatar_url
+                          {msg.sender_id && departedIds.has(msg.sender_id) ? (
+                            <span>{(msg.sender_name || "?").charAt(0).toUpperCase()}</span>
+                          ) : msg.sender_avatar_url
                             ? <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-full h-full object-cover" />
-                            : msg.sender_name.charAt(0).toUpperCase()
+                            : (msg.sender_name || "?").charAt(0).toUpperCase()
                           }
                         </div>
                       )}

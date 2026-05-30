@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
+import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { RoleDescriptionEditor } from "./plan-tab"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
@@ -706,6 +708,63 @@ const PROFILE_SECTIONS: {
   },
 ]
 
+function DangerZone({
+  ministryName,
+  leaveConfirm,
+  leaving,
+  leaveError,
+  onShowConfirm,
+  onCancel,
+  onConfirm,
+}: {
+  ministryName: string
+  leaveConfirm: boolean
+  leaving: boolean
+  leaveError: string | null
+  onShowConfirm: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="mt-8 pt-6 border-t border-[#E8E2D2]">
+      <p style={{ ...MONO_STYLE, fontSize: "10px", color: "#A09A8C", marginBottom: "12px", letterSpacing: "0.08em" }}>DANGER ZONE</p>
+      {!leaveConfirm ? (
+        <button
+          onClick={onShowConfirm}
+          className="flex items-center gap-2 text-[#9F3030] text-[13px] font-medium px-4 py-2 rounded-xl border border-[#9F3030]/25 bg-[#9F3030]/5 hover:bg-[#9F3030]/10 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Leave {ministryName}
+        </button>
+      ) : (
+        <div className="rounded-xl border border-[#9F3030]/25 bg-[#9F3030]/5 p-4 flex flex-col gap-3">
+          <p className="text-[13px] text-[#9F3030] font-medium">Leave {ministryName}?</p>
+          <p className="text-[12px] text-[#5A5466] leading-relaxed">
+            Your messages will remain visible until an admin runs cleanup. You can rejoin with an invite code.
+          </p>
+          {leaveError && <p className="text-[12px] text-[#9F3030]">{leaveError}</p>}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onConfirm}
+              disabled={leaving}
+              className="flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#9F3030] hover:bg-[#7A2525] transition-colors disabled:opacity-50"
+            >
+              {leaving ? "Leaving…" : "Yes, leave"}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={leaving}
+              className="text-[#5A5466] text-[13px] font-medium px-4 py-1.5 rounded-lg hover:bg-[#E8E2D2] transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ProfileTab({
   userId,
   initialProfile,
@@ -728,9 +787,13 @@ export function ProfileTab({
   onSectionChange: (s: "spiritual-profile" | "journal") => void
 }) {
   const supabase = createClient()
+  const router = useRouter()
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [leaveConfirm, setLeaveConfirm] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
@@ -809,6 +872,14 @@ export function ProfileTab({
   async function handleToggleStreak(v: boolean) {
     await supabase.from("profiles").update({ show_journal_streak: v }).eq("id", userId)
     setProfile(p => ({ ...p, show_journal_streak: v }))
+  }
+
+  async function handleLeaveMinistry() {
+    setLeaving(true)
+    setLeaveError(null)
+    const { error } = await selfLeaveMinistry()
+    if (error) { setLeaveError(error); setLeaving(false); return }
+    router.push("/join")
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1071,11 +1142,29 @@ export function ProfileTab({
         {/* Desktop: profile sections */}
         <div className="hidden md:block px-7 pt-6 pb-6">
           {renderProfileSections()}
+          <DangerZone
+            ministryName={ministryName}
+            leaveConfirm={leaveConfirm}
+            leaving={leaving}
+            leaveError={leaveError}
+            onShowConfirm={() => setLeaveConfirm(true)}
+            onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
+            onConfirm={handleLeaveMinistry}
+          />
         </div>
 
         {/* Mobile: profile sections */}
         <div className="md:hidden px-5 pb-6">
           {renderProfileSections()}
+          <DangerZone
+            ministryName={ministryName}
+            leaveConfirm={leaveConfirm}
+            leaving={leaving}
+            leaveError={leaveError}
+            onShowConfirm={() => setLeaveConfirm(true)}
+            onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
+            onConfirm={handleLeaveMinistry}
+          />
         </div>
       </>}
     </div>

@@ -601,16 +601,24 @@ export async function excommunicateMember(targetUserId: string): Promise<{ error
 
   const admin = createAdminClient()
 
+  const targetMinistryId = profile.ministry_id
+
   // Insert the ban record first
   const { error: banErr } = await admin.from("ministry_bans").upsert(
-    { ministry_id: profile.ministry_id, user_id: targetUserId, banned_by: user.id },
+    { ministry_id: targetMinistryId, user_id: targetUserId, banned_by: user.id },
     { onConflict: "ministry_id,user_id" }
   )
   if (banErr) return { error: banErr.message }
 
-  // Then remove them from the ministry
-  await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
-  await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+  // Record the departure so chats show the "left" indicator
+  await admin.from("ministry_departures").upsert(
+    { user_id: targetUserId, ministry_id: targetMinistryId },
+    { onConflict: "user_id,ministry_id" }
+  )
+
+  // Remove from the ministry
+  await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", targetMinistryId)
+  await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", targetMinistryId)
 
   return { error: null }
 }
@@ -627,6 +635,13 @@ export async function selfLeaveMinistry(): Promise<{ error: string | null }> {
   const admin = createAdminClient()
   const ministryId = profile.ministry_id
 
+  // Record the departure so chats show the "left" indicator
+  await admin.from("ministry_departures").upsert(
+    { user_id: user.id, ministry_id: ministryId },
+    { onConflict: "user_id,ministry_id" }
+  )
+
+  // Remove from the ministry
   await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", user.id)
   await admin.from("user_ministries").delete().eq("user_id", user.id).eq("ministry_id", ministryId)
 
@@ -695,4 +710,48 @@ export async function setCurrentMinistry(ministryId: string): Promise<{ error: s
     .eq("id", user.id)
 
   return { error: error?.message ?? null }
+}
+
+// ─── Admin: clean up departed members after 30 days ─────────────────────────
+// Nulls sender_id on their messages (shows "Former Member") and removes the
+// departure record. Never touches profiles or auth.users.
+export async function runDepartedMemberCleanup(ministryId: string): Promise<{ cleaned: number; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { cleaned: 0, error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { cleaned: 0, error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { cleaned: 0, error: "Unauthorized." }
+
+  const admin = createAdminClient()
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: expired } = await admin
+    .from("ministry_departures")
+    .select("user_id")
+    .eq("ministry_id", ministryId)
+    .lt("left_at", cutoff)
+
+  if (!expired || expired.length === 0) return { cleaned: 0, error: null }
+
+  const userIds = expired.map((d: { user_id: string }) => d.user_id)
+
+  // Get all group IDs for this ministry
+  const { data: groups } = await admin.from("groups").select("id").eq("ministry_id", ministryId)
+  const groupIds = (groups ?? []).map((g: { id: string }) => g.id)
+
+  // Null out sender_id on messages so they display as "Former Member"
+  if (groupIds.length > 0) {
+    await admin
+      .from("messages")
+      .update({ sender_id: null })
+      .in("sender_id", userIds)
+      .in("group_id", groupIds)
+  }
+
+  // Remove departure records — "left" indicator disappears, cleanup is done
+  await admin.from("ministry_departures").delete().eq("ministry_id", ministryId).in("user_id", userIds)
+
+  return { cleaned: userIds.length, error: null }
 }
