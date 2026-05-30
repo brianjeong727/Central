@@ -28,7 +28,7 @@ import { FormsTab } from "./tabs/forms-tab"
 import { CongregationTab } from "./tabs/congregation-tab"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 
-export function HomeApp({ userId, initialProfile, ministryId, ministryName }: HomeAppProps) {
+export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -53,18 +53,24 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     replaceParam("tab", tab)
   }
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
-  const [totalChatsUnread, setTotalChatsUnread] = useState(0)
+  const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
+    (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
+  )
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
-  const [recentChats, setRecentChats] = useState<ChatPreview[]>([])
-  const [userTeams, setUserTeams] = useState<UserTeam[]>([])
+  const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
+  const [userTeams, setUserTeams] = useState<UserTeam[]>(initialUserTeams ?? [])
   const [allTeams, setAllTeams] = useState<Team[]>([])
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
-  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(null)
-  const [hasResponded, setHasResponded] = useState(false)
+  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(initialActiveQuestion ?? null)
+  const [hasResponded, setHasResponded] = useState(initialHasResponded ?? false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [showQuickCreateTeam, setShowQuickCreateTeam] = useState(false)
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(searchParams.get("team"))
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
+    const urlTeam = searchParams.get("team")
+    if (urlTeam) return urlTeam
+    return initialUserTeams?.[0]?.teamId ?? null
+  })
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
   const validSections = ["spiritual-profile", "journal"] as const
   const initialSection = searchParams.get("section") as "spiritual-profile" | "journal" | null
@@ -144,89 +150,44 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
     replaceParam("finance", s === "give" ? null : s)
   }
 
-  // Fetch all user groups with their latest message + real unread counts, sorted by recency
+  type ChatPreviewRow = {
+    group_id: string; group_name: string; group_type: string
+    last_read_at: string | null; last_msg_content: string | null
+    last_msg_sender_name: string | null; last_msg_at: string | null
+    last_msg_type: string | null; unread_count: number
+  }
+
+  // Single DB round-trip via get_chat_previews function (replaces unbounded messages fetch)
   const loadRecentChats = useCallback(async () => {
-    const { data: groups } = await supabase
-      .from("group_members")
-      .select("groups(id, name, type, ministry_id), last_read_at")
-      .eq("user_id", userId)
+    const { data } = await supabase.rpc("get_chat_previews", {
+      p_user_id: userId,
+      p_ministry_id: ministryId,
+    })
+    if (!data) return
 
-    if (!groups) return
-
-    type RawGroup = { groups: { id: string; name: string; type: string; ministry_id: string | null } | { id: string; name: string; type: string; ministry_id: string | null }[] | null; last_read_at: string | null }
-    const groupList = (groups as RawGroup[])
-      .map((m) => {
-        if (!m.groups) return null
-        const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-        if (!g || g.ministry_id !== ministryId) return null
-        return { ...g, lastReadAt: m.last_read_at }
+    const previews = ((data as ChatPreviewRow[])
+      .map((row) => ({
+        id: row.group_id,
+        groupName: row.group_name,
+        lastMessage: row.last_msg_content ?? "",
+        lastMessageSender: row.last_msg_sender_name ?? "",
+        unreadCount: Number(row.unread_count),
+        avatarColor: getAvatarColor(row.group_name),
+        initials: getInitials(row.group_name),
+        time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+        _ts: row.last_msg_at ?? "",
+      }))
+      .sort((a, b) => {
+        if (!a._ts && !b._ts) return 0
+        if (!a._ts) return 1
+        if (!b._ts) return -1
+        return b._ts.localeCompare(a._ts)
       })
-      .filter(Boolean) as { id: string; name: string; type: string; lastReadAt: string | null }[]
-
-    if (groupList.length === 0) {
-      setRecentChats([])
-      return
-    }
-
-    const groupIds = groupList.map((g) => g.id)
-    const lastReadMap: Record<string, string | null> = {}
-    for (const g of groupList) lastReadMap[g.id] = g.lastReadAt
-
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("group_id, content, created_at, sender_id, message_type, profiles!sender_id(name)")
-      .in("group_id", groupIds)
-      .order("created_at", { ascending: false })
-
-    type RawMsg = { group_id: string; content: string; created_at: string; sender_id: string | null; message_type: string; profiles: { name: string } | { name: string }[] | null }
-    const lastMsgMap: Record<string, { content: string; senderName: string; time: string; ts: string }> = {}
-    const unreadCountMap: Record<string, number> = {}
-    for (const msg of ((msgs ?? []) as RawMsg[])) {
-      if (!lastMsgMap[msg.group_id]) {
-        const p = Array.isArray(msg.profiles) ? msg.profiles[0] : msg.profiles
-        lastMsgMap[msg.group_id] = {
-          content: msg.content,
-          senderName: p?.name ?? "",
-          time: formatRelativeTime(msg.created_at),
-          ts: msg.created_at,
-        }
-      }
-      // System messages don't count as unread
-      if (msg.message_type === "system") continue
-      const lra = lastReadMap[msg.group_id]
-      if (msg.sender_id !== userId && (!lra || msg.created_at > lra)) {
-        unreadCountMap[msg.group_id] = (unreadCountMap[msg.group_id] ?? 0) + 1
-      }
-    }
-
-    const previews: ChatPreview[] = groupList.map((g) => {
-      const last = lastMsgMap[g.id]
-      return {
-        id: g.id,
-        groupName: g.name,
-        lastMessage: last?.content ?? "",
-        lastMessageSender: last?.senderName ?? "",
-        unreadCount: unreadCountMap[g.id] ?? 0,
-        avatarColor: getAvatarColor(g.name),
-        initials: getInitials(g.name),
-        time: last?.time ?? "",
-        _ts: last?.ts ?? "",
-      } as ChatPreview & { _ts: string }
-    })
-
-    // Sort by most recent message descending
-    previews.sort((a, b) => {
-      const ta = (a as ChatPreview & { _ts: string })._ts
-      const tb = (b as ChatPreview & { _ts: string })._ts
-      if (!ta && !tb) return 0
-      if (!ta) return 1
-      if (!tb) return -1
-      return tb.localeCompare(ta)
-    })
+      .map(({ _ts: _, ...rest }) => rest)) as ChatPreview[]
 
     setRecentChats(previews)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId])
 
   const loadUserTeams = useCallback(async () => {
     type RawMembership = {
@@ -369,32 +330,15 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
+  // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {
-    const { data } = await supabase
-      .from("group_members")
-      .select("group_id, last_read_at, groups(ministry_id)")
-      .eq("user_id", userId)
-
-    if (!data || data.length === 0) { setTotalChatsUnread(0); return }
-
-    type GmRow = { group_id: string; last_read_at: string | null; groups: { ministry_id: string } | { ministry_id: string }[] | null }
-    const filtered = (data as GmRow[]).filter(m => {
-      const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-      return g?.ministry_id === ministryId
+    const { data } = await supabase.rpc("get_chat_previews", {
+      p_user_id: userId,
+      p_ministry_id: ministryId,
     })
-
-    let total = 0
-    await Promise.all(
-      filtered.map(async ({ group_id, last_read_at }) => {
-        let q = supabase
-          .from("messages")
-          .select("*", { count: "exact", head: true })
-          .eq("group_id", group_id)
-          .neq("sender_id", userId)
-        if (last_read_at) q = q.gt("created_at", last_read_at)
-        const { count } = await q
-        total += count ?? 0
-      })
+    const total = (data ?? []).reduce(
+      (sum: number, row: { unread_count: number }) => sum + Number(row.unread_count),
+      0
     )
     setTotalChatsUnread(total)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -517,7 +461,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName }: Ho
           {activeTab === "chats" && (
             <div className="md:flex md:h-full md:overflow-hidden">
               {/* Left: chat list */}
-              <div className="md:w-[300px] md:flex-shrink-0 md:border-r md:border-[#E5E0D2] md:overflow-y-auto md:h-full md:bg-[#FBF8F2]">
+              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[#E5E0D2] md:overflow-y-auto md:h-full md:bg-[#FBF8F2]">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}

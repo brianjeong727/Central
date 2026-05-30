@@ -611,6 +611,10 @@ export interface HomeAppProps {
   initialProfile: Profile
   ministryId: string
   ministryName: string
+  initialRecentChats?: ChatPreview[]
+  initialUserTeams?: UserTeam[]
+  initialActiveQuestion?: CongregationQuestion | null
+  initialHasResponded?: boolean
 }
 
 export type { ChatPreview }

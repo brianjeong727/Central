@@ -1,8 +1,25 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
+import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
+import type { UserTeam, CongregationQuestion } from "./types"
+import type { ChatPreview } from "@/components/ui/chats-section"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
+
+type PreviewRow = {
+  group_id: string; group_name: string; group_type: string
+  last_read_at: string | null; last_msg_content: string | null
+  last_msg_sender_name: string | null; last_msg_at: string | null
+  last_msg_type: string | null; unread_count: number
+}
+
+type RawMembership = {
+  team_id: string
+  role_id: string
+  teams: { id: string; name: string; icon: string | null; description: string | null; team_type: string } | { id: string; name: string; icon: string | null; description: string | null; team_type: string }[] | null
+  team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
+}
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -22,11 +39,70 @@ export default async function HomePage() {
 
   if (!profile?.ministry_id) redirect("/join")
 
-  const { data: ministry } = await supabase
-    .from("ministries")
-    .select("name")
-    .eq("id", profile.ministry_id)
-    .single()
+  // Parallel fetch: ministry name + chat previews + user teams + active question
+  const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([
+    supabase.from("ministries").select("name").eq("id", profile.ministry_id).single(),
+    supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
+    supabase
+      .from("team_members")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type), team_roles(id, name, permissions)")
+      .eq("user_id", user.id),
+    supabase
+      .from("congregation_questions")
+      .select("*")
+      .eq("ministry_id", profile.ministry_id)
+      .eq("is_active", true)
+      .maybeSingle(),
+  ])
+
+  // Build sorted ChatPreview[]
+  const rawPreviews = ((chatResult.data ?? []) as PreviewRow[]).map((row) => ({
+    id: row.group_id,
+    groupName: row.group_name,
+    lastMessage: row.last_msg_content ?? "",
+    lastMessageSender: row.last_msg_sender_name ?? "",
+    unreadCount: Number(row.unread_count),
+    avatarColor: getAvatarColor(row.group_name),
+    initials: getInitials(row.group_name),
+    time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+    _ts: row.last_msg_at ?? "",
+  }))
+  rawPreviews.sort((a, b) => {
+    if (!a._ts && !b._ts) return 0
+    if (!a._ts) return 1
+    if (!b._ts) return -1
+    return b._ts.localeCompare(a._ts)
+  })
+  const initialRecentChats: ChatPreview[] = rawPreviews.map(({ _ts: _, ...rest }) => rest)
+
+  // Build UserTeam[]
+  const initialUserTeams: UserTeam[] = ((teamResult.data ?? []) as RawMembership[]).flatMap((m) => {
+    const t = Array.isArray(m.teams) ? m.teams[0] : m.teams
+    const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+    if (!t || !r) return []
+    const rawType = t.team_type ?? "standard"
+    const teamType: "standard" | "dg_praise" | "one_time" = ["standard", "dg_praise", "one_time"].includes(rawType)
+      ? (rawType as "standard" | "dg_praise" | "one_time")
+      : "standard"
+    return [{
+      teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description,
+      teamType, roleId: r.id, roleName: r.name,
+      permissions: Array.isArray(r.permissions) ? r.permissions : [],
+    }]
+  })
+
+  // Active question + whether this user already responded (sequential — depends on question)
+  const initialActiveQuestion = (questionResult.data ?? null) as CongregationQuestion | null
+  let initialHasResponded = false
+  if (initialActiveQuestion) {
+    const { data: resp } = await supabase
+      .from("congregation_responses")
+      .select("id")
+      .eq("question_id", initialActiveQuestion.id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+    initialHasResponded = !!resp
+  }
 
   const safeProfile = profile ?? {
     id: user.id,
@@ -50,7 +126,11 @@ export default async function HomePage() {
       userId={user.id}
       initialProfile={safeProfile}
       ministryId={profile.ministry_id}
-      ministryName={ministry?.name ?? ""}
+      ministryName={ministryResult.data?.name ?? ""}
+      initialRecentChats={initialRecentChats}
+      initialUserTeams={initialUserTeams}
+      initialActiveQuestion={initialActiveQuestion}
+      initialHasResponded={initialHasResponded}
     />
   )
 }
