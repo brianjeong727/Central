@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp, Pin, PinOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
+import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
@@ -782,14 +783,18 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   function handleNewAnnouncement(newAnn: Announcement) {
     setAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: false, form_id: null, user_has_responded: false }, ...prev])
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.create", entityType: "announcement", entityId: newAnn.id, entityLabel: newAnn.title })
   }
 
   function handleDeleteAnnouncement(id: string) {
+    const target = announcements.find(a => a.id === id)
     setAnnouncements((prev) => prev.filter((ann) => ann.id !== id))
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: id, entityLabel: target?.title ?? null })
   }
 
   function handleEditSuccess(updated: Announcement) {
     setAnnouncements((prev) => prev.map((ann) => ann.id === updated.id ? { ...ann, ...updated } : ann))
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.edit", entityType: "announcement", entityId: updated.id, entityLabel: updated.title })
   }
 
   function handleOpenEditor(ann: EnrichedAnnouncement) {
@@ -799,10 +804,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   async function handleDesktopDelete(ann: EnrichedAnnouncement) {
     setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id))
     await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: ann.id, entityLabel: ann.title })
   }
 
   async function handlePinToggle(annId: string, currentlyPinned: boolean) {
     const client = createClient()
+    const target = announcements.find(a => a.id === annId)
     if (!currentlyPinned) {
       // Unpin any currently pinned announcement before pinning this one
       await client.from("announcements").update({ is_pinned: false }).eq("ministry_id", ministryId).eq("is_pinned", true)
@@ -813,14 +820,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         ? { ...a, is_pinned: !currentlyPinned }
         : { ...a, is_pinned: currentlyPinned ? a.is_pinned : false }
     ))
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlyPinned ? "announcement.unpin" : "announcement.pin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
   async function handleSubPinToggle(annId: string, currentlySubPinned: boolean) {
     const client = createClient()
+    const target = announcements.find(a => a.id === annId)
     await client.from("announcements").update({ is_sub_pinned: !currentlySubPinned }).eq("id", annId).eq("ministry_id", ministryId)
     setAnnouncements(prev => prev.map(a =>
       a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
     ))
+    logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlySubPinned ? "announcement.unsubpin" : "announcement.subpin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
   const pinnedAnn = announcements.find(a => a.is_pinned)

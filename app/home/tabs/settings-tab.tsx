@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
+import { logAudit } from "@/lib/audit"
 import {
   updateMinistryPublic,
   updateMinistryInfo,
@@ -38,7 +39,7 @@ interface MinistryInfo {
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
-type ActiveSettingsTab = "general" | "people" | "automations" | "workspace"
+type ActiveSettingsTab = "general" | "people" | "automations" | "workspace" | "audit"
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
   admin:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Admin"   },
@@ -76,6 +77,7 @@ export function SettingsTab({
   onPublicChange,
   userRole,
   userId,
+  userName,
 }: {
   ministryId: string
   ministryName: string
@@ -83,6 +85,7 @@ export function SettingsTab({
   onPublicChange: (v: boolean) => void
   userRole: string
   userId: string
+  userName: string
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -91,7 +94,7 @@ export function SettingsTab({
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
     const p = new URLSearchParams(window.location.search).get("stab")
-    return (["general", "people", "automations", "workspace"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
+    return (["general", "people", "automations", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
   })
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
@@ -217,6 +220,10 @@ export function SettingsTab({
   const [deletingVerseId, setDeletingVerseId] = useState<string | null>(null)
   const [dragOverVerseIdx, setDragOverVerseIdx] = useState<number | null>(null)
 
+  // Audit log
+  const [auditLogs, setAuditLogs] = useState<Array<{ id: string; actor_name: string; action: string; entity_type: string; entity_label: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+
   // Loading
   const [loading, setLoading] = useState(true)
 
@@ -255,6 +262,11 @@ export function SettingsTab({
     if (activeSettingsTab === "people" && isAdmin && bannedMembers.length === 0) {
       loadBannedMembers()
     }
+    if (activeSettingsTab === "audit" && isAdmin && auditLogs.length === 0) {
+      setAuditLoading(true)
+      supabase.from("audit_logs").select("id, actor_name, action, entity_type, entity_label, metadata, created_at").eq("ministry_id", ministryId).order("created_at", { ascending: false }).limit(100)
+        .then(({ data }) => { setAuditLogs((data ?? []) as typeof auditLogs); setAuditLoading(false) })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSettingsTab])
 
@@ -280,24 +292,33 @@ export function SettingsTab({
 
   // ── Role change ─────────────────────────────────────────────────────────────
   async function handleRoleChange(memberId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder") {
+    const target = members.find(m => m.id === memberId)
     const { error } = await updateMemberRole(memberId, newRole)
-    if (!error) setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
+    if (!error) {
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
+      logAudit({ ministryId, actorId: userId, actorName: userName, action: "member.role_change", entityType: "member", entityId: memberId, entityLabel: target?.name ?? null, metadata: { old_role: target?.role ?? null, new_role: newRole } })
+    }
   }
 
   // ── Remove member ───────────────────────────────────────────────────────────
   async function handleRemoveMember(memberId: string) {
+    const target = members.find(m => m.id === memberId)
     const { error } = await removeMember(memberId)
-    if (!error) setMembers(prev => prev.filter(m => m.id !== memberId))
+    if (!error) {
+      setMembers(prev => prev.filter(m => m.id !== memberId))
+      logAudit({ ministryId, actorId: userId, actorName: userName, action: "member.remove", entityType: "member", entityId: memberId, entityLabel: target?.name ?? null })
+    }
   }
 
   // ── Excommunicate member ─────────────────────────────────────────────────────
   async function handleExcommunicate(memberId: string) {
     setExcomming(true)
+    const target = members.find(m => m.id === memberId)
     const { error } = await excommunicateMember(memberId)
     if (!error) {
       setMembers(prev => prev.filter(m => m.id !== memberId))
-      const target = members.find(m => m.id === memberId)
       if (target) setBannedMembers(prev => [{ user_id: memberId, name: target.name, email: target.email, created_at: new Date().toISOString() }, ...prev])
+      logAudit({ ministryId, actorId: userId, actorName: userName, action: "member.excommunicate", entityType: "member", entityId: memberId, entityLabel: target?.name ?? null })
     }
     setExcomming(false)
     setPeopleExcomConfirmId(null)
@@ -546,6 +567,7 @@ export function SettingsTab({
     { key: "people", label: "People" },
     { key: "automations", label: "Automations" },
     { key: "workspace", label: "Workspace" },
+    ...(isAdmin ? [{ key: "audit" as ActiveSettingsTab, label: "Audit Log" }] : []),
   ]
 
   return (
@@ -1170,6 +1192,57 @@ export function SettingsTab({
                     )}
                   </div>
                 </section>
+              )}
+            </div>
+          )}
+
+          {activeSettingsTab === "audit" && isAdmin && (
+            <div style={{ marginTop: 40 }}>
+              <div style={{ marginBottom: 24 }}>
+                <p style={SECTION_LABEL}>Audit Log</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Admin activity</h2>
+                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
+              </div>
+              {auditLoading ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+              ) : auditLogs.length === 0 ? (
+                <div style={{ ...CARD, padding: "28px 22px", textAlign: "center" }}>
+                  <p style={{ fontSize: 14, color: "#8A8497" }}>No activity recorded yet. Logs appear here as admins take actions.</p>
+                </div>
+              ) : (
+                <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  {auditLogs.map((log, i) => {
+                    const actionLabel: Record<string, string> = {
+                      "announcement.create": "Created announcement",
+                      "announcement.edit": "Edited announcement",
+                      "announcement.delete": "Deleted announcement",
+                      "announcement.pin": "Pinned announcement",
+                      "announcement.unpin": "Unpinned announcement",
+                      "announcement.subpin": "Pinned to For You",
+                      "announcement.unsubpin": "Removed from For You",
+                      "member.role_change": "Changed member role",
+                      "member.remove": "Removed member",
+                      "member.excommunicate": "Excommunicated member",
+                      "team.member_add": "Added team member",
+                      "team.member_remove": "Removed team member",
+                      "team.member_role_change": "Changed team role",
+                    }
+                    const label = actionLabel[log.action] ?? log.action
+                    const meta = log.metadata
+                    const roleChange = meta?.old_role && meta?.new_role ? ` (${meta.old_role} → ${meta.new_role})` : ""
+                    const ts = new Date(log.created_at)
+                    const timeStr = ts.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                    return (
+                      <div key={log.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < auditLogs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
+                          <div style={{ marginTop: 2, fontSize: 12, color: "#8A8497" }}>by {log.actor_name}</div>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#A09A8C", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </div>
           )}

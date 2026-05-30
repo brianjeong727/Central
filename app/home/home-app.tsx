@@ -585,6 +585,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
               onPublicChange={setMinistryIsPublic}
               userRole={initialProfile.role}
               userId={userId}
+              userName={initialProfile.name}
             />
           )}
 
