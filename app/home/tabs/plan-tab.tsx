@@ -9183,6 +9183,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState<string | null>(null)
   const [roleDeleteError, setRoleDeleteError] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
+  // Pending member role changes — staged until Save
+  const [pendingMemberRoles, setPendingMemberRoles] = useState<Record<string, string>>({})
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
 
   const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
   const canDelete = isAdmin || isPresident
@@ -9316,13 +9319,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setConfirmRemoveId(null)
   }
 
-  async function handleChangeRole(memberId: string, newRoleId: string) {
-    const { error: err } = await supabase.from("team_members")
-      .update({ role_id: newRoleId })
-      .eq("team_id", team.id)
-      .eq("user_id", memberId)
-    if (err) { setError(err.message); return }
+  function handleChangeRole(memberId: string, newRoleId: string) {
     const newRole = roles.find(r => r.id === newRoleId)
+    // Stage the change — persisted on Save
+    setPendingMemberRoles(prev => ({ ...prev, [memberId]: newRoleId }))
     setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
   }
 
@@ -9378,6 +9378,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const hasChanges =
     draftRoleIds.size > 0 ||
     pendingDeleteRoleIds.size > 0 ||
+    Object.keys(pendingMemberRoles).length > 0 ||
     roles.some(r => {
       if (draftRoleIds.has(r.id)) return false
       const saved = savedPerms[r.id]
@@ -9452,7 +9453,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       return next
     })
 
+    // 4. Save staged member role changes
+    const snapMemberRoles = { ...pendingMemberRoles }
+    if (Object.keys(snapMemberRoles).length > 0) {
+      await Promise.all(
+        Object.entries(snapMemberRoles).map(([uid, roleId]) =>
+          supabase.from("team_members").update({ role_id: roleId }).eq("team_id", team.id).eq("user_id", uid)
+        )
+      )
+      setPendingMemberRoles({})
+    }
+
     setSavingPerms(false)
+    setSavedMsg("Changes saved")
+    setTimeout(() => setSavedMsg(null), 3000)
   }
 
   function handleDiscardChanges() {
@@ -9463,6 +9477,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setActiveRole(cur => Math.min(cur, Math.max(0, surviving.length - 1)))
     setDraftRoleIds(new Set())
     setPendingDeleteRoleIds(new Set())
+    setPendingMemberRoles({})
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
@@ -9625,6 +9640,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               >
                 Delete
               </button>
+            ) : savedMsg ? (
+              <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
             ) : hasChanges ? (
               <button
                 onClick={handleSaveChanges}
@@ -9704,6 +9721,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   Delete team
                 </button>
               </>
+            ) : savedMsg ? (
+              <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
             ) : hasChanges ? (
               <>
                 <button
