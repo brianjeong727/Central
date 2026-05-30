@@ -755,3 +755,21 @@ export async function runDepartedMemberCleanup(ministryId: string): Promise<{ cl
 
   return { cleaned: userIds.length, error: null }
 }
+
+// Elevate members/visitors on a leader-tier team (DGL, Board) to "leader" role.
+// Never downgrades admins or existing leaders.
+export async function elevateToLeader(userIds: string[], ministryId: string): Promise<{ error: string | null }> {
+  if (userIds.length === 0) return { error: null }
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin
+      .from("profiles")
+      .update({ role: "leader" })
+      .in("id", userIds)
+      .eq("ministry_id", ministryId)
+      .in("role", ["member", "visitor"])
+    return { error: error?.message ?? null }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to elevate role." }
+  }
+}

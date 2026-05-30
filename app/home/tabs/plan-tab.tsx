@@ -36,6 +36,7 @@ import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOption
 import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
+import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -8761,6 +8762,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     )
     if (membersErr) { setError(membersErr.message); setSaving(false); return }
 
+    // Elevate all initial members to "leader" role for DGL and Board teams
+    const allPerms = roles.flatMap(r => r.permissions)
+    const isLeaderTeam = allPerms.includes("can_create_dgs") || allPerms.includes("can_view_dgs") ||
+      (allPerms.includes("can_view_finances") && allPerms.includes("can_manage_members"))
+    if (isLeaderTeam) {
+      await elevateToLeader(Array.from(allMembersMap.keys()), ministryId)
+    }
+
     onCreated(team.id)
   }
 
@@ -9293,6 +9302,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     }))
     const { error: err } = await supabase.from("team_members").insert(rows)
     if (err) { setError(err.message); setSaving(false); return }
+
+    // Elevate newly added members to "leader" for DGL and Board teams
+    const allTeamPerms = roles.flatMap(r => r.permissions)
+    const isLeaderTeam = allTeamPerms.includes("can_create_dgs") || allTeamPerms.includes("can_view_dgs") ||
+      (allTeamPerms.includes("can_view_finances") && allTeamPerms.includes("can_manage_members"))
+    if (isLeaderTeam) {
+      await elevateToLeader(Array.from(selectedIds), ministryId)
+    }
+
     // Reload members locally and return to settings — do NOT call onChanged() which closes settings
     const { data: membersData } = await supabase
       .from("team_members")
@@ -10331,6 +10349,11 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
       Array.from(memberRoleMap.entries()).map(([user_id, role_id]) => ({ team_id: team.id, user_id, role_id, added_by: userId }))
     )
     if (mErr) { setError(mErr.message); setSaving(false); return }
+
+    // Elevate all initial members to "leader" for DGL and Board teams
+    if (selectedPresetId === "dgl" || selectedPresetId === "board") {
+      await elevateToLeader(Array.from(memberRoleMap.keys()), ministryId)
+    }
 
     // For DGL teams, auto-seed the semester roster with the picked presidents
     if (selectedPresetId === "dgl" && (presidentPick || presidentPick2)) {
