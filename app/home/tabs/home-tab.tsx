@@ -79,42 +79,84 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
 
   useEffect(() => {
     async function load() {
-      // All announcements (pinned first, then newest)
-      const { data: anns } = await supabase
-        .from("announcements")
-        .select("*")
-        .eq("ministry_id", ministryId)
-        .order("is_pinned", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(10)
-      const list = anns ?? []
+      // Round 1: all independent fetches run in parallel
+      const memberCountQuery = isLeaderOrAdmin
+        ? supabase.from("profiles").select("*", { count: "exact", head: true }).eq("ministry_id", ministryId)
+        : Promise.resolve({ count: null as number | null, data: null, error: null })
 
-      // Hero = pinned announcement; fallback = most recent
+      const [
+        { data: anns },
+        { data: prayerProfile },
+        { data: verses },
+        { count: memberCountRaw },
+      ] = await Promise.all([
+        supabase
+          .from("announcements")
+          .select("*")
+          .eq("ministry_id", ministryId)
+          .order("is_pinned", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("profiles")
+          .select("name, pray_for_me")
+          .eq("ministry_id", ministryId)
+          .not("pray_for_me", "is", null)
+          .neq("id", profile.id)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("home_verses")
+          .select("reference, text")
+          .eq("ministry_id", ministryId)
+          .order("order_index", { ascending: true }),
+        memberCountQuery,
+      ])
+
+      // Apply independent results immediately
+      if (prayerProfile?.pray_for_me) {
+        setFeaturedPrayer({ name: prayerProfile.name, text: prayerProfile.pray_for_me })
+      }
+      if (verses && verses.length > 0) {
+        const now = new Date()
+        const dayOfYear = Math.floor(
+          (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
+        )
+        const v = verses[dayOfYear % verses.length] as { reference: string; text: string }
+        setHomeVerse(v)
+      }
+      setMemberCount(memberCountRaw ?? null)
+
+      const list = anns ?? []
       const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
       setHeroAnn(hero)
       setLatestAnn(list[0] ?? null)
       setEventCount(list.filter((a) => a.is_event).length)
 
-      // User's RSVPs across all fetched announcements
-      let userRsvpIds = new Set<string>()
-      if (list.length > 0) {
-        const { data: myRsvps } = await supabase
-          .from("rsvps")
-          .select("announcement_id")
-          .eq("user_id", profile.id)
-          .in("announcement_id", list.map((a) => a.id))
-        userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
-        setRsvpedAnnIds(userRsvpIds)
-      }
+      // Round 2: user RSVPs + hero RSVP count in parallel (both need data from Round 1)
+      const [{ data: myRsvps }, { data: heroRsvpRows }] = await Promise.all([
+        list.length > 0
+          ? supabase
+              .from("rsvps")
+              .select("announcement_id")
+              .eq("user_id", profile.id)
+              .in("announcement_id", list.map((a) => a.id))
+          : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
+        hero
+          ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
+          : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+      ])
 
-      // Hero RSVP detail
+      const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
+      setRsvpedAnnIds(userRsvpIds)
+
       if (hero) {
         setFeaturedShowAttendees(hero.show_attendees ?? false)
         setUserHasRsvped(userRsvpIds.has(hero.id))
-        const { data: heroRsvpRows } = await supabase
-          .from("rsvps").select("user_id").eq("announcement_id", hero.id)
         const rows = heroRsvpRows ?? []
         setRsvpCount(rows.length)
+
+        // Round 3: attendee profiles (only when RSVPs exist)
         if (rows.length > 0) {
           const { data: profileRows } = await supabase
             .from("profiles").select("id, name")
@@ -124,7 +166,7 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         }
       }
 
-      // "For You" — subpinned items first, then events not RSVPed, then recent; exclude hero
+      // "For You" — synchronous sort from already-fetched list
       const heroId = hero?.id
       const forYou = list
         .filter((a) => a.id !== heroId)
@@ -135,43 +177,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         })
         .slice(0, 3)
       setForYouItems(forYou)
-
-      // Member count — leaders only
-      if (isLeaderOrAdmin) {
-        const { count } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("ministry_id", ministryId)
-        setMemberCount(count ?? null)
-      }
-
-      // Featured prayer request from a peer
-      const { data: prayerProfile } = await supabase
-        .from("profiles")
-        .select("name, pray_for_me")
-        .eq("ministry_id", ministryId)
-        .not("pray_for_me", "is", null)
-        .neq("id", profile.id)
-        .limit(1)
-        .maybeSingle()
-      if (prayerProfile?.pray_for_me) {
-        setFeaturedPrayer({ name: prayerProfile.name, text: prayerProfile.pray_for_me })
-      }
-
-      // Daily verse rotation — deterministic by day_of_year % count
-      const { data: verses } = await supabase
-        .from("home_verses")
-        .select("reference, text")
-        .eq("ministry_id", ministryId)
-        .order("order_index", { ascending: true })
-      if (verses && verses.length > 0) {
-        const now = new Date()
-        const dayOfYear = Math.floor(
-          (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
-        )
-        const v = verses[dayOfYear % verses.length] as { reference: string; text: string }
-        setHomeVerse(v)
-      }
 
       setLoading(false)
     }
