@@ -7721,6 +7721,7 @@ function GroupGeneratorWizard({
   const [dragError, setDragError] = useState<string | null>(null)
 
   // SG mode integration — DGL roster data
+  const [sglChecked, setSglChecked] = useState(false)
   const [sglTeamId, setSglTeamId] = useState<string | null>(null)
   const [sglRosterConfirmed, setSglRosterConfirmed] = useState(false)
   const [sgDGLs, setSgDGLs] = useState<DGLLeader[]>([])
@@ -7836,7 +7837,7 @@ function GroupGeneratorWizard({
         .eq("ministry_id", ministryId)
         .ilike("name", "%small group leader%")
         .maybeSingle()
-      if (!teamRow) return
+      if (!teamRow) { setSglChecked(true); return }
       setSglTeamId(teamRow.id)
 
       const { data: statusRow } = await supabase
@@ -7847,6 +7848,7 @@ function GroupGeneratorWizard({
         .maybeSingle()
       const confirmed = !!statusRow?.confirmed
       setSglRosterConfirmed(confirmed)
+      setSglChecked(true)
       if (!confirmed) return
 
       const { data: rosterRows } = await supabase
@@ -8294,24 +8296,22 @@ function GroupGeneratorWizard({
                   desc="Visitors are distributed evenly rather than grouped together."
                 />
               )}
-              {sglTeamId !== null && (
-                <GgToggle
-                  checked={smallGroupMode}
-                  onChange={setSmallGroupMode}
-                  label="Small group mode"
-                  desc="Assigns members to DGL groups by gender and year balance."
-                  disabled={!sglRosterConfirmed}
-                  tooltip="Confirm the DGL roster in Small Group Leaders first"
-                />
-              )}
-              {sglTeamId === null && (
-                <GgToggle
-                  checked={smallGroupMode}
-                  onChange={setSmallGroupMode}
-                  label="Small group mode"
-                  desc="Penalizes re-grouping people who were together last time."
-                />
-              )}
+              {(() => {
+                const sgDisabled = !sglChecked || (sglTeamId !== null && !sglRosterConfirmed)
+                const sgDesc = sglTeamId !== null
+                  ? "Assigns members to DGL groups by gender and year balance."
+                  : "Penalizes re-grouping people who were together last time."
+                return (
+                  <GgToggle
+                    checked={smallGroupMode}
+                    onChange={setSmallGroupMode}
+                    label="Small group mode"
+                    desc={sgDesc}
+                    disabled={sgDisabled}
+                    tooltip={sglTeamId !== null ? "Confirm the DGL roster in Small Group Leaders first" : undefined}
+                  />
+                )
+              })()}
             </div>
 
             {/* CSV upload — only for non-DGL small group mode */}
