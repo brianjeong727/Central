@@ -680,6 +680,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       .select("*")
       .eq("ministry_id", ministryId)
       .order("is_pinned", { ascending: false })
+      .order("is_sub_pinned", { ascending: false })
       .order("created_at", { ascending: false })
 
     if (!isLeaderOrAdmin) {
