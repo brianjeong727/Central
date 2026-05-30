@@ -3431,7 +3431,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Desktop Plan C header */}
       <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
       </div>
 
       {/* Desktop search */}
@@ -3446,7 +3446,32 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      <div className="px-5 pt-14 pb-2 md:pt-2 md:px-2 md:flex-1 md:overflow-y-auto">
+      {/* Desktop full-width tab bar */}
+      <div className="hidden md:flex border-b border-[#E5E0D2] flex-shrink-0">
+        {(["church", "my"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => {
+              setSubTab(t)
+              setSearch("")
+              const sp = new URLSearchParams(window.location.search)
+              sp.set("chats", t)
+              router.replace(`?${sp.toString()}`, { scroll: false })
+            }}
+            style={{
+              flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 600,
+              color: subTab === t ? "#13101A" : "#8A8497",
+              background: "transparent", border: "none",
+              borderBottom: `2px solid ${subTab === t ? "#3E1540" : "transparent"}`,
+              cursor: "pointer", transition: "color 0.15s",
+            }}
+          >
+            {t === "church" ? "Church Chats" : "My Chats"}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-5 pt-14 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
       {/* Mobile header */}
       <div className="flex items-center justify-between mb-6 md:hidden">
         <div className="flex items-center gap-2.5">
@@ -3466,8 +3491,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         </button>
       </div>
 
-      {/* Sub-tab switcher — mobile pill / desktop mono labels */}
-      <div className="flex items-center gap-1 bg-[#FBF8F2] rounded-xl p-1 mb-5 md:bg-transparent md:p-0 md:mb-1 md:mx-1">
+      {/* Sub-tab switcher — mobile only */}
+      <div className="flex items-center gap-1 bg-[#FBF8F2] rounded-xl p-1 mb-5 md:hidden">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
@@ -3478,13 +3503,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               sp.set("chats", t)
               router.replace(`?${sp.toString()}`, { scroll: false })
             }}
-            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all
-              md:py-1.5 md:px-2 md:rounded-lg md:text-left md:flex-none
-              ${subTab === t
-                ? "bg-white text-[#3E1540] shadow-sm md:bg-[#EFEAE0] md:shadow-none md:text-[#13101A]"
-                : "text-[#8A8497] hover:text-[#3E1540]/70 md:text-[#8A8497] md:hover:bg-[#F4F1E8] md:bg-transparent"
-              }`}
-
+            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
+              subTab === t
+                ? "bg-white text-[#3E1540] shadow-sm"
+                : "text-[#8A8497] hover:text-[#3E1540]/70"
+            }`}
           >
             {t === "church" ? "Church Chats" : "My Chats"}
           </button>
@@ -3504,13 +3527,13 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       {/* Section header with + button */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 md:px-4">
         <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
           className="md:hidden">
           {subTab === "church" ? "Church chats" : "My chats"}
         </h3>
         {/* Desktop mono section label */}
-        <p className="hidden md:block mx-2 mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
+        <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
           {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
         </p>
         {showPlusButton && (
@@ -3538,7 +3561,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           }
         />
       ) : (
-        <div className="flex flex-col gap-2.5 md:gap-1">
+        <div className="flex flex-col gap-2.5 md:gap-0">
           {active.map((group, i) => (
             <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
           ))}
@@ -3548,7 +3571,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             <div className="mt-2">
               <button
                 onClick={() => setShowArchived((s) => !s)}
-                className="w-full flex items-center justify-between py-3 px-1"
+                className="w-full flex items-center justify-between py-3 px-1 md:px-4"
               >
                 <span className="text-[11px] font-bold text-[#8A8497]/40 uppercase tracking-wider">
                   Archived · {archivedChurchChats.length}
@@ -3638,24 +3661,24 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
 
       {/* Desktop panel item style */}
       <div
-        className="hidden md:flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F4F1E8] transition-colors"
+        className="hidden md:flex items-center gap-3.5 px-4 py-3.5 hover:bg-[#F4F1E8] transition-colors"
         style={{
           background: isActive ? "#EFEAE0" : "transparent",
           borderLeft: isActive ? "3px solid #3E1540" : "3px solid transparent",
         }}
       >
         <div style={{
-          width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
           background: avatarBg, color: "#F6F4EF",
           display: "grid", placeItems: "center",
-          fontFamily: "var(--font-instrument-serif)", fontSize: "17px",
+          fontFamily: "var(--font-instrument-serif)", fontSize: "21px",
         }}>
           {firstInitial}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "14px", fontWeight: group.unread_count ? 700 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#13101A" }}>{group.name}</div>
+          <div style={{ fontSize: "15px", fontWeight: group.unread_count ? 700 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#13101A" }}>{group.name}</div>
           {group.last_message && (
-            <div style={{ fontSize: "12px", color: group.unread_count ? "#5A5466" : "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: group.unread_count ? 500 : 400, marginTop: 1 }}>
+            <div style={{ fontSize: "13px", color: group.unread_count ? "#5A5466" : "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: group.unread_count ? 500 : 400, marginTop: 2 }}>
               {group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message}
             </div>
           )}
