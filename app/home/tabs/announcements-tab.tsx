@@ -814,13 +814,21 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     ))
   }
 
+  async function handleSubPinToggle(annId: string, currentlySubPinned: boolean) {
+    const client = createClient()
+    await client.from("announcements").update({ is_sub_pinned: !currentlySubPinned }).eq("id", annId).eq("ministry_id", ministryId)
+    setAnnouncements(prev => prev.map(a =>
+      a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
+    ))
+  }
+
   const pinnedAnn = announcements.find(a => a.is_pinned)
   const unpinned = announcements.filter(a => !a.is_pinned)
   const desktopList = pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned
   const filteredDesktop = filter === "all" ? desktopList
     : filter === "events" ? desktopList.filter(a => a.is_event)
     : filter === "forms" ? desktopList.filter(a => a.has_form)
-    : desktopList.filter(a => a.is_pinned)
+    : desktopList.filter(a => a.is_pinned || a.is_sub_pinned)
 
   const FILTERS: { id: FilterType; label: string }[] = [
     { id: "all", label: "All" },
@@ -897,6 +905,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 onEdit={handleOpenEditor}
                 onDelete={handleDeleteAnnouncement}
                 onPinToggle={handlePinToggle}
+                onSubPinToggle={handleSubPinToggle}
                 onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
               />
             ))}
@@ -972,8 +981,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         )}
                         {isLeaderOrAdmin && (
                           <>
-                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin" : "Pin"}>
+                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
                               {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                            </button>
+                            <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${ann.is_sub_pinned ? "bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "hover:bg-[#EFEAE0]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
+                              <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[#3E1540]" : "text-[#A09A8C]"}`} style={{ transform: "rotate(-45deg)" }} />
                             </button>
                             <button onClick={() => setEditingAnnouncement(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
                             <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
@@ -994,6 +1006,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
                         <div style={{ display: "flex", gap: 4 }}>
                           {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309" }}>Draft</span>}
+                          {ann.is_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#3E1540", textTransform: "uppercase", fontWeight: 500, color: "#F6F4EF" }}>📌 Pinned</span>}
+                          {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#F1ECFF", border: "1px solid #D8CAFF", textTransform: "uppercase", fontWeight: 500, color: "#3E1540" }}>For You</span>}
                           <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
                         </div>
                       </div>
@@ -1015,8 +1029,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             )}
                             {isLeaderOrAdmin && (
                               <>
-                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin" : "Pin"}>
+                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
                                   {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                                </button>
+                                <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${ann.is_sub_pinned ? "border-[#D8CAFF] bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "border-[#E5E0D2] hover:bg-[#EFEAE0]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
+                                  <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[#3E1540]" : "text-[#A09A8C]"}`} style={{ transform: "rotate(-45deg)" }} />
                                 </button>
                                 <button onClick={() => setEditingAnnouncement(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
                                 <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
@@ -1144,7 +1161,7 @@ export function AnnouncementDetail({ announcement, userId, userRole, onClose, on
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -1188,6 +1205,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {isPinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Pinned ·</span>}
+                {!isPinned && announcement.is_sub_pinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>For You ·</span>}
                 <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
                 {announcement.audience && announcement.audience !== "all" && (
                   <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
@@ -1207,7 +1225,11 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                       <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
                         <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
                           {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#3E1540]" />}
-                          {announcement.is_pinned ? "Unpin" : "Pin"}
+                          {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
+                        </button>
+                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
+                          <Pin className="w-3.5 h-3.5 text-[#3E1540]" style={{ transform: "rotate(-45deg)" }} />
+                          {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
                         </button>
                         <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
                         <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>

@@ -66,6 +66,7 @@ export interface Announcement {
   body: string
   created_at: string
   is_pinned: boolean
+  is_sub_pinned: boolean
   is_event: boolean
   image_url: string | null
   audience: string | null
@@ -254,6 +255,7 @@ export interface AnnouncementCardProps {
   onEdit: (ann: EnrichedAnnouncement) => void
   onDelete: (id: string) => void
   onPinToggle?: (id: string, isPinned: boolean) => void
+  onSubPinToggle?: (id: string, isSubPinned: boolean) => void
   onOpenForm: (formId: string, announcementId: string, title: string) => void
 }
 

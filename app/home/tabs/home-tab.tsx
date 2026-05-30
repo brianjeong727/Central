@@ -89,8 +89,8 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         .limit(10)
       const list = anns ?? []
 
-      // Hero = first event announcement; fallback = most recent announcement of any type
-      const hero = list.find((a) => a.is_event) ?? null
+      // Hero = pinned announcement; fallback = most recent
+      const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
       setHeroAnn(hero)
       setLatestAnn(list[0] ?? null)
       setEventCount(list.filter((a) => a.is_event).length)
@@ -124,13 +124,13 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         }
       }
 
-      // "For You" — events not RSVPed first, then pinned, then recent; exclude hero
+      // "For You" — subpinned items first, then events not RSVPed, then recent; exclude hero
       const heroId = hero?.id
       const forYou = list
         .filter((a) => a.id !== heroId)
         .sort((a, b) => {
-          const aScore = (a.is_pinned ? 100 : 0) + (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0)
-          const bScore = (b.is_pinned ? 100 : 0) + (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0)
+          const aScore = (a.is_sub_pinned ? 1000 : 0) + (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0)
+          const bScore = (b.is_sub_pinned ? 1000 : 0) + (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0)
           return bScore - aScore
         })
         .slice(0, 3)
@@ -496,8 +496,8 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                   {forYouItems.map((a) => (
                     <div key={a.id} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 flex flex-col hover:bg-[#F7F4EF] transition-colors duration-150">
                       <div className="flex items-start justify-between gap-2 mb-3">
-                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 6, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#5A5466", whiteSpace: "nowrap" }}>
-                          {a.is_pinned ? "📌 Pinned" : a.is_event ? "Event" : "Post"}
+                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 6, background: a.is_sub_pinned ? "#F1ECFF" : "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: a.is_sub_pinned ? "#3E1540" : "#5A5466", whiteSpace: "nowrap" }}>
+                          {a.is_sub_pinned ? "📌 For You" : a.is_event ? "Event" : "Post"}
                         </span>
                         {a.is_event && (
                           <button
