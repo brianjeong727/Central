@@ -10331,6 +10331,13 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
       Array.from(memberRoleMap.entries()).map(([user_id, role_id]) => ({ team_id: team.id, user_id, role_id, added_by: userId }))
     )
     if (mErr) { setError(mErr.message); setSaving(false); return }
+
+    // For DGL teams, auto-seed the semester roster with the picked presidents
+    if (selectedPresetId === "dgl" && (presidentPick || presidentPick2)) {
+      const rosterIds = [presidentPick, coPresidency ? presidentPick2 : null].filter(Boolean) as string[]
+      await confirmDGLRosterAction(team.id, ministryId, rosterIds, getSemesterLabel(), userId)
+    }
+
     onCreated(team.id)
   }
 
