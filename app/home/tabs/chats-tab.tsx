@@ -1825,6 +1825,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value
     setInputText(val)
+    // Auto-resize textarea to fit content
+    const el = e.target
+    el.style.height = "auto"
+    el.style.height = el.scrollHeight + "px"
     // @mention detection
     const pos = e.target.selectionStart ?? val.length
     const before = val.slice(0, pos)
@@ -1859,6 +1863,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setMentionQuery(null)
     setPendingAttachment(null)
     if (pa) URL.revokeObjectURL(pa.previewUrl)
+    // Reset textarea height after clearing
+    if (textareaRef.current) { textareaRef.current.style.height = "auto" }
 
     const replyTarget = replyingTo
     setReplyingTo(null)
@@ -1944,7 +1950,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
       if (e.key === "Escape") { setMentionQuery(null); return }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
@@ -2652,7 +2658,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   const preview = urls.map(u => linkPreviews[u]).find(p => p && p.title)
                                   return (
                                     <>
-                                      <div className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}>
+                                      <div
+                                        className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}
+                                        style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
+                                      >
                                         {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
                                           ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
                                           : renderMentions(msg.content, isOwn)}
@@ -2893,7 +2902,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               ))}
             </div>
           )}
-          <div className="flex items-center gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3" style={{ minHeight: 44 }}>
+          <div className="flex items-end gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-2.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -2933,8 +2942,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               onKeyDown={handleKeyDown}
               placeholder={`Message ${displayName}`}
               rows={1}
-              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-28 overflow-y-auto self-center"
-              style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0 }}
+              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-36 overflow-y-auto"
+              style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
             />
             <div className="flex items-center gap-0.5 flex-shrink-0">
               {/* Emoji picker trigger */}
