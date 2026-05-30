@@ -3353,6 +3353,17 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
+  function clearUnread(groupId: string) {
+    const zero = (list: ChatGroup[]) => list.map(g => g.id === groupId ? { ...g, unread_count: 0 } : g)
+    setChurchChats(zero)
+    setMyChats(zero)
+  }
+
+  function handleOpenChat(groupId: string, groupName: string) {
+    clearUnread(groupId)
+    onOpenChat(groupId, groupName)
+  }
+
   useEffect(() => {
     async function load() {
       const { data } = await supabase
@@ -3591,7 +3602,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       ) : (
         <div className="flex flex-col gap-2.5 md:gap-0">
           {active.map((group, i) => (
-            <ChatGroupCard key={group.id} group={group} onClick={() => onOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
+            <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
           ))}
 
           {/* Archived section (Church Chats only) */}
@@ -3610,7 +3621,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 <div className="flex flex-col gap-2.5">
                   {archivedChurchChats.map((group) => (
                     <div key={group.id} className="opacity-50">
-                      <ChatGroupCard group={group} onClick={() => onOpenChat(group.id, group.name)} />
+                      <ChatGroupCard group={group} onClick={() => handleOpenChat(group.id, group.name)} />
                     </div>
                   ))}
                 </div>
