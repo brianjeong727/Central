@@ -3364,6 +3364,12 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     onOpenChat(groupId, groupName)
   }
 
+  // Clear unread whenever activeGroupId changes (covers auto-open, HomeTab clicks, etc.)
+  useEffect(() => {
+    if (activeGroupId) clearUnread(activeGroupId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroupId])
+
   useEffect(() => {
     async function load() {
       const { data } = await supabase
