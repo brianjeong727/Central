@@ -10221,11 +10221,40 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // President picker state
+  const [presidentPick, setPresidentPick] = useState<string | null>(null)
+  const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
+  const [coPresidency, setCoPresidency] = useState(false)
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+
+  // Index of the first "president" role — drives the required picker in step 3
+  const presidentRoleIdx = roles.findIndex(r => r.name.toLowerCase().includes("president"))
+  const defaultMemberRoleIdx = (() => {
+    for (let i = roles.length - 1; i >= 0; i--) {
+      if (!roles[i].name.toLowerCase().includes("president")) return i
+    }
+    return 0
+  })()
+
+  useEffect(() => {
+    if (step !== 3 || presidentRoleIdx < 0) return
+    supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("ministry_id", ministryId)
+      .neq("id", userId)
+      .order("name")
+      .then(({ data }) => setMinistryMembers(data ?? []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, presidentRoleIdx])
+
   function applyPreset(presetId: string) {
     const display = WIZARD_PRESETS_DISPLAY.find(p => p.id === presetId)
     const data    = TEAM_PRESETS.find(p => p.id === presetId)
     if (display) { if (!name.trim()) setName(display.label); setIconKey(display.iconKey) }
     if (data) setRoles(data.roles.map(r => ({ name: r.name, permissions: [...r.permissions] })))
+    // Reset president picks when preset changes
+    setPresidentPick(null); setPresidentPick2(null); setCoPresidency(false)
   }
 
   function toggleRolePermission(ri: number, perm: string) {
@@ -10242,6 +10271,11 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   }
 
   async function handleCreate() {
+    if (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2))) {
+      setError(coPresidency ? "Please select both co-presidents." : "Please select a president.")
+      setSaving(false)
+      return
+    }
     setSaving(true); setError(null)
     const presetData = TEAM_PRESETS.find(p => p.id === selectedPresetId)
     const teamType = (presetData as { teamType?: string } | undefined)?.teamType ?? "standard"
@@ -10250,23 +10284,33 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
       .select("id").single()
     if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
 
-    let topRoleId: string | null = null
+    const createdRoleIds: string[] = []
     for (let i = 0; i < roles.length; i++) {
       const { data: role, error: rErr } = await supabase
         .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions })
         .select("id").single()
       if (rErr || !role) { setError(rErr?.message ?? "Failed to create role."); setSaving(false); return }
-      if (i === 0) topRoleId = role.id
+      createdRoleIds.push(role.id)
     }
-    if (!topRoleId) {
+    if (createdRoleIds.length === 0) {
       const { data: admin, error: aErr } = await supabase
         .from("team_roles").insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
         .select("id").single()
       if (aErr || !admin) { setError(aErr?.message ?? "Failed to create role."); setSaving(false); return }
-      topRoleId = admin.id
+      createdRoleIds.push(admin.id)
     }
-    const { error: mErr } = await supabase
-      .from("team_members").insert({ team_id: team.id, user_id: userId, role_id: topRoleId, added_by: userId })
+
+    // Build member map: creator gets default non-president role; picked president(s) get president role
+    const memberRoleMap = new Map<string, string>()
+    const creatorRoleId = createdRoleIds[defaultMemberRoleIdx] ?? createdRoleIds[0]
+    const presidentRoleId = presidentRoleIdx >= 0 ? (createdRoleIds[presidentRoleIdx] ?? createdRoleIds[0]) : createdRoleIds[0]
+    memberRoleMap.set(userId, creatorRoleId)
+    if (presidentPick) memberRoleMap.set(presidentPick, presidentRoleId)
+    if (coPresidency && presidentPick2) memberRoleMap.set(presidentPick2, presidentRoleId)
+
+    const { error: mErr } = await supabase.from("team_members").insert(
+      Array.from(memberRoleMap.entries()).map(([user_id, role_id]) => ({ team_id: team.id, user_id, role_id, added_by: userId }))
+    )
     if (mErr) { setError(mErr.message); setSaving(false); return }
     onCreated(team.id)
   }
@@ -10449,6 +10493,73 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                 </button>
               </div>
 
+              {/* ── President picker (required when preset has a president role) ── */}
+              {presidentRoleIdx >= 0 && (
+                <div style={{ border: "2px solid rgba(62,21,64,0.2)", borderRadius: 14, background: "#F8F5FF", padding: "16px 18px", marginBottom: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <span style={{ ...WIZARD_MONO, color: "#3E1540" }}>{roles[presidentRoleIdx].name}</span>
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#FEE2E2", color: "#9F3030", border: "1px solid #FECACA", fontWeight: 600, letterSpacing: "0.3px", textTransform: "uppercase" as const }}>Required</span>
+                    <div style={{ marginLeft: "auto" }}>
+                      <button
+                        type="button"
+                        onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#5A5466", fontFamily: "inherit", padding: 0 }}
+                      >
+                        <span style={{ width: 14, height: 14, borderRadius: 3, border: `1px solid ${coPresidency ? "#3E1540" : "#C4C4C4"}`, background: coPresidency ? "#3E1540" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                          {coPresidency && <Check style={{ width: 9, height: 9, color: "#fff" }} />}
+                        </span>
+                        Co-presidency
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 10, lineHeight: 1.5 }}>
+                    You will remain in your ministry role. Pick who holds this position from your ministry.
+                  </p>
+                  {/* First president */}
+                  {presidentPick ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#3E1540", borderRadius: 10, padding: "10px 14px", marginBottom: coPresidency ? 8 : 0 }}>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}</span>
+                      <button onClick={() => setPresidentPick(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
+                        <X style={{ width: 14, height: 14 }} />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value=""
+                      onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
+                      style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "#fff", fontSize: 13, color: "#13101A", fontFamily: "inherit", marginBottom: coPresidency ? 8 : 0 }}
+                    >
+                      <option value="" disabled>Select a person…</option>
+                      {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  {/* Second president (co-presidency) */}
+                  {coPresidency && (
+                    presidentPick2 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#3E1540", borderRadius: 10, padding: "10px 14px" }}>
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}</span>
+                        <button onClick={() => setPresidentPick2(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
+                          <X style={{ width: 14, height: 14 }} />
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value=""
+                        onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "#fff", fontSize: 13, color: "#13101A", fontFamily: "inherit" }}
+                      >
+                        <option value="" disabled>Select second person…</option>
+                        {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    )
+                  )}
+                </div>
+              )}
+
               {/* Roles header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={WIZARD_MONO}>ROLES · {roles.length}</div>
@@ -10477,7 +10588,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                     ) : (
                       <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A" }}>{role.name}</span>
                     )}
-                    {ri === 0 && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#2D0F2E", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
+                    {ri === defaultMemberRoleIdx && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#2D0F2E", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
+                    {ri === presidentRoleIdx && presidentRoleIdx !== defaultMemberRoleIdx && presidentPick && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#3E1540", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>{ministryMembers.find(m => m.id === presidentPick)?.name?.split(" ")[0] ?? "Selected"}</span>}
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 12, color: "#8A8497" }}>{role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}</span>
                     {selectedPresetId === "custom" && (
@@ -10542,8 +10654,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
               <span style={{ fontSize: 12, color: "#8A8497" }}>You can edit roles & permissions any time from team settings.</span>
               <button
                 onClick={handleCreate}
-                disabled={saving}
-                style={{ padding: "11px 24px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))}
+                style={{ padding: "11px 24px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
               >
                 {saving ? "Creating…" : <><Check style={{ width: 14, height: 14 }} /> Create team</>}
               </button>
