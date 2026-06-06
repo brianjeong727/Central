@@ -828,3 +828,49 @@ export async function createTeamChatAction(
 
   return { groupId }
 }
+
+// ── createEventPlanningChatAction ─────────────────────────────────────────────
+// Creates (or reopens) a church group chat named "[Event Name] Planning" with
+// all people assigned roles on this event plan + the creator.
+export async function createEventPlanningChatAction(
+  eventPlanId: string,
+  eventTitle: string,
+  assignedUserIds: string[],
+  createdBy: string,
+  ministryId: string,
+): Promise<{ groupId: string | null; created: boolean; error?: string }> {
+  const admin = createAdminClient()
+  const memberIds = [...new Set([...assignedUserIds, createdBy])]
+
+  const { data: planRow } = await admin
+    .from("event_plans")
+    .select("planning_group_id")
+    .eq("id", eventPlanId)
+    .single()
+
+  const now = new Date().toISOString()
+
+  if (planRow?.planning_group_id) {
+    await admin.from("group_members").upsert(
+      memberIds.map(uid => ({ group_id: planRow.planning_group_id, user_id: uid, last_read_at: now })),
+      { onConflict: "group_id,user_id" },
+    )
+    return { groupId: planRow.planning_group_id as string, created: false }
+  }
+
+  const chatName = `${eventTitle} Planning`
+  const { data: group, error: gErr } = await admin
+    .from("groups")
+    .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
+    .select("id")
+    .single()
+  if (gErr || !group) return { groupId: null, created: false, error: "Failed to create group chat." }
+
+  await admin.from("group_members").upsert(
+    memberIds.map(uid => ({ group_id: group.id, user_id: uid, last_read_at: now })),
+    { onConflict: "group_id,user_id" },
+  )
+  await admin.from("event_plans").update({ planning_group_id: group.id }).eq("id", eventPlanId)
+
+  return { groupId: group.id as string, created: true }
+}

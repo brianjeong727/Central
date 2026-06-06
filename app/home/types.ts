@@ -377,6 +377,7 @@ export interface EventPlan {
   expected_turnout: number | null
   budget_allocated: number | null
   type_data: Record<string, unknown>
+  planning_group_id: string | null
 }
 
 export interface EventTask {

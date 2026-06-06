@@ -33,7 +33,7 @@ import {
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOptions, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
@@ -1171,7 +1171,7 @@ export function MeetingNotesSection({
 
 export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, canEditBudget, onTeamSettings,
-  planningEvent, onPlanningEventChange, refreshSignal,
+  planningEvent, onPlanningEventChange, refreshSignal, onOpenChat,
 }: {
   teamId: string | null
   teamName: string
@@ -1187,6 +1187,7 @@ export function StudentOrgTeamHome({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
   refreshSignal?: number
+  onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1285,6 +1286,7 @@ export function StudentOrgTeamHome({
         canEditBudget={canEditBudget}
         teamId={teamId}
         onClose={() => onPlanningEventChange(null)}
+        onOpenChat={onOpenChat}
       />
     )
   }
@@ -1990,6 +1992,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               planningEvent={studentOrgPlanningEvent}
               onPlanningEventChange={setStudentOrgPlanningEvent}
               refreshSignal={studentOrgRefreshSignal}
+              onOpenChat={onOpenChat}
             />
           </div>
         ) : isDGLTeam && activeTeamId ? (
@@ -2045,6 +2048,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                   teamId={activeTeamId}
                   userId={userId}
                   canEdit={isAdmin || perms.includes("can_plan_events")}
+                  onOpenChat={onOpenChat}
                 />
               )
             })()}
@@ -2093,6 +2097,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent}
             onPlanningEventChange={setStudentOrgPlanningEvent}
+            onOpenChat={onOpenChat}
           />
         ) : isDGLTeam && activeTeamId ? (
           <SmallGroupLeadersTab
@@ -5390,11 +5395,13 @@ export function MinistryCalendar({
   teamId,
   userId,
   canEdit,
+  onOpenChat,
 }: {
   ministryId: string
   teamId: string | null
   userId: string
   canEdit: boolean
+  onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
@@ -5620,6 +5627,7 @@ export function MinistryCalendar({
           canEdit={canEdit}
           teamId={teamId}
           onClose={() => setPlanningEvent(null)}
+          onOpenChat={onOpenChat}
         />
       )}
     </div>
@@ -5638,6 +5646,7 @@ export function EventPlanWorkspace({
   inline = false,
   hideHero = false,
   teamId,
+  onOpenChat,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -5648,6 +5657,7 @@ export function EventPlanWorkspace({
   inline?: boolean
   hideHero?: boolean
   teamId?: string | null
+  onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -5665,6 +5675,11 @@ export function EventPlanWorkspace({
   const [roles, setRoles] = useState<EventRole[]>([])
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
+
+  // Planning chat state
+  const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
+  const [creatingPlanChat, setCreatingPlanChat] = useState(false)
+  const [planChatError, setPlanChatError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingStatus, setSavingStatus] = useState(false)
   const [eventStatus, setEventStatus] = useState<'planning' | 'active' | 'complete'>(calendarEvent.status ?? 'planning')
@@ -5744,6 +5759,7 @@ export function EventPlanWorkspace({
       if (!planData) { setLoading(false); return }
 
       setPlan(planData as EventPlan)
+      setPlanningGroupId((planData as EventPlan).planning_group_id ?? null)
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
       setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
@@ -5967,6 +5983,18 @@ export function EventPlanWorkspace({
       notes: editRoleNotes || null,
     }).eq("id", roleId)
     setEditingRoleId(null)
+  }
+
+  async function handleCreatePlanningChat() {
+    if (!plan) return
+    const assignedIds = roles.filter(r => r.assigned_to).map(r => r.assigned_to as string)
+    setCreatingPlanChat(true)
+    setPlanChatError(null)
+    const result = await createEventPlanningChatAction(plan.id, calendarEvent.title, assignedIds, userId, ministryId)
+    setCreatingPlanChat(false)
+    if (result.error || !result.groupId) { setPlanChatError(result.error ?? "Failed to create chat."); return }
+    setPlanningGroupId(result.groupId)
+    onOpenChat?.(result.groupId, `${calendarEvent.title} Planning`)
   }
 
   async function handleAddNote() {
@@ -6453,14 +6481,35 @@ export function EventPlanWorkspace({
                     <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Roles &amp; Leads</h2>
                   </div>
                   {canEdit && (
-                    <button
-                      onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
-                      style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      + Add role
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {planningGroupId ? (
+                        <button
+                          onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
+                        >
+                          <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCreatePlanningChat}
+                          disabled={creatingPlanChat || roles.filter(r => r.assigned_to).length === 0}
+                          title={roles.filter(r => r.assigned_to).length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: creatingPlanChat ? "not-allowed" : "pointer", fontWeight: 500, opacity: roles.filter(r => r.assigned_to).length === 0 ? 0.4 : 1 }}
+                        >
+                          <MessageCircle style={{ width: 13, height: 13 }} />
+                          {creatingPlanChat ? "Creating…" : "Create planning chat"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
+                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
+                      >
+                        + Add role
+                      </button>
+                    </div>
                   )}
                 </div>
+                {planChatError && <p style={{ fontSize: 12, color: "#C44B4B", marginTop: 8 }}>{planChatError}</p>}
 
                 {/* Roles rows */}
                 <div style={{ marginTop: 28 }}>
