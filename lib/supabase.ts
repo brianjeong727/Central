@@ -14,11 +14,6 @@ export function createClient(): SupabaseClient {
   return client
 }
 
-// Use NEXT_PUBLIC_SITE_URL when set (production/Vercel) so OAuth redirects
-// never point at localhost on mobile devices.
 export function siteOrigin(): string {
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
-  }
   return window.location.origin
 }
