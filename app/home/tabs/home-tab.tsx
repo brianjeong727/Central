@@ -8,7 +8,7 @@ import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard } from "@/components/central"
+import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
@@ -336,21 +336,7 @@ export function HomeTab({
             className="hidden md:flex items-end justify-between px-14 pt-11 pb-9"
             style={{ gap: 24, borderBottom: "1px solid var(--line)" }}
           >
-            <div style={{ maxWidth: 640 }}>
-              <div style={EYEBROW}>{dateLabel}</div>
-              <h1
-                style={{
-                  margin: "14px 0 0",
-                  fontFamily: "var(--serif)",
-                  fontWeight: 400,
-                  fontSize: 52,
-                  lineHeight: 1.05,
-                  color: "var(--ink)",
-                  letterSpacing: "-0.6px",
-                }}
-              >
-                {greeting}
-              </h1>
+            <PageTitle eyebrow={dateLabel} title={greeting} style={{ maxWidth: 640 }}>
               <span
                 style={{
                   display: "inline-block",
@@ -365,7 +351,7 @@ export function HomeTab({
               >
                 {roleBadge}
               </span>
-            </div>
+            </PageTitle>
 
             {/* Stat cards row */}
             <div className="flex gap-4 pb-1.5">
@@ -548,9 +534,7 @@ export function HomeTab({
                 {pulseSubmitted ? (
                   <div style={{ textAlign: "center", padding: "16px 0" }}>
                     <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                    <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0 }}>
-                      Thanks for sharing.
-                    </p>
+                    <CardTitle size={22}>Thanks for sharing.</CardTitle>
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
                       Your response was received anonymously.
                     </p>
@@ -561,9 +545,9 @@ export function HomeTab({
                       <div style={EYEBROW}>
                         Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
                       </div>
-                      <p style={{ fontFamily: "var(--serif)", fontSize: 24, lineHeight: 1.2, color: "var(--ink)", margin: "8px 0 0" }}>
+                      <CardTitle size={24} style={{ marginTop: 8 }}>
                         {activeQuestion.question_text}
-                      </p>
+                      </CardTitle>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
@@ -712,18 +696,7 @@ export function HomeTab({
                         )}
                       </div>
 
-                      {/* Title — sans per spec (list-context card title) */}
-                      <div
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 500,
-                          color: "var(--ink)",
-                          lineHeight: 1.3,
-                          fontFamily: "var(--sans)",
-                        }}
-                      >
-                        {a.title}
-                      </div>
+                      <CardTitle size={20}>{a.title}</CardTitle>
 
                       {/* Body — flex: 1 so all cards in a row push actions to the same baseline */}
                       <p
@@ -799,13 +772,11 @@ export function HomeTab({
               >
                 <div>
                   <div style={EYEBROW}>Today&apos;s verse</div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 20, marginTop: 4, color: "var(--ink)" }}>
-                    {homeVerse.reference}
-                  </div>
+                  <CardTitle size={20} style={{ marginTop: 4 }}>{homeVerse.reference}</CardTitle>
                 </div>
-                <div style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: "var(--ink)" }}>
+                <CardTitle size={17} italic style={{ lineHeight: 1.5 }}>
                   &ldquo;{homeVerse.text}&rdquo;
-                </div>
+                </CardTitle>
               </CentralCard>
             )}
           </div>
@@ -815,21 +786,7 @@ export function HomeTab({
           <div className="md:hidden px-5 pb-4">
 
             {/* Mobile greeting header */}
-            <div style={{ marginBottom: 24 }}>
-              <div style={EYEBROW}>{dateLabel}</div>
-              <h1
-                style={{
-                  fontFamily: "var(--serif)",
-                  fontSize: 34,
-                  fontWeight: 400,
-                  letterSpacing: "-0.5px",
-                  color: "var(--ink)",
-                  lineHeight: 1.1,
-                  margin: "8px 0 0",
-                }}
-              >
-                {greeting}
-              </h1>
+            <PageTitle eyebrow={dateLabel} title={greeting} titleSize={34} style={{ marginBottom: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                 <span
                   style={{
@@ -854,7 +811,7 @@ export function HomeTab({
                   </span>
                 )}
               </div>
-            </div>
+            </PageTitle>
 
             <div className="flex flex-col gap-8">
 
@@ -916,9 +873,7 @@ export function HomeTab({
                   {pulseSubmitted ? (
                     <CentralCard variant="callout" padding="24px" style={{ textAlign: "center" }}>
                       <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                      <p style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", margin: 0 }}>
-                        Thanks for sharing.
-                      </p>
+                      <CardTitle size={20}>Thanks for sharing.</CardTitle>
                       <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6, fontFamily: "var(--sans)" }}>
                         Your response was received anonymously.
                       </p>
@@ -928,9 +883,9 @@ export function HomeTab({
                       <div style={EYEBROW}>
                         Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
                       </div>
-                      <p style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.2, color: "var(--ink)", margin: "8px 0 14px" }}>
+                      <CardTitle size={22} style={{ margin: "8px 0 14px" }}>
                         {activeQuestion.question_text}
-                      </p>
+                      </CardTitle>
 
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1051,15 +1006,10 @@ export function HomeTab({
                             >
                               {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
                             </span>
-                            {/* Sans title per spec — list-context card title */}
-                            <div
+                            <CardTitle
+                              size={18}
                               style={{
                                 marginTop: 4,
-                                fontSize: 15,
-                                fontWeight: 500,
-                                color: "var(--ink)",
-                                lineHeight: 1.3,
-                                fontFamily: "var(--sans)",
                                 overflow: "hidden",
                                 display: "-webkit-box",
                                 WebkitLineClamp: 1,
@@ -1067,7 +1017,7 @@ export function HomeTab({
                               } as React.CSSProperties}
                             >
                               {a.title}
-                            </div>
+                            </CardTitle>
                           </div>
                           {a.is_event ? (
                             <button
