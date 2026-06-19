@@ -1,6 +1,6 @@
 {
   "pkg": "central",
-  "projectId": "70d2b1a9-4655-47d3-a387-ec9e399e1c6a",
+  "projectId": "dcea8ad6-fab7-427f-afdb-65ab63943d15",
   "shape": "package",
   "srcDir": "components/ui",
   "tsconfig": "tsconfig.json",
@@ -8,6 +8,8 @@
   "overrides": {
     "BottomNav": { "viewport": "390x80" }
   },
+  "entry": ".ds-entry.tsx",
+  "readmeHeader": ".design-sync/conventions.md",
   "componentSrcMap": {
     "ChatPreview": null,
     "Avatar": "components/ui/avatar.tsx",

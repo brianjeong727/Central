@@ -42,3 +42,7 @@ next-env.d.ts
 
 # design-sync build output
 /ds-bundle/
+/.ds-sync/node_modules/
+/.design-sync/.cache/
+/.design-sync/learnings/
+/.design-sync/node_modules
