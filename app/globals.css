@@ -7,8 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* Sans → Inter; Mono → system monospace (not Inter) */
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-inter);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: var(--font-instrument-serif), "Cormorant Garamond", Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -38,50 +40,118 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Discrete radius scale from §1.4 (6/8/10/12/14/16/18) */
+  --radius-sm: 0.375rem;  /* 6px  — tiny pills, icon buttons */
+  --radius-md: 0.625rem;  /* 10px — inputs, secondary buttons */
+  --radius-lg: 0.75rem;   /* 12px — most cards */
+  --radius-xl: 0.875rem;  /* 14px — sidebar callouts, prominent cards */
+  --radius-2xl: 1rem;     /* 16px — composer pill */
+  --radius-3xl: 1.125rem; /* 18px — hero banner, full-bleed modal */
+  --radius-4xl: 1.5rem;   /* 24px — reserved */
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* ── Central named palette (§1.2) ──────────────────────────────────────── */
+  /* Plum family */
+  --plum:        #3E1540;
+  --plum-2:      #2D0F2E;
+  --plum-deep:   #1B0A1E;
+  --plum-light:  #4A1B4D;
+
+  /* Text colors */
+  --ink:         #13101A;
+  --body:        #5A5466;
+  --muted-text:  #8A8497;  /* named --muted-text to avoid collision with shadcn --muted surface */
+  --faint:       #A09A8C;
+
+  /* Cream surface family */
+  --cream:       #FBF8F2;
+  --cream-2:     #F8F4EA;
+  --cream-3:     #F6F2E8;
+  --ivory:       #F1ECDE;
+  --canvas:      #F1ECDE;
+
+  /* Hairline family */
+  --line:        #E8E2D2;
+  --line-2:      #E2DDCF;
+  --line-3:      #EFE9DA;
+  --dashed:      #C4C0B0;
+
+  /* Semantic accents */
+  --success:     #7FA67F;
+  --warm-tan:    #9D7B4F;
+  --sage:        #5B7A6C;
+  --gold:        #D4A45C;
+  --danger:      #9F3030;
+
+  /* ── Font stack aliases (§1.3) ──────────────────────────────────────────── */
+  --serif: var(--font-instrument-serif), "Cormorant Garamond", Georgia, serif;
+  --sans:  var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:  ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── Spacing scale (§1.4) ───────────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  6px;
+  --space-3:  8px;
+  --space-4:  10px;
+  --space-5:  12px;
+  --space-6:  14px;
+  --space-7:  18px;
+  --space-8:  22px;
+  --space-9:  28px;
+  --space-10: 36px;
+  --space-11: 40px;
+  --space-12: 56px;
+
+  /* Radius aliases (§1.4) */
+  --r-pill:   6px;   /* tiny pills, icon buttons */
+  --r-chip:   8px;   /* chips */
+  --r-input:  10px;  /* inputs, secondary buttons */
+  --r-card:   12px;  /* most cards */
+  --r-callout: 14px; /* sidebar callouts, prominent cards */
+  --r-pill-lg: 16px; /* composer pill */
+  --r-hero:   18px;  /* hero banner, full-bleed modal */
+
+  /* ── shadcn semantic aliases → Central palette ──────────────────────────── */
+  --background:          #FBF8F2; /* cream — never white */
+  --foreground:          #13101A; /* ink */
+  --card:                #FBF8F2; /* cream */
+  --card-foreground:     #13101A;
+  --popover:             #FBF8F2;
+  --popover-foreground:  #13101A;
+  --primary:             #2D0F2E; /* plum-2 */
+  --primary-foreground:  #FBF8F2; /* cream */
+  --secondary:           #F1ECDE; /* ivory */
+  --secondary-foreground: #2D0F2E;
+  --muted:               #F1ECDE; /* ivory surface — shadcn uses this as a bg */
+  --muted-foreground:    #8A8497; /* spec --muted text */
+  --accent:              #F1ECDE;
+  --accent-foreground:   #2D0F2E;
+  --destructive:         #9F3030; /* danger — outline only, per spec */
+  --border:              #E2DDCF; /* line-2 — card border, input border */
+  --input:               #E2DDCF;
+  --ring:                #3E1540; /* plum — focus ring */
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.625rem; /* 10px base — used by shadcn radius-* calc() aliases */
+  --sidebar:                  #FBF8F2;
+  --sidebar-foreground:       #13101A;
+  --sidebar-primary:          #2D0F2E;
+  --sidebar-primary-foreground: #FBF8F2;
+  --sidebar-accent:           #F1ECDE;
+  --sidebar-accent-foreground: #2D0F2E;
+  --sidebar-border:           #E8E2D2;
+  --sidebar-ring:             #3E1540;
 }
 
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+/* NOTE: DESIGN_SYSTEM.md does not define a dark palette. These values are    */
+/* kept structurally intact from the shadcn default so dark-mode-aware        */
+/* components don't break, but they are NOT brand-reviewed. If the app adds  */
+/* a dark theme, this block needs a full design pass.                         */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -122,7 +192,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-DM-sans), system-ui, sans-serif;
+    font-family: var(--sans); /* was var(--font-DM-sans) — that variable is undefined */
   }
   html {
     @apply font-sans;
