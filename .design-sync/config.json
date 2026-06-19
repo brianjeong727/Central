@@ -1,0 +1,28 @@
+{
+  "pkg": "central",
+  "projectId": "70d2b1a9-4655-47d3-a387-ec9e399e1c6a",
+  "shape": "package",
+  "srcDir": "components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/tailwind-compiled.css",
+  "overrides": {
+    "BottomNav": { "viewport": "390x80" }
+  },
+  "componentSrcMap": {
+    "ChatPreview": null,
+    "Avatar": "components/ui/avatar.tsx",
+    "AvatarFallback": "components/ui/avatar.tsx",
+    "AvatarImage": "components/ui/avatar.tsx",
+    "BottomNav": "components/ui/bottom-nav.tsx",
+    "Button": "components/ui/button.tsx",
+    "Card": "components/ui/card.tsx",
+    "CardContent": "components/ui/card.tsx",
+    "CardDescription": "components/ui/card.tsx",
+    "CardFooter": "components/ui/card.tsx",
+    "CardHeader": "components/ui/card.tsx",
+    "CardTitle": "components/ui/card.tsx",
+    "ChatsSection": "components/ui/chats-section.tsx",
+    "Input": "components/ui/input.tsx",
+    "Label": "components/ui/label.tsx"
+  }
+}
