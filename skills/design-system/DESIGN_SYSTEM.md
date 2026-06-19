@@ -6,19 +6,27 @@ This system replaces a more generic, white-card SaaS look with an **editorial cr
 
 ---
 
+## 0. Design North Star
+
+**"Reverent, not corporate. Warm, not cute. Calm, not playful."**
+
+Central is a daily-driver tool that an entire church community lives in for communication, giving, and leadership. Warmth comes from tone, materials (cream surfaces, editorial serif), generous whitespace, and human language — NOT from decoration, bold color blocks, or playfulness. When any decision is unclear, default to calm and restraint.
+
+---
+
 ## 1. Foundation
 
 ### 1.1 Voice
 - **Editorial, not enterprise.** Read like a thoughtful product (Stripe, Linear, Notion's marketing site) — never like a generic dashboard.
-- **Quiet by default.** Most surfaces are cream and ink. Color is used as **ink and accent**, never as decoration.
+- **Quiet by default.** Most surfaces are cream and ink. Plum appears in small, surgical moments — a monogram chip, the active tab underline, a single primary CTA — never as a repeated surface or background fill. When tempted to add a plum gradient card, add whitespace instead.
 - **Restraint over information density.** Whitespace, generous line-height, and large type are load-bearing.
 
 ### 1.2 Color tokens
 
 | Token | Hex | Use |
 |---|---|---|
-| `--plum`        | `#3E1540` | Primary accent, active borders, monogram chips, hero gradients (mid-stop), checkboxes, branded fills |
-| `--plum-2`      | `#2D0F2E` | Primary button background, active breadcrumb text, hero gradient base |
+| `--plum`        | `#3E1540` | Active borders, monogram chips, active tab underline, checkbox fill, focus ring — surgical accent; at most 1–2 moments per view |
+| `--plum-2`      | `#2D0F2E` | Single primary CTA button, active breadcrumb text, identity hero gradient base (rare) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
 | `--ink`         | `#13101A` | Primary text |
@@ -40,7 +48,7 @@ This system replaces a more generic, white-card SaaS look with an **editorial cr
 | `--gold`        | `#D4A45C` | Avatar accent only — never as button color |
 | `--danger`      | `#9F3030` | Destructive text/border only — never as filled button bg |
 
-**Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except inside hero banners (§4.1).
+**Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except in the rare full-identity hero (§4.1). Do not use plum as a repeated surface, card background, or decorative fill — it is a surgical accent appearing in at most one or two intentional moments per view.
 
 ### 1.3 Typography
 
@@ -55,7 +63,7 @@ This system replaces a more generic, white-card SaaS look with an **editorial cr
 | Display    | serif | 56–64 | 400 | -0.6 to -1   | Hero banner names ("SSO", "Student Org Board") |
 | H1         | serif | 44–52 | 400 | -0.5 to -0.6 | Page titles ("Choose a ministry", "Write") |
 | H2         | serif | 32–36 | 400 | -0.3 to -0.4 | Section titles inside a page |
-| H3         | serif | 22–26 | 400 | -0.2         | Card titles, role names |
+| H3         | sans  | 16–18 | 500 | 0            | UI-chrome card titles, role names, list headings. Serif H3 only for genuine editorial section heads within long-form content. |
 | Body L     | serif | 19    | 400 | 0.1          | Long-form quotes, editorial body, transition notes, chat reading-room |
 | Body       | sans  | 14–15 | 400 | 0            | UI copy, descriptions |
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
@@ -68,7 +76,9 @@ This system replaces a more generic, white-card SaaS look with an **editorial cr
 - Long bodies (announcements, transition notes, chat thread) are set in **serif at 17–19px** for a reading-room feel — not sans body.
 - Stat card numbers are serif, not bold sans.
 
-**Do not:** use Inter for headlines. Do not use system serif fallbacks alone. Do not bold serif text — weight 400 only. Do not all-caps anything except mono eyebrows.
+**Serif usage threshold:** Serif is the warmth carrier — it must feel deliberate, not wallpaper. Use it for: page H1, major section H2 (always with eyebrow), editorial long-form body, stat card numbers, display/hero text. Do NOT use it for: card titles in list views, role name labels, metadata lines, navigation text, helper copy, or any text under 16px. If more than two or three text nodes on a single screen are serif, the hierarchy collapses and the effect is diluted.
+
+**Do not:** use Inter for H1 or genuine H2 section titles. Do not use system serif fallbacks alone. Do not bold serif text — weight 400 only. Do not all-caps anything except mono eyebrows. Do not use serif for UI-chrome elements: card titles in list views, role badges, metadata rows, tab labels, navigation items, or any functional label — those are Inter/sans.
 
 ### 1.4 Spacing & radius
 - **Scale:** 4, 6, 8, 10, 12, 14, 18, 22, 28, 36, 40, 56. Do not invent in-between values.
@@ -143,7 +153,7 @@ For pages without a hero banner:
 ## 4. Component library
 
 ### 4.1 Plum hero banner
-The single most identity-carrying component. Used for: team home, event detail, profile, give, the "Up Next" card.
+The highest-weight identity statement in the app. Reserved for **at most one** genuine identity moment per page — the surface that needs to own the room. This is not a default treatment for any entity type; it is an earned moment. Team home, profile, giving page, and event detail may each carry one hero; the "Up Next" home card uses a cream card with plum accent rather than the full gradient.
 
 ```
 border-radius: 18
@@ -156,7 +166,7 @@ padding: 30px 36px 32px
 - **Layout:** flex row, gap 24. Square monogram (84–92px, radius 16–18, `rgba(251,248,242,0.08)` bg, `rgba(251,248,242,0.18)` border, serif initial 46px) + identity column (mono eyebrow `rgba(251,248,242,0.65)` + serif title 48–56 + meta 15px `rgba(251,248,242,0.78)`) + actions column right-aligned.
 - **Action buttons inside hero:** primary uses cream bg / plum-2 text; secondary uses `rgba(251,248,242,0.08)` bg with cream text and 1px `rgba(251,248,242,0.25)` border. Radius 10.
 
-**Do not:** put the hero on every page — only identity-anchored pages. Do not use it for a list page. Do not change the gradient direction or colors.
+**Do not:** use the hero as a default card treatment or a repeated pattern within a view. Do not place it on list pages, settings pages, or secondary surfaces. Do not use it more than once in the same view — two full-bleed plum moments cancel each other. Do not change the gradient stops or direction when it appears.
 
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
