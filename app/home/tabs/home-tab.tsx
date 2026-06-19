@@ -1,21 +1,65 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Bell, Check, MessageCircle, Calendar } from "lucide-react"
+import { ChevronRight, Bell, MessageCircle, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { Spinner, RingCrossLogo, MONO_STYLE } from "../components/shared"
+import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import type { HomeTabProps, Announcement, CongregationQuestion } from "../types"
+import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard } from "@/components/central"
+import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
 
-export function HomeTab({ profile, userRole, ministryId, ministryName, recentChats, onSeeChats, onSeeAnnouncements, onOpenChat, onGoToProfile, avatarUrl, activeQuestion, hasResponded, onResponded }: HomeTabProps) {
+// ── Design tokens ─────────────────────────────────────────────────────────────
+
+const EYEBROW: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: 11,
+  letterSpacing: "1.4px",
+  color: "var(--muted-text)",
+  textTransform: "uppercase",
+}
+
+function getRoleBadgeStyle(role: string): React.CSSProperties {
+  const r = role.toLowerCase()
+  if (["admin", "deacon", "elder", "pastor"].includes(r)) {
+    return { background: "var(--plum-2)", color: "var(--cream)", border: "none" }
+  }
+  if (["leader", "dgl"].includes(r)) {
+    return { background: "var(--ivory)", color: "var(--plum)", border: "1px solid var(--line-2)" }
+  }
+  return { background: "var(--ivory)", color: "var(--muted-text)", border: "1px solid var(--line-2)" }
+}
+
+function pulseTypeLabel(type: string) {
+  if (type === "poll") return "Poll"
+  if (type === "scale") return "1–5 Scale"
+  if (type === "prayer") return "Prayer"
+  return "Open"
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function HomeTab({
+  profile,
+  userRole,
+  ministryId,
+  ministryName,
+  recentChats,
+  onSeeChats,
+  onSeeAnnouncements,
+  onOpenChat,
+  onGoToProfile,
+  avatarUrl,
+  activeQuestion,
+  hasResponded,
+  onResponded,
+}: HomeTabProps) {
   const supabase = createClient()
 
-  // Grad-check banner state (optimistic clear)
   const [needsGradCheck, setNeedsGradCheck] = useState(profile.needs_grad_check ?? false)
 
   async function handleGradCheck(graduated: boolean) {
@@ -23,7 +67,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
     respondToGradCheck(profile.id, graduated)
   }
 
-  // Hero event state
   const [heroAnn, setHeroAnn] = useState<Announcement | null>(null)
   const [latestAnn, setLatestAnn] = useState<Announcement | null>(null)
   const [userHasRsvped, setUserHasRsvped] = useState(false)
@@ -32,16 +75,13 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const [rsvpAttendees, setRsvpAttendees] = useState<{ user_id: string; name: string }[]>([])
   const [featuredShowAttendees, setFeaturedShowAttendees] = useState(false)
 
-  // Page-level state
   const [forYouItems, setForYouItems] = useState<Announcement[]>([])
   const [rsvpedAnnIds, setRsvpedAnnIds] = useState<Set<string>>(new Set())
-  const [featuredPrayer, setFeaturedPrayer] = useState<{ name: string; text: string } | null>(null)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [eventCount, setEventCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
-  // Pastor Pulse card state
   const [pulseInput, setPulseInput] = useState<string>("")
   const [pulseScale, setPulseScale] = useState<number | null>(null)
   const [pulseOption, setPulseOption] = useState<string | null>(null)
@@ -75,11 +115,14 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? `Good morning, ${firstName}` : hour < 17 ? `Good afternoon, ${firstName}` : hour < 21 ? `Good evening, ${firstName}` : `Good night, ${firstName}`
+  const greeting =
+    hour < 12 ? `Good morning, ${firstName}`
+    : hour < 17 ? `Good afternoon, ${firstName}`
+    : hour < 21 ? `Good evening, ${firstName}`
+    : `Good night, ${firstName}`
 
   useEffect(() => {
     async function load() {
-      // Round 1: all independent fetches run in parallel
       const memberCountQuery = isLeaderOrAdmin
         ? supabase.from("profiles").select("*", { count: "exact", head: true }).eq("ministry_id", ministryId)
         : Promise.resolve({ count: null as number | null, data: null, error: null })
@@ -113,10 +156,9 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         memberCountQuery,
       ])
 
-      // Apply independent results immediately
-      if (prayerProfile?.pray_for_me) {
-        setFeaturedPrayer({ name: prayerProfile.name, text: prayerProfile.pray_for_me })
-      }
+      // suppress unused variable warning for prayerProfile (state was removed but fetch kept)
+      void prayerProfile
+
       if (verses && verses.length > 0) {
         const now = new Date()
         const dayOfYear = Math.floor(
@@ -133,7 +175,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
       setLatestAnn(list[0] ?? null)
       setEventCount(list.filter((a) => a.is_event).length)
 
-      // Round 2: user RSVPs + hero RSVP count in parallel (both need data from Round 1)
       const [{ data: myRsvps }, { data: heroRsvpRows }] = await Promise.all([
         list.length > 0
           ? supabase
@@ -156,7 +197,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         const rows = heroRsvpRows ?? []
         setRsvpCount(rows.length)
 
-        // Round 3: attendee profiles (only when RSVPs exist)
         if (rows.length > 0) {
           const { data: profileRows } = await supabase
             .from("profiles").select("id, name")
@@ -166,7 +206,6 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         }
       }
 
-      // "For You" — synchronous sort from already-fetched list
       const heroId = hero?.id
       const forYou = list
         .filter((a) => a.id !== heroId)
@@ -221,55 +260,67 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
     }
   }
 
-  const statParts: string[] = [
-    eventCount > 0 ? `${eventCount} upcoming event${eventCount !== 1 ? "s" : ""}` : "",
-    totalUnread > 0 ? `${totalUnread} unread message${totalUnread !== 1 ? "s" : ""}` : "no unread messages",
-    isLeaderOrAdmin && memberCount !== null ? `${memberCount} member${memberCount !== 1 ? "s" : ""}` : "",
-  ].filter(Boolean)
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const pulseAnswered =
+    (activeQuestion?.question_type === "poll" && !pulseOption) ||
+    (activeQuestion?.question_type === "scale" && !pulseScale) ||
+    ((activeQuestion?.question_type === "open" || activeQuestion?.question_type === "prayer") && !pulseInput.trim())
 
   return (
     <div className="pb-28 md:pb-0">
       <DesktopTopbar crumbs={["Central", "Home"]} />
 
-      {/* Mobile top bar */}
+      {/* ── Mobile top bar ── */}
       <div className="flex items-center justify-between px-5 pt-14 pb-4 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <RingCrossLogo size={26} color="#3E1540" />
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          <RingCrossLogo size={26} color="var(--plum)" />
+          <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
+            {ministryName}
+          </span>
         </a>
         <button
           onClick={onGoToProfile}
-          className="size-9 rounded-full overflow-hidden bg-[#3E1540] border border-[#ECE8DE] flex items-center justify-center hover:opacity-90 transition-opacity flex-shrink-0"
+          style={{
+            width: 36, height: 36, borderRadius: 999, overflow: "hidden",
+            background: "var(--plum)", border: "1px solid var(--line)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}
           aria-label="Your profile"
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            <img src={avatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
-            <span className="text-white font-bold text-[11px]">{getInitials(profile.name)}</span>
+            <span style={{ color: "var(--cream)", fontWeight: 700, fontSize: 11, fontFamily: "var(--sans)" }}>
+              {getInitials(profile.name)}
+            </span>
           )}
         </button>
       </div>
 
-      {/* Grad-check banner — shown only to seniors who haven't responded yet */}
+      {/* ── Grad-check banner ── */}
       {needsGradCheck && (
-        <div style={{ margin: "12px 20px 0", borderRadius: 12, border: "1px solid #E5E0D2", borderLeft: "4px solid #3E1540", background: "white", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{
+          margin: "12px 20px 0",
+          borderRadius: "var(--r-card)",
+          border: "1px solid var(--line)",
+          background: "var(--cream)",
+          padding: "14px 16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Have you graduated?</p>
-            <p style={{ fontSize: 13, color: "#8A8497" }}>Let us know so we can move you to the right group.</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Have you graduated?</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Let us know so we can move you to the right group.</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => handleGradCheck(true)}
-              style={{ flex: 1, background: "#3E1540", color: "white", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-inter)", border: "none", borderRadius: 8, padding: "8px 0", cursor: "pointer" }}
-            >
+            <CentralButton onClick={() => handleGradCheck(true)} style={{ flex: 1, justifyContent: "center" }}>
               I&apos;ve graduated
-            </button>
-            <button
-              onClick={() => handleGradCheck(false)}
-              style={{ flex: 1, background: "none", color: "#13101A", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)", border: "1px solid #E5E0D2", borderRadius: 8, padding: "8px 0", cursor: "pointer" }}
-            >
+            </CentralButton>
+            <CentralButton variant="secondary" onClick={() => handleGradCheck(false)} style={{ flex: 1, justifyContent: "center" }}>
               Still a student
-            </button>
+            </CentralButton>
           </div>
         </div>
       )}
@@ -278,134 +329,136 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
         <div className="px-5 md:px-14 pt-8"><Spinner /></div>
       ) : (
         <>
-          {/* ── Desktop header ── */}
-          <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
-            <div style={{ maxWidth: "640px" }}>
-              <p style={MONO_STYLE}>{dateLabel}</p>
-              <h1 style={{ margin: "14px 0 8px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, color: "#13101A", letterSpacing: "-0.01em" }}>
+          {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
+
+          {/* Desktop: hero header */}
+          <div
+            className="hidden md:flex items-end justify-between px-14 pt-11 pb-9"
+            style={{ gap: 24, borderBottom: "1px solid var(--line)" }}
+          >
+            <div style={{ maxWidth: 640 }}>
+              <div style={EYEBROW}>{dateLabel}</div>
+              <h1
+                style={{
+                  margin: "14px 0 0",
+                  fontFamily: "var(--serif)",
+                  fontWeight: 400,
+                  fontSize: 52,
+                  lineHeight: 1.05,
+                  color: "var(--ink)",
+                  letterSpacing: "-0.6px",
+                }}
+              >
                 {greeting}
               </h1>
-              <span style={{ display: "inline-block", fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  marginTop: 12,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  fontFamily: "var(--sans)",
+                  ...getRoleBadgeStyle(userRole),
+                }}
+              >
                 {roleBadge}
               </span>
-              <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px" }}>
-                {statParts.join(" · ")}
-              </p>
             </div>
-            <div className="flex gap-6 pb-1.5">
-              {([
-                { label: "Events", value: String(eventCount) },
-                { label: "Unread", value: String(totalUnread) },
-                ...(isLeaderOrAdmin && memberCount !== null ? [{ label: "Members", value: String(memberCount) }] : []),
-              ] as { label: string; value: string }[]).map(({ label, value }) => (
-                <div key={label} style={{ textAlign: "right" }}>
-                  <p style={MONO_STYLE}>{label}</p>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", marginTop: "2px", fontVariantNumeric: "tabular-nums", color: "#13101A" }}>{value}</p>
-                </div>
-              ))}
+
+            {/* Stat cards row */}
+            <div className="flex gap-4 pb-1.5">
+              <StatCard eyebrow="Events" value={eventCount} sub="upcoming" valueSize={32} />
+              <StatCard eyebrow="Unread" value={totalUnread} sub="messages" valueSize={32} />
+              {isLeaderOrAdmin && memberCount !== null && (
+                <StatCard eyebrow="Members" value={memberCount} sub="in ministry" valueSize={32} />
+              )}
             </div>
           </div>
 
-          {/* ── Desktop content ── */}
+          {/* Desktop: main content */}
           <div className="hidden md:block px-14 py-7">
-            {/* Hero + chats */}
-            <div className="grid gap-5" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
-              {/* Hero event card */}
+
+            {/* Up Next + Chats — 1.5fr 1fr grid */}
+            <div className="grid gap-5" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+
+              {/* Up Next card */}
               {heroAnn ? (
-                <div
-                  className="relative overflow-hidden rounded-2xl text-[#F6F4EF] flex flex-col hover:shadow-[0_3px_12px_rgba(19,16,26,0.12)] transition-shadow duration-150"
-                  style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "32px 32px 28px", minHeight: "320px" }}
-                >
-                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
-                  <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
-                  <div className="relative flex justify-between items-start">
-                    <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Up next</span>
-                    <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>Event</span>
-                  </div>
-                  <h2 className="relative" style={{ margin: "28px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 0.98, letterSpacing: "-0.01em" }}>
-                    {heroAnn.title}
-                  </h2>
-                  <p className="relative mt-2.5 text-[13px] leading-relaxed line-clamp-3" style={{ opacity: 0.78, maxWidth: "420px" }}>
-                    {heroAnn.body}
-                  </p>
-                  <div className="relative mt-auto pt-9">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleHomeRsvp}
-                        disabled={rsvping}
-                        style={{ background: userHasRsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: userHasRsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "9px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}
-                      >
-                        {userHasRsvped ? "Going ✓" : "RSVP"}
-                      </button>
-                      <button
-                        onClick={onSeeAnnouncements}
-                        style={{ background: "rgba(255,255,255,0.08)", color: "#F6F4EF", border: "1px solid rgba(255,255,255,0.18)", padding: "9px 18px", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
-                      >
-                        Details
-                      </button>
-                      {rsvpCount > 0 && <span style={{ fontSize: "12px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}>{rsvpCount} going</span>}
-                    </div>
-                    {showAttendeeList && (
-                      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {rsvpAttendees.slice(0, 8).map((a) => (
-                          <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                        ))}
-                        {rsvpAttendees.length > 8 && <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{rsvpAttendees.length - 8} more</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <UpNextCard
+                  label="Up next"
+                  labelAccent
+                  title={heroAnn.title}
+                  body={heroAnn.body}
+                  isEvent={heroAnn.is_event}
+                  userHasRsvped={userHasRsvped}
+                  rsvping={rsvping}
+                  rsvpCount={rsvpCount}
+                  attendees={rsvpAttendees}
+                  showAttendees={showAttendeeList}
+                  onRsvp={handleHomeRsvp}
+                  onDetails={onSeeAnnouncements}
+                />
               ) : latestAnn ? (
-                <div
-                  className="relative overflow-hidden rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "32px 32px 28px", minHeight: "320px" }}
-                >
-                  <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: -100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
-                  <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.07, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
-                  <div className="relative flex justify-between items-start">
-                    <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Latest</span>
-                    <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>Post</span>
-                  </div>
-                  <h2 className="relative" style={{ margin: "28px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 0.98, letterSpacing: "-0.01em", color: "#F6F4EF" }}>
-                    {latestAnn.title}
-                  </h2>
-                  <p className="relative mt-2.5 text-[13px] leading-relaxed line-clamp-3" style={{ opacity: 0.78, maxWidth: "420px", color: "#F6F4EF" }}>
-                    {latestAnn.body}
-                  </p>
-                  <div className="relative mt-auto pt-9">
-                    <button
-                      onClick={onSeeAnnouncements}
-                      style={{ background: "#F6F4EF", color: "#13101A", border: 0, padding: "9px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}
-                    >
-                      See announcement
-                    </button>
-                  </div>
-                </div>
+                <UpNextCard
+                  label="Latest"
+                  labelAccent={false}
+                  title={latestAnn.title}
+                  body={latestAnn.body}
+                  isEvent={false}
+                  onDetails={onSeeAnnouncements}
+                />
               ) : (
-                <div className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] flex flex-col items-center justify-center gap-3 text-center" style={{ minHeight: "320px", padding: "40px 32px" }}>
-                  <Calendar className="w-8 h-8 text-[#C4C4C4]" />
+                <CentralCard
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 12,
+                    minHeight: 290,
+                    textAlign: "center",
+                  }}
+                  padding="40px 32px"
+                >
+                  <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
                   <div>
-                    <p style={{ fontSize: "15px", fontWeight: 600, color: "#13101A" }}>No upcoming events</p>
-                    <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "4px" }}>Check the announcements tab for updates</p>
+                    <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>No upcoming events</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
+                      Check the announcements tab for updates.
+                    </p>
                   </div>
-                  <button onClick={onSeeAnnouncements} style={{ marginTop: "8px", fontSize: "12px", color: "#3E1540", fontWeight: 500, border: "1px solid #3E1540", padding: "6px 16px", borderRadius: 999, cursor: "pointer", background: "transparent" }}>
+                  <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
                     See announcements
-                  </button>
-                </div>
+                  </CentralButton>
+                </CentralCard>
               )}
 
               {/* Recent chats */}
-              <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden flex flex-col">
-                <div className="px-4 py-3.5 border-b border-[#E5E0D2] flex items-center">
-                  <span style={{ fontSize: "13px", fontWeight: 500 }}>Your chats</span>
-                  <span className="flex-1" />
-                  {totalUnread > 0 && <span style={{ fontSize: "11px", color: "#8A8497" }}>{totalUnread} unread</span>}
+              <CentralCard
+                padding={0}
+                style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
+              >
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid var(--line)",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={EYEBROW}>Your chats</div>
+                  <span style={{ flex: 1 }} />
+                  {totalUnread > 0 && (
+                    <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{totalUnread} unread</span>
+                  )}
                 </div>
+
                 {top3.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center py-10">
-                    <div className="text-center">
-                      <MessageCircle className="w-6 h-6 text-[#C4C4C4] mx-auto mb-2" />
-                      <p style={{ fontSize: "13px", color: "#8A8497" }}>No chats yet</p>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 0" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <MessageCircle style={{ width: 24, height: 24, color: "var(--dashed)", margin: "0 auto 8px" }} />
+                      <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No chats yet</p>
                     </div>
                   </div>
                 ) : (
@@ -413,241 +466,471 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                     <button
                       key={c.id}
                       onClick={() => onOpenChat(c.id, c.groupName)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F4F1E8] active:scale-[0.99] transition-[transform,background-color] duration-100"
-                      style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 18px",
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        borderTop: i ? "1px solid var(--line-3)" : "none",
+                        cursor: "pointer",
+                        transition: "background 100ms ease",
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "var(--ivory)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "none")}
                     >
-                      <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", color: "#F6F4EF", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: 600 }}>
+                      <div
+                        style={{
+                          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                          background: i === 0 ? "var(--plum)" : "var(--ink)",
+                          display: "grid", placeItems: "center",
+                          fontSize: 11, fontWeight: 600, color: "var(--cream)",
+                          fontFamily: "var(--sans)",
+                        }}
+                      >
                         {c.initials}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="flex justify-between gap-2 items-baseline">
-                          <span style={{ fontSize: "13px", fontWeight: c.unreadCount ? 600 : 500 }}>{c.groupName}</span>
-                          {c.time && <span style={{ fontSize: "10px", color: "#8A8497", flexShrink: 0 }}>{c.time}</span>}
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+                          <span style={{ fontSize: 13, fontWeight: c.unreadCount ? 600 : 500, color: "var(--ink)", fontFamily: "var(--sans)" }}>
+                            {c.groupName}
+                          </span>
+                          {c.time && (
+                            <span style={{ fontSize: 10, color: "var(--faint)", flexShrink: 0, fontFamily: "var(--sans)" }}>
+                              {c.time}
+                            </span>
+                          )}
                         </div>
                         {c.lastMessage && (
-                          <p style={{ fontSize: "12px", color: "#5A5466", marginTop: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.lastMessage}</p>
+                          <p style={{ fontSize: 12, color: "var(--body)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)" }}>
+                            {c.lastMessage}
+                          </p>
                         )}
                       </div>
                       {c.unreadCount > 0 && (
-                        <span style={{ background: "#C9A34B", color: "#13101A", fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: 999 }}>{c.unreadCount}</span>
+                        <span style={{ background: "var(--plum)", color: "var(--cream)", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, fontFamily: "var(--sans)" }}>
+                          {c.unreadCount}
+                        </span>
                       )}
                     </button>
                   ))
                 )}
-                <button onClick={onSeeChats} className="px-4 py-3 mt-auto border-t border-[#E5E0D2] text-[12px] text-[#8A8497] hover:text-[#13101A] active:opacity-70 text-left transition-[color,opacity] duration-150">
+
+                <button
+                  onClick={onSeeChats}
+                  style={{
+                    padding: "12px 18px",
+                    marginTop: "auto",
+                    border: "none",
+                    borderTop: "1px solid var(--line)",
+                    fontSize: 12,
+                    color: "var(--muted-text)",
+                    background: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontFamily: "var(--sans)",
+                    transition: "color 120ms ease",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "var(--ink)")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "var(--muted-text)")}
+                >
                   See all chats →
                 </button>
-              </div>
+              </CentralCard>
             </div>
 
-            {/* Pastor Pulse card — desktop */}
+            {/* ── Pastor Pulse — desktop ── */}
             {activeQuestion && !hasResponded && !isPastorRole && (
-              <div className="mt-6 rounded-2xl px-8 py-7" style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 100%)", color: "#F6F4EF" }}>
+              <CentralCard variant="callout" radius="var(--r-callout)" style={{ marginTop: 22 }} padding="28px 32px">
                 {pulseSubmitted ? (
-                  <div style={{ textAlign: "center", padding: "20px 0" }}>
-                    <p style={{ fontSize: 22, marginBottom: 6 }}>🙏</p>
-                    <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Thanks for sharing</p>
-                    <p style={{ fontSize: 13, color: "rgba(246,244,239,0.65)" }}>Your response was received anonymously.</p>
+                  <div style={{ textAlign: "center", padding: "16px 0" }}>
+                    <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
+                    <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0 }}>
+                      Thanks for sharing.
+                    </p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
+                      Your response was received anonymously.
+                    </p>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36, alignItems: "start" }}>
                     <div>
-                      <span style={{ fontSize: 10, letterSpacing: "0.8px", textTransform: "uppercase", fontWeight: 600, color: "rgba(246,244,239,0.6)", display: "block", marginBottom: 10 }}>
-                        Pastor Pulse · {activeQuestion.question_type === "poll" ? "Poll" : activeQuestion.question_type === "scale" ? "1–5 Scale" : activeQuestion.question_type === "prayer" ? "Prayer" : "Open"}
-                      </span>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, lineHeight: 1.15, color: "#F6F4EF", margin: 0 }}>{activeQuestion.question_text}</p>
+                      <div style={EYEBROW}>
+                        Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
+                      </div>
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 24, lineHeight: 1.2, color: "var(--ink)", margin: "8px 0 0" }}>
+                        {activeQuestion.question_text}
+                      </p>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {activeQuestion.options.map((opt) => (
-                            <button key={opt} onClick={() => setPulseOption(opt)} style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${pulseOption === opt ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseOption === opt ? "rgba(246,244,239,0.15)" : "transparent", color: "#F6F4EF", fontSize: 14, fontWeight: pulseOption === opt ? 600 : 400, cursor: "pointer", textAlign: "left" }}>{opt}</button>
+                            <button
+                              key={opt}
+                              onClick={() => setPulseOption(opt)}
+                              style={{
+                                padding: "9px 14px",
+                                borderRadius: "var(--r-input)",
+                                border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
+                                background: pulseOption === opt ? "var(--ivory)" : "transparent",
+                                color: pulseOption === opt ? "var(--plum)" : "var(--body)",
+                                fontSize: 14,
+                                fontWeight: pulseOption === opt ? 500 : 400,
+                                cursor: "pointer",
+                                textAlign: "left",
+                                fontFamily: "var(--sans)",
+                              }}
+                            >
+                              {opt}
+                            </button>
                           ))}
                         </div>
                       )}
                       {activeQuestion.question_type === "scale" && (
                         <div style={{ display: "flex", gap: 8 }}>
                           {[1, 2, 3, 4, 5].map((n) => (
-                            <button key={n} onClick={() => setPulseScale(n)} style={{ flex: 1, aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${pulseScale === n ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseScale === n ? "rgba(246,244,239,0.2)" : "transparent", color: "#F6F4EF", fontSize: 18, fontWeight: 600, cursor: "pointer" }}>{n}</button>
+                            <button
+                              key={n}
+                              onClick={() => setPulseScale(n)}
+                              style={{
+                                flex: 1,
+                                aspectRatio: "1",
+                                borderRadius: "var(--r-input)",
+                                border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
+                                background: pulseScale === n ? "var(--ivory)" : "transparent",
+                                color: pulseScale === n ? "var(--plum)" : "var(--ink)",
+                                fontSize: 16,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: "var(--sans)",
+                              }}
+                            >
+                              {n}
+                            </button>
                           ))}
                         </div>
                       )}
                       {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
-                        <textarea value={pulseInput} onChange={e => setPulseInput(e.target.value)} placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"} rows={3} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid rgba(246,244,239,0.25)", background: "rgba(246,244,239,0.1)", color: "#F6F4EF", fontSize: 14, fontFamily: "var(--font-inter)", resize: "none", boxSizing: "border-box", outline: "none" }} />
+                        <textarea
+                          value={pulseInput}
+                          onChange={e => setPulseInput(e.target.value)}
+                          placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
+                          rows={3}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: "var(--r-input)",
+                            border: "1px solid var(--line-2)",
+                            background: "var(--cream-2)",
+                            color: "var(--ink)",
+                            fontSize: 14,
+                            fontFamily: "var(--sans)",
+                            resize: "none",
+                            boxSizing: "border-box",
+                            outline: "none",
+                          }}
+                        />
                       )}
-                      <button
+                      <CentralButton
                         onClick={handlePulseSubmit}
-                        disabled={pulseSubmitting || (activeQuestion.question_type === "poll" && !pulseOption) || (activeQuestion.question_type === "scale" && !pulseScale) || ((activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && !pulseInput.trim())}
-                        style={{ padding: "11px 0", borderRadius: 10, background: "#F6F4EF", color: "#3E1540", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", opacity: pulseSubmitting ? 0.6 : 1 }}
+                        disabled={pulseSubmitting || pulseAnswered}
+                        style={{ justifyContent: "center" }}
                       >
                         {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                      </button>
+                      </CentralButton>
                     </div>
                   </div>
                 )}
-              </div>
+              </CentralCard>
             )}
 
-            {/* For You section */}
+            {/* ── For You section — desktop ── */}
             {forYouItems.length > 0 && (
-              <div className="mt-8">
-                <div className="flex items-baseline justify-between mb-4">
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "26px", color: "#13101A", letterSpacing: "-0.01em", margin: 0 }}>For you</h2>
-                  <button onClick={onSeeAnnouncements} style={{ fontSize: "12px", color: "#8A8497", cursor: "pointer", background: "none", border: "none" }} className="hover:text-[#3E1540] transition-colors">
-                    See all →
-                  </button>
-                </div>
+              <div style={{ marginTop: 36 }}>
+                <SectionHeader
+                  eyebrow="Announcements"
+                  title="For you"
+                  action={
+                    <button
+                      onClick={onSeeAnnouncements}
+                      style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                    >
+                      See all →
+                    </button>
+                  }
+                  style={{ marginBottom: 18 }}
+                />
+
                 <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                   {forYouItems.map((a) => (
-                    <div key={a.id} className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] p-5 flex flex-col hover:bg-[#F7F4EF] transition-colors duration-150">
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 6, background: a.is_sub_pinned ? "#F1ECFF" : "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: a.is_sub_pinned ? "#3E1540" : "#5A5466", whiteSpace: "nowrap" }}>
-                          {a.is_sub_pinned ? "📌 For You" : a.is_event ? "Event" : "Post"}
+                    <CentralCard
+                      key={a.id}
+                      style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                      padding={20}
+                    >
+                      {/* Type badge + RSVP */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            letterSpacing: "0.5px",
+                            fontWeight: 500,
+                            textTransform: "uppercase",
+                            padding: "3px 10px",
+                            borderRadius: 999,
+                            background: "var(--ivory)",
+                            border: "1px solid var(--line-2)",
+                            color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
+                            whiteSpace: "nowrap",
+                            fontFamily: "var(--sans)",
+                          }}
+                        >
+                          {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
                         </span>
                         {a.is_event && (
                           <button
                             onClick={() => handleForYouRsvp(a.id)}
-                            style={{ fontSize: "11px", fontWeight: 500, padding: "3px 10px", borderRadius: 999, background: rsvpedAnnIds.has(a.id) ? "#EFEAE0" : "transparent", color: rsvpedAnnIds.has(a.id) ? "#5A5466" : "#3E1540", border: `1px solid ${rsvpedAnnIds.has(a.id) ? "#E5E0D2" : "#3E1540"}`, cursor: "pointer", flexShrink: 0 }}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 500,
+                              padding: "3px 10px",
+                              borderRadius: 999,
+                              border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
+                              background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
+                              color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                              fontFamily: "var(--sans)",
+                            }}
                           >
                             {rsvpedAnnIds.has(a.id) ? "Going ✓" : "RSVP"}
                           </button>
                         )}
                       </div>
-                      <h4 style={{ margin: "0 0 6px", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "20px", lineHeight: 1.15, color: "#13101A" }}>{a.title}</h4>
-                      <p style={{ fontSize: "12px", color: "#5A5466", lineHeight: 1.55, flex: 1 }} className="line-clamp-2">{a.body}</p>
-                      <button onClick={onSeeAnnouncements} style={{ marginTop: "14px", fontSize: "11px", color: "#8A8497", cursor: "pointer", background: "none", border: "none", textAlign: "left", padding: 0 }} className="hover:text-[#3E1540] transition-colors">
+
+                      {/* Title — sans per spec (list-context card title) */}
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 500,
+                          color: "var(--ink)",
+                          lineHeight: 1.3,
+                          fontFamily: "var(--sans)",
+                        }}
+                      >
+                        {a.title}
+                      </div>
+
+                      {/* Body — flex: 1 so all cards in a row push actions to the same baseline */}
+                      <p
+                        className="line-clamp-2"
+                        style={{
+                          fontSize: 12,
+                          color: "var(--body)",
+                          lineHeight: 1.55,
+                          flex: 1,
+                          margin: 0,
+                          fontFamily: "var(--sans)",
+                        }}
+                      >
+                        {a.body}
+                      </p>
+
+                      {/* View action — always at bottom */}
+                      <button
+                        onClick={onSeeAnnouncements}
+                        style={{
+                          fontSize: 11,
+                          color: "var(--muted-text)",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          padding: 0,
+                          fontFamily: "var(--sans)",
+                        }}
+                      >
                         View →
                       </button>
-                    </div>
+                    </CentralCard>
                   ))}
                 </div>
+
                 {/* Leader prompt: event has 0 RSVPs */}
                 {isLeaderOrAdmin && heroAnn && rsvpCount === 0 && (
-                  <div className="mt-3 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] px-5 py-3 flex items-center gap-3">
-                    <Bell className="w-3.5 h-3.5 text-[#8A8497] flex-shrink-0" />
-                    <p style={{ fontSize: "12px", color: "#5A5466", margin: 0 }}>
-                      No one has RSVPed to <span style={{ fontWeight: 600, color: "#13101A" }}>{heroAnn.title}</span> yet — share the details with your group!
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "12px 16px",
+                      background: "var(--cream)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "var(--r-card)",
+                    }}
+                  >
+                    <Bell style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0 }} />
+                    <p style={{ fontSize: 12, color: "var(--body)", margin: 0, fontFamily: "var(--sans)" }}>
+                      No one has RSVPed to{" "}
+                      <span style={{ fontWeight: 600, color: "var(--ink)" }}>{heroAnn.title}</span>{" "}
+                      yet — share the details with your group.
                     </p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Daily verse */}
+            {/* ── Daily verse — desktop ── */}
             {homeVerse && (
-              <div className="mt-6 rounded-xl border border-[#E5E0D2] bg-[#FBF8F2]" style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "1fr 2fr", alignItems: "center", gap: "32px" }}>
+              <CentralCard
+                style={{
+                  marginTop: 24,
+                  display: "grid",
+                  gridTemplateColumns: "1fr 2fr",
+                  alignItems: "center",
+                  gap: 32,
+                }}
+                padding="22px 28px"
+              >
                 <div>
-                  <p style={MONO_STYLE}>Today&apos;s verse</p>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", marginTop: "4px", color: "#13101A" }}>{homeVerse.reference}</p>
+                  <div style={EYEBROW}>Today&apos;s verse</div>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: 20, marginTop: 4, color: "var(--ink)" }}>
+                    {homeVerse.reference}
+                  </div>
                 </div>
-                <div style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "17px", lineHeight: 1.5, color: "#13101A" }}>
+                <div style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: "var(--ink)" }}>
                   &ldquo;{homeVerse.text}&rdquo;
                 </div>
-              </div>
+              </CentralCard>
             )}
           </div>
 
-          {/* ── Mobile content ── */}
+          {/* ══════════════════════════════════════════════════════ MOBILE ══ */}
+
           <div className="md:hidden px-5 pb-4">
-            <div className="mb-6">
-              <p style={MONO_STYLE} className="mb-2">{dateLabel}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "34px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, margin: 0 }}>
+
+            {/* Mobile greeting header */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={EYEBROW}>{dateLabel}</div>
+              <h1
+                style={{
+                  fontFamily: "var(--serif)",
+                  fontSize: 34,
+                  fontWeight: 400,
+                  letterSpacing: "-0.5px",
+                  color: "var(--ink)",
+                  lineHeight: 1.1,
+                  margin: "8px 0 0",
+                }}
+              >
                 {greeting}
-              </p>
-              <div className="flex items-center gap-2 mt-2.5">
-                <span style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "3px 10px", borderRadius: 999, fontWeight: 500 }}>
+              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    padding: "3px 10px",
+                    borderRadius: 999,
+                    fontFamily: "var(--sans)",
+                    ...getRoleBadgeStyle(userRole),
+                  }}
+                >
                   {roleBadge}
                 </span>
                 {eventCount > 0 && (
-                  <span style={{ fontSize: "11px", color: "#8A8497" }}>{eventCount} event{eventCount !== 1 ? "s" : ""}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                    {eventCount} event{eventCount !== 1 ? "s" : ""}
+                  </span>
                 )}
                 {totalUnread > 0 && (
-                  <span style={{ fontSize: "11px", color: "#8A8497" }}>{totalUnread} unread</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                    {totalUnread} unread
+                  </span>
                 )}
               </div>
             </div>
 
             <div className="flex flex-col gap-8">
-              {/* Hero event */}
+
+              {/* ── Up Next — mobile ── */}
               <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", color: "var(--plum)", textTransform: "uppercase" }}>
                     Up next
-                  </h2>
-                  <button onClick={onSeeAnnouncements} className="text-[12px] text-[#8A8497] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors">
-                    See all <ChevronRight className="w-3 h-3" />
+                  </div>
+                  <button
+                    onClick={onSeeAnnouncements}
+                    style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                  >
+                    See all <ChevronRight style={{ width: 12, height: 12 }} />
                   </button>
                 </div>
 
                 {heroAnn ? (
-                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
-                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)]" />
-                    <div className="relative">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Event</span>
-                      </div>
-                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>{heroAnn.title}</h3>
-                      <p className="text-[13px] leading-relaxed mb-5 line-clamp-3" style={{ color: "rgba(246,244,239,0.75)" }}>{heroAnn.body}</p>
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={handleHomeRsvp}
-                          disabled={rsvping}
-                          className={`font-bold py-3 px-7 rounded-full text-[14px] transition-colors ${userHasRsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97]"}`}
-                        >
-                          {userHasRsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
-                        </button>
-                        <button onClick={onSeeAnnouncements} className="text-[13px] font-medium transition-colors" style={{ color: "rgba(246,244,239,0.6)" }}>
-                          Details
-                        </button>
-                      </div>
-                      {showAttendeeList && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {rsvpAttendees.slice(0, 6).map((a) => (
-                            <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                          ))}
-                          {rsvpAttendees.length > 6 && <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{rsvpAttendees.length - 6} more</span>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <UpNextCard
+                    label="Up next"
+                    labelAccent
+                    title={heroAnn.title}
+                    body={heroAnn.body}
+                    isEvent={heroAnn.is_event}
+                    userHasRsvped={userHasRsvped}
+                    rsvping={rsvping}
+                    rsvpCount={rsvpCount}
+                    attendees={rsvpAttendees}
+                    showAttendees={showAttendeeList}
+                    onRsvp={handleHomeRsvp}
+                    onDetails={onSeeAnnouncements}
+                    mobile
+                  />
                 ) : latestAnn ? (
-                  <div className="rounded-[22px] bg-[#3E1540] px-6 py-6 text-[#F6F4EF] relative overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
-                    <div className="absolute -top-[90px] -right-[90px] w-[260px] h-[260px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)]" />
-                    <div className="relative">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Latest</span>
-                      </div>
-                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", lineHeight: 1, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 10px" }}>{latestAnn.title}</h3>
-                      <p className="text-[13px] leading-relaxed mb-5 line-clamp-3" style={{ color: "rgba(246,244,239,0.75)" }}>{latestAnn.body}</p>
-                      <button onClick={onSeeAnnouncements} className="font-bold py-3 px-7 rounded-full text-[14px] bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97] transition-colors">
-                        See announcement
-                      </button>
-                    </div>
-                  </div>
+                  <UpNextCard
+                    label="Latest"
+                    labelAccent={false}
+                    title={latestAnn.title}
+                    body={latestAnn.body}
+                    isEvent={false}
+                    onDetails={onSeeAnnouncements}
+                    mobile
+                  />
                 ) : (
-                  <div className="rounded-[22px] border border-[#E5E0D2] bg-[#FBF8F2] px-6 py-8 flex flex-col items-center gap-2 text-center">
-                    <Calendar className="w-7 h-7 text-[#C4C4C4]" />
-                    <p style={{ fontSize: "14px", fontWeight: 600, color: "#13101A" }}>No upcoming events</p>
-                    <p style={{ fontSize: "12px", color: "#8A8497" }}>Check back when events are posted</p>
-                  </div>
+                  <CentralCard
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
+                    padding="32px 24px"
+                  >
+                    <Calendar style={{ width: 28, height: 28, color: "var(--dashed)" }} />
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--sans)" }}>No upcoming events</p>
+                    <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>Check back when events are posted.</p>
+                  </CentralCard>
                 )}
               </section>
 
-              {/* Pastor Pulse card — mobile */}
+              {/* ── Pastor Pulse — mobile ── */}
               {activeQuestion && !hasResponded && !isPastorRole && (
                 <section>
                   {pulseSubmitted ? (
-                    <div className="rounded-[22px] border border-[#E5E0D2] bg-[#FBF8F2] px-6 py-6 text-center">
-                      <p style={{ fontSize: 22, marginBottom: 6 }}>🙏</p>
-                      <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Thanks for sharing</p>
-                      <p style={{ fontSize: 12, color: "#8A8497" }}>Your response was received anonymously.</p>
-                    </div>
+                    <CentralCard variant="callout" padding="24px" style={{ textAlign: "center" }}>
+                      <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", margin: 0 }}>
+                        Thanks for sharing.
+                      </p>
+                      <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6, fontFamily: "var(--sans)" }}>
+                        Your response was received anonymously.
+                      </p>
+                    </CentralCard>
                   ) : (
-                    <div className="rounded-[22px] px-6 py-6" style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 100%)", color: "#F6F4EF" }}>
-                      <span style={{ fontSize: 10, letterSpacing: "0.8px", textTransform: "uppercase", fontWeight: 600, color: "rgba(246,244,239,0.6)", display: "block", marginBottom: 10 }}>
-                        Pastor Pulse · {activeQuestion.question_type === "poll" ? "Poll" : activeQuestion.question_type === "scale" ? "1–5 Scale" : activeQuestion.question_type === "prayer" ? "Prayer" : "Open"}
-                      </span>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, lineHeight: 1.2, marginBottom: 16, color: "#F6F4EF" }}>{activeQuestion.question_text}</p>
+                    <CentralCard variant="callout" padding="24px">
+                      <div style={EYEBROW}>
+                        Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
+                      </div>
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 22, lineHeight: 1.2, color: "var(--ink)", margin: "8px 0 14px" }}>
+                        {activeQuestion.question_text}
+                      </p>
 
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -655,8 +938,21 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                             <button
                               key={opt}
                               onClick={() => setPulseOption(opt)}
-                              style={{ padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${pulseOption === opt ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseOption === opt ? "rgba(246,244,239,0.15)" : "transparent", color: "#F6F4EF", fontSize: 14, fontWeight: pulseOption === opt ? 600 : 400, cursor: "pointer", textAlign: "left" }}
-                            >{opt}</button>
+                              style={{
+                                padding: "10px 14px",
+                                borderRadius: "var(--r-input)",
+                                border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
+                                background: pulseOption === opt ? "var(--ivory)" : "transparent",
+                                color: pulseOption === opt ? "var(--plum)" : "var(--body)",
+                                fontSize: 14,
+                                fontWeight: pulseOption === opt ? 500 : 400,
+                                cursor: "pointer",
+                                textAlign: "left",
+                                fontFamily: "var(--sans)",
+                              }}
+                            >
+                              {opt}
+                            </button>
                           ))}
                         </div>
                       )}
@@ -667,8 +963,21 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                             <button
                               key={n}
                               onClick={() => setPulseScale(n)}
-                              style={{ flex: 1, aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${pulseScale === n ? "#F6F4EF" : "rgba(246,244,239,0.25)"}`, background: pulseScale === n ? "rgba(246,244,239,0.2)" : "transparent", color: "#F6F4EF", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
-                            >{n}</button>
+                              style={{
+                                flex: 1,
+                                aspectRatio: "1",
+                                borderRadius: "var(--r-input)",
+                                border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
+                                background: pulseScale === n ? "var(--ivory)" : "transparent",
+                                color: pulseScale === n ? "var(--plum)" : "var(--ink)",
+                                fontSize: 16,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: "var(--sans)",
+                              }}
+                            >
+                              {n}
+                            </button>
                           ))}
                         </div>
                       )}
@@ -679,67 +988,138 @@ export function HomeTab({ profile, userRole, ministryId, ministryName, recentCha
                           onChange={e => setPulseInput(e.target.value)}
                           placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
                           rows={3}
-                          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid rgba(246,244,239,0.25)", background: "rgba(246,244,239,0.1)", color: "#F6F4EF", fontSize: 14, fontFamily: "var(--font-inter)", resize: "none", boxSizing: "border-box", outline: "none" }}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: "var(--r-input)",
+                            border: "1px solid var(--line-2)",
+                            background: "var(--cream-2)",
+                            color: "var(--ink)",
+                            fontSize: 14,
+                            fontFamily: "var(--sans)",
+                            resize: "none",
+                            boxSizing: "border-box",
+                            outline: "none",
+                          }}
                         />
                       )}
 
-                      <button
+                      <CentralButton
                         onClick={handlePulseSubmit}
-                        disabled={pulseSubmitting || (activeQuestion.question_type === "poll" && !pulseOption) || (activeQuestion.question_type === "scale" && !pulseScale) || ((activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && !pulseInput.trim())}
-                        style={{ marginTop: 14, width: "100%", padding: "12px 0", borderRadius: 10, background: "#F6F4EF", color: "#3E1540", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", opacity: pulseSubmitting ? 0.6 : 1 }}
+                        disabled={pulseSubmitting || pulseAnswered}
+                        style={{ marginTop: 12, width: "100%", justifyContent: "center" }}
                       >
                         {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                      </button>
-                    </div>
+                      </CentralButton>
+                    </CentralCard>
                   )}
                 </section>
               )}
 
-              {/* For You - mobile */}
+              {/* ── For You — mobile ── */}
               {forYouItems.length > 0 && (
                 <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
-                      For you
-                    </h2>
-                    <button onClick={onSeeAnnouncements} className="text-[12px] text-[#8A8497] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors">
-                      See all <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="flex flex-col gap-3">
+                  <SectionHeader
+                    eyebrow="Announcements"
+                    title="For you"
+                    titleSize={22}
+                    action={
+                      <button
+                        onClick={onSeeAnnouncements}
+                        style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                      >
+                        See all <ChevronRight style={{ width: 12, height: 12 }} />
+                      </button>
+                    }
+                    style={{ marginBottom: 12 }}
+                  />
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {forYouItems.map((a) => (
-                      <div key={a.id} className="rounded-2xl bg-white border border-[#E5E0D2] px-4 py-4 shadow-[0_1px_4px_rgba(19,16,26,0.04)] hover:bg-[#F7F4EF] transition-colors duration-150">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <span style={{ fontSize: "10px", letterSpacing: "0.8px", color: "#8A8497", textTransform: "uppercase", fontWeight: 500 }}>
-                              {a.is_pinned ? "📌 Pinned" : a.is_event ? "Event" : "Post"}
+                      <CentralCard key={a.id} padding={16}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                letterSpacing: "0.5px",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
+                                fontFamily: "var(--sans)",
+                              }}
+                            >
+                              {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
                             </span>
-                            <h4 style={{ margin: "4px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "18px", lineHeight: 1.2, color: "#13101A" }} className="line-clamp-1">{a.title}</h4>
+                            {/* Sans title per spec — list-context card title */}
+                            <div
+                              style={{
+                                marginTop: 4,
+                                fontSize: 15,
+                                fontWeight: 500,
+                                color: "var(--ink)",
+                                lineHeight: 1.3,
+                                fontFamily: "var(--sans)",
+                                overflow: "hidden",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: "vertical",
+                              } as React.CSSProperties}
+                            >
+                              {a.title}
+                            </div>
                           </div>
                           {a.is_event ? (
                             <button
                               onClick={() => handleForYouRsvp(a.id)}
-                              style={{ fontSize: "12px", fontWeight: 500, padding: "5px 12px", borderRadius: 999, flexShrink: 0, background: rsvpedAnnIds.has(a.id) ? "#EFEAE0" : "#3E1540", color: rsvpedAnnIds.has(a.id) ? "#5A5466" : "#F6F4EF", border: "none", cursor: "pointer" }}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 500,
+                                padding: "5px 12px",
+                                borderRadius: 999,
+                                flexShrink: 0,
+                                border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
+                                background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
+                                color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
+                                cursor: "pointer",
+                                fontFamily: "var(--sans)",
+                              }}
                             >
                               {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
                             </button>
                           ) : (
-                            <button onClick={onSeeAnnouncements} style={{ fontSize: "12px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>View →</button>
+                            <button
+                              onClick={onSeeAnnouncements}
+                              style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
+                            >
+                              View →
+                            </button>
                           )}
                         </div>
                         {!a.is_event && (
-                          <p style={{ marginTop: "6px", fontSize: "12px", color: "#5A5466", lineHeight: 1.5 }} className="line-clamp-2">{a.body}</p>
+                          <p
+                            className="line-clamp-2"
+                            style={{ marginTop: 6, fontSize: 12, color: "var(--body)", lineHeight: 1.5, fontFamily: "var(--sans)" }}
+                          >
+                            {a.body}
+                          </p>
                         )}
-                      </div>
+                      </CentralCard>
                     ))}
                   </div>
                 </section>
               )}
 
-              {/* Chats */}
+              {/* ── Chats — mobile ── */}
               {top3.length > 0 && (
-                <ChatsSection chats={top3} totalUnread={totalUnread} onSeeAll={onSeeChats} onOpenChat={onOpenChat} />
+                <ChatsSection
+                  chats={top3}
+                  totalUnread={totalUnread}
+                  onSeeAll={onSeeChats}
+                  onOpenChat={onOpenChat}
+                />
               )}
+
             </div>
           </div>
         </>
