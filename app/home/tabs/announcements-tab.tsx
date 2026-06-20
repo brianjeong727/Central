@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp, Pin, PinOff } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
-import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
+import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { FormFillView } from "./forms-tab"
-import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
+import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
 
 // ── Form builder types (local) ────────────────────────────────────────────────
 
@@ -662,6 +663,7 @@ function InlineEditFields({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
   const supabase = createClient()
+  const router = useRouter()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -979,12 +981,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
                         {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
                       </div>
-                      <div>
+                      <div
+                        onClick={() => router.push(`/announcements/${ann.id}`)}
+                        style={{ cursor: "pointer" }}
+                        title="See announcement"
+                      >
                         <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ann.title}</div>
-                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
+                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{previewBody(ann.body)}</div>
                       </div>
                       <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
                       <div className="flex justify-end items-center gap-1.5">
+                        <button onClick={() => router.push(`/announcements/${ann.id}`)} style={{ fontSize: "11px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[#3E1540] transition-colors">See →</button>
                         {ann.is_event && (
                           <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
@@ -1023,8 +1030,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         </div>
                       </div>
                       <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
-                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
-                      <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
+                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
+                      <button onClick={() => router.push(`/announcements/${ann.id}`)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginTop: 10, fontFamily: "var(--font-inter)", textAlign: "left" }} className="hover:text-[#3E1540] transition-colors">See announcement →</button>
+                      <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                           <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1111,74 +1119,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   )
 }
 
-// ── Announcement Detail ──────────────────────────────────────────────────────
-
-export function AnnouncementDetail({ announcement, userId, userRole, onClose, onRsvpToggle }: AnnouncementDetailProps) {
-  const supabase = createClient()
-  const [rsvping, setRsvping] = useState(false)
-
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
-
-  async function handleRsvp() {
-    if (rsvping) return
-    setRsvping(true)
-    onRsvpToggle(announcement.id)
-    if (announcement.user_has_rsvped) {
-      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", userId)
-    } else {
-      await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
-    }
-    setRsvping(false)
-  }
-
-  const showAttendeeList = announcement.is_event && announcement.rsvp_attendees.length > 0 && (isLeaderOrAdmin || announcement.show_attendees)
-
-  return (
-    <AnimateIn className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
-          <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"><ArrowLeft className="w-4 h-4 text-[#3E1540]" /></button>
-          <span className="text-[15px] font-semibold text-[#13101A]">Announcement</span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <div className="flex items-center gap-1.5 text-[13px] text-[#8A8497] mb-5">
-            <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{formatDate(announcement.created_at)}</span>
-          </div>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, marginBottom: "16px" }}>{announcement.title}</h1>
-          <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{announcement.body}</p>
-          {showAttendeeList && (
-            <div className="mt-6 pt-5 border-t border-[#EFEAE0]">
-              <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">{announcement.rsvp_count} going</p>
-              <div className="flex flex-wrap gap-2">
-                {announcement.rsvp_attendees.map(a => (
-                  <span key={a.user_id} style={{ fontSize: "12px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        {announcement.is_event && (
-          <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4 pb-20">
-            <button onClick={handleRsvp} disabled={rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] hover:bg-[#3E1540]/15 active:scale-[0.97]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF] active:scale-[0.97]"}`}>
-              {announcement.user_has_rsvped ? <span className="flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />You&apos;re going — tap to undo</span> : "RSVP"}
-            </button>
-          </div>
-        )}
-      </div>
-    </AnimateIn>
-  )
-}
-
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
 export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm }: AnnouncementCardProps) {
   const supabase = createClient()
+  const router = useRouter()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [showDetail, setShowDetail] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
@@ -1252,8 +1201,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             </div>
 
             <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
-            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{announcement.body}</p>
-            <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
+            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
+            <button onClick={() => router.push(`/announcements/${announcement.id}`)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
@@ -1298,7 +1247,6 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           )}
         </div>
 
-        {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
       </>
     )
   }
@@ -1341,8 +1289,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           </div>
 
           <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
-          <p className="text-[13px] leading-relaxed line-clamp-2 mb-1" style={{ color: "#5A5466" }}>{announcement.body}</p>
-          <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
+          <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "#5A5466" }}>{previewBody(announcement.body)}</p>
+          <button onClick={() => router.push(`/announcements/${announcement.id}`)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginBottom: "16px", fontFamily: "var(--font-inter)" }} className="hover:text-[#3E1540] transition-colors text-left">See announcement →</button>
 
           {announcement.is_event && (
             <div className="pt-3 border-t border-[#EFEAE0]">
@@ -1387,7 +1335,6 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
         )}
       </div>
 
-      {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
     </>
   )
 }

@@ -236,14 +236,6 @@ export interface AnnouncementsTabProps {
   ministryName: string
 }
 
-export interface AnnouncementDetailProps {
-  announcement: EnrichedAnnouncement
-  userId: string
-  userRole: string
-  onClose: () => void
-  onRsvpToggle: (id: string) => void
-}
-
 export interface AnnouncementCardProps {
   announcement: EnrichedAnnouncement
   isPinned: boolean

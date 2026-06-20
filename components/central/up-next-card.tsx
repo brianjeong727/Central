@@ -1,6 +1,7 @@
 "use client"
 
 import { CSSProperties } from "react"
+import { CalendarDays } from "lucide-react"
 import { CentralButton } from "./button"
 
 const PLUM_EYEBROW: CSSProperties = {
@@ -17,6 +18,46 @@ const MUTED_EYEBROW: CSSProperties = {
   letterSpacing: "1.4px",
   color: "var(--muted-text)",
   textTransform: "uppercase",
+}
+
+// TODO: Replace with real EventDetailRail when schema gains date / time / location fields.
+// At that point, wire in: event_date (ISO string), event_time (string), location (string).
+function EventDetailPlaceholder() {
+  return (
+    <div
+      style={{
+        flex: "0 0 30%",
+        minWidth: 160,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        border: "1.5px dashed var(--dashed)",
+        borderRadius: "var(--r-input)",
+        padding: "28px 20px",
+        textAlign: "center",
+      }}
+    >
+      <CalendarDays style={{ width: 20, height: 20, color: "var(--dashed)" }} />
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "1.2px",
+          color: "var(--muted-text)",
+          textTransform: "uppercase",
+        }}
+      >
+        Event details
+      </div>
+      <div style={{ fontSize: 12, color: "var(--body)", lineHeight: 1.4 }}>
+        No date, time, or
+        <br />
+        location set yet
+      </div>
+    </div>
+  )
 }
 
 interface UpNextCardProps {
@@ -52,104 +93,158 @@ export function UpNextCard({
   mobile = false,
   style,
 }: UpNextCardProps) {
-  const titleSize = mobile ? 34 : 44
-  const padding = mobile ? "24px 24px" : "36px 36px"
   const maxAttendees = mobile ? 6 : 8
+  const bodyText = body ? body.replace(/\n+/g, " ") : null
 
-  return (
-    <div
-      style={{
-        background: "var(--cream-3)",
-        border: "1px solid var(--line)",
-        boxShadow: "inset 4px 0 0 var(--plum)",
-        borderRadius: "var(--r-callout)",
-        padding,
-        display: "flex",
-        flexDirection: "column",
-        gap: mobile ? 14 : 18,
-        ...style,
-      }}
-    >
-      {/* Eyebrow — plum for "Up Next", muted for "Latest" */}
-      <div style={labelAccent ? PLUM_EYEBROW : MUTED_EYEBROW}>{label}</div>
+  const cardBase: CSSProperties = {
+    background: "var(--cream-3)",
+    border: "1px solid var(--line)",
+    boxShadow: "inset 4px 0 0 var(--plum)",
+    borderRadius: "var(--r-callout)",
+    ...style,
+  }
 
-      {/* Title + body */}
-      <div>
-        <h2
+  // Eyebrow: plum dot + label (dot only shown for primary "Up Next" variant)
+  const eyebrow = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {labelAccent && (
+        <div
           style={{
-            fontFamily: "var(--serif)",
-            fontSize: titleSize,
-            fontWeight: 400,
-            letterSpacing: "-0.5px",
-            lineHeight: 1.05,
-            color: "var(--ink)",
-            margin: 0,
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "var(--plum)",
+            flexShrink: 0,
           }}
-        >
-          {title}
-        </h2>
-        {body && (
-          <p
-            className="line-clamp-3"
-            style={{
-              fontSize: 13,
-              color: "var(--body)",
-              marginTop: 10,
-              lineHeight: 1.55,
-            }}
-          >
-            {body}
-          </p>
+        />
+      )}
+      <div style={labelAccent ? PLUM_EYEBROW : MUTED_EYEBROW}>{label}</div>
+    </div>
+  )
+
+  // Action row — shared between mobile and desktop
+  const actions = (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <CentralButton variant="primary" onClick={onDetails}>
+          {isEvent ? "See details" : "See announcement"}
+        </CentralButton>
+        {isEvent && onRsvp && (
+          <CentralButton onClick={onRsvp} disabled={rsvping} variant="secondary">
+            {userHasRsvped ? "Going ✓" : "RSVP"}
+          </CentralButton>
+        )}
+        {isEvent && rsvpCount > 0 && (
+          <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>
+            {rsvpCount} going
+          </span>
         )}
       </div>
-
-      {/* Actions */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <CentralButton variant="primary" onClick={onDetails}>
-            {isEvent ? "See details" : "See announcement"}
-          </CentralButton>
-          {isEvent && onRsvp && (
-            <CentralButton
-              onClick={onRsvp}
-              disabled={rsvping}
-              variant="secondary"
+      {showAttendees && attendees.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+          {attendees.slice(0, maxAttendees).map((a) => (
+            <span
+              key={a.user_id}
+              style={{
+                fontSize: 11,
+                color: "var(--body)",
+                background: "var(--ivory)",
+                border: "1px solid var(--line)",
+                padding: "2px 9px",
+                borderRadius: 999,
+              }}
             >
-              {userHasRsvped ? "Going ✓" : "RSVP"}
-            </CentralButton>
-          )}
-          {isEvent && rsvpCount > 0 && (
-            <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>
-              {rsvpCount} going
+              {a.name.split(" ")[0]}
+            </span>
+          ))}
+          {attendees.length > maxAttendees && (
+            <span style={{ fontSize: 11, color: "var(--faint)", padding: "2px 4px" }}>
+              +{attendees.length - maxAttendees} more
             </span>
           )}
         </div>
+      )}
+    </div>
+  )
 
-        {showAttendees && attendees.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-            {attendees.slice(0, maxAttendees).map((a) => (
-              <span
-                key={a.user_id}
-                style={{
-                  fontSize: 11,
-                  color: "var(--body)",
-                  background: "var(--ivory)",
-                  border: "1px solid var(--line)",
-                  padding: "2px 9px",
-                  borderRadius: 999,
-                }}
-              >
-                {a.name.split(" ")[0]}
-              </span>
-            ))}
-            {attendees.length > maxAttendees && (
-              <span style={{ fontSize: 11, color: "var(--faint)", padding: "2px 4px" }}>
-                +{attendees.length - maxAttendees} more
-              </span>
-            )}
-          </div>
-        )}
+  // ── Mobile: single column ────────────────────────────────────────────────────
+  if (mobile) {
+    return (
+      <div style={{ ...cardBase, padding: "24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {eyebrow}
+        <div>
+          <h2
+            style={{
+              fontFamily: "var(--serif)",
+              fontSize: 34,
+              fontWeight: 400,
+              letterSpacing: "-0.5px",
+              lineHeight: 1.05,
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            {title}
+          </h2>
+          {bodyText && (
+            <p
+              className="line-clamp-3"
+              style={{ fontSize: 13, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}
+            >
+              {bodyText}
+            </p>
+          )}
+        </div>
+        {actions}
       </div>
+    )
+  }
+
+  // ── Desktop: two-column hero with plum divider ───────────────────────────────
+  return (
+    <div style={{ ...cardBase, padding: "36px 36px", display: "flex", alignItems: "stretch" }}>
+      {/* Left content column */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+        {eyebrow}
+        <div>
+          <h2
+            style={{
+              fontFamily: "var(--serif)",
+              fontSize: 44,
+              fontWeight: 400,
+              letterSpacing: "-0.5px",
+              lineHeight: 1.05,
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            {title}
+          </h2>
+          {bodyText && (
+            <p
+              className="line-clamp-3"
+              style={{ fontSize: 13, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}
+            >
+              {bodyText}
+            </p>
+          )}
+        </div>
+        {actions}
+      </div>
+
+      {/* Thin plum divider */}
+      <div
+        style={{
+          width: 1,
+          background: "var(--plum)",
+          opacity: 0.35,
+          margin: "0 36px",
+          flexShrink: 0,
+        }}
+      />
+
+      {/* Right rail — event detail placeholder until schema has date/time/location */}
+      <EventDetailPlaceholder />
     </div>
   )
 }

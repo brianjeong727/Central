@@ -55,3 +55,7 @@ export function audienceLabel(audience: string | null): string {
   if (audience === "group") return "Specific Group"
   return audience
 }
+
+export function previewBody(body: string): string {
+  return body.replace(/\s*\n+\s*/g, " ").trim()
+}

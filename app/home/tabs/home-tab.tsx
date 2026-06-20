@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
-import { getInitials } from "../utils"
+import { getInitials, previewBody } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip } from "@/components/central"
@@ -59,6 +60,7 @@ export function HomeTab({
   onResponded,
 }: HomeTabProps) {
   const supabase = createClient()
+  const router = useRouter()
 
   const [needsGradCheck, setNeedsGradCheck] = useState(profile.needs_grad_check ?? false)
 
@@ -388,7 +390,7 @@ export function HomeTab({
                 attendees={rsvpAttendees}
                 showAttendees={showAttendeeList}
                 onRsvp={handleHomeRsvp}
-                onDetails={onSeeAnnouncements}
+                onDetails={() => router.push(`/announcements/${heroAnn.id}`)}
               />
             ) : latestAnn ? (
               <UpNextCard
@@ -397,7 +399,7 @@ export function HomeTab({
                 title={latestAnn.title}
                 body={latestAnn.body}
                 isEvent={false}
-                onDetails={onSeeAnnouncements}
+                onDetails={() => router.push(`/announcements/${latestAnn.id}`)}
               />
             ) : (
               <CentralCard
@@ -615,12 +617,12 @@ export function HomeTab({
                           fontFamily: "var(--sans)",
                         }}
                       >
-                        {a.body}
+                        {previewBody(a.body)}
                       </p>
 
                       {/* View action — always at bottom */}
                       <button
-                        onClick={onSeeAnnouncements}
+                        onClick={() => router.push(`/announcements/${a.id}`)}
                         style={{
                           fontSize: 11,
                           color: "var(--muted-text)",
@@ -632,7 +634,7 @@ export function HomeTab({
                           fontFamily: "var(--sans)",
                         }}
                       >
-                        View →
+                        See announcement →
                       </button>
                     </CentralCard>
                   ))}
@@ -747,7 +749,7 @@ export function HomeTab({
                     attendees={rsvpAttendees}
                     showAttendees={showAttendeeList}
                     onRsvp={handleHomeRsvp}
-                    onDetails={onSeeAnnouncements}
+                    onDetails={() => router.push(`/announcements/${heroAnn.id}`)}
                     mobile
                   />
                 ) : latestAnn ? (
@@ -757,7 +759,7 @@ export function HomeTab({
                     title={latestAnn.title}
                     body={latestAnn.body}
                     isEvent={false}
-                    onDetails={onSeeAnnouncements}
+                    onDetails={() => router.push(`/announcements/${latestAnn.id}`)}
                     mobile
                   />
                 ) : (
@@ -925,29 +927,36 @@ export function HomeTab({
                             </CardTitle>
                           </div>
                           {a.is_event ? (
-                            <button
-                              onClick={() => handleForYouRsvp(a.id)}
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 500,
-                                padding: "5px 12px",
-                                borderRadius: 999,
-                                flexShrink: 0,
-                                border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
-                                background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
-                                color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
-                                cursor: "pointer",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
-                            </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                              <button
+                                onClick={() => handleForYouRsvp(a.id)}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  padding: "5px 12px",
+                                  borderRadius: 999,
+                                  border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
+                                  background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
+                                  color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
+                                  cursor: "pointer",
+                                  fontFamily: "var(--sans)",
+                                }}
+                              >
+                                {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
+                              </button>
+                              <button
+                                onClick={() => router.push(`/announcements/${a.id}`)}
+                                style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                              >
+                                View →
+                              </button>
+                            </div>
                           ) : (
                             <button
-                              onClick={onSeeAnnouncements}
+                              onClick={() => router.push(`/announcements/${a.id}`)}
                               style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
                             >
-                              View →
+                              See →
                             </button>
                           )}
                         </div>
@@ -956,7 +965,7 @@ export function HomeTab({
                             className="line-clamp-2"
                             style={{ marginTop: 6, fontSize: 12, color: "var(--body)", lineHeight: 1.5, fontFamily: "var(--sans)" }}
                           >
-                            {a.body}
+                            {previewBody(a.body)}
                           </p>
                         )}
                       </CentralCard>
