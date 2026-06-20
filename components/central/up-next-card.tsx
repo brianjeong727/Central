@@ -53,14 +53,17 @@ export function UpNextCard({
   style,
 }: UpNextCardProps) {
   const titleSize = mobile ? 34 : 44
-  const padding = mobile ? "24px 24px" : "28px 32px"
+  const padding = mobile ? "24px 24px" : "36px 36px"
   const maxAttendees = mobile ? 6 : 8
 
   return (
     <div
       style={{
         background: "var(--cream-3)",
-        border: "1px solid var(--line)",
+        borderTop: "2px solid var(--plum)",
+        borderLeft: "1px solid var(--line)",
+        borderRight: "1px solid var(--line)",
+        borderBottom: "1px solid var(--line)",
         borderRadius: "var(--r-callout)",
         padding,
         display: "flex",
@@ -105,18 +108,18 @@ export function UpNextCard({
       {/* Actions */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <CentralButton variant="primary" onClick={onDetails}>
+            {isEvent ? "See details" : "See announcement"}
+          </CentralButton>
           {isEvent && onRsvp && (
             <CentralButton
               onClick={onRsvp}
               disabled={rsvping}
-              variant={userHasRsvped ? "secondary" : "primary"}
+              variant="secondary"
             >
               {userHasRsvped ? "Going ✓" : "RSVP"}
             </CentralButton>
           )}
-          <CentralButton variant="secondary" onClick={onDetails}>
-            {isEvent ? "Details" : "See announcement"}
-          </CentralButton>
           {isEvent && rsvpCount > 0 && (
             <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>
               {rsvpCount} going

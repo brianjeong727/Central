@@ -374,8 +374,8 @@ export function HomeTab({
             style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
           >
 
-            {/* Up Next + Chats — 1.5fr 1fr grid */}
-            <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr", gap: "var(--space-8)", alignItems: "start" }}>
+            {/* Up Next + Chats — 2fr 1fr: Up Next is dominant primary */}
+            <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", gap: "var(--space-8)", alignItems: "start" }}>
 
               {/* Up Next card */}
               {heroAnn ? (
@@ -435,7 +435,7 @@ export function HomeTab({
               >
                 <div
                   style={{
-                    padding: "14px 18px",
+                    padding: "10px 18px",
                     borderBottom: "1px solid var(--line)",
                     display: "flex",
                     alignItems: "center",
@@ -465,7 +465,7 @@ export function HomeTab({
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
-                        padding: "12px 18px",
+                        padding: "10px 18px",
                         textAlign: "left",
                         background: "none",
                         border: "none",
@@ -516,7 +516,7 @@ export function HomeTab({
                 <button
                   onClick={onSeeChats}
                   style={{
-                    padding: "12px 18px",
+                    padding: "10px 18px",
                     marginTop: "auto",
                     border: "none",
                     borderTop: "1px solid var(--line)",
