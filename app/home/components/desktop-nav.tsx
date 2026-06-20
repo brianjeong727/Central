@@ -112,6 +112,18 @@ export function DesktopSidebar({
     transition: "background 100ms ease",
   })
 
+  function getSectionName(): string {
+    switch (activeTab) {
+      case "chats":        return "Messages"
+      case "plan":         return "Planning"
+      case "directory":    return "People"
+      case "giving":       return "Finance"
+      case "congregation": return "Congregation"
+      case "profile":      return profileSection === "journal" ? "Journal" : "Profile"
+      default:             return "Home"
+    }
+  }
+
   function renderPanelBody() {
     // ── Chats: recent chat list ──────────────────────────────────────────────
     if (activeTab === "chats") {
@@ -233,8 +245,7 @@ export function DesktopSidebar({
       ]
       const visible = financeSections.filter(s => s.show)
       return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...MONO, padding: "8px 8px 6px" }}>Finance</p>
+        <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
           {visible.map(s => (
             <button
               key={s.section}
@@ -257,8 +268,7 @@ export function DesktopSidebar({
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
-        <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...MONO, padding: "8px 8px 6px" }}>You</p>
+        <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
           {items.map((s, i) => (
             <button
               key={i}
@@ -295,8 +305,7 @@ export function DesktopSidebar({
     const restrictedItems = homeItems.filter(i => (restrictedTabs as readonly string[]).includes(i.tab))
 
     return (
-      <div className="flex-1 overflow-y-auto px-2 pb-3">
-        <p style={{ ...MONO, padding: "8px 8px 6px" }}>Home</p>
+      <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
         {generalItems.map(item => (
           <button key={item.tab} style={subItemStyle(activeTab === item.tab)} onClick={() => onTabChange(item.tab)}>
             <span style={{ flex: 1 }}>{item.label}</span>
@@ -304,7 +313,7 @@ export function DesktopSidebar({
         ))}
         {restrictedItems.length > 0 && (
           <>
-            <div style={{ height: 1, background: LINE, margin: "4px 8px" }} />
+            <div style={{ height: 1, background: LINE, opacity: 0.5, margin: "6px 10px" }} />
             {restrictedItems.map(item => (
               <button key={item.tab} style={subItemStyle(activeTab === item.tab)} onClick={() => onTabChange(item.tab)}>
                 <span style={{ flex: 1 }}>{item.label}</span>
@@ -424,11 +433,11 @@ export function DesktopSidebar({
         className={`hidden flex-col w-[220px] flex-shrink-0 h-screen ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}
         style={{ background: PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
-        {/* Workspace header */}
-        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${LINE}`, flexShrink: 0 }}>
-          <p style={MONO}>Workspace</p>
+        {/* Section header */}
+        <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
+          <p style={MONO}>Section</p>
           <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
-            {ministryName}
+            {getSectionName()}
           </p>
         </div>
 
