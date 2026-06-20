@@ -334,10 +334,10 @@ export function HomeTab({
 
           {/* Desktop: hero header */}
           <div
-            className="hidden md:flex items-end justify-between px-14"
+            className="hidden md:flex items-center justify-between px-14"
             style={{
-              paddingTop: "var(--space-10)",
-              paddingBottom: "var(--space-7)",
+              paddingTop: "var(--space-8)",
+              paddingBottom: "var(--space-8)",
               gap: "var(--space-8)",
             }}
           >
@@ -358,8 +358,8 @@ export function HomeTab({
               </span>
             </PageTitle>
 
-            {/* Stat cards row */}
-            <div className="flex gap-4 pb-1.5">
+            {/* Stat cards row — centered against the greeting text block */}
+            <div className="flex gap-4">
               <StatCard eyebrow="Events" value={eventCount} sub="upcoming" valueSize={32} />
               <StatCard eyebrow="Unread" value={totalUnread} sub="messages" valueSize={32} />
               {isLeaderOrAdmin && memberCount !== null && (
