@@ -329,6 +329,9 @@ export function HomeTab({
         <>
           {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
 
+          {/* Hairline below breadcrumb, above greeting */}
+          <div className="hidden md:block"><InsetHairline /></div>
+
           {/* Desktop: hero header */}
           <div
             className="hidden md:flex items-end justify-between px-14"

@@ -33,7 +33,7 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   return (
     <div
       className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0"
-      style={{ background: PANEL_BG, borderBottom: `1px solid ${LINE}` }}
+      style={{ background: "transparent" }}
     >
       <div className="flex items-center gap-1.5 text-[12px]">
         {crumbs.map((c, i) => (
