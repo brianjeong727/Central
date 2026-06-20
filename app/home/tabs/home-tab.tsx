@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Bell, MessageCircle, Calendar } from "lucide-react"
+import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle } from "@/components/central"
+import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
@@ -374,167 +374,65 @@ export function HomeTab({
             style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
           >
 
-            {/* Up Next + Chats — 2fr 1fr: Up Next is dominant primary */}
-            <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", gap: "var(--space-8)", alignItems: "start" }}>
-
-              {/* Up Next card */}
-              {heroAnn ? (
-                <UpNextCard
-                  label="Up next"
-                  labelAccent
-                  title={heroAnn.title}
-                  body={heroAnn.body}
-                  isEvent={heroAnn.is_event}
-                  userHasRsvped={userHasRsvped}
-                  rsvping={rsvping}
-                  rsvpCount={rsvpCount}
-                  attendees={rsvpAttendees}
-                  showAttendees={showAttendeeList}
-                  onRsvp={handleHomeRsvp}
-                  onDetails={onSeeAnnouncements}
-                />
-              ) : latestAnn ? (
-                <UpNextCard
-                  label="Latest"
-                  labelAccent={false}
-                  title={latestAnn.title}
-                  body={latestAnn.body}
-                  isEvent={false}
-                  onDetails={onSeeAnnouncements}
-                />
-              ) : (
-                <CentralCard
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    minHeight: 290,
-                    textAlign: "center",
-                  }}
-                  padding="40px 32px"
-                >
-                  <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
-                  <div>
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>No upcoming events</p>
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
-                      Check the announcements tab for updates.
-                    </p>
-                  </div>
-                  <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
-                    See announcements
-                  </CentralButton>
-                </CentralCard>
-              )}
-
-              {/* Recent chats */}
+            {/* Up Next — full-width hero */}
+            {heroAnn ? (
+              <UpNextCard
+                label="Up next"
+                labelAccent
+                title={heroAnn.title}
+                body={heroAnn.body}
+                isEvent={heroAnn.is_event}
+                userHasRsvped={userHasRsvped}
+                rsvping={rsvping}
+                rsvpCount={rsvpCount}
+                attendees={rsvpAttendees}
+                showAttendees={showAttendeeList}
+                onRsvp={handleHomeRsvp}
+                onDetails={onSeeAnnouncements}
+              />
+            ) : latestAnn ? (
+              <UpNextCard
+                label="Latest"
+                labelAccent={false}
+                title={latestAnn.title}
+                body={latestAnn.body}
+                isEvent={false}
+                onDetails={onSeeAnnouncements}
+              />
+            ) : (
               <CentralCard
-                padding={0}
-                style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 12,
+                  minHeight: 220,
+                  textAlign: "center",
+                }}
+                padding="40px 32px"
               >
-                <div
-                  style={{
-                    padding: "10px 18px",
-                    borderBottom: "1px solid var(--line)",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <div style={EYEBROW}>Your chats</div>
-                  <span style={{ flex: 1 }} />
-                  {totalUnread > 0 && (
-                    <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{totalUnread} unread</span>
-                  )}
+                <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>No upcoming events</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
+                    Check the announcements tab for updates.
+                  </p>
                 </div>
-
-                {top3.length === 0 ? (
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 0" }}>
-                    <div style={{ textAlign: "center" }}>
-                      <MessageCircle style={{ width: 24, height: 24, color: "var(--dashed)", margin: "0 auto 8px" }} />
-                      <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No chats yet</p>
-                    </div>
-                  </div>
-                ) : (
-                  top3.map((c, i) => (
-                    <button
-                      key={c.id}
-                      onClick={() => onOpenChat(c.id, c.groupName)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "10px 18px",
-                        textAlign: "left",
-                        background: "none",
-                        border: "none",
-                        borderTop: i ? "1px solid var(--line-3)" : "none",
-                        cursor: "pointer",
-                        transition: "background 100ms ease",
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "var(--ivory)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "none")}
-                    >
-                      <div
-                        style={{
-                          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                          background: i === 0 ? "var(--plum)" : "var(--ink)",
-                          display: "grid", placeItems: "center",
-                          fontSize: 11, fontWeight: 600, color: "var(--cream)",
-                          fontFamily: "var(--sans)",
-                        }}
-                      >
-                        {c.initials}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                          <span style={{ fontSize: 13, fontWeight: c.unreadCount ? 600 : 500, color: "var(--ink)", fontFamily: "var(--sans)" }}>
-                            {c.groupName}
-                          </span>
-                          {c.time && (
-                            <span style={{ fontSize: 10, color: "var(--faint)", flexShrink: 0, fontFamily: "var(--sans)" }}>
-                              {c.time}
-                            </span>
-                          )}
-                        </div>
-                        {c.lastMessage && (
-                          <p style={{ fontSize: 12, color: "var(--body)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)" }}>
-                            {c.lastMessage}
-                          </p>
-                        )}
-                      </div>
-                      {c.unreadCount > 0 && (
-                        <span style={{ background: "var(--plum)", color: "var(--cream)", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, fontFamily: "var(--sans)" }}>
-                          {c.unreadCount}
-                        </span>
-                      )}
-                    </button>
-                  ))
-                )}
-
-                <button
-                  onClick={onSeeChats}
-                  style={{
-                    padding: "10px 18px",
-                    marginTop: "auto",
-                    border: "none",
-                    borderTop: "1px solid var(--line)",
-                    fontSize: 12,
-                    color: "var(--muted-text)",
-                    background: "none",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontFamily: "var(--sans)",
-                    transition: "color 120ms ease",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = "var(--ink)")}
-                  onMouseLeave={e => (e.currentTarget.style.color = "var(--muted-text)")}
-                >
-                  See all chats →
-                </button>
+                <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
+                  See announcements
+                </CentralButton>
               </CentralCard>
-            </div>
+            )}
+
+            {/* Your chats — horizontal strip below hero */}
+            <ChatStrip
+              chats={top3}
+              totalUnread={totalUnread}
+              onOpenChat={onOpenChat}
+              onSeeAll={onSeeChats}
+              style={{ marginTop: "var(--space-8)" }}
+            />
 
             {/* ── Pastor Pulse — desktop ── */}
             {activeQuestion && !hasResponded && !isPastorRole && (

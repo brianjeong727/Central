@@ -60,10 +60,8 @@ export function UpNextCard({
     <div
       style={{
         background: "var(--cream-3)",
-        borderTop: "2px solid var(--plum)",
-        borderLeft: "1px solid var(--line)",
-        borderRight: "1px solid var(--line)",
-        borderBottom: "1px solid var(--line)",
+        border: "1px solid var(--line)",
+        boxShadow: "inset 4px 0 0 var(--plum)",
         borderRadius: "var(--r-callout)",
         padding,
         display: "flex",
