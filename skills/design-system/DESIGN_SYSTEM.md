@@ -37,7 +37,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
 | `--body-bg`     | `#F4F1E8` | Desktop body surface + context sidebar — one continuous field |
-| `--ivory`       | `#F1ECDE` | Icon rail bg (distinctly darker step), active sidebar item, soft-pill background |
+| `--ivory`       | `#F1ECDE` | Icon rail bg (distinctly darker step), active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) — the one surface that needs to lead the column |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
 | `--line`        | `#E8E2D2` | Primary hairline |
 | `--line-2`      | `#E2DDCF` | Card border, input border |

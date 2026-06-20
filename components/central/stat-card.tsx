@@ -17,6 +17,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ eyebrow, value, sub, valueSize = 36, style }: StatCardProps) {
+  const isZero = value === 0 || value === "0"
   return (
     <div
       style={{
@@ -33,7 +34,7 @@ export function StatCard({ eyebrow, value, sub, valueSize = 36, style }: StatCar
           fontFamily: "var(--serif)",
           fontSize: valueSize,
           marginTop: 8,
-          color: "var(--ink)",
+          color: isZero ? "var(--faint)" : "var(--ink)",
           letterSpacing: "-0.5px",
           lineHeight: 1,
         }}

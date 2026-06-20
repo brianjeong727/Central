@@ -20,26 +20,24 @@ const MUTED_EYEBROW: CSSProperties = {
   textTransform: "uppercase",
 }
 
-// TODO: Replace with real EventDetailRail when schema gains date / time / location fields.
-// At that point, wire in: event_date (ISO string), event_time (string), location (string).
+// B · Emphasis: solid cream inset (not dashed) — DS §4.18 reserves dashed for
+// ACTIONABLE empty states with a +; this passive "not set yet" reads calmer solid.
 function EventDetailPlaceholder() {
   return (
     <div
       style={{
-        flex: "0 0 30%",
-        minWidth: 160,
+        background: "var(--cream)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-input)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        border: "1.5px dashed var(--dashed)",
-        borderRadius: "var(--r-input)",
-        padding: "28px 20px",
         textAlign: "center",
+        padding: "28px 20px",
       }}
     >
-      <CalendarDays style={{ width: 20, height: 20, color: "var(--dashed)" }} />
+      <CalendarDays style={{ width: 26, height: 26, color: "var(--faint)", marginBottom: 14 }} />
       <div
         style={{
           fontFamily: "var(--mono)",
@@ -47,11 +45,12 @@ function EventDetailPlaceholder() {
           letterSpacing: "1.2px",
           color: "var(--muted-text)",
           textTransform: "uppercase",
+          marginBottom: 12,
         }}
       >
-        Event details
+        Event Details
       </div>
-      <div style={{ fontSize: 12, color: "var(--body)", lineHeight: 1.4 }}>
+      <div style={{ fontSize: 14, color: "var(--faint)", lineHeight: 1.5 }}>
         No date, time, or
         <br />
         location set yet
@@ -96,14 +95,15 @@ export function UpNextCard({
   const maxAttendees = mobile ? 6 : 8
   const bodyText = body ? body.replace(/\n+/g, " ") : null
 
+  // B · Emphasis: --ivory as the single emphasized surface; --line-2 border to
+  // complement the warmer/slightly-darker card bg (DS soft-callout pattern).
   const cardBase: CSSProperties = {
-    background: "var(--cream-3)",
-    border: "1px solid var(--line)",
+    background: "var(--ivory)",
+    border: "1px solid var(--line-2)",
     borderRadius: "var(--r-callout)",
     ...style,
   }
 
-  // Eyebrow: plum dot + label (dot only shown for primary "Up Next" variant)
   const eyebrow = (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {labelAccent && (
@@ -121,7 +121,6 @@ export function UpNextCard({
     </div>
   )
 
-  // Action row — shared between mobile and desktop
   const actions = (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -199,20 +198,31 @@ export function UpNextCard({
     )
   }
 
-  // ── Desktop: two-column hero with plum divider ───────────────────────────────
+  // ── Desktop: B · Emphasis — two-column grid 1.95fr 1fr ──────────────────────
+  // Title at 36px steps clearly below the greeting H1 (52px) so both serif
+  // moments are distinct and neither competes for dominance.
   return (
-    <div style={{ ...cardBase, padding: "40px 40px", display: "flex", alignItems: "stretch" }}>
+    <div
+      style={{
+        ...cardBase,
+        padding: "36px 40px",
+        display: "grid",
+        gridTemplateColumns: "1.95fr 1fr",
+        gap: "40px",
+        alignItems: "stretch",
+      }}
+    >
       {/* Left content column */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 22 }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
         {eyebrow}
-        <div>
+        <div style={{ marginTop: 18 }}>
           <h2
             style={{
               fontFamily: "var(--serif)",
-              fontSize: 60,
+              fontSize: 36,
               fontWeight: 400,
-              letterSpacing: "-0.5px",
-              lineHeight: 1.02,
+              letterSpacing: "-0.01em",
+              lineHeight: 1.04,
               color: "var(--ink)",
               margin: 0,
             }}
@@ -222,27 +232,18 @@ export function UpNextCard({
           {bodyText && (
             <p
               className="line-clamp-2"
-              style={{ fontSize: 13, color: "var(--body)", marginTop: 14, lineHeight: 1.55 }}
+              style={{ fontSize: 15, color: "var(--body)", marginTop: 12, lineHeight: 1.6 }}
             >
               {bodyText}
             </p>
           )}
         </div>
-        {actions}
+        <div style={{ marginTop: "auto", paddingTop: 28 }}>
+          {actions}
+        </div>
       </div>
 
-      {/* Thin plum divider */}
-      <div
-        style={{
-          width: 1,
-          background: "var(--plum)",
-          opacity: 0.35,
-          margin: "0 36px",
-          flexShrink: 0,
-        }}
-      />
-
-      {/* Right rail — event detail placeholder until schema has date/time/location */}
+      {/* Right: event detail slot — cream bg so it reads lighter than the ivory card */}
       <EventDetailPlaceholder />
     </div>
   )
