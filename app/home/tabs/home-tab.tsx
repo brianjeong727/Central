@@ -333,8 +333,13 @@ export function HomeTab({
 
           {/* Desktop: hero header */}
           <div
-            className="hidden md:flex items-end justify-between px-14 pt-11 pb-9"
-            style={{ gap: 24, borderBottom: "1px solid var(--line)" }}
+            className="hidden md:flex items-end justify-between px-14"
+            style={{
+              paddingTop: "var(--space-10)",
+              paddingBottom: "var(--space-7)",
+              gap: "var(--space-8)",
+              borderBottom: "1px solid var(--line)",
+            }}
           >
             <PageTitle eyebrow={dateLabel} title={greeting} style={{ maxWidth: 640 }}>
               <span
@@ -364,10 +369,13 @@ export function HomeTab({
           </div>
 
           {/* Desktop: main content */}
-          <div className="hidden md:block px-14 py-7">
+          <div
+            className="hidden md:block px-14"
+            style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
+          >
 
             {/* Up Next + Chats — 1.5fr 1fr grid */}
-            <div className="grid gap-5" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+            <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr", gap: "var(--space-8)", alignItems: "start" }}>
 
               {/* Up Next card */}
               {heroAnn ? (
@@ -649,12 +657,11 @@ export function HomeTab({
                   style={{ marginBottom: 18 }}
                 />
 
-                <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+                <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-6)" }}>
                   {forYouItems.map((a) => (
                     <CentralCard
                       key={a.id}
                       style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                      padding={20}
                     >
                       {/* Type badge + RSVP */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -762,11 +769,11 @@ export function HomeTab({
             {homeVerse && (
               <CentralCard
                 style={{
-                  marginTop: 24,
+                  marginTop: "var(--space-8)",
                   display: "grid",
                   gridTemplateColumns: "1fr 2fr",
                   alignItems: "center",
-                  gap: 32,
+                  gap: "var(--space-9)",
                 }}
                 padding="22px 28px"
               >
@@ -786,7 +793,7 @@ export function HomeTab({
           <div className="md:hidden px-5 pb-4">
 
             {/* Mobile greeting header */}
-            <PageTitle eyebrow={dateLabel} title={greeting} titleSize={34} style={{ marginBottom: 24 }}>
+            <PageTitle eyebrow={dateLabel} title={greeting} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                 <span
                   style={{
@@ -813,7 +820,7 @@ export function HomeTab({
               </div>
             </PageTitle>
 
-            <div className="flex flex-col gap-8">
+            <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
 
               {/* ── Up Next — mobile ── */}
               <section>

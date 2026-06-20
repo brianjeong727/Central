@@ -65,16 +65,15 @@ export function UpNextCard({
         padding,
         display: "flex",
         flexDirection: "column",
-        gap: mobile ? 16 : 20,
-        minHeight: mobile ? "auto" : 290,
+        gap: mobile ? 14 : 18,
         ...style,
       }}
     >
       {/* Eyebrow — plum for "Up Next", muted for "Latest" */}
       <div style={labelAccent ? PLUM_EYEBROW : MUTED_EYEBROW}>{label}</div>
 
-      {/* Title + body — grows to fill space */}
-      <div style={{ flex: 1 }}>
+      {/* Title + body */}
+      <div>
         <h2
           style={{
             fontFamily: "var(--serif)",
