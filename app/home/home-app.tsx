@@ -423,7 +423,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
-    <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--body-bg)]">
+    <div className="relative min-h-screen bg-white max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-white">
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
@@ -494,7 +494,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           {activeTab === "chats" && (
             <div className="md:flex md:h-full md:overflow-hidden">
               {/* Left: chat list */}
-              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[var(--line)] md:overflow-y-auto md:h-full md:bg-[var(--cream)]">
+              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[var(--line)] md:overflow-y-auto md:h-full md:bg-white">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}
@@ -527,7 +527,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   />
                 </div>
               ) : (
-                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[var(--cream)]">
+                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-white">
                   <div className="text-center">
                     <MessageCircle className="w-10 h-10 text-[var(--line)] mx-auto mb-3" />
                     <p className="text-[14px] font-semibold text-[var(--muted-text)]">Select a chat</p>
