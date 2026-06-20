@@ -1459,110 +1459,147 @@ export function AnnouncementDetailView({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
 
-  return (
-    <>
-      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]" style={{ overflowY: "auto" }}>
-        {/* Sticky header */}
-        <div style={{
-          position: "sticky", top: 0, zIndex: 10, background: "#FBF8F2",
-          borderBottom: "1px solid #E8E2D2", flexShrink: 0,
-          padding: "max(env(safe-area-inset-top), 48px) 20px 14px",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
-          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-            <ArrowLeft style={{ width: 15, height: 15, color: "#3E1540" }} />
-          </button>
-          <span style={DETAIL_MONO}>Announcement</span>
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  function DetailContent() {
+    if (loading) return (
+      <div className="flex-1 flex items-center justify-center">
+        <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #E8E2D2", borderTopColor: "#3E1540", animation: "spin 0.7s linear infinite" }} />
+      </div>
+    )
+    if (!ann) return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <p className="text-[15px] font-medium text-[#13101A]">Announcement not found.</p>
+        <button onClick={onClose} className="text-[13px] text-[#5A5466] bg-transparent border-none cursor-pointer">← Close</button>
+      </div>
+    )
+    return (
+      <>
+        {/* ── Mobile: single scrollable column (matches edit modal mobile layout) ── */}
+        <div className="md:hidden flex-1 overflow-y-auto min-h-0">
+          {ann.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={ann.image_url} alt={ann.title} className="w-full h-48 object-cover" />
+          )}
+          <div className="px-5 py-5 flex flex-col gap-5">
+            {/* Eyebrow */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span style={monoStyle}>{formatDate(ann.created_at)}</span>
+              {ann.audience && ann.audience !== "all" && (
+                <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+              )}
+              {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
+            </div>
+            {/* Serif title */}
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#13101A", margin: 0 }}>{ann.title}</h1>
+            {/* Body — newlines preserved */}
+            <div style={{ fontFamily: DETAIL_SERIF, fontSize: 16, lineHeight: 1.7, color: "#2D2836", whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            {/* Divider + stats */}
+            <div style={{ height: 1, background: "#E8E2D2" }} />
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+              {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
+            </div>
+            {/* RSVP */}
+            {ann.is_event && (
+              <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+              </button>
+            )}
+            {/* Attendees */}
+            {showAttendees && (
+              <div>
+                <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+                </div>
+              </div>
+            )}
+            {/* Form */}
+            {ann.has_form && (
+              ann.user_has_responded
+                ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
+                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+            )}
+          </div>
         </div>
 
-        {loading ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #E8E2D2", borderTopColor: "#3E1540", animation: "spin 0.7s linear infinite" }} />
-          </div>
-        ) : !ann ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-            <p style={{ fontSize: 15, color: "#13101A", fontWeight: 500, fontFamily: DETAIL_SANS }}>Announcement not found.</p>
-            <button onClick={onClose} style={{ fontSize: 13, color: "#5A5466", background: "none", border: "none", cursor: "pointer", fontFamily: DETAIL_SANS }}>← Go back</button>
-          </div>
-        ) : (
-          <div style={{ maxWidth: 680, margin: "0 auto", width: "100%", paddingBottom: 80 }}>
-            {ann.image_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ann.image_url} alt={ann.title} style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }} />
-            )}
-            <div style={{ padding: "28px 24px 0" }}>
+        {/* ── Desktop: full-width reading column (mirrors edit modal writing surface) ── */}
+        <div className="hidden md:flex flex-1 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto flex flex-col px-10 pt-8 pb-8">
+              {/* Image */}
+              {ann.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ann.image_url} alt={ann.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 12, marginBottom: 28, flexShrink: 0 }} />
+              )}
               {/* Eyebrow */}
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, ...DETAIL_MONO }}>
-                  <Calendar style={{ width: 11, height: 11 }} />
-                  <span>{formatDate(ann.created_at)}</span>
-                </div>
+              <div className="flex flex-wrap items-center gap-2.5 mb-3">
+                <span style={monoStyle}>{formatDate(ann.created_at)}</span>
                 {ann.audience && ann.audience !== "all" && (
-                  <span style={{ ...DETAIL_MONO, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+                  <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
                 )}
-                {ann.is_pinned && <span style={{ ...DETAIL_MONO, color: "#3E1540" }}>📌 Pinned</span>}
+                {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
               </div>
-
-              {/* Title */}
-              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: "clamp(28px, 5vw, 38px)", lineHeight: 1.08, letterSpacing: "-0.02em", color: "#13101A", margin: "0 0 20px" }}>
-                {ann.title}
-              </h1>
-
-              {/* Body — full reading-room view, newlines preserved */}
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 17, fontWeight: 400, lineHeight: 1.75, color: "#2D2836", marginBottom: 28, whiteSpace: "pre-wrap" }}>
-                {ann.body}
-              </div>
-
+              {/* Serif title — same sizing as edit modal's title input (40px) */}
+              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "#13101A", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid #E2DDCF", flexShrink: 0 }}>{ann.title}</h1>
+              {/* Body — serif 19px, newlines preserved (matches edit modal body textarea) */}
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "#13101A", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
               {/* Stats */}
-              <div style={{ display: "flex", alignItems: "center", gap: 18, paddingBottom: 24, borderBottom: "1px solid #E8E2D2", marginBottom: 24 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#8A8497" }}>
-                  <Eye style={{ width: 12, height: 12 }} />{ann.view_count} views
-                </span>
-                {ann.is_event && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#8A8497" }}>
-                    <Users style={{ width: 12, height: 12 }} />{ann.rsvp_count} going
-                  </span>
-                )}
+              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #E8E2D2", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+                {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
               </div>
-
               {/* RSVP */}
               {ann.is_event && (
-                <div style={{ marginBottom: 24 }}>
-                  <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px 22px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
-                    {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />You&apos;re going — tap to undo</> : "RSVP"}
+                <div style={{ marginTop: 20 }}>
+                  <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                    {ann.user_has_rsvped ? <><Check style={{ width: 14, height: 14 }} />Going — click to undo</> : "RSVP"}
                   </button>
                 </div>
               )}
-
               {/* Attendees */}
               {showAttendees && (
-                <div style={{ marginBottom: 24 }}>
-                  <p style={{ ...DETAIL_MONO, marginBottom: 10 }}>Going · {ann.rsvp_count}</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {ann.rsvp_attendees.map((a) => (
-                      <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                    ))}
+                <div style={{ marginTop: 20 }}>
+                  <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
                   </div>
                 </div>
               )}
-
               {/* Form */}
               {ann.has_form && (
-                <div style={{ marginBottom: 24 }}>
-                  {ann.user_has_responded ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#5B7A6C", fontWeight: 500 }}>
-                      <FileText style={{ width: 13, height: 13 }} />Form submitted
-                    </span>
-                  ) : (
-                    <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                      <FileText style={{ width: 13, height: 13 }} />Fill out form →
-                    </button>
-                  )}
+                <div style={{ marginTop: 20 }}>
+                  {ann.user_has_responded
+                    ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
+                    : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+                  }
                 </div>
               )}
             </div>
           </div>
-        )}
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {/* Exact same shell as CreateAnnouncementModal */}
+      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+        {/* Header — mirrors CreateAnnouncementModal: mono label left, close right, border-b */}
+        <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
+          <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
+            <p style={monoStyle}>Announcement</p>
+            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <X className="w-3.5 h-3.5 text-[#5A5466]" />
+            </button>
+          </div>
+        </div>
+        <DetailContent />
       </AnimateIn>
 
       {formFillOpen && ann?.form_id && (
