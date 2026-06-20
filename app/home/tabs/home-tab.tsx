@@ -366,6 +366,9 @@ export function HomeTab({
             </div>
           </div>
 
+          {/* Hairline divider between greeting block and body */}
+          <div className="hidden md:block" style={{ height: 1, background: "var(--line)", margin: "0 0" }} />
+
           {/* Desktop: main content */}
           <div
             className="hidden md:block px-14"
