@@ -17,7 +17,7 @@ import { DesktopSidebar } from "./components/desktop-nav"
 
 // Tabs
 import { HomeTab } from "./tabs/home-tab"
-import { AnnouncementsTab } from "./tabs/announcements-tab"
+import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
 import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
@@ -53,6 +53,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("tab", tab)
   }
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(null)
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -443,6 +444,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onSeeAnnouncements={() => setActiveTab("announcements")}
                 onOpenChat={handleOpenChat}
                 onGoToProfile={() => setActiveTab("profile")}
+                onOpenAnnouncement={(id) => setOpenAnnouncementId(id)}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -453,7 +455,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => router.push(`/announcements/${id}`)} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => setOpenAnnouncementId(id)} />
             </div>
           )}
 
@@ -632,6 +634,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           onClose={handleChatClose}
           onRead={recountTotalUnread}
           onNameChange={handleChatNameChange}
+        />
+      )}
+
+      {openAnnouncementId && (
+        <AnnouncementDetailView
+          announcementId={openAnnouncementId}
+          userId={userId}
+          ministryId={ministryId}
+          userRole={initialProfile.role}
+          userName={initialProfile.name}
+          onClose={() => setOpenAnnouncementId(null)}
         />
       )}
 

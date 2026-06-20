@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -54,13 +53,13 @@ export function HomeTab({
   onSeeAnnouncements,
   onOpenChat,
   onGoToProfile,
+  onOpenAnnouncement,
   avatarUrl,
   activeQuestion,
   hasResponded,
   onResponded,
 }: HomeTabProps) {
   const supabase = createClient()
-  const router = useRouter()
 
   const [needsGradCheck, setNeedsGradCheck] = useState(profile.needs_grad_check ?? false)
 
@@ -390,7 +389,7 @@ export function HomeTab({
                 attendees={rsvpAttendees}
                 showAttendees={showAttendeeList}
                 onRsvp={handleHomeRsvp}
-                onDetails={() => router.push(`/announcements/${heroAnn.id}`)}
+                onDetails={() => onOpenAnnouncement(heroAnn.id)}
               />
             ) : latestAnn ? (
               <UpNextCard
@@ -399,7 +398,7 @@ export function HomeTab({
                 title={latestAnn.title}
                 body={latestAnn.body}
                 isEvent={false}
-                onDetails={() => router.push(`/announcements/${latestAnn.id}`)}
+                onDetails={() => onOpenAnnouncement(latestAnn.id)}
               />
             ) : (
               <CentralCard
@@ -622,7 +621,7 @@ export function HomeTab({
 
                       {/* View action — always at bottom */}
                       <button
-                        onClick={() => router.push(`/announcements/${a.id}`)}
+                        onClick={() => onOpenAnnouncement(a.id)}
                         style={{
                           fontSize: 11,
                           color: "var(--muted-text)",
@@ -749,7 +748,7 @@ export function HomeTab({
                     attendees={rsvpAttendees}
                     showAttendees={showAttendeeList}
                     onRsvp={handleHomeRsvp}
-                    onDetails={() => router.push(`/announcements/${heroAnn.id}`)}
+                    onDetails={() => onOpenAnnouncement(heroAnn.id)}
                     mobile
                   />
                 ) : latestAnn ? (
@@ -759,7 +758,7 @@ export function HomeTab({
                     title={latestAnn.title}
                     body={latestAnn.body}
                     isEvent={false}
-                    onDetails={() => router.push(`/announcements/${latestAnn.id}`)}
+                    onDetails={() => onOpenAnnouncement(latestAnn.id)}
                     mobile
                   />
                 ) : (
@@ -945,7 +944,7 @@ export function HomeTab({
                                 {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
                               </button>
                               <button
-                                onClick={() => router.push(`/announcements/${a.id}`)}
+                                onClick={() => onOpenAnnouncement(a.id)}
                                 style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
                               >
                                 View →
@@ -953,7 +952,7 @@ export function HomeTab({
                             </div>
                           ) : (
                             <button
-                              onClick={() => router.push(`/announcements/${a.id}`)}
+                              onClick={() => onOpenAnnouncement(a.id)}
                               style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
                             >
                               See →

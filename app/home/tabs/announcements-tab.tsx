@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users } from "lucide-react"
+import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
@@ -661,9 +660,8 @@ function InlineEditFields({
 
 // ── Announcements Tab ────────────────────────────────────────────────────────
 
-export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
+export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const router = useRouter()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -920,6 +918,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 onPinToggle={handlePinToggle}
                 onSubPinToggle={handleSubPinToggle}
                 onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
+                onOpenDetail={onOpenAnnouncement}
               />
             ))}
           </div>
@@ -982,7 +981,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
                       </div>
                       <div
-                        onClick={() => router.push(`/announcements/${ann.id}`)}
+                        onClick={() => onOpenAnnouncement(ann.id)}
                         style={{ cursor: "pointer" }}
                         title="See announcement"
                       >
@@ -991,7 +990,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       </div>
                       <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
                       <div className="flex justify-end items-center gap-1.5">
-                        <button onClick={() => router.push(`/announcements/${ann.id}`)} style={{ fontSize: "11px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[#3E1540] transition-colors">See →</button>
+                        <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[#3E1540] transition-colors">See →</button>
                         {ann.is_event && (
                           <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
@@ -1031,7 +1030,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       </div>
                       <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
                       <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
-                      <button onClick={() => router.push(`/announcements/${ann.id}`)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginTop: 10, fontFamily: "var(--font-inter)", textAlign: "left" }} className="hover:text-[#3E1540] transition-colors">See announcement →</button>
+                      <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginTop: 10, fontFamily: "var(--font-inter)", textAlign: "left" }} className="hover:text-[#3E1540] transition-colors">See announcement →</button>
                       <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                           <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
@@ -1121,9 +1120,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
   const supabase = createClient()
-  const router = useRouter()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -1202,7 +1200,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
 
             <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
             <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
-            <button onClick={() => router.push(`/announcements/${announcement.id}`)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
+            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
@@ -1290,7 +1288,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
 
           <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
           <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "#5A5466" }}>{previewBody(announcement.body)}</p>
-          <button onClick={() => router.push(`/announcements/${announcement.id}`)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginBottom: "16px", fontFamily: "var(--font-inter)" }} className="hover:text-[#3E1540] transition-colors text-left">See announcement →</button>
+          <button onClick={() => onOpenDetail(announcement.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginBottom: "16px", fontFamily: "var(--font-inter)" }} className="hover:text-[#3E1540] transition-colors text-left">See announcement →</button>
 
           {announcement.is_event && (
             <div className="pt-3 border-t border-[#EFEAE0]">
@@ -1335,6 +1333,251 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
         )}
       </div>
 
+    </>
+  )
+}
+
+// ── Announcement Detail View (in-shell overlay) ──────────────────────────────
+
+const DETAIL_SERIF = "var(--font-instrument-serif)"
+const DETAIL_SANS = "var(--font-inter)"
+const DETAIL_MONO: React.CSSProperties = {
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: 11,
+  letterSpacing: "1.4px",
+  textTransform: "uppercase" as const,
+  color: "#8A8497",
+}
+
+interface DetailAnnouncement {
+  id: string
+  title: string
+  body: string
+  created_at: string
+  is_pinned: boolean
+  is_event: boolean
+  image_url: string | null
+  audience: string | null
+  show_attendees: boolean
+  view_count: number
+  rsvp_count: number
+  user_has_rsvped: boolean
+  rsvp_attendees: { user_id: string; name: string }[]
+  has_form: boolean
+  form_id: string | null
+  user_has_responded: boolean
+}
+
+export function AnnouncementDetailView({
+  announcementId,
+  userId,
+  ministryId,
+  userRole,
+  userName,
+  onClose,
+}: {
+  announcementId: string
+  userId: string
+  ministryId: string
+  userRole: string
+  userName: string
+  onClose: () => void
+}) {
+  const supabase = createClient()
+  const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [rsvping, setRsvping] = useState(false)
+  const [formFillOpen, setFormFillOpen] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data: annData } = await supabase
+        .from("announcements")
+        .select("*")
+        .eq("id", announcementId)
+        .eq("ministry_id", ministryId)
+        .maybeSingle()
+
+      if (!annData) { setLoading(false); return }
+
+      const [{ data: viewRows }, { data: rsvpRows }, { data: formData }] = await Promise.all([
+        supabase.from("announcement_views").select("user_id").eq("announcement_id", announcementId),
+        supabase.from("rsvps").select("user_id").eq("announcement_id", announcementId),
+        supabase.from("announcement_forms").select("id").eq("announcement_id", announcementId).maybeSingle(),
+      ])
+
+      supabase.from("announcement_views")
+        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+        .then()
+
+      const rsvpUserIds = (rsvpRows ?? []).map((r: { user_id: string }) => r.user_id)
+      const userHasRsvped = rsvpUserIds.includes(userId)
+
+      let rsvpAttendees: { user_id: string; name: string }[] = []
+      if (rsvpUserIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from("profiles").select("id, name").in("id", rsvpUserIds).eq("ministry_id", ministryId)
+        rsvpAttendees = (profileRows ?? []).map((p: { id: string; name: string }) => ({ user_id: p.id, name: p.name }))
+      }
+
+      let userHasResponded = false
+      if (formData?.id) {
+        const { data: respRow } = await supabase
+          .from("form_responses").select("id").eq("form_id", formData.id).eq("user_id", userId).maybeSingle()
+        userHasResponded = !!respRow
+      }
+
+      setAnn({
+        ...annData,
+        view_count: (viewRows ?? []).length,
+        rsvp_count: rsvpUserIds.length,
+        user_has_rsvped: userHasRsvped,
+        rsvp_attendees: rsvpAttendees,
+        has_form: !!formData,
+        form_id: formData?.id ?? null,
+        user_has_responded: userHasResponded,
+      })
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcementId])
+
+  async function handleRsvp() {
+    if (!ann || rsvping) return
+    setRsvping(true)
+    if (ann.user_has_rsvped) {
+      await supabase.from("rsvps").delete().eq("announcement_id", ann.id).eq("user_id", userId)
+      setAnn((prev) => prev ? { ...prev, user_has_rsvped: false, rsvp_count: Math.max(0, prev.rsvp_count - 1), rsvp_attendees: prev.rsvp_attendees.filter((a) => a.user_id !== userId) } : prev)
+    } else {
+      await supabase.from("rsvps").upsert({ announcement_id: ann.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+      setAnn((prev) => prev ? { ...prev, user_has_rsvped: true, rsvp_count: prev.rsvp_count + 1, rsvp_attendees: [...prev.rsvp_attendees, { user_id: userId, name: userName }] } : prev)
+    }
+    setRsvping(false)
+  }
+
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
+
+  return (
+    <>
+      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]" style={{ overflowY: "auto" }}>
+        {/* Sticky header */}
+        <div style={{
+          position: "sticky", top: 0, zIndex: 10, background: "#FBF8F2",
+          borderBottom: "1px solid #E8E2D2", flexShrink: 0,
+          padding: "max(env(safe-area-inset-top), 48px) 20px 14px",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <ArrowLeft style={{ width: 15, height: 15, color: "#3E1540" }} />
+          </button>
+          <span style={DETAIL_MONO}>Announcement</span>
+        </div>
+
+        {loading ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #E8E2D2", borderTopColor: "#3E1540", animation: "spin 0.7s linear infinite" }} />
+          </div>
+        ) : !ann ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+            <p style={{ fontSize: 15, color: "#13101A", fontWeight: 500, fontFamily: DETAIL_SANS }}>Announcement not found.</p>
+            <button onClick={onClose} style={{ fontSize: 13, color: "#5A5466", background: "none", border: "none", cursor: "pointer", fontFamily: DETAIL_SANS }}>← Go back</button>
+          </div>
+        ) : (
+          <div style={{ maxWidth: 680, margin: "0 auto", width: "100%", paddingBottom: 80 }}>
+            {ann.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ann.image_url} alt={ann.title} style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }} />
+            )}
+            <div style={{ padding: "28px 24px 0" }}>
+              {/* Eyebrow */}
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, ...DETAIL_MONO }}>
+                  <Calendar style={{ width: 11, height: 11 }} />
+                  <span>{formatDate(ann.created_at)}</span>
+                </div>
+                {ann.audience && ann.audience !== "all" && (
+                  <span style={{ ...DETAIL_MONO, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+                )}
+                {ann.is_pinned && <span style={{ ...DETAIL_MONO, color: "#3E1540" }}>📌 Pinned</span>}
+              </div>
+
+              {/* Title */}
+              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: "clamp(28px, 5vw, 38px)", lineHeight: 1.08, letterSpacing: "-0.02em", color: "#13101A", margin: "0 0 20px" }}>
+                {ann.title}
+              </h1>
+
+              {/* Body — full reading-room view, newlines preserved */}
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 17, fontWeight: 400, lineHeight: 1.75, color: "#2D2836", marginBottom: 28, whiteSpace: "pre-wrap" }}>
+                {ann.body}
+              </div>
+
+              {/* Stats */}
+              <div style={{ display: "flex", alignItems: "center", gap: 18, paddingBottom: 24, borderBottom: "1px solid #E8E2D2", marginBottom: 24 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#8A8497" }}>
+                  <Eye style={{ width: 12, height: 12 }} />{ann.view_count} views
+                </span>
+                {ann.is_event && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#8A8497" }}>
+                    <Users style={{ width: 12, height: 12 }} />{ann.rsvp_count} going
+                  </span>
+                )}
+              </div>
+
+              {/* RSVP */}
+              {ann.is_event && (
+                <div style={{ marginBottom: 24 }}>
+                  <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px 22px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                    {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />You&apos;re going — tap to undo</> : "RSVP"}
+                  </button>
+                </div>
+              )}
+
+              {/* Attendees */}
+              {showAttendees && (
+                <div style={{ marginBottom: 24 }}>
+                  <p style={{ ...DETAIL_MONO, marginBottom: 10 }}>Going · {ann.rsvp_count}</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {ann.rsvp_attendees.map((a) => (
+                      <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Form */}
+              {ann.has_form && (
+                <div style={{ marginBottom: 24 }}>
+                  {ann.user_has_responded ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#5B7A6C", fontWeight: 500 }}>
+                      <FileText style={{ width: 13, height: 13 }} />Form submitted
+                    </span>
+                  ) : (
+                    <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                      <FileText style={{ width: 13, height: 13 }} />Fill out form →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </AnimateIn>
+
+      {formFillOpen && ann?.form_id && (
+        <FormFillView
+          formId={ann.form_id}
+          announcementId={ann.id}
+          announcementTitle={ann.title}
+          userId={userId}
+          ministryId={ministryId}
+          onClose={() => setFormFillOpen(false)}
+          onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
+        />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }

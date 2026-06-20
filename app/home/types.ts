@@ -213,6 +213,7 @@ export interface HomeTabProps {
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string) => void
   onGoToProfile: () => void
+  onOpenAnnouncement: (id: string) => void
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
