@@ -33,13 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${instrumentSerif.variable}`}>
       <head>
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body
-        className={`${inter.variable} ${instrumentSerif.variable} antialiased font-sans`}
-      >
+      <body className="antialiased font-sans">
         <PWARegister />
         {children}
       </body>

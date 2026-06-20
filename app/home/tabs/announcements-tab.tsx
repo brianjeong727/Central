@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, ArrowLeft, Calendar, MoreHorizontal, Plus, Users, Edit3, FileText, ChevronUp, Pin, PinOff } from "lucide-react"
+import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
-import { getInitials, formatRelativeTime, audienceLabel, formatDate } from "../utils"
-import { DesktopTopbar } from "../components/desktop-nav"
+import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
-import type { AnnouncementsTabProps, AnnouncementDetailProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
+import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
 
 // ── Form builder types (local) ────────────────────────────────────────────────
 
@@ -660,7 +659,7 @@ function InlineEditFields({
 
 // ── Announcements Tab ────────────────────────────────────────────────────────
 
-export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName }: AnnouncementsTabProps) {
+export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
   const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
   const [loading, setLoading] = useState(true)
@@ -835,11 +834,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   const pinnedAnn = announcements.find(a => a.is_pinned)
   const unpinned = announcements.filter(a => !a.is_pinned)
-  const desktopList = pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned
-  const filteredDesktop = filter === "all" ? desktopList
-    : filter === "events" ? desktopList.filter(a => a.is_event)
-    : filter === "forms" ? desktopList.filter(a => a.has_form)
-    : desktopList.filter(a => a.is_pinned || a.is_sub_pinned)
+  // pinnedAnn always lives in the banner; the list below only shows unpinned
+  const desktopList = unpinned
+  const filteredDesktop = filter === "all"
+    ? desktopList
+    : filter === "events"
+      ? [...(pinnedAnn?.is_event ? [pinnedAnn] : []), ...desktopList.filter(a => a.is_event)]
+      : filter === "forms"
+        ? [...(pinnedAnn?.has_form ? [pinnedAnn] : []), ...desktopList.filter(a => a.has_form)]
+        : desktopList.filter(a => a.is_sub_pinned) // "pinned" chip = For You items; hero already shows the pinned one
 
   const FILTERS: { id: FilterType; label: string }[] = [
     { id: "all", label: "All" },
@@ -850,18 +853,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar
-        crumbs={["Central", "Announcements"]}
-        right={isLeaderOrAdmin ? (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] hover:bg-[#2D0F2E] text-[#F6F4EF] rounded-lg text-[12px] font-medium transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />New announcement
-          </button>
-        ) : undefined}
-      />
-
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
@@ -886,6 +877,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>What the ministry is planning, praying for, and showing up to.</p>
         </div>
         <div className="flex items-center gap-2 pb-1.5">
+          {isLeaderOrAdmin && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ background: "var(--ink)", color: "var(--cream)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--plum-2)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "var(--ink)")}
+            >
+              <Plus className="w-3.5 h-3.5" />New announcement
+            </button>
+          )}
           <div className="flex border border-[#E5E0D2] rounded-lg overflow-hidden">
             <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "#EFEAE0" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
             <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "#EFEAE0" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
@@ -903,12 +905,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         <>
           {/* Mobile card list */}
           <div className="md:hidden px-5 pb-4 flex flex-col gap-4">
-            {announcements.map((ann, idx) => (
+            {announcements.map((ann) => (
               <AnnouncementCard
                 key={ann.id}
                 announcement={ann}
-                isPinned={ann.is_pinned && idx === 0}
-                featured={idx === 0}
+                isPinned={ann.is_pinned}
+                featured={ann.is_pinned}
                 userId={userId}
                 ministryId={ministryId}
                 userRole={userRole}
@@ -918,6 +920,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 onPinToggle={handlePinToggle}
                 onSubPinToggle={handleSubPinToggle}
                 onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
+                onOpenDetail={onOpenAnnouncement}
               />
             ))}
           </div>
@@ -931,34 +934,41 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               ))}
             </div>
 
-            {/* Pinned hero strip */}
+            {/* Pinned hero strip — matches Up Next card footprint (padding 40px 40px) */}
             {pinnedAnn && filter === "all" && (
-              <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "22px 28px", }}>
+              <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "40px 40px" }}>
                 <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
                 <div className="relative">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}>
-                    <div>
-                      <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.6, marginBottom: "8px" }}>📌 Pinned</p>
-                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
-                      <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
-                    </div>
-                    <div className="flex gap-2.5 items-center">
-                      {pinnedAnn.is_event && (
-                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: pinnedAnn.user_has_rsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "8px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
-                          {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "40px", alignItems: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      <p style={{ fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>📌 Pinned</p>
+                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em" }}>{pinnedAnn.title}</h2>
+                      <p style={{ margin: 0, fontSize: "13px", opacity: 0.78, lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
+                      {/* Actions row — mirrors Up Next card button row */}
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "#F6F4EF", color: "#13101A", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                          {pinnedAnn.is_event ? "See details" : "See announcement"}
                         </button>
-                      )}
-                      {isLeaderOrAdmin && (
-                        <>
-                          <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
-                            <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                        {pinnedAnn.is_event && (
+                          <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.08)", color: "#F6F4EF", border: "1px solid rgba(255,255,255,0.25)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                            {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
                           </button>
-                          <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                            <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                          </button>
-                        </>
-                      )}
+                        )}
+                        {pinnedAnn.rsvp_count > 0 && (
+                          <span style={{ fontSize: 12, opacity: 0.6 }}>{pinnedAnn.rsvp_count} going</span>
+                        )}
+                      </div>
                     </div>
+                    {isLeaderOrAdmin && (
+                      <div className="flex gap-2 items-center self-start">
+                        <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
+                          <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                        </button>
+                        <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                          <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -979,12 +989,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
                         {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
                       </div>
-                      <div>
+                      <div
+                        onClick={() => onOpenAnnouncement(ann.id)}
+                        style={{ cursor: "pointer" }}
+                        title="See announcement"
+                      >
                         <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ann.title}</div>
-                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ann.body}</div>
+                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{previewBody(ann.body)}</div>
                       </div>
                       <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
                       <div className="flex justify-end items-center gap-1.5">
+                        <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[#3E1540] transition-colors">See →</button>
                         {ann.is_event && (
                           <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
@@ -1023,8 +1038,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         </div>
                       </div>
                       <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
-                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{ann.body}</p>
-                      <div style={{ marginTop: "22px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
+                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
+                      <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginTop: 10, fontFamily: "var(--font-inter)", textAlign: "left" }} className="hover:text-[#3E1540] transition-colors">See announcement →</button>
+                      <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                           <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1111,74 +1127,14 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   )
 }
 
-// ── Announcement Detail ──────────────────────────────────────────────────────
-
-export function AnnouncementDetail({ announcement, userId, userRole, onClose, onRsvpToggle }: AnnouncementDetailProps) {
-  const supabase = createClient()
-  const [rsvping, setRsvping] = useState(false)
-
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
-
-  async function handleRsvp() {
-    if (rsvping) return
-    setRsvping(true)
-    onRsvpToggle(announcement.id)
-    if (announcement.user_has_rsvped) {
-      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", userId)
-    } else {
-      await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
-    }
-    setRsvping(false)
-  }
-
-  const showAttendeeList = announcement.is_event && announcement.rsvp_attendees.length > 0 && (isLeaderOrAdmin || announcement.show_attendees)
-
-  return (
-    <AnimateIn className="fixed inset-0 z-50 bg-white flex flex-col md:left-[296px]">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 pt-12 pb-4 md:pt-5 bg-white border-b border-[#ECE8DE]">
-          <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#FBF8F2] flex items-center justify-center flex-shrink-0 hover:bg-[#F2EDE0] transition-colors"><ArrowLeft className="w-4 h-4 text-[#3E1540]" /></button>
-          <span className="text-[15px] font-semibold text-[#13101A]">Announcement</span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <div className="flex items-center gap-1.5 text-[13px] text-[#8A8497] mb-5">
-            <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{formatDate(announcement.created_at)}</span>
-          </div>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.1, marginBottom: "16px" }}>{announcement.title}</h1>
-          <p className="text-[14px] text-[#5A5466] leading-relaxed whitespace-pre-wrap">{announcement.body}</p>
-          {showAttendeeList && (
-            <div className="mt-6 pt-5 border-t border-[#EFEAE0]">
-              <p className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wider mb-3">{announcement.rsvp_count} going</p>
-              <div className="flex flex-wrap gap-2">
-                {announcement.rsvp_attendees.map(a => (
-                  <span key={a.user_id} style={{ fontSize: "12px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        {announcement.is_event && (
-          <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4 pb-20">
-            <button onClick={handleRsvp} disabled={rsvping} className={`w-full rounded-xl py-4 font-semibold text-[15px] transition-colors ${announcement.user_has_rsvped ? "bg-[#3E1540]/10 text-[#3E1540] hover:bg-[#3E1540]/15 active:scale-[0.97]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-[#F6F4EF] active:scale-[0.97]"}`}>
-              {announcement.user_has_rsvped ? <span className="flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />You&apos;re going — tap to undo</span> : "RSVP"}
-            </button>
-          </div>
-        )}
-      </div>
-    </AnimateIn>
-  )
-}
-
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
   const supabase = createClient()
   const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [showDetail, setShowDetail] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
@@ -1252,8 +1208,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             </div>
 
             <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
-            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{announcement.body}</p>
-            <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium mb-4 transition-colors" style={{ color: "rgba(246,244,239,0.5)" }}>Read more</button>
+            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
+            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
@@ -1298,7 +1254,6 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           )}
         </div>
 
-        {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
       </>
     )
   }
@@ -1341,8 +1296,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           </div>
 
           <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
-          <p className="text-[13px] leading-relaxed line-clamp-2 mb-1" style={{ color: "#5A5466" }}>{announcement.body}</p>
-          <button onClick={() => setShowDetail(true)} className="text-[12px] font-medium text-[#8A8497] hover:text-[#3E1540] mb-4 transition-colors">Read more</button>
+          <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "#5A5466" }}>{previewBody(announcement.body)}</p>
+          <button onClick={() => onOpenDetail(announcement.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginBottom: "16px", fontFamily: "var(--font-inter)" }} className="hover:text-[#3E1540] transition-colors text-left">See announcement →</button>
 
           {announcement.is_event && (
             <div className="pt-3 border-t border-[#EFEAE0]">
@@ -1387,7 +1342,288 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
         )}
       </div>
 
-      {showDetail && <AnnouncementDetail announcement={announcement} userId={userId} userRole={userRole} onClose={() => setShowDetail(false)} onRsvpToggle={onRsvpToggle} />}
+    </>
+  )
+}
+
+// ── Announcement Detail View (in-shell overlay) ──────────────────────────────
+
+const DETAIL_SERIF = "var(--font-instrument-serif)"
+const DETAIL_SANS = "var(--font-inter)"
+const DETAIL_MONO: React.CSSProperties = {
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: 11,
+  letterSpacing: "1.4px",
+  textTransform: "uppercase" as const,
+  color: "#8A8497",
+}
+
+interface DetailAnnouncement {
+  id: string
+  title: string
+  body: string
+  created_at: string
+  is_pinned: boolean
+  is_event: boolean
+  image_url: string | null
+  audience: string | null
+  show_attendees: boolean
+  view_count: number
+  rsvp_count: number
+  user_has_rsvped: boolean
+  rsvp_attendees: { user_id: string; name: string }[]
+  has_form: boolean
+  form_id: string | null
+  user_has_responded: boolean
+}
+
+export function AnnouncementDetailView({
+  announcementId,
+  userId,
+  ministryId,
+  userRole,
+  userName,
+  onClose,
+}: {
+  announcementId: string
+  userId: string
+  ministryId: string
+  userRole: string
+  userName: string
+  onClose: () => void
+}) {
+  const supabase = createClient()
+  const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [rsvping, setRsvping] = useState(false)
+  const [formFillOpen, setFormFillOpen] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data: annData } = await supabase
+        .from("announcements")
+        .select("*")
+        .eq("id", announcementId)
+        .eq("ministry_id", ministryId)
+        .maybeSingle()
+
+      if (!annData) { setLoading(false); return }
+
+      const [{ data: viewRows }, { data: rsvpRows }, { data: formData }] = await Promise.all([
+        supabase.from("announcement_views").select("user_id").eq("announcement_id", announcementId),
+        supabase.from("rsvps").select("user_id").eq("announcement_id", announcementId),
+        supabase.from("announcement_forms").select("id").eq("announcement_id", announcementId).maybeSingle(),
+      ])
+
+      supabase.from("announcement_views")
+        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+        .then()
+
+      const rsvpUserIds = (rsvpRows ?? []).map((r: { user_id: string }) => r.user_id)
+      const userHasRsvped = rsvpUserIds.includes(userId)
+
+      let rsvpAttendees: { user_id: string; name: string }[] = []
+      if (rsvpUserIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from("profiles").select("id, name").in("id", rsvpUserIds).eq("ministry_id", ministryId)
+        rsvpAttendees = (profileRows ?? []).map((p: { id: string; name: string }) => ({ user_id: p.id, name: p.name }))
+      }
+
+      let userHasResponded = false
+      if (formData?.id) {
+        const { data: respRow } = await supabase
+          .from("form_responses").select("id").eq("form_id", formData.id).eq("user_id", userId).maybeSingle()
+        userHasResponded = !!respRow
+      }
+
+      setAnn({
+        ...annData,
+        view_count: (viewRows ?? []).length,
+        rsvp_count: rsvpUserIds.length,
+        user_has_rsvped: userHasRsvped,
+        rsvp_attendees: rsvpAttendees,
+        has_form: !!formData,
+        form_id: formData?.id ?? null,
+        user_has_responded: userHasResponded,
+      })
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcementId])
+
+  async function handleRsvp() {
+    if (!ann || rsvping) return
+    setRsvping(true)
+    if (ann.user_has_rsvped) {
+      await supabase.from("rsvps").delete().eq("announcement_id", ann.id).eq("user_id", userId)
+      setAnn((prev) => prev ? { ...prev, user_has_rsvped: false, rsvp_count: Math.max(0, prev.rsvp_count - 1), rsvp_attendees: prev.rsvp_attendees.filter((a) => a.user_id !== userId) } : prev)
+    } else {
+      await supabase.from("rsvps").upsert({ announcement_id: ann.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+      setAnn((prev) => prev ? { ...prev, user_has_rsvped: true, rsvp_count: prev.rsvp_count + 1, rsvp_attendees: [...prev.rsvp_attendees, { user_id: userId, name: userName }] } : prev)
+    }
+    setRsvping(false)
+  }
+
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
+
+  const monoStyle: React.CSSProperties = {
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497",
+  }
+
+  function DetailContent() {
+    if (loading) return (
+      <div className="flex-1 flex items-center justify-center">
+        <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #E8E2D2", borderTopColor: "#3E1540", animation: "spin 0.7s linear infinite" }} />
+      </div>
+    )
+    if (!ann) return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <p className="text-[15px] font-medium text-[#13101A]">Announcement not found.</p>
+        <button onClick={onClose} className="text-[13px] text-[#5A5466] bg-transparent border-none cursor-pointer">← Close</button>
+      </div>
+    )
+    return (
+      <>
+        {/* ── Mobile: single scrollable column (matches edit modal mobile layout) ── */}
+        <div className="md:hidden flex-1 overflow-y-auto min-h-0">
+          {ann.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={ann.image_url} alt={ann.title} className="w-full h-48 object-cover" />
+          )}
+          <div className="px-5 py-5 flex flex-col gap-5">
+            {/* Eyebrow */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span style={monoStyle}>{formatDate(ann.created_at)}</span>
+              {ann.audience && ann.audience !== "all" && (
+                <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+              )}
+              {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
+            </div>
+            {/* Serif title */}
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#13101A", margin: 0 }}>{ann.title}</h1>
+            {/* Body — newlines preserved */}
+            <div style={{ fontFamily: DETAIL_SERIF, fontSize: 16, lineHeight: 1.7, color: "#2D2836", whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            {/* Divider + stats */}
+            <div style={{ height: 1, background: "#E8E2D2" }} />
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+              {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
+            </div>
+            {/* RSVP */}
+            {ann.is_event && (
+              <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+              </button>
+            )}
+            {/* Attendees */}
+            {showAttendees && (
+              <div>
+                <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+                </div>
+              </div>
+            )}
+            {/* Form */}
+            {ann.has_form && (
+              ann.user_has_responded
+                ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
+                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Desktop: full-width reading column (mirrors edit modal writing surface) ── */}
+        <div className="hidden md:flex flex-1 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto flex flex-col px-10 pt-8 pb-8">
+              {/* Image */}
+              {ann.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ann.image_url} alt={ann.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 12, marginBottom: 28, flexShrink: 0 }} />
+              )}
+              {/* Eyebrow */}
+              <div className="flex flex-wrap items-center gap-2.5 mb-3">
+                <span style={monoStyle}>{formatDate(ann.created_at)}</span>
+                {ann.audience && ann.audience !== "all" && (
+                  <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+                )}
+                {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
+              </div>
+              {/* Serif title — same sizing as edit modal's title input (40px) */}
+              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "#13101A", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid #E2DDCF", flexShrink: 0 }}>{ann.title}</h1>
+              {/* Body — serif 19px, newlines preserved (matches edit modal body textarea) */}
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "#13101A", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
+              {/* Stats */}
+              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #E8E2D2", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+                {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
+              </div>
+              {/* RSVP */}
+              {ann.is_event && (
+                <div style={{ marginTop: 20 }}>
+                  <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                    {ann.user_has_rsvped ? <><Check style={{ width: 14, height: 14 }} />Going — click to undo</> : "RSVP"}
+                  </button>
+                </div>
+              )}
+              {/* Attendees */}
+              {showAttendees && (
+                <div style={{ marginTop: 20 }}>
+                  <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+                  </div>
+                </div>
+              )}
+              {/* Form */}
+              {ann.has_form && (
+                <div style={{ marginTop: 20 }}>
+                  {ann.user_has_responded
+                    ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
+                    : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {/* Exact same shell as CreateAnnouncementModal */}
+      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+        {/* Header — mirrors CreateAnnouncementModal: mono label left, close right, border-b */}
+        <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
+          <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
+            <p style={monoStyle}>Announcement</p>
+            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <X className="w-3.5 h-3.5 text-[#5A5466]" />
+            </button>
+          </div>
+        </div>
+        <DetailContent />
+      </AnimateIn>
+
+      {formFillOpen && ann?.form_id && (
+        <FormFillView
+          formId={ann.form_id}
+          announcementId={ann.id}
+          announcementTitle={ann.title}
+          userId={userId}
+          ministryId={ministryId}
+          onClose={() => setFormFillOpen(false)}
+          onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
+        />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }

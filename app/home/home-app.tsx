@@ -13,11 +13,11 @@ import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
-import { DesktopSidebar } from "./components/desktop-nav"
+import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 
 // Tabs
 import { HomeTab } from "./tabs/home-tab"
-import { AnnouncementsTab } from "./tabs/announcements-tab"
+import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
 import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
@@ -53,6 +53,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("tab", tab)
   }
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(null)
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -148,6 +149,34 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
     setFinanceSection(s)
     replaceParam("finance", s === "give" ? null : s)
+  }
+
+  // Congregation sub-view — lifted so shell can build accurate crumbs
+  const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
+
+  // Shell breadcrumb computation — derived from shell-known state, no tab props needed
+  function getShellCrumbs(): string[] {
+    const financeLabels: Record<string, string> = { reimbursements: "Reimbursements", budget: "Budget", allocation: "Allocation" }
+    const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
+    switch (activeTab) {
+      case "home":          return ["Central", "Home"]
+      case "announcements": return ["Central", "Announcements"]
+      case "give":          return ["Central", "Finance"]
+      case "forms":         return ["Central", "Forms"]
+      case "settings":      return ["Central", "Settings"]
+      case "chats":         return ["Central", "Chats"]
+      case "giving":        return financeSection !== "reimbursements"
+                              ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
+                              : ["Central", "Finance"]
+      case "plan": {
+        const team = userTeams.find(t => t.teamId === activeTeamId)
+        return team ? ["Central", "Planning", team.teamName] : ["Central", "Planning"]
+      }
+      case "directory":     return ["Central", "Directory"]
+      case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
+      case "congregation":  return ["Central", "Congregation", congregationLabels[congregationView]]
+      default:              return ["Central"]
+    }
   }
 
   type ChatPreviewRow = {
@@ -394,7 +423,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
-    <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[#F4F1E8]">
+    <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--body-bg)]">
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
@@ -428,6 +457,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {/* Content + bottom nav wrapper */}
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
+        {/* Shell topbar — breadcrumbs + ⌘K search, always present on desktop */}
+        <DesktopTopbar crumbs={getShellCrumbs()} />
+
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
 
@@ -443,6 +475,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onSeeAnnouncements={() => setActiveTab("announcements")}
                 onOpenChat={handleOpenChat}
                 onGoToProfile={() => setActiveTab("profile")}
+                onOpenAnnouncement={(id) => setOpenAnnouncementId(id)}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -453,7 +486,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => setOpenAnnouncementId(id)} />
             </div>
           )}
 
@@ -461,7 +494,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           {activeTab === "chats" && (
             <div className="md:flex md:h-full md:overflow-hidden">
               {/* Left: chat list */}
-              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[#E5E0D2] md:overflow-y-auto md:h-full md:bg-[#FBF8F2]">
+              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[var(--line)] md:overflow-y-auto md:h-full md:bg-[var(--cream)]">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}
@@ -494,11 +527,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   />
                 </div>
               ) : (
-                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[#FBF8F2]">
+                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[var(--cream)]">
                   <div className="text-center">
-                    <MessageCircle className="w-10 h-10 text-[#C4C4C4] mx-auto mb-3" />
-                    <p className="text-[14px] font-semibold text-[#8A8497]">Select a chat</p>
-                    <p className="text-[12px] text-[#C4C4C4] mt-1">Choose a conversation on the left</p>
+                    <MessageCircle className="w-10 h-10 text-[var(--line)] mx-auto mb-3" />
+                    <p className="text-[14px] font-semibold text-[var(--muted-text)]">Select a chat</p>
+                    <p className="text-[12px] text-[var(--faint)] mt-1">Choose a conversation on the left</p>
                   </div>
                 </div>
               )}
@@ -605,6 +638,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 userId={userId}
                 ministryId={ministryId}
                 userRole={initialProfile.role}
+                onViewChange={setCongregationView}
               />
             </div>
           )}
@@ -632,6 +666,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           onClose={handleChatClose}
           onRead={recountTotalUnread}
           onNameChange={handleChatNameChange}
+        />
+      )}
+
+      {openAnnouncementId && (
+        <AnnouncementDetailView
+          announcementId={openAnnouncementId}
+          userId={userId}
+          ministryId={ministryId}
+          userRole={initialProfile.role}
+          userName={initialProfile.name}
+          onClose={() => setOpenAnnouncementId(null)}
         />
       )}
 

@@ -201,6 +201,7 @@ export interface CongregationTabProps {
   userId: string
   ministryId: string
   userRole: string
+  onViewChange?: (view: "ask" | "responses" | "archive") => void
 }
 
 export interface HomeTabProps {
@@ -213,6 +214,7 @@ export interface HomeTabProps {
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string) => void
   onGoToProfile: () => void
+  onOpenAnnouncement: (id: string) => void
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
@@ -234,14 +236,7 @@ export interface AnnouncementsTabProps {
   userGradYear: number | null
   ministryId: string
   ministryName: string
-}
-
-export interface AnnouncementDetailProps {
-  announcement: EnrichedAnnouncement
-  userId: string
-  userRole: string
-  onClose: () => void
-  onRsvpToggle: (id: string) => void
+  onOpenAnnouncement: (id: string) => void
 }
 
 export interface AnnouncementCardProps {
@@ -257,6 +252,7 @@ export interface AnnouncementCardProps {
   onPinToggle?: (id: string, isPinned: boolean) => void
   onSubPinToggle?: (id: string, isSubPinned: boolean) => void
   onOpenForm: (formId: string, announcementId: string, title: string) => void
+  onOpenDetail: (id: string) => void
 }
 
 export interface CreateChatScreenProps {

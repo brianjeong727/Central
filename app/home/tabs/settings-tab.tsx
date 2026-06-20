@@ -22,7 +22,6 @@ import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
-import { DesktopTopbar } from "../components/desktop-nav"
 import { getInitials } from "../utils"
 
 interface MemberRow {
@@ -585,8 +584,6 @@ export function SettingsTab({
 
   return (
     <div className="md:h-full md:overflow-y-auto">
-      <DesktopTopbar crumbs={["Central", "Church Settings"]} />
-
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
         <div>

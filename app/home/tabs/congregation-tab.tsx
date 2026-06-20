@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import { Plus, X, BarChart2, Archive, ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "../components/shared"
-import { DesktopTopbar } from "../components/desktop-nav"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -35,9 +34,10 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
   prayer: "Members share anonymous prayer requests",
 }
 
-export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
+export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
   const supabase = createClient()
-  const [view, setView] = useState<View>("ask")
+  const [view, setViewState] = useState<View>("ask")
+  function setView(v: View) { setViewState(v); onViewChange?.(v) }
 
   // Active question
   const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(null)
@@ -267,8 +267,6 @@ export function CongregationTab({ userId, ministryId }: CongregationTabProps) {
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar crumbs={["Central", "Congregation", view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"]} />
-
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={monoStyle}>Congregation</p>

@@ -12,7 +12,6 @@ import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
 import data from "@emoji-mart/data"
-import { DesktopTopbar } from "../components/desktop-nav"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
@@ -573,25 +572,29 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         )}
       </div>
 
-      {/* ── Desktop topbar ── */}
-      <div className="hidden md:block flex-shrink-0">
-        <DesktopTopbar
-          crumbs={["Central", "Chats", displayGroupName, "Info"]}
-          right={
-            hasChanges ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
-                <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
-                  {saving ? "Saving…" : "Save changes"}
-                </button>
-              </div>
-            ) : (
-              <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white">
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
-              </button>
-            )
-          }
-        />
+      {/* ── Desktop settings header ── */}
+      <div className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ flex: 1 }}>
+          <span style={{ color: "var(--muted-text)" }}>Central</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--muted-text)" }}>Chats</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--muted-text)" }}>{displayGroupName}</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--ink)", fontWeight: 500 }}>Info</span>
+        </div>
+        {hasChanges ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
+            <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        ) : (
+          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white" style={{ color: "#8A8497" }}>
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
