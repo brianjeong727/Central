@@ -248,8 +248,8 @@ export function DesktopSidebar({
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
 
-    // ── Finance (giving tab): sub-sections ───────────────────────────────────
-    if (activeTab === "giving" || activeTab === "give") {
+    // ── Finance (giving tab): sub-sections — Reimbursements + Budget only ──────
+    if (activeTab === "giving") {
       const financeSections: { label: string; section: "reimbursements" | "budget"; show: boolean }[] = [
         { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
         { label: "Budget",         section: "budget",         show: !!(isTreasurer || isAdmin) },
@@ -258,23 +258,15 @@ export function DesktopSidebar({
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <p style={{ ...MONO, padding: "8px 8px 6px" }}>Finance</p>
-          <button style={subItemStyle(activeTab === "give")} onClick={() => onTabChange("give")}>
-            <span style={{ flex: 1 }}>Give</span>
-          </button>
-          {visible.length > 0 && (
-            <>
-              <div style={{ height: 1, background: LINE, margin: "4px 8px" }} />
-              {visible.map(s => (
-                <button
-                  key={s.section}
-                  style={subItemStyle(financeSection === s.section || (s.section === "budget" && financeSection === "allocation"))}
-                  onClick={() => onFinanceSectionChange(s.section)}
-                >
-                  <span style={{ flex: 1 }}>{s.label}</span>
-                </button>
-              ))}
-            </>
-          )}
+          {visible.map(s => (
+            <button
+              key={s.section}
+              style={subItemStyle(financeSection === s.section || (s.section === "budget" && financeSection === "allocation"))}
+              onClick={() => onFinanceSectionChange(s.section)}
+            >
+              <span style={{ flex: 1 }}>{s.label}</span>
+            </button>
+          ))}
         </div>
       )
     }
@@ -371,8 +363,7 @@ export function DesktopSidebar({
           const isActive =
             activeTab === id ||
             (id === "home" && ["settings", "announcements", "forms", "give"].includes(activeTab)) ||
-            (id === "profile" && activeTab === "congregation") ||
-            (id === "giving" && activeTab === "give")
+            (id === "profile" && activeTab === "congregation")
           return (
             <button
               key={id}
