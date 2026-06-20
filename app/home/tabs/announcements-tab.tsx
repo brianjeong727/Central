@@ -835,11 +835,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   const pinnedAnn = announcements.find(a => a.is_pinned)
   const unpinned = announcements.filter(a => !a.is_pinned)
-  const desktopList = pinnedAnn ? [pinnedAnn, ...unpinned] : unpinned
-  const filteredDesktop = filter === "all" ? desktopList
-    : filter === "events" ? desktopList.filter(a => a.is_event)
-    : filter === "forms" ? desktopList.filter(a => a.has_form)
-    : desktopList.filter(a => a.is_pinned || a.is_sub_pinned)
+  // pinnedAnn always lives in the banner; the list below only shows unpinned
+  const desktopList = unpinned
+  const filteredDesktop = filter === "all"
+    ? desktopList
+    : filter === "events"
+      ? [...(pinnedAnn?.is_event ? [pinnedAnn] : []), ...desktopList.filter(a => a.is_event)]
+      : filter === "forms"
+        ? [...(pinnedAnn?.has_form ? [pinnedAnn] : []), ...desktopList.filter(a => a.has_form)]
+        : desktopList.filter(a => a.is_sub_pinned) // "pinned" chip = For You items; hero already shows the pinned one
 
   const FILTERS: { id: FilterType; label: string }[] = [
     { id: "all", label: "All" },
@@ -903,12 +907,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         <>
           {/* Mobile card list */}
           <div className="md:hidden px-5 pb-4 flex flex-col gap-4">
-            {announcements.map((ann, idx) => (
+            {announcements.map((ann) => (
               <AnnouncementCard
                 key={ann.id}
                 announcement={ann}
-                isPinned={ann.is_pinned && idx === 0}
-                featured={idx === 0}
+                isPinned={ann.is_pinned}
+                featured={ann.is_pinned}
                 userId={userId}
                 ministryId={ministryId}
                 userRole={userRole}
@@ -932,34 +936,41 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               ))}
             </div>
 
-            {/* Pinned hero strip */}
+            {/* Pinned hero strip — matches Up Next card footprint (padding 40px 40px) */}
             {pinnedAnn && filter === "all" && (
-              <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "22px 28px", }}>
+              <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "40px 40px" }}>
                 <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
                 <div className="relative">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "24px", alignItems: "center" }}>
-                    <div>
-                      <p style={{ fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase", opacity: 0.6, marginBottom: "8px" }}>📌 Pinned</p>
-                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "32px", lineHeight: 1.1 }}>{pinnedAnn.title}</h2>
-                      <p style={{ marginTop: "6px", fontSize: "13px", opacity: 0.78 }} className="line-clamp-2">{pinnedAnn.body}</p>
-                    </div>
-                    <div className="flex gap-2.5 items-center">
-                      {pinnedAnn.is_event && (
-                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "#F6F4EF", color: pinnedAnn.user_has_rsvped ? "#F6F4EF" : "#13101A", border: 0, padding: "8px 18px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
-                          {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "40px", alignItems: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      <p style={{ fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>📌 Pinned</p>
+                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em" }}>{pinnedAnn.title}</h2>
+                      <p style={{ margin: 0, fontSize: "13px", opacity: 0.78, lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
+                      {/* Actions row — mirrors Up Next card button row */}
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "#F6F4EF", color: "#13101A", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                          {pinnedAnn.is_event ? "See details" : "See announcement"}
                         </button>
-                      )}
-                      {isLeaderOrAdmin && (
-                        <>
-                          <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
-                            <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                        {pinnedAnn.is_event && (
+                          <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.08)", color: "#F6F4EF", border: "1px solid rgba(255,255,255,0.25)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                            {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
                           </button>
-                          <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                            <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                          </button>
-                        </>
-                      )}
+                        )}
+                        {pinnedAnn.rsvp_count > 0 && (
+                          <span style={{ fontSize: 12, opacity: 0.6 }}>{pinnedAnn.rsvp_count} going</span>
+                        )}
+                      </div>
                     </div>
+                    {isLeaderOrAdmin && (
+                      <div className="flex gap-2 items-center self-start">
+                        <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
+                          <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
+                        </button>
+                        <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                          <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
