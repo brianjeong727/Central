@@ -10,7 +10,7 @@ import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
 
 const RAIL_BG    = "var(--ivory)"         // ← single token controlling rail warmth
-const PANEL_BG   = "#ffffff"
+const PANEL_BG   = "var(--cream)"
 const LINE       = "var(--line)"
 const PLUM       = "var(--plum)"
 const INK        = "var(--ink)"
@@ -329,7 +329,7 @@ export function DesktopSidebar({
     <>
       {/* ── Icon Rail ─────────────────────────────────────────────────────── */}
       <div
-        className="hidden md:flex flex-col w-[72px] flex-shrink-0 h-screen items-center py-4 gap-0.5"
+        className="hidden md:flex flex-col w-[72px] flex-shrink-0 h-screen items-center py-4 gap-1"
         style={{ background: RAIL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Logo — DO NOT TOUCH: exact original markup preserved */}
