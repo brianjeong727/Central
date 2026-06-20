@@ -99,7 +99,6 @@ export function UpNextCard({
   const cardBase: CSSProperties = {
     background: "var(--cream-3)",
     border: "1px solid var(--line)",
-    boxShadow: "inset 4px 0 0 var(--plum)",
     borderRadius: "var(--r-callout)",
     ...style,
   }
