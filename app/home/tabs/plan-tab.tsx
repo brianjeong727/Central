@@ -10794,6 +10794,8 @@ function SmallGroupLeadersTab({
 }) {
   const supabase = createClient()
   const router = useRouter()
+  // Unique per-mount ID so desktop + mobile instances don't collide on the same channel name
+  const channelInstanceId = useRef(Math.random().toString(36).slice(2)).current
   type SGLTab = "home" | "schedule" | "bible_study"
   const validTabs: SGLTab[] = isPastor ? ["bible_study", "schedule"] : ["home", "schedule", "bible_study"]
   const defaultTab: SGLTab = isPastor ? "bible_study" : "home"
@@ -10869,7 +10871,7 @@ function SmallGroupLeadersTab({
   // Realtime: refresh home assignments when president publishes
   useEffect(() => {
     const channel = supabase
-      .channel(`dgl-assignments-${userId}-${teamId}`)
+      .channel(`dgl-assignments-${userId}-${teamId}-${channelInstanceId}`)
       .on("postgres_changes", {
         event: "*",
         schema: "public",
@@ -10893,7 +10895,7 @@ function SmallGroupLeadersTab({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
     const channel = supabase
-      .channel(`sg-leader-${userId}-${teamId}`)
+      .channel(`sg-leader-${userId}-${teamId}-${channelInstanceId}`)
       .on("postgres_changes", {
         event: "*",
         schema: "public",
