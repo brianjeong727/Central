@@ -7,7 +7,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip } from "@/components/central"
+import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
@@ -336,7 +336,6 @@ export function HomeTab({
               paddingTop: "var(--space-10)",
               paddingBottom: "var(--space-7)",
               gap: "var(--space-8)",
-              borderBottom: "1px solid var(--line)",
             }}
           >
             <PageTitle eyebrow={dateLabel} title={greeting} style={{ maxWidth: 640 }}>
@@ -366,8 +365,8 @@ export function HomeTab({
             </div>
           </div>
 
-          {/* Hairline divider between greeting block and body */}
-          <div className="hidden md:block" style={{ height: 1, background: "var(--line)", margin: "0 0" }} />
+          {/* Inset hairline between greeting block and body */}
+          <div className="hidden md:block"><InsetHairline /></div>
 
           {/* Desktop: main content */}
           <div
