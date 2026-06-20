@@ -10,7 +10,7 @@ import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
 
 const RAIL_BG    = "var(--ivory)"         // ← single token controlling rail warmth
-const PANEL_BG   = "var(--cream)"
+const PANEL_BG   = "var(--body-bg)"
 const LINE       = "var(--line)"
 const PLUM       = "var(--plum)"
 const INK        = "var(--ink)"

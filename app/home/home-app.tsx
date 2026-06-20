@@ -423,7 +423,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
-    <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[#F4F1E8]">
+    <div className="relative min-h-screen bg-[#FBF8F2] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--body-bg)]">
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
