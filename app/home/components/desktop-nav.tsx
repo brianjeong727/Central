@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from "lucide-react"
-import { Search } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
@@ -32,7 +31,7 @@ const MONO: React.CSSProperties = {
 export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   return (
     <div
-      className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0"
+      className="hidden md:flex h-12 px-14 items-center gap-4 flex-shrink-0"
       style={{ background: "transparent" }}
     >
       <div className="flex items-center gap-1.5 text-[12px]">
@@ -44,28 +43,6 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
             {i < crumbs.length - 1 && <span style={{ color: "var(--line-2)", userSelect: "none" }}>/</span>}
           </span>
         ))}
-      </div>
-      <div className="flex-1" />
-      <div
-        onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer select-none transition-colors"
-        style={{
-          border: `1px solid ${LINE}`,
-          background: CREAM_2,
-          color: MUTED,
-          width: 240,
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = IVORY)}
-        onMouseLeave={e => (e.currentTarget.style.background = CREAM_2)}
-      >
-        <Search className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="text-[12px] flex-1">Jump to anything</span>
-        <span
-          className="text-[10px] px-1.5 py-0.5 rounded leading-none"
-          style={{ border: `1px solid ${LINE}`, background: PANEL_BG, color: MUTED }}
-        >
-          ⌘K
-        </span>
       </div>
       {right}
     </div>
