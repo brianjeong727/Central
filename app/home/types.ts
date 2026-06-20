@@ -234,6 +234,7 @@ export interface AnnouncementsTabProps {
   userGradYear: number | null
   ministryId: string
   ministryName: string
+  onOpenAnnouncement: (id: string) => void
 }
 
 export interface AnnouncementCardProps {
@@ -249,6 +250,7 @@ export interface AnnouncementCardProps {
   onPinToggle?: (id: string, isPinned: boolean) => void
   onSubPinToggle?: (id: string, isSubPinned: boolean) => void
   onOpenForm: (formId: string, announcementId: string, title: string) => void
+  onOpenDetail: (id: string) => void
 }
 
 export interface CreateChatScreenProps {

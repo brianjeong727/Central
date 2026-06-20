@@ -201,18 +201,18 @@ export function UpNextCard({
 
   // ── Desktop: two-column hero with plum divider ───────────────────────────────
   return (
-    <div style={{ ...cardBase, padding: "36px 36px", display: "flex", alignItems: "stretch" }}>
+    <div style={{ ...cardBase, padding: "40px 40px", display: "flex", alignItems: "stretch" }}>
       {/* Left content column */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 22 }}>
         {eyebrow}
         <div>
           <h2
             style={{
               fontFamily: "var(--serif)",
-              fontSize: 44,
+              fontSize: 60,
               fontWeight: 400,
               letterSpacing: "-0.5px",
-              lineHeight: 1.05,
+              lineHeight: 1.02,
               color: "var(--ink)",
               margin: 0,
             }}
@@ -221,8 +221,8 @@ export function UpNextCard({
           </h2>
           {bodyText && (
             <p
-              className="line-clamp-3"
-              style={{ fontSize: 13, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}
+              className="line-clamp-2"
+              style={{ fontSize: 13, color: "var(--body)", marginTop: 14, lineHeight: 1.55 }}
             >
               {bodyText}
             </p>
