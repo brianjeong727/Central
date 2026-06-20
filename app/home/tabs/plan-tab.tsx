@@ -10877,7 +10877,14 @@ function SmallGroupLeadersTab({
         filter: `user_id=eq.${userId}`,
       }, () => { void loadHome() })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      // Synchronously splice out of realtime.channels so the next supabase.channel()
+      // call with the same name gets a fresh object, not the still-subscribed one.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rt = (supabase as any).realtime as { channels: unknown[] } | undefined
+      if (rt) rt.channels = rt.channels.filter((c: unknown) => c !== channel)
+      channel.unsubscribe().catch(() => {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId, userId])
 
@@ -10897,7 +10904,13 @@ function SmallGroupLeadersTab({
         timer = setTimeout(() => { void loadHome() }, 150)
       })
       .subscribe()
-    return () => { clearTimeout(timer); supabase.removeChannel(channel) }
+    return () => {
+      clearTimeout(timer)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rt = (supabase as any).realtime as { channels: unknown[] } | undefined
+      if (rt) rt.channels = rt.channels.filter((c: unknown) => c !== channel)
+      channel.unsubscribe().catch(() => {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId, userId])
 
