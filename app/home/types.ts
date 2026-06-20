@@ -201,6 +201,7 @@ export interface CongregationTabProps {
   userId: string
   ministryId: string
   userRole: string
+  onViewChange?: (view: "ask" | "responses" | "archive") => void
 }
 
 export interface HomeTabProps {

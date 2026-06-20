@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
-import { DesktopTopbar } from "../components/desktop-nav"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
 
@@ -854,18 +853,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar
-        crumbs={["Central", "Announcements"]}
-        right={isLeaderOrAdmin ? (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] hover:bg-[#2D0F2E] text-[#F6F4EF] rounded-lg text-[12px] font-medium transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />New announcement
-          </button>
-        ) : undefined}
-      />
-
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
@@ -890,6 +877,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>What the ministry is planning, praying for, and showing up to.</p>
         </div>
         <div className="flex items-center gap-2 pb-1.5">
+          {isLeaderOrAdmin && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ background: "var(--ink)", color: "var(--cream)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--plum-2)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "var(--ink)")}
+            >
+              <Plus className="w-3.5 h-3.5" />New announcement
+            </button>
+          )}
           <div className="flex border border-[#E5E0D2] rounded-lg overflow-hidden">
             <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "#EFEAE0" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
             <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "#EFEAE0" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>

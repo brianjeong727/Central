@@ -13,7 +13,7 @@ import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
-import { DesktopSidebar } from "./components/desktop-nav"
+import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 
 // Tabs
 import { HomeTab } from "./tabs/home-tab"
@@ -149,6 +149,34 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
     setFinanceSection(s)
     replaceParam("finance", s === "give" ? null : s)
+  }
+
+  // Congregation sub-view — lifted so shell can build accurate crumbs
+  const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
+
+  // Shell breadcrumb computation — derived from shell-known state, no tab props needed
+  function getShellCrumbs(): string[] {
+    const financeLabels: Record<string, string> = { reimbursements: "Reimbursements", budget: "Budget", allocation: "Allocation" }
+    const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
+    switch (activeTab) {
+      case "home":          return ["Central", "Home"]
+      case "announcements": return ["Central", "Announcements"]
+      case "give":          return ["Central", "Finance"]
+      case "forms":         return ["Central", "Forms"]
+      case "settings":      return ["Central", "Settings"]
+      case "chats":         return ["Central", "Chats"]
+      case "giving":        return financeSection !== "reimbursements"
+                              ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
+                              : ["Central", "Finance"]
+      case "plan": {
+        const team = userTeams.find(t => t.teamId === activeTeamId)
+        return team ? ["Central", "Planning", team.teamName] : ["Central", "Planning"]
+      }
+      case "directory":     return ["Central", "Directory"]
+      case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
+      case "congregation":  return ["Central", "Congregation", congregationLabels[congregationView]]
+      default:              return ["Central"]
+    }
   }
 
   type ChatPreviewRow = {
@@ -429,6 +457,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {/* Content + bottom nav wrapper */}
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
+        {/* Shell topbar — breadcrumbs + ⌘K search, always present on desktop */}
+        <DesktopTopbar crumbs={getShellCrumbs()} />
+
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
 
@@ -607,6 +638,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 userId={userId}
                 ministryId={ministryId}
                 userRole={initialProfile.role}
+                onViewChange={setCongregationView}
               />
             </div>
           )}

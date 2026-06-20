@@ -1,41 +1,87 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Home, MessageCircle, BookOpen, ClipboardList, User, LogOut, Plus, ChevronRight, Wallet } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from "lucide-react"
 import { Search } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ChatsSection } from "@/components/ui/chats-section"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
 
+// ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
+
+const RAIL_BG    = "var(--ivory)"         // ← single token controlling rail warmth
+const PANEL_BG   = "var(--cream)"
+const LINE       = "var(--line)"
+const PLUM       = "var(--plum)"
+const INK        = "var(--ink)"
+const MUTED      = "var(--muted-text)"
+const IVORY      = "var(--ivory)"
+const CREAM_2    = "var(--cream-2)"
+
+const MONO: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: 10,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: MUTED,
+}
+
+// ── DesktopTopbar ─────────────────────────────────────────────────────────────
+
 export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   return (
-    <div className="hidden md:flex h-14 px-7 items-center gap-4 border-b border-[#E5E0D2] bg-[#FBF8F2] flex-shrink-0">
+    <div
+      className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0"
+      style={{ background: PANEL_BG, borderBottom: `1px solid ${LINE}` }}
+    >
       <div className="flex items-center gap-1.5 text-[12px]">
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
-            <span className={i === crumbs.length - 1 ? "text-[#13101A] font-medium" : "text-[#8A8497]"}>{c}</span>
-            {i < crumbs.length - 1 && <span className="text-[#C4C4C4] select-none">/</span>}
+            <span style={{ color: i === crumbs.length - 1 ? INK : MUTED, fontWeight: i === crumbs.length - 1 ? 500 : 400 }}>
+              {c}
+            </span>
+            {i < crumbs.length - 1 && <span style={{ color: "var(--line-2)", userSelect: "none" }}>/</span>}
           </span>
         ))}
       </div>
       <div className="flex-1" />
       <div
         onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
-        className="flex items-center gap-2 px-3 py-1.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] w-[240px] cursor-pointer hover:bg-[#ECE8DE] transition-colors select-none"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer select-none transition-colors"
+        style={{
+          border: `1px solid ${LINE}`,
+          background: CREAM_2,
+          color: MUTED,
+          width: 240,
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = IVORY)}
+        onMouseLeave={e => (e.currentTarget.style.background = CREAM_2)}
       >
         <Search className="w-3.5 h-3.5 flex-shrink-0" />
         <span className="text-[12px] flex-1">Jump to anything</span>
-        <span className="text-[10px] px-1.5 py-0.5 border border-[#E5E0D2] rounded bg-[#FBF8F2] leading-none">⌘K</span>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded leading-none"
+          style={{ border: `1px solid ${LINE}`, background: PANEL_BG, color: MUTED }}
+        >
+          ⌘K
+        </span>
       </div>
       {right}
     </div>
   )
 }
 
-export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnread, showPlan, userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat, activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId, onActiveTeamChange, profileSection, onProfileSectionChange, financeSection, onFinanceSectionChange, isTreasurer, isDGL, canCreateTeam, userId }: DesktopSidebarProps) {
+// ── DesktopSidebar ────────────────────────────────────────────────────────────
+
+export function DesktopSidebar({
+  activeTab, onTabChange, ministryName, chatsUnread, showPlan,
+  userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat,
+  activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId,
+  onActiveTeamChange, profileSection, onProfileSectionChange,
+  financeSection, onFinanceSectionChange, isTreasurer, isDGL,
+  canCreateTeam, userId,
+}: DesktopSidebarProps) {
   const supabase = createClient()
   const [note, setNote] = useState("")
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
@@ -60,45 +106,43 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
     }, 600)
   }, [userId, supabase])
 
-  const navItems: { id: Tab; icon: React.FC<{ className?: string }> }[] = [
-    { id: "home", icon: Home },
-    { id: "chats", icon: MessageCircle },
-    ...(showPlan ? [{ id: "plan" as Tab, icon: ClipboardList }] : []),
-    { id: "directory", icon: BookOpen },
-    { id: "giving", icon: Wallet },
-    { id: "profile", icon: User },
+  const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
+    { id: "home",      label: "Home",      icon: Home },
+    { id: "chats",     label: "Messages",  icon: MessageCircle },
+    ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
+    { id: "directory", label: "People",    icon: BookOpen },
+    { id: "giving",    label: "Finance",   icon: Wallet },
+    { id: "profile",   label: "You",       icon: User },
   ]
-
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "10px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
 
   const subItemStyle = (active?: boolean, danger?: boolean): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
     padding: "7px 10px",
-    borderRadius: "8px",
+    borderRadius: "var(--r-chip)",
     cursor: "pointer",
-    background: active ? "#EFEAE0" : "transparent",
-    color: danger ? "#9D2D2D" : "#13101A",
-    fontSize: "13px",
+    background: active ? IVORY : "transparent",
+    color: danger ? "var(--danger)" : active ? INK : "var(--body)",
+    fontSize: 13,
     fontWeight: active ? 500 : 400,
     border: "none",
     width: "100%",
     textAlign: "left",
+    fontFamily: "var(--sans)",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid",
+    borderLeftColor: active ? PLUM : "transparent",
+    transition: "background 100ms ease",
   })
 
   function renderPanelBody() {
+    // ── Chats: recent chat list ──────────────────────────────────────────────
     if (activeTab === "chats") {
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Recent</p>
+          <p style={{ ...MONO, padding: "8px 8px 6px" }}>Recent</p>
           {recentChats.length === 0 ? (
-            <p className="text-[12px] text-[#8A8497] px-2 py-2">No chats yet</p>
+            <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px" }}>No chats yet</p>
           ) : (
             recentChats.slice(0, 6).map((c, i) => {
               const isActive = activeGroupId === c.id
@@ -107,30 +151,37 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
                   key={c.id}
                   onClick={() => onOpenChat(c.id, c.groupName)}
                   style={{
-                    display: "flex", alignItems: "center", gap: "10px",
-                    padding: "8px 8px", borderRadius: "8px", cursor: "pointer",
-                    background: isActive ? "#EFEAE0" : "transparent",
-                    borderTop: "none", borderRight: "none", borderBottom: "none",
-                    borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 8px", borderRadius: "var(--r-chip)", cursor: "pointer",
+                    background: isActive ? IVORY : "transparent",
+                    border: "none",
+                    borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
                     width: "100%", textAlign: "left",
+                    transition: "background 100ms ease",
                   }}
                 >
                   <div style={{
-                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                    background: i % 2 === 0 ? "#3E1540" : "#13101A",
-                    color: "#F6F4EF", display: "grid", placeItems: "center",
-                    fontSize: "10px", fontWeight: 600,
+                    width: 28, height: 28, borderRadius: "var(--r-chip)", flexShrink: 0,
+                    background: i % 2 === 0 ? PLUM : INK,
+                    color: "var(--cream)", display: "grid", placeItems: "center",
+                    fontSize: 10, fontWeight: 600, fontFamily: "var(--sans)",
                   }}>
                     {c.initials}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: c.unreadCount ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.groupName}</div>
+                    <div style={{ fontSize: 13, fontWeight: c.unreadCount ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>
+                      {c.groupName}
+                    </div>
                     {c.lastMessage && (
-                      <div style={{ fontSize: "11px", color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.lastMessage}</div>
+                      <div style={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)" }}>
+                        {c.lastMessage}
+                      </div>
                     )}
                   </div>
                   {c.unreadCount > 0 && (
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: "#13101A", background: "#C9A34B", padding: "1px 6px", borderRadius: 999 }}>{c.unreadCount}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: INK, background: "var(--gold)", padding: "1px 6px", borderRadius: 999, fontFamily: "var(--sans)" }}>
+                      {c.unreadCount}
+                    </span>
                   )}
                 </button>
               )
@@ -140,15 +191,16 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
+    // ── Plan: team list ──────────────────────────────────────────────────────
     if (activeTab === "plan") {
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 6px" }}>
-            <p style={monoStyle}>Your teams · {userTeams.length}</p>
+            <p style={MONO}>Your teams · {userTeams.length}</p>
             {(canCreateTeam || isAdmin) && onCreateTeam && (
               <button
                 onClick={onCreateTeam}
-                style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", borderRadius: 4, padding: 0 }}
+                style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: MUTED, borderRadius: "var(--r-pill)", padding: 0 }}
                 title="New team"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -156,30 +208,32 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
             )}
           </div>
           {userTeams.length === 0 ? (
-            <p className="text-[12px] text-[#8A8497] px-2 py-2">No teams yet</p>
+            <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px" }}>No teams yet</p>
           ) : (
             userTeams.map((t) => {
               const isActive = t.teamId === activeTeamId
               return (
                 <button key={t.teamId} onClick={() => onActiveTeamChange(t.teamId)} style={{
-                  display: "flex", alignItems: "center", gap: "10px",
-                  padding: "9px 8px", borderRadius: "8px", cursor: "pointer",
-                  background: isActive ? "#EFEAE0" : "transparent",
-                  borderTopWidth: 0, borderRightWidth: 0, borderBottomWidth: 0,
-                  borderLeftWidth: 2, borderLeftStyle: "solid",
-                  borderLeftColor: isActive ? "#3E1540" : "transparent",
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 8px", borderRadius: "var(--r-chip)", cursor: "pointer",
+                  background: isActive ? IVORY : "transparent",
+                  border: "none",
+                  borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
                   width: "100%", textAlign: "left",
+                  transition: "background 100ms ease",
                 }}>
                   <PlanLineIcon
                     iconKey={t.teamIcon ?? "users"}
-                    bg={isActive ? "#3E1540" : "#F4F1E8"}
-                    fg={isActive ? "#F6F4EF" : "#13101A"}
+                    bg={isActive ? PLUM : "var(--line)"}
+                    fg={isActive ? "var(--cream)" : INK}
                     size={30}
                     radius={8}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.teamName}</div>
-                    <div style={{ fontSize: "10px", color: "#8A8497", letterSpacing: "0.4px" }}>{t.roleName}</div>
+                    <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>
+                      {t.teamName}
+                    </div>
+                    <div style={{ fontSize: 10, color: MUTED, letterSpacing: "0.4px", fontFamily: "var(--sans)" }}>{t.roleName}</div>
                   </div>
                 </button>
               )
@@ -189,46 +243,64 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
+    // ── Directory: no sub-nav in panel ───────────────────────────────────────
     if (activeTab === "directory") {
       return <div className="flex-1 overflow-y-auto px-2 pb-3" />
     }
 
-    if (activeTab === "giving") {
+    // ── Finance (giving tab): sub-sections ───────────────────────────────────
+    if (activeTab === "giving" || activeTab === "give") {
       const financeSections: { label: string; section: "reimbursements" | "budget"; show: boolean }[] = [
         { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
-        { label: "Budget", section: "budget", show: !!(isTreasurer || isAdmin) },
+        { label: "Budget",         section: "budget",         show: !!(isTreasurer || isAdmin) },
       ]
+      const visible = financeSections.filter(s => s.show)
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Giving</p>
-          {financeSections.filter(s => s.show).map(s => (
-            <button key={s.section} style={subItemStyle(financeSection === s.section || (s.section === "budget" && financeSection === "allocation"))} onClick={() => onFinanceSectionChange(s.section)}>
-              <span style={{ flex: 1 }}>{s.label}</span>
-            </button>
-          ))}
+          <p style={{ ...MONO, padding: "8px 8px 6px" }}>Finance</p>
+          <button style={subItemStyle(activeTab === "give")} onClick={() => onTabChange("give")}>
+            <span style={{ flex: 1 }}>Give</span>
+          </button>
+          {visible.length > 0 && (
+            <>
+              <div style={{ height: 1, background: LINE, margin: "4px 8px" }} />
+              {visible.map(s => (
+                <button
+                  key={s.section}
+                  style={subItemStyle(financeSection === s.section || (s.section === "budget" && financeSection === "allocation"))}
+                  onClick={() => onFinanceSectionChange(s.section)}
+                >
+                  <span style={{ flex: 1 }}>{s.label}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )
     }
 
+    // ── Profile / Congregation ───────────────────────────────────────────────
     if (activeTab === "profile" || activeTab === "congregation") {
       const items: { label: string; section?: "spiritual-profile" | "journal"; tab?: Tab; danger?: boolean; onClick?: () => void }[] = [
-        { label: "Profile", section: "spiritual-profile" },
-        { label: "Journal", section: "journal" },
+        { label: "Profile",  section: "spiritual-profile" },
+        { label: "Journal",  section: "journal" },
         ...(isPastor ? [{ label: "Congregation", tab: "congregation" as Tab }] : []),
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>You</p>
+          <p style={{ ...MONO, padding: "8px 8px 6px" }}>You</p>
           {items.map((s, i) => (
             <button
               key={i}
               style={subItemStyle(
-                s.tab ? activeTab === s.tab : s.section ? (activeTab === "profile" && profileSection === s.section) : undefined,
+                s.tab ? activeTab === s.tab
+                  : s.section ? (activeTab === "profile" && profileSection === s.section)
+                  : undefined,
                 s.danger
               )}
               onClick={
-                s.tab ? () => onTabChange(s.tab!)
+                s.tab    ? () => onTabChange(s.tab!)
                 : s.section ? () => { if (activeTab !== "profile") onTabChange("profile"); onProfileSectionChange(s.section!) }
                 : s.onClick
               }
@@ -240,40 +312,32 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
       )
     }
 
-    // Home panel — Home, Announcements, Give, Forms, and Settings (admin-only)
+    // ── Home section: Home, Announcements, Give, Forms, Settings ────────────
     const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
-      { label: "Home", tab: "home" },
-      { label: "Announcements", tab: "announcements" },
-      { label: "Give", tab: "give" },
-      { label: "Forms", tab: "forms" },
+      { label: "Home",            tab: "home" },
+      { label: "Announcements",   tab: "announcements" },
+      { label: "Give",            tab: "give" },
+      { label: "Forms",           tab: "forms" },
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
-    const generalTabs = ["home", "announcements", "give"] as const
-    const restrictedTabs = ["forms", "settings"] as const
-    const generalItems = homeItems.filter(i => (generalTabs as readonly string[]).includes(i.tab))
+    const generalTabs  = ["home", "announcements", "give"] as const
+    const restrictedTabs = ["forms", "settings"]   as const
+    const generalItems   = homeItems.filter(i => (generalTabs   as readonly string[]).includes(i.tab))
     const restrictedItems = homeItems.filter(i => (restrictedTabs as readonly string[]).includes(i.tab))
 
     return (
       <div className="flex-1 overflow-y-auto px-2 pb-3">
-        <p style={{ ...monoStyle, padding: "8px 8px 6px" }}>Home</p>
-        {generalItems.map((item) => (
-          <button
-            key={item.tab}
-            style={subItemStyle(activeTab === item.tab)}
-            onClick={() => onTabChange(item.tab)}
-          >
+        <p style={{ ...MONO, padding: "8px 8px 6px" }}>Home</p>
+        {generalItems.map(item => (
+          <button key={item.tab} style={subItemStyle(activeTab === item.tab)} onClick={() => onTabChange(item.tab)}>
             <span style={{ flex: 1 }}>{item.label}</span>
           </button>
         ))}
         {restrictedItems.length > 0 && (
           <>
-            <div style={{ height: 1, background: "#E5E0D2", margin: "4px 8px" }} />
-            {restrictedItems.map((item) => (
-              <button
-                key={item.tab}
-                style={subItemStyle(activeTab === item.tab)}
-                onClick={() => onTabChange(item.tab)}
-              >
+            <div style={{ height: 1, background: LINE, margin: "4px 8px" }} />
+            {restrictedItems.map(item => (
+              <button key={item.tab} style={subItemStyle(activeTab === item.tab)} onClick={() => onTabChange(item.tab)}>
                 <span style={{ flex: 1 }}>{item.label}</span>
               </button>
             ))}
@@ -285,10 +349,17 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
 
   return (
     <>
-      {/* Icon Rail */}
-      <div className="hidden md:flex flex-col w-16 flex-shrink-0 h-screen bg-[#13101A] items-center py-4 gap-1">
-        {/* Logo — links back to landing */}
-        <a href="/landing" className="w-9 h-9 rounded-[10px] bg-[#3E1540] flex items-center justify-center mb-3.5 flex-shrink-0 hover:bg-[#2D0F2E] transition-colors" style={{ textDecoration: "none" }}>
+      {/* ── Icon Rail ─────────────────────────────────────────────────────── */}
+      <div
+        className="hidden md:flex flex-col w-[72px] flex-shrink-0 h-screen items-center py-4 gap-0.5"
+        style={{ background: RAIL_BG, borderRight: `1px solid ${LINE}` }}
+      >
+        {/* Logo — DO NOT TOUCH: exact original markup preserved */}
+        <a
+          href="/landing"
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center mb-3.5 flex-shrink-0 hover:opacity-90 transition-opacity"
+          style={{ background: PLUM, textDecoration: "none" }}
+        >
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
             <circle cx="50" cy="50" r="44" stroke="#F6F4EF" strokeWidth="6" />
             <rect x="47" y="22" width="6" height="56" fill="#F6F4EF" />
@@ -296,27 +367,68 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
           </svg>
         </a>
 
-        {navItems.map(({ id, icon: Icon }) => {
-          const isActive = activeTab === id || (id === "home" && (activeTab === "settings" || activeTab === "announcements" || activeTab === "forms" || activeTab === "give")) || (id === "profile" && activeTab === "congregation")
+        {navItems.map(({ id, label, icon: Icon }) => {
+          const isActive =
+            activeTab === id ||
+            (id === "home" && ["settings", "announcements", "forms", "give"].includes(activeTab)) ||
+            (id === "profile" && activeTab === "congregation") ||
+            (id === "giving" && activeTab === "give")
           return (
             <button
               key={id}
               onClick={() => onTabChange(id)}
-              className="relative w-10 h-10 rounded-[10px] flex items-center justify-center transition-colors"
+              className="relative flex flex-col items-center gap-1 w-full px-1 py-2 rounded-none transition-colors"
               style={{
-                background: isActive ? "rgba(255,255,255,0.10)" : "transparent",
-                color: isActive ? "#F6F4EF" : "rgba(246,244,239,0.45)",
+                background: "transparent",
+                color: isActive ? PLUM : MUTED,
                 border: "none",
                 cursor: "pointer",
               }}
             >
-              <Icon className="w-[18px] h-[18px]" />
+              {/* Active pill indicator */}
               {isActive && (
-                <span className="absolute left-[-9px] top-2 bottom-2 w-0.5 bg-[#F6F4EF] rounded-full" />
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 6, top: "50%", transform: "translateY(-50%)",
+                    width: 3, height: 24,
+                    background: PLUM,
+                    borderRadius: 99,
+                  }}
+                />
               )}
-              {id === "chats" && chatsUnread > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#C9A34B] rounded-full" />
-              )}
+              <div
+                style={{
+                  width: 36, height: 32, borderRadius: "var(--r-chip)",
+                  background: isActive ? "var(--cream-3)" : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "background 100ms ease",
+                  position: "relative",
+                }}
+              >
+                <Icon className="w-[18px] h-[18px]" />
+                {id === "chats" && chatsUnread > 0 && (
+                  <span
+                    style={{
+                      position: "absolute", top: 4, right: 4,
+                      width: 6, height: 6,
+                      background: "var(--gold)", borderRadius: "50%",
+                    }}
+                  />
+                )}
+              </div>
+              <span
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 8,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: isActive ? PLUM : MUTED,
+                  lineHeight: 1,
+                }}
+              >
+                {label}
+              </span>
             </button>
           )
         })}
@@ -324,21 +436,30 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         <div className="flex-1" />
 
         {/* User avatar */}
-        <div className="w-8 h-8 rounded-full bg-[#3E1540] flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+          style={{ background: PLUM }}
+        >
           {userAvatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-[11px] font-semibold text-[#F6F4EF]">{userInitials}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--cream)", fontFamily: "var(--sans)" }}>
+              {userInitials}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Context Panel — hidden for chats/directory (those tabs have their own left panel) */}
-      <div className={`hidden flex-col w-[232px] flex-shrink-0 h-screen bg-[#FBF8F2] border-r border-[#E5E0D2] ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}>
+      {/* ── Context Panel ─────────────────────────────────────────────────── */}
+      <div
+        className={`hidden flex-col w-[220px] flex-shrink-0 h-screen ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}
+        style={{ background: PANEL_BG, borderRight: `1px solid ${LINE}` }}
+      >
         {/* Workspace header */}
-        <div className="px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
-          <p style={monoStyle}>Workspace</p>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>
+        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${LINE}`, flexShrink: 0 }}>
+          <p style={MONO}>Workspace</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
             {ministryName}
           </p>
         </div>
@@ -346,11 +467,20 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
         {renderPanelBody()}
 
         {/* Sticky note */}
-        <div className="mx-3 mb-4 flex-shrink-0" style={{ padding: "10px 12px", border: "1px solid #DDD9C8", borderRadius: 10, background: "#FAF6E4", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div
+          style={{
+            margin: "0 10px 12px",
+            padding: "10px 12px",
+            border: `1px solid var(--line-2)`,
+            borderRadius: "var(--r-input)",
+            background: "var(--cream-2)",
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <p style={{ ...monoStyle, color: "#A09A6A" }}>Note</p>
+            <p style={{ ...MONO, color: "var(--faint)" }}>Note</p>
             {saveStatus === "saved" && (
-              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 9, letterSpacing: "0.05em", color: "#A0BA8A" }}>SAVED</span>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.05em", color: "var(--success)" }}>SAVED</span>
             )}
           </div>
           <textarea
@@ -360,8 +490,8 @@ export function DesktopSidebar({ activeTab, onTabChange, ministryName, chatsUnre
             rows={3}
             style={{
               width: "100%", resize: "none", border: "none", outline: "none",
-              background: "transparent", fontFamily: "var(--font-inter)",
-              fontSize: "12px", lineHeight: 1.55, color: "#2D2A1E",
+              background: "transparent", fontFamily: "var(--sans)",
+              fontSize: 12, lineHeight: 1.55, color: INK,
               padding: 0, boxSizing: "border-box",
             }}
           />

@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
-import { DesktopTopbar } from "../components/desktop-nav"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
@@ -270,8 +269,6 @@ export function HomeTab({
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar crumbs={["Central", "Home"]} />
-
       {/* ── Mobile top bar ── */}
       <div className="flex items-center justify-between px-5 pt-14 pb-4 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>

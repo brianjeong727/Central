@@ -7,7 +7,6 @@ import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
-import { DesktopTopbar } from "../components/desktop-nav"
 import type { DirectoryMember } from "../types"
 
 export function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, initialMemberId, onMemberSelect, onOpenChat, onBack }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; initialMemberId?: string; onMemberSelect?: (id: string | null) => void; onOpenChat: (id: string, name: string) => void; onBack?: () => void }) {
@@ -50,11 +49,6 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
 
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-
-      {/* Desktop Topbar — full-width row */}
-      <DesktopTopbar
-        crumbs={selected ? ["Central", "Directory", selected.name] : ["Central", "Directory"]}
-      />
 
       {/* ── Desktop: split-pane row ── */}
       <div className="hidden md:flex md:flex-1 md:overflow-hidden">

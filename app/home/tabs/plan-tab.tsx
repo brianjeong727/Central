@@ -42,7 +42,6 @@ import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
-import { DesktopTopbar } from "../components/desktop-nav"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -1832,9 +1831,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
   return (
     <div className="pb-2 md:pb-0">
-      {/* Desktop Topbar */}
-      <DesktopTopbar crumbs={["Central", "Plan"]} />
-
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
@@ -9750,102 +9746,64 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         </div>
       </div>
 
-      {/* ── Desktop topbar ── */}
-      <DesktopTopbar
-        crumbs={showAddMember
-          ? ["Central", "Plan", team.name, "Settings", "Add member"]
-          : ["Central", "Plan", team.name, "Settings"]
-        }
-        right={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {showAddMember ? (
-              <>
-                <button
-                  onClick={() => { setShowAddMember(false); setError(null) }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}
-                >
-                  <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+      {/* ── Desktop settings header ── */}
+      <div className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
+        <div className="flex items-center gap-1.5 text-[12px]" style={{ flex: 1 }}>
+          <span style={{ color: "var(--muted-text)" }}>Central</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--muted-text)" }}>Planning</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--muted-text)" }}>{team.name}</span>
+          <span style={{ color: "var(--line-2)" }}>/</span>
+          <span style={{ color: "var(--ink)", fontWeight: 500 }}>{showAddMember ? "Add member" : "Settings"}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {showAddMember ? (
+            <>
+              <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}>
+                <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+              </button>
+              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}>
+                <X style={{ width: 15, height: 15 }} />
+              </button>
+            </>
+          ) : confirmDelete ? (
+            <>
+              <button onClick={() => setConfirmDelete(false)} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleDeleteTeam} style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete team</button>
+            </>
+          ) : savedMsg ? (
+            <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
+          ) : hasChanges ? (
+            <>
+              <button onClick={handleDiscardChanges} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
+              <button onClick={handleSaveChanges} disabled={savingPerms} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}>
+                {savingPerms ? "Saving…" : "Save changes"}
+              </button>
+            </>
+          ) : (
+            <>
+              {canCreateGroupChat && (chatCreated ? (
+                <button onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                  <MessageCircle style={{ width: 13, height: 13 }} /> Open chat
                 </button>
-                <button
-                  onClick={onClose}
-                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
-                >
-                  <X style={{ width: 15, height: 15 }} />
+              ) : (
+                <button onClick={handleCreateGroupChat} disabled={creatingChat} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}>
+                  <MessageCircle style={{ width: 13, height: 13 }} /> {creatingChat ? "Creating…" : "Group chat"}
                 </button>
-              </>
-            ) : confirmDelete ? (
-              <>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}
-                >
-                  Cancel
+              ))}
+              {canDelete && (
+                <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}>
+                  <Trash2 style={{ width: 13, height: 13 }} /> Delete team
                 </button>
-                <button
-                  onClick={handleDeleteTeam}
-                  style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
-                >
-                  Delete team
-                </button>
-              </>
-            ) : savedMsg ? (
-              <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
-            ) : hasChanges ? (
-              <>
-                <button
-                  onClick={handleDiscardChanges}
-                  style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}
-                >
-                  Discard
-                </button>
-                <button
-                  onClick={handleSaveChanges}
-                  disabled={savingPerms}
-                  style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
-                >
-                  {savingPerms ? "Saving…" : "Save changes"}
-                </button>
-              </>
-            ) : (
-              <>
-                {canCreateGroupChat && (
-                  chatCreated ? (
-                    <button
-                      onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
-                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
-                    >
-                      <MessageCircle style={{ width: 13, height: 13 }} /> Open chat
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleCreateGroupChat}
-                      disabled={creatingChat}
-                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}
-                    >
-                      <MessageCircle style={{ width: 13, height: 13 }} /> {creatingChat ? "Creating…" : "Group chat"}
-                    </button>
-                  )
-                )}
-                {canDelete && (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}
-                  >
-                    <Trash2 style={{ width: 13, height: 13 }} /> Delete team
-                  </button>
-                )}
-                <button
-                  onClick={onClose}
-                  style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}
-                  title="Close settings"
-                >
-                  <X style={{ width: 15, height: 15 }} />
-                </button>
-              </>
-            )}
-          </div>
-        }
-      />
+              )}
+              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }} title="Close settings">
+                <X style={{ width: 15, height: 15 }} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {error && (

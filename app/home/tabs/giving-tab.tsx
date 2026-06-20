@@ -7,7 +7,6 @@ import {
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
   FileText, ImageIcon,
 } from "lucide-react"
-import { DesktopTopbar } from "../components/desktop-nav"
 import { Spinner } from "../components/shared"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
@@ -960,8 +959,6 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
   return (
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
-      <DesktopTopbar crumbs={["Central", "Giving", ...(activeSection !== "give" ? [sectionLabel] : [])]} />
-
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={monoStyle}>2 Corinthians 9:7</p>

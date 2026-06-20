@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import { Check, ChevronDown, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
-import { DesktopTopbar } from "../components/desktop-nav"
 import type { FormsTabProps, FieldType } from "../types"
 
 interface FormFieldRow {
@@ -532,8 +531,6 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
 
   return (
     <div className="pb-28 md:pb-0">
-      <DesktopTopbar crumbs={["Central", "Forms"]} />
-
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={MONO_STYLE}>Forms</p>

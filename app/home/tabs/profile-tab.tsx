@@ -9,7 +9,6 @@ import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { DesktopTopbar } from "../components/desktop-nav"
 import { RoleDescriptionEditor } from "./plan-tab"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
@@ -1003,30 +1002,6 @@ export function ProfileTab({
   return (
     <div className="pb-6 md:pb-0">
 
-      {/* Desktop Topbar */}
-      <DesktopTopbar
-        crumbs={activeSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]}
-        right={
-          activeSection === "spiritual-profile" ? (
-            <div className="hidden md:flex items-center gap-2">
-              {editing ? (
-                <>
-                  <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#E5E0D2] rounded-lg text-[12px] text-[#5A5466] hover:bg-[#F4F1E8] transition-colors">
-                    <X className="w-3.5 h-3.5" />Cancel
-                  </button>
-                  <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50">
-                    <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
-                  </button>
-                </>
-              ) : (
-                <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#13101A] text-[#F6F4EF] rounded-lg text-[12px] font-medium hover:bg-[#2D0F2E] transition-colors">
-                  <Edit3 className="w-3.5 h-3.5" />Edit profile
-                </button>
-              )}
-            </div>
-          ) : null
-        }
-      />
 
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
@@ -1088,6 +1063,22 @@ export function ProfileTab({
                 {profile.graduation_year && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>Class · </span>{profile.graduation_year}</div>}
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>School · </span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</div>}
                 <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
+              </div>
+              <div style={{ marginTop: 20, display: "flex", gap: 8 }}>
+                {editing ? (
+                  <>
+                    <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] transition-colors" style={{ border: "1px solid rgba(246,244,239,0.25)", background: "transparent", color: "rgba(246,244,239,0.75)", cursor: "pointer" }}>
+                      <X className="w-3.5 h-3.5" />Cancel
+                    </button>
+                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors disabled:opacity-50" style={{ background: "rgba(246,244,239,0.15)", border: "1px solid rgba(246,244,239,0.3)", color: "#F6F4EF", cursor: saving ? "not-allowed" : "pointer" }}>
+                      <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors" style={{ background: "rgba(246,244,239,0.15)", border: "1px solid rgba(246,244,239,0.3)", color: "#F6F4EF", cursor: "pointer" }}>
+                    <Edit3 className="w-3.5 h-3.5" />Edit profile
+                  </button>
+                )}
               </div>
             </div>
           </div>
