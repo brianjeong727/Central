@@ -9,7 +9,7 @@ import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
-import { CentralButton, InsetHairline } from "@/components/central"
+import { CentralButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -738,7 +738,7 @@ function DangerZone({
   onConfirm: () => void
 }) {
   return (
-    <div style={{ marginTop: 48 }}>
+    <div style={{ paddingTop: 48 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
         <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase" as const, color: "var(--danger)" }}>Danger Zone</span>
@@ -999,7 +999,7 @@ export function ProfileTab({
   }
 
   return (
-    <div className="pb-6 md:pb-0">
+    <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
 
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
@@ -1011,11 +1011,11 @@ export function ProfileTab({
           </div>
 
           {/* Desktop header */}
-          <div className="hidden md:block px-14 pt-11 pb-8" style={{ borderBottom: "1px solid var(--line)" }}>
-            <p style={{ ...MONO_STYLE, marginBottom: 6 }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 52, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
-            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
-          </div>
+          <TabPageHeader>
+            <PageTitle eyebrow="Your Journal" title="Journal">
+              <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
+            </PageTitle>
+          </TabPageHeader>
 
           <div className="px-5 md:px-14">
             <JournalSection
@@ -1030,7 +1030,7 @@ export function ProfileTab({
         </div>
       )}
 
-      {activeSection === "spiritual-profile" && <>
+      {activeSection === "spiritual-profile" && <div className="md:flex md:flex-col md:flex-1">
 
         {/* ── Mobile: top bar ── */}
         <div className="flex items-center gap-2.5 px-5 pt-14 pb-3 md:hidden">
@@ -1076,8 +1076,7 @@ export function ProfileTab({
         </div>
 
         {/* ── Desktop: cream identity header ── */}
-        <div className="hidden md:block"><InsetHairline /></div>
-        <div className="hidden md:flex items-center gap-6 px-14" style={{ paddingTop: 36, paddingBottom: 36 }}>
+        <TabPageHeader style={{ gap: 24 }}>
           <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: 14, background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
             <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
             {profile.avatar_url
@@ -1107,21 +1106,22 @@ export function ProfileTab({
           ) : (
             <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Edit3 size={13} />Edit profile</CentralButton>
           )}
-        </div>
-        <div className="hidden md:block"><InsetHairline /></div>
+        </TabPageHeader>
 
         {/* ── Desktop: profile sections ── */}
-        <div className="hidden md:block px-14 pt-6 pb-6">
+        <div className="hidden md:flex md:flex-col md:flex-1 px-14 pt-6 pb-10">
           {renderProfileSections()}
-          <DangerZone
-            ministryName={ministryName}
-            leaveConfirm={leaveConfirm}
-            leaving={leaving}
-            leaveError={leaveError}
-            onShowConfirm={() => setLeaveConfirm(true)}
-            onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
-            onConfirm={handleLeaveMinistry}
-          />
+          <div style={{ marginTop: "auto" }}>
+            <DangerZone
+              ministryName={ministryName}
+              leaveConfirm={leaveConfirm}
+              leaving={leaving}
+              leaveError={leaveError}
+              onShowConfirm={() => setLeaveConfirm(true)}
+              onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
+              onConfirm={handleLeaveMinistry}
+            />
+          </div>
         </div>
 
         {/* ── Mobile: profile sections ── */}
@@ -1137,7 +1137,7 @@ export function ProfileTab({
             onConfirm={handleLeaveMinistry}
           />
         </div>
-      </>}
+      </div>}
     </div>
   )
 }

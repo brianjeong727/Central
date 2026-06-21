@@ -8,6 +8,7 @@ import {
   FileText, ImageIcon,
 } from "lucide-react"
 import { Spinner } from "../components/shared"
+import { TabPageHeader, PageTitle } from "@/components/central"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
@@ -57,18 +58,30 @@ const FUNDS = [
   { value: "pitt", label: "Pitt" },
 ]
 
+// Semantic colors not in Central's design token palette — amber warning, danger tints, budget green
+const WARN_BG = "#FFF8E1"
+const WARN_BORDER = "#FDE68A"
+const WARN_TEXT = "#B45309"
+const DANGER_TINT_BG = "#FDF1F1"
+const DANGER_TINT_BORDER = "#E8C5C5"
+const DANGER_ROW_BG = "#FDF9F9"
+const DELETE_CONFIRM_BG = "#FEF2F2"
+const DELETE_CONFIRM_BORDER = "#FECACA"
+const BUDGET_GREEN = "#2D5445"
+const REIMBURSED_TINT = "#EDE5F0"
+
 const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  pending:    { label: "Pending",    bg: "#F2F0F5", text: "#5A5466" },
-  approved:   { label: "Approved",  bg: "#E6F4EA", text: "#1E6B3C" },
-  rejected:   { label: "Rejected",  bg: "#FEE2E2", text: "#991B1B" },
-  reimbursed: { label: "Reimbursed",bg: "#EDE5F0", text: "#3E1540" },
-  flagged:    { label: "Flagged",   bg: "#FFF8E1", text: "#B45309" },
+  pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
+  approved:   { label: "Approved",  bg: "#E6F4EA",       text: "#1E6B3C" },
+  rejected:   { label: "Rejected",  bg: "#FEE2E2",       text: "var(--danger)" },
+  reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
+  flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
 
 const FORM_STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  not_started: { label: "Not started", bg: "#F2F0F5", text: "#8A8497" },
-  in_progress: { label: "In progress", bg: "#FFF3CD", text: "#854D0E" },
-  complete:    { label: "Complete",    bg: "#DCFCE7", text: "#166534" },
+  not_started: { label: "Not started", bg: "var(--ivory)", text: "var(--muted-text)" },
+  in_progress: { label: "In progress", bg: "#FFF3CD",      text: "#854D0E" },
+  complete:    { label: "Complete",    bg: "#DCFCE7",       text: "#166534" },
 }
 
 const DISMISSAL_REASONS = [
@@ -80,13 +93,13 @@ const DISMISSAL_REASONS = [
 const PRESET_AMOUNTS = ["10", "25", "50", "100", "250"]
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", border: "1px solid #ECE8DE",
-  borderRadius: 10, fontSize: 13, color: "#13101A", background: "#FDFBF7",
+  width: "100%", padding: "10px 12px", border: "1px solid var(--line)",
+  borderRadius: "var(--r-input)", fontSize: 13, color: "var(--ink)", background: "var(--cream)",
   outline: "none", boxSizing: "border-box",
 }
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
-  textTransform: "uppercase", color: "#8A8497", marginBottom: 5, display: "block",
+  textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 5, display: "block",
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -111,8 +124,8 @@ function RPersonChip({ name }: { name: string }) {
   const parts = name.trim().split(" ")
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 3px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>
-      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "#3E1540", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 7.5, fontWeight: 600, flexShrink: 0, letterSpacing: 0.3 }}>{initials.toUpperCase()}</span>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 3px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>
+      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 7.5, fontWeight: 600, flexShrink: 0, letterSpacing: 0.3 }}>{initials.toUpperCase()}</span>
       {name}
     </span>
   )
@@ -121,7 +134,7 @@ function RPersonChip({ name }: { name: string }) {
 function RStatusPill({ status }: { status: string }) {
   const m = FORM_STATUS_META[status] ?? FORM_STATUS_META.not_started
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", borderRadius: 999, background: "#FBF8F2", border: "1px solid #E2DDCF", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase" as const, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", borderRadius: 999, background: "var(--cream)", border: "1px solid var(--line-2)", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", textTransform: "uppercase" as const, whiteSpace: "nowrap" }}>
       {m.label}
     </span>
   )
@@ -131,7 +144,7 @@ function Initials({ name, size = 28 }: { name: string; size?: number }) {
   const parts = name.trim().split(" ")
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: "#3E1540", color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.36, fontWeight: 600, flexShrink: 0 }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.36, fontWeight: 600, flexShrink: 0 }}>
       {initials.toUpperCase()}
     </div>
   )
@@ -139,17 +152,17 @@ function Initials({ name, size = 28 }: { name: string; size?: number }) {
 
 function GivingTrustPanel({ zelleInfo, onCopy, copied }: { zelleInfo: string; onCopy: () => void; copied: boolean }) {
   return (
-    <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, padding: "18px 20px" }}>
-      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Giving destination</p>
-      <div style={{ padding: "12px 14px", border: "1px solid #ECE8DE", background: "#FBF8F2", borderRadius: 12, marginBottom: 12 }}>
-        <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 600, lineHeight: 1.2 }}>{zelleInfo}</p>
-        <p style={{ fontSize: 12, color: "#8A8497", marginTop: 4 }}>Zelle email or phone</p>
+    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
+      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Giving destination</p>
+      <div style={{ padding: "12px 14px", border: "1px solid var(--line)", background: "var(--cream)", borderRadius: 12, marginBottom: 12 }}>
+        <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 600, lineHeight: 1.2 }}>{zelleInfo}</p>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>Zelle email or phone</p>
       </div>
-      <button onClick={onCopy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, border: "1px solid #E5E0D2", background: "white", color: copied ? "#3E1540" : "#5A5466", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
+      <button onClick={onCopy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
         {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
         {copied ? "Copied" : "Copy Zelle info"}
       </button>
-      <p style={{ fontSize: 12.5, color: "#5A5466", lineHeight: 1.55 }}>
+      <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>
         Central only stores your ministry&apos;s Zelle destination. Gifts, receipts, statements, and tax records stay with your ministry.
       </p>
     </div>
@@ -204,10 +217,10 @@ function SubmitReceiptModal({
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.4)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: "#FDFBF7", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid #ECE8DE" }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Submit a receipt</p>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "#F2EDE0", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} color="#5A5466" /></button>
+      <div style={{ background: "var(--cream)", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid var(--line)" }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)" }}>Submit a receipt</p>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ivory)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} color="var(--body)" /></button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -219,9 +232,9 @@ function SubmitReceiptModal({
             <div><label style={labelStyle}>Purchase date</label><input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={inputStyle} /></div>
           </div>
           {overLimit && (
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "#FFF8E1", border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
-              <AlertTriangle size={14} color="#B45309" style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 12.5, color: "#B45309", lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
+              <AlertTriangle size={14} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ fontSize: 12.5, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>
           )}
           <div><label style={labelStyle}>Event name (optional)</label><input type="text" placeholder="e.g. Week 3 DG Dinner" value={eventName} onChange={e => setEventName(e.target.value)} style={inputStyle} /></div>
@@ -231,19 +244,19 @@ function SubmitReceiptModal({
             <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} />
             {imageUrl ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#3E1540", fontWeight: 500 }}>View uploaded image</a>
-                <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+                <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>View uploaded image</a>
+                <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
               </div>
             ) : (
-              <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 14px", border: "1px dashed #C4C4C4", borderRadius: 10, background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", width: "100%" }}>
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 14px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", width: "100%" }}>
                 <Upload size={14} />{uploading ? "Uploading…" : "Upload image"}
               </button>
             )}
           </div>
-          {error && <p style={{ fontSize: 13, color: "#B91C1C" }}>{error}</p>}
+          {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
         </div>
-        <div style={{ padding: "12px 20px 24px", borderTop: "1px solid #ECE8DE" }}>
-          <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "#3E1540", color: "#F6F4EF", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
+        <div style={{ padding: "12px 20px 24px", borderTop: "1px solid var(--line)" }}>
+          <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
             {submitting ? "Submitting…" : "Submit receipt"}
           </button>
         </div>
@@ -314,32 +327,32 @@ function ReceiptPanel({
 
   return (
     <div>
-      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>Receipt</p>
+      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Receipt</p>
 
       {receiptData ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {receiptData.receipt_image_url ? (
-            <a href={receiptData.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 10, overflow: "hidden", border: "1px solid #ECE8DE", maxWidth: 200 }}>
+            <a href={receiptData.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 10, overflow: "hidden", border: "1px solid var(--line)", maxWidth: 200 }}>
               <img src={receiptData.receipt_image_url} alt="Receipt" style={{ width: "100%", display: "block", objectFit: "cover" }} />
             </a>
           ) : (
-            <div style={{ width: 48, height: 48, borderRadius: 10, background: "#F4F1E8", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ImageIcon size={18} color="#8A8497" />
+            <div style={{ width: 48, height: 48, borderRadius: 10, background: "var(--body-bg)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ImageIcon size={18} color="var(--muted-text)" />
             </div>
           )}
           <div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#13101A" }}>${Number(receiptData.amount).toFixed(2)}</p>
+            <p style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>${Number(receiptData.amount).toFixed(2)}</p>
             {overLimit && (
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
-                <AlertTriangle size={12} color="#B45309" />
-                <span style={{ fontSize: 11, color: "#B45309", fontWeight: 600 }}>Over ${dgDinnerLimit} limit</span>
+                <AlertTriangle size={12} color={WARN_TEXT} />
+                <span style={{ fontSize: 11, color: WARN_TEXT, fontWeight: 600 }}>Over ${dgDinnerLimit} limit</span>
               </div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
               <Initials name={receiptData.submitted_by_name ?? "?"} size={22} />
               <div>
-                <p style={{ fontSize: 12.5, fontWeight: 500, color: "#13101A" }}>{receiptData.submitted_by_name ?? "Unknown"}</p>
-                <p style={{ fontSize: 11, color: "#8A8497" }}>{new Date(receiptData.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink)" }}>{receiptData.submitted_by_name ?? "Unknown"}</p>
+                <p style={{ fontSize: 11, color: "var(--muted-text)" }}>{new Date(receiptData.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
               </div>
             </div>
           </div>
@@ -347,21 +360,21 @@ function ReceiptPanel({
       ) : canUpload ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {(dgl1 || dgl2) && (
-            <p style={{ fontSize: 12.5, color: "#8A8497", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
               Waiting for receipt from{" "}
-              {dgl1 && <strong style={{ color: "#13101A" }}>{dgl1}</strong>}
+              {dgl1 && <strong style={{ color: "var(--ink)" }}>{dgl1}</strong>}
               {dgl1 && dgl2 && " or "}
-              {dgl2 && <strong style={{ color: "#13101A" }}>{dgl2}</strong>}
+              {dgl2 && <strong style={{ color: "var(--ink)" }}>{dgl2}</strong>}
             </p>
           )}
           <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} />
           {imageUrl ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#3E1540", fontWeight: 500 }}>View uploaded photo</a>
-              <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+              <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>View uploaded photo</a>
+              <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
             </div>
           ) : (
-            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", border: "1px dashed #C4C4C4", borderRadius: 10, background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer" }}>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer" }}>
               <Upload size={14} />{uploading ? "Uploading…" : "Upload receipt photo"}
             </button>
           )}
@@ -370,27 +383,27 @@ function ReceiptPanel({
             <input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, maxWidth: 140 }} />
           </div>
           {overLimit && (
-            <div style={{ display: "flex", gap: 6, alignItems: "flex-start", background: "#FFF8E1", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 10px" }}>
-              <AlertTriangle size={12} color="#B45309" style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 11.5, color: "#B45309", lineHeight: 1.4 }}>Over ${dgDinnerLimit} limit</p>
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-start", background: WARN_BG, border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 10px" }}>
+              <AlertTriangle size={12} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ fontSize: 11.5, color: WARN_TEXT, lineHeight: 1.4 }}>Over ${dgDinnerLimit} limit</p>
             </div>
           )}
-          {error && <p style={{ fontSize: 12.5, color: "#B91C1C" }}>{error}</p>}
-          <button onClick={handleSubmit} disabled={submitting} style={{ padding: "8px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1, alignSelf: "flex-start" }}>
+          {error && <p style={{ fontSize: 12.5, color: "var(--danger)" }}>{error}</p>}
+          <button onClick={handleSubmit} disabled={submitting} style={{ padding: "8px 16px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1, alignSelf: "flex-start" }}>
             {submitting ? "Submitting…" : "Submit receipt"}
           </button>
         </div>
       ) : (
-        <div style={{ padding: "16px", background: "#F9F7F2", borderRadius: 10, border: "1px dashed #E5E0D2" }}>
+        <div style={{ padding: "16px", background: "var(--cream)", borderRadius: 10, border: "1px dashed var(--dashed)" }}>
           {(dgl1 || dgl2) ? (
-            <p style={{ fontSize: 12.5, color: "#8A8497", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
               Waiting for receipt from{" "}
-              {dgl1 && <strong style={{ color: "#5A5466" }}>{dgl1}</strong>}
+              {dgl1 && <strong style={{ color: "var(--body)" }}>{dgl1}</strong>}
               {dgl1 && dgl2 && " or "}
-              {dgl2 && <strong style={{ color: "#5A5466" }}>{dgl2}</strong>}
+              {dgl2 && <strong style={{ color: "var(--body)" }}>{dgl2}</strong>}
             </p>
           ) : (
-            <p style={{ fontSize: 12.5, color: "#8A8497" }}>No receipt submitted yet.</p>
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)" }}>No receipt submitted yet.</p>
           )}
         </div>
       )}
@@ -459,11 +472,11 @@ function FormPanel({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div>
           <label style={labelStyle}>Name</label>
-          <input type="text" value={form.treasurer_name ?? ""} readOnly style={{ ...inputStyle, background: "#F4F1E8", color: "#5A5466" }} />
+          <input type="text" value={form.treasurer_name ?? ""} readOnly style={{ ...inputStyle, background: "var(--body-bg)", color: "var(--body)" }} />
         </div>
         <div>
           <label style={labelStyle}>Date</label>
-          <input type="text" value={form.friday_date ? new Date(form.friday_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} readOnly style={{ ...inputStyle, background: "#F4F1E8", color: "#5A5466" }} />
+          <input type="text" value={form.friday_date ? new Date(form.friday_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} readOnly style={{ ...inputStyle, background: "var(--body-bg)", color: "var(--body)" }} />
         </div>
       </div>
 
@@ -471,7 +484,7 @@ function FormPanel({
       <div>
         <label style={labelStyle}>Expense purpose</label>
         {readOnly
-          ? <p style={{ fontSize: 13, color: "#13101A", padding: "10px 12px", background: "#F4F1E8", borderRadius: 10, border: "1px solid #ECE8DE" }}>{expensePurpose || "—"}</p>
+          ? <p style={{ fontSize: 13, color: "var(--ink)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)" }}>{expensePurpose || "—"}</p>
           : <input type="text" placeholder="e.g. DG Dinner – Oct 18" value={expensePurpose} onChange={e => setExpensePurpose(e.target.value)} style={inputStyle} />
         }
       </div>
@@ -482,16 +495,16 @@ function FormPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 80px 24px", gap: 6 }}>
             {["Date", "Description", "Cost", ""].map(h => (
-              <span key={h} style={{ fontSize: 10, color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>{h}</span>
+              <span key={h} style={{ fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>{h}</span>
             ))}
           </div>
           {items.map((it, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr 80px 24px", gap: 6, alignItems: "center" }}>
               {readOnly ? (
                 <>
-                  <span style={{ fontSize: 12.5, color: "#5A5466", padding: "8px 10px" }}>{it.date ? new Date(it.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span>
-                  <span style={{ fontSize: 13, color: "#13101A", padding: "8px 10px" }}>{it.description}</span>
-                  <span style={{ fontSize: 13, color: "#13101A", padding: "8px 10px" }}>${Number(it.cost).toFixed(2)}</span>
+                  <span style={{ fontSize: 12.5, color: "var(--body)", padding: "8px 10px" }}>{it.date ? new Date(it.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span>
+                  <span style={{ fontSize: 13, color: "var(--ink)", padding: "8px 10px" }}>{it.description}</span>
+                  <span style={{ fontSize: 13, color: "var(--ink)", padding: "8px 10px" }}>${Number(it.cost).toFixed(2)}</span>
                   <span />
                 </>
               ) : (
@@ -499,8 +512,8 @@ function FormPanel({
                   <input type="date" value={it.date ?? ""} onChange={e => updateItem(i, "date", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
                   <input type="text" placeholder="What was purchased" value={it.description} onChange={e => updateItem(i, "description", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
                   <input type="number" min="0" step="0.01" placeholder="0.00" value={it.cost === 0 ? "" : it.cost} onChange={e => updateItem(i, "cost", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
-                  <button onClick={() => removeItem(i)} disabled={items.length === 1} style={{ width: 24, height: 24, borderRadius: "50%", background: items.length === 1 ? "transparent" : "#F2EDE0", border: "none", cursor: items.length === 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: items.length === 1 ? 0.3 : 1 }}>
-                    <X size={10} color="#5A5466" />
+                  <button onClick={() => removeItem(i)} disabled={items.length === 1} style={{ width: 24, height: 24, borderRadius: "50%", background: items.length === 1 ? "transparent" : "var(--ivory)", border: "none", cursor: items.length === 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: items.length === 1 ? 0.3 : 1 }}>
+                    <X size={10} color="var(--body)" />
                   </button>
                 </>
               )}
@@ -508,10 +521,10 @@ function FormPanel({
           ))}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
             {!readOnly && items.length < 10
-              ? <button onClick={addItem} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#3E1540", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}><Plus size={12} /> Add row</button>
+              ? <button onClick={addItem} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}><Plus size={12} /> Add row</button>
               : <span />
             }
-            <p style={{ fontSize: 14, fontWeight: 700, color: "#13101A" }}>Total: ${total.toFixed(2)}</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>Total: ${total.toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -520,7 +533,7 @@ function FormPanel({
       <div>
         <label style={labelStyle}>Notes</label>
         {readOnly
-          ? <p style={{ fontSize: 13, color: "#5A5466", padding: "10px 12px", background: "#F4F1E8", borderRadius: 10, border: "1px solid #ECE8DE", minHeight: 38 }}>{notes || "—"}</p>
+          ? <p style={{ fontSize: 13, color: "var(--body)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)", minHeight: 38 }}>{notes || "—"}</p>
           : <textarea placeholder="Additional context for the deacon" value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} />
         }
       </div>
@@ -529,13 +542,13 @@ function FormPanel({
       <div>
         <label style={labelStyle}>Signature</label>
         {readOnly
-          ? <p style={{ fontSize: 13, fontStyle: "italic", color: "#13101A", padding: "10px 12px", background: "#F4F1E8", borderRadius: 10, border: "1px solid #ECE8DE" }}>{signature || "—"}</p>
+          ? <p style={{ fontSize: 13, fontStyle: "italic", color: "var(--ink)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)" }}>{signature || "—"}</p>
           : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <input type="text" placeholder="Type your full name to sign" value={signature} onChange={e => setSignature(e.target.value)} style={{ ...inputStyle, fontStyle: "italic" }} />
               {!savedSignature && (
-                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 12.5, color: "#5A5466" }}>
-                  <input type="checkbox" checked={signatureSaved} onChange={e => setSignatureSaved(e.target.checked)} style={{ accentColor: "#3E1540", width: 14, height: 14 }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 12.5, color: "var(--body)" }}>
+                  <input type="checkbox" checked={signatureSaved} onChange={e => setSignatureSaved(e.target.checked)} style={{ accentColor: "var(--plum)", width: 14, height: 14 }} />
                   Save for future forms
                 </label>
               )}
@@ -544,14 +557,14 @@ function FormPanel({
         }
       </div>
 
-      {error && <p style={{ fontSize: 12.5, color: "#B91C1C" }}>{error}</p>}
+      {error && <p style={{ fontSize: 12.5, color: "var(--danger)" }}>{error}</p>}
 
       {!readOnly && (
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={handleDraft} disabled={saving} style={{ flex: 1, height: 42, background: "white", color: "#13101A", borderRadius: 10, border: "1px solid #ECE8DE", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
+          <button onClick={handleDraft} disabled={saving} style={{ flex: 1, height: 42, background: "var(--cream)", color: "var(--ink)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
             {saving ? "Saving…" : "Save draft"}
           </button>
-          <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, height: 42, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1 }}>
+          <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, height: 42, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1 }}>
             {submitting ? "Submitting…" : "Submit form"}
           </button>
         </div>
@@ -571,9 +584,9 @@ function DismissButton({
     <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       {pending ? (
         <>
-          <span style={{ fontSize: 12, color: "#5A5466" }}>Dismiss as {reason}?</span>
-          <button onClick={onConfirm} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "#3E1540", color: "#F6F4EF", border: "none", cursor: "pointer" }}>Yes</button>
-          <button onClick={onCancel} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "#F2EDE0", color: "#5A5466", border: "none", cursor: "pointer" }}>No</button>
+          <span style={{ fontSize: 12, color: "var(--body)" }}>Dismiss as {reason}?</span>
+          <button onClick={onConfirm} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--plum)", color: "var(--cream)", border: "none", cursor: "pointer" }}>Yes</button>
+          <button onClick={onCancel} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--ivory)", color: "var(--body)", border: "none", cursor: "pointer" }}>No</button>
         </>
       ) : null}
     </div>
@@ -651,22 +664,22 @@ function ReimbursementCard({
   const dgl2Name = form.assigned_dgl_ids[1] ? (dglNames.get(form.assigned_dgl_ids[1]) ?? "DGL") : null
 
   return (
-    <div style={{ background: "#FBF8F2", border: inline ? "none" : "1px solid #E8E2D2", borderRadius: inline ? 0 : 12, overflow: "hidden", opacity: isDismissed ? 0.65 : 1 }}>
+    <div style={{ background: "var(--cream)", border: inline ? "none" : "1px solid var(--line)", borderRadius: inline ? 0 : 12, overflow: "hidden", opacity: isDismissed ? 0.65 : 1 }}>
       {/* Card header — click to expand */}
       <button
         onClick={() => setExpanded(v => !v)}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F8F4EA" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--cream-2)" }}
         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
         style={{ width: "100%", padding: "15px 14px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto 20px", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer", textAlign: "left", transition: "background 120ms ease" }}
       >
         {/* Date */}
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, fontWeight: 400, letterSpacing: -0.2, color: isDismissed ? "#8A8497" : "#13101A", textDecoration: isDismissed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, letterSpacing: -0.2, color: isDismissed ? "var(--muted-text)" : "var(--ink)", textDecoration: isDismissed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {fridayHeader}
         </span>
         {/* Assignee chip(s) or dismissal pill */}
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {isDismissed ? (
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: 999, background: "#F2F0F5", color: "#8A8497", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--muted-text)", textTransform: "uppercase" }}>
               {DISMISSAL_REASONS.find(d => d.value === form.dismissal_reason)?.label ?? form.dismissal_reason}
             </span>
           ) : (
@@ -679,12 +692,12 @@ function ReimbursementCard({
         {/* Status pill */}
         {isDismissed ? <span /> : <RStatusPill status={form.status} />}
         {/* Chevron */}
-        <ChevronRight size={15} color="#A09A8C" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
+        <ChevronRight size={15} color="var(--faint)" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
       </button>
 
       {/* Expanded content */}
       {expanded && (
-        <div style={{ borderTop: "1px solid #EFE9DA", padding: "18px 16px", background: "#F8F4EA", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ borderTop: "1px solid var(--line-3)", padding: "18px 16px", background: "var(--cream-2)", display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Two-panel layout on desktop */}
           <div className="md:grid md:gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
             {/* Form panel — Treasurer/Admin only */}
@@ -720,18 +733,18 @@ function ReimbursementCard({
 
           {/* Dismiss controls */}
           {canDismiss && !isDismissed && (
-            <div style={{ paddingTop: 12, borderTop: "1px solid #F2EDE0" }}>
-              <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>Dismiss this form</p>
+            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ivory)" }}>
+              <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 8 }}>Dismiss this form</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 {DISMISSAL_REASONS.map(dr => (
                   pendingDismiss === dr.value ? (
                     <div key={dr.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 12, color: "#5A5466" }}>Dismiss as {dr.label}?</span>
-                      <button onClick={() => handleDismiss(dr.value)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "#3E1540", color: "#F6F4EF", border: "none", cursor: "pointer" }}>Yes</button>
-                      <button onClick={() => setPendingDismiss(null)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "#F2EDE0", color: "#5A5466", border: "none", cursor: "pointer" }}>No</button>
+                      <span style={{ fontSize: 12, color: "var(--body)" }}>Dismiss as {dr.label}?</span>
+                      <button onClick={() => handleDismiss(dr.value)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--plum)", color: "var(--cream)", border: "none", cursor: "pointer" }}>Yes</button>
+                      <button onClick={() => setPendingDismiss(null)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--ivory)", color: "var(--body)", border: "none", cursor: "pointer" }}>No</button>
                     </div>
                   ) : (
-                    <button key={dr.value} onClick={() => setPendingDismiss(dr.value)} disabled={!!pendingDismiss} style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 999, background: "#F2F0F5", color: "#5A5466", border: "none", cursor: "pointer", opacity: pendingDismiss && pendingDismiss !== dr.value ? 0.4 : 1 }}>
+                    <button key={dr.value} onClick={() => setPendingDismiss(dr.value)} disabled={!!pendingDismiss} style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 999, background: "var(--ivory)", color: "var(--body)", border: "none", cursor: "pointer", opacity: pendingDismiss && pendingDismiss !== dr.value ? 0.4 : 1 }}>
                       Mark as {dr.label}
                     </button>
                   )
@@ -741,8 +754,8 @@ function ReimbursementCard({
           )}
 
           {isDismissed && canDismiss && (
-            <div style={{ paddingTop: 12, borderTop: "1px solid #F2EDE0" }}>
-              <button onClick={handleUndismiss} style={{ fontSize: 12.5, color: "#3E1540", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Undo dismissal</button>
+            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ivory)" }}>
+              <button onClick={handleUndismiss} style={{ fontSize: 12.5, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Undo dismissal</button>
             </div>
           )}
         </div>
@@ -955,23 +968,23 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
   const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : "Budget"
   const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : "Track expenses, reimbursements, and per-fund spending targets."
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
     <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
-        <p style={monoStyle}>2 Corinthians 9:7</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>{sectionLabel}</h1>
-        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>{sectionSubtitle}</p>
+        <p style={monoStyle}>Finance · 2 Corinthians 9:7</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>{sectionLabel}</h1>
+        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>{sectionSubtitle}</p>
       </div>
 
       {/* Desktop header */}
-      <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        <p style={monoStyle}>2 Corinthians 9:7</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>{sectionLabel}</h1>
-        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>{sectionSubtitle}</p>
-      </div>
+      <TabPageHeader>
+        <PageTitle eyebrow="Finance · 2 Corinthians 9:7" title={sectionLabel}>
+          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>{sectionSubtitle}</p>
+        </PageTitle>
+      </TabPageHeader>
 
       <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none">
 
@@ -979,7 +992,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
         {visibleSections.length > 1 && (
           <div className="flex gap-2 mb-6 md:hidden flex-wrap">
             {visibleSections.map(s => (
-              <button key={s.id} onClick={() => onSectionChange(s.id)} style={{ padding: "7px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === s.id ? "none" : "1px solid #ECE8DE", background: activeSection === s.id ? "#3E1540" : "white", color: activeSection === s.id ? "#F6F4EF" : "#5A5466", cursor: "pointer" }}>
+              <button key={s.id} onClick={() => onSectionChange(s.id)} style={{ padding: "7px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === s.id ? "none" : "1px solid var(--line)", background: activeSection === s.id ? "var(--plum)" : "var(--cream)", color: activeSection === s.id ? "var(--cream)" : "var(--body)", cursor: "pointer" }}>
                 {s.label}
               </button>
             ))}
@@ -998,22 +1011,22 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                       {editing ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                           <label style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
-                          <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" autoFocus style={{ background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "#F6F4EF", outline: "none", width: "100%", boxSizing: "border-box" }} />
+                          <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" autoFocus style={{ background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "#F6F4EF", color: "#3E1540", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
+                            <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "var(--cream)", color: "var(--plum)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
                             <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 16px", background: "transparent", color: "rgba(246,244,239,0.6)", borderRadius: 10, fontSize: 13, border: "1px solid rgba(246,244,239,0.2)", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
                       ) : !zelleInfo && !isAdmin ? (
                         <div>
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#F6F4EF", marginBottom: 8 }}>Giving info coming soon</p>
+                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--cream)", marginBottom: 8 }}>Giving info coming soon</p>
                           <p style={{ fontSize: 13, color: "rgba(246,244,239,0.6)", lineHeight: 1.5 }}>Check back later for ways to give.</p>
                         </div>
                       ) : !zelleInfo && isAdmin ? (
                         <div>
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#F6F4EF", marginBottom: 8 }}>Set up giving</p>
+                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--cream)", marginBottom: 8 }}>Set up giving</p>
                           <p style={{ fontSize: 13, color: "rgba(246,244,239,0.6)", marginBottom: 20, lineHeight: 1.5 }}>Add your Zelle email or phone number so members can give.</p>
-                          <button onClick={() => { setEditValue(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "#F6F4EF", color: "#3E1540", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                          <button onClick={() => { setEditValue(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "var(--cream)", color: "var(--plum)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                             <Pencil style={{ width: 13, height: 13 }} /> Add Zelle info
                           </button>
                         </div>
@@ -1021,19 +1034,19 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                         <>
                           <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)", marginBottom: 12 }}>Your gift</p>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
-                            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "rgba(246,244,239,0.55)", lineHeight: 1 }}>$</span>
-                            <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 64, color: "#F6F4EF", width: "100%", padding: 0, lineHeight: 1 }} />
+                            <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "rgba(246,244,239,0.55)", lineHeight: 1 }}>$</span>
+                            <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--cream)", width: "100%", padding: 0, lineHeight: 1 }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
                             {PRESET_AMOUNTS.map(v => (
-                              <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "rgba(246,244,239,0.95)" : "transparent", color: amount === v ? "#3E1540" : "#F6F4EF", border: "1px solid rgba(246,244,239,0.25)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 600 : 400 }}>${v}</button>
+                              <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "rgba(246,244,239,0.95)" : "transparent", color: amount === v ? "var(--plum)" : "var(--cream)", border: "1px solid rgba(246,244,239,0.25)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 600 : 400 }}>${v}</button>
                             ))}
                           </div>
-                          <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "#F6F4EF", color: "#3E1540", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+                          <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--cream)", color: "var(--plum)", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                             <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
                           </button>
-                          {zelleFallback && <p style={{ fontSize: 13, color: "rgba(246,244,239,0.75)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "#F6F4EF" }}>{zelleInfo}</strong></p>}
-                          <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "transparent", color: copied ? "#F6F4EF" : "rgba(246,244,239,0.6)", borderRadius: 10, fontSize: 13, border: `1px solid ${copied ? "rgba(246,244,239,0.45)" : "rgba(246,244,239,0.15)"}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                          {zelleFallback && <p style={{ fontSize: 13, color: "rgba(246,244,239,0.75)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--cream)" }}>{zelleInfo}</strong></p>}
+                          <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "transparent", color: copied ? "var(--cream)" : "rgba(246,244,239,0.6)", borderRadius: 10, fontSize: 13, border: `1px solid ${copied ? "rgba(246,244,239,0.45)" : "rgba(246,244,239,0.15)"}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                             {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
                             {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
                           </button>
@@ -1063,18 +1076,18 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                 <div>
                   <div style={{ marginBottom: 24 }}>
                     <div style={monoStyle}>{`DG DINNERS · ${dgForms.length} FORMS`}</div>
-                    <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, letterSpacing: -0.3, color: "#13101A", marginTop: 4 }}>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
                       Spring semester rotation
                     </div>
-                    <div style={{ fontSize: 14, color: "#5A5466", marginTop: 6 }}>
+                    <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
                       One form per assigned Friday — auto-generated from the rotation.
                     </div>
                   </div>
 
                   {reimburseLoading ? <Spinner /> : dgForms.length === 0 ? (
-                    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed #C4C0B0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>No DG dinner forms yet</div>
-                      <div style={{ fontSize: 13, color: "#8A8497", maxWidth: 360, lineHeight: 1.5 }}>Forms are auto-created when the DGL rotation is published.</div>
+                    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+                      <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No DG dinner forms yet</div>
+                      <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Forms are auto-created when the DGL rotation is published.</div>
                     </div>
                   ) : (() => {
                     const byMonth = new Map<string, ReimbursementForm[]>()
@@ -1090,13 +1103,13 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                         {[...byMonth.entries()].map(([month, forms]) => (
                           <div key={month}>
                             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 6 }}>
-                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "#8A8497" }}>{month.toUpperCase()}</span>
-                              <span style={{ height: 1, background: "#E8E2D2", flex: 1 }} />
-                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "#A09A8C" }}>{forms.length} {forms.length === 1 ? "FORM" : "FORMS"}</span>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "var(--muted-text)" }}>{month.toUpperCase()}</span>
+                              <span style={{ height: 1, background: "var(--line)", flex: 1 }} />
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "var(--faint)" }}>{forms.length} {forms.length === 1 ? "FORM" : "FORMS"}</span>
                             </div>
-                            <div style={{ borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+                            <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
                               {forms.map((form, i) => (
-                                <div key={form.id} style={{ borderTop: i > 0 ? "1px solid #EFE9DA" : "none" }}>
+                                <div key={form.id} style={{ borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
                                   <ReimbursementCard
                                     form={form}
                                     dglNames={dglNames}
@@ -1128,27 +1141,27 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18, gap: 24 }}>
                       <div>
                         <div style={monoStyle}>OTHERS</div>
-                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, letterSpacing: -0.3, color: "#13101A", marginTop: 4 }}>
+                        <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
                           Other expenses
                         </div>
-                        <div style={{ fontSize: 14, color: "#5A5466", marginTop: 6 }}>
+                        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
                           Manual reimbursement forms for one-off ministry expenses.
                         </div>
                       </div>
-                      <button onClick={handleCreateOtherForm} disabled={creatingOther} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: creatingOther ? 0.6 : 1, fontFamily: "var(--font-inter)" }}>
+                      <button onClick={handleCreateOtherForm} disabled={creatingOther} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: creatingOther ? 0.6 : 1, fontFamily: "var(--sans)" }}>
                         <Plus size={14} />New form
                       </button>
                     </div>
 
                     {otherForms.length === 0 ? (
-                      <div style={{ padding: "44px 24px", borderRadius: 14, border: "1px dashed #C4C0B0", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>No other forms yet</div>
-                        <div style={{ fontSize: 13, color: "#8A8497", maxWidth: 360, lineHeight: 1.5 }}>Manual reimbursements you create will appear here.</div>
+                      <div style={{ padding: "44px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+                        <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No other forms yet</div>
+                        <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Manual reimbursements you create will appear here.</div>
                       </div>
                     ) : (
-                      <div style={{ borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+                      <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
                         {otherForms.map((form, i) => (
-                          <div key={form.id} style={{ borderTop: i > 0 ? "1px solid #EFE9DA" : "none" }}>
+                          <div key={form.id} style={{ borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
                             <ReimbursementCard
                               form={form}
                               dglNames={dglNames}
@@ -1177,7 +1190,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {(activeSection === "budget" || activeSection === "allocation") && canAccessBudget && (
               <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
                 {[{ id: "budget" as const, label: "Expenses" }, { id: "allocation" as const, label: "Allocation" }].map(t => (
-                  <button key={t.id} onClick={() => onSectionChange(t.id)} style={{ padding: "6px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === t.id ? "none" : "1px solid #ECE8DE", background: activeSection === t.id ? "#3E1540" : "white", color: activeSection === t.id ? "#F6F4EF" : "#5A5466", cursor: "pointer" }}>
+                  <button key={t.id} onClick={() => onSectionChange(t.id)} style={{ padding: "6px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === t.id ? "none" : "1px solid var(--line)", background: activeSection === t.id ? "var(--plum)" : "var(--cream)", color: activeSection === t.id ? "var(--cream)" : "var(--body)", cursor: "pointer" }}>
                     {t.label}
                   </button>
                 ))}
@@ -1201,20 +1214,20 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {activeSection === "budget" && canAccessBudget && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 10 }}>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A" }}>Expense ledger</p>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Expense ledger</p>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid #ECE8DE", borderRadius: 10, background: "white", color: "#5A5466", fontSize: 13, cursor: "pointer" }}>
+                    <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--cream)", color: "var(--body)", fontSize: 13, cursor: "pointer" }}>
                       <Download size={13} />{budgetExporting ? "…" : "Export"}
                     </button>
-                    <button onClick={() => setShowAddEntry(v => !v)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: showAddEntry ? "#F2EDE0" : "#3E1540", color: showAddEntry ? "#13101A" : "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    <button onClick={() => setShowAddEntry(v => !v)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: showAddEntry ? "var(--ivory)" : "var(--plum)", color: showAddEntry ? "var(--ink)" : "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       <Plus size={14} />Add entry
                     </button>
                   </div>
                 </div>
 
                 {showAddEntry && (
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 12, padding: "16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>New manual entry</p>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, padding: "16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>New manual entry</p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                       <div><label style={labelStyle}>Date</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={inputStyle} /></div>
                       <div><label style={labelStyle}>Category</label><select value={entryCategory} onChange={e => setEntryCategory(e.target.value)} style={inputStyle}>{dynamicCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
@@ -1224,8 +1237,8 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                       <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={entryAmount} onChange={e => setEntryAmount(e.target.value)} style={inputStyle} /></div>
                     </div>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button onClick={() => setShowAddEntry(false)} style={{ padding: "8px 16px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-                      <button onClick={handleAddBudgetEntry} disabled={addingEntry || !entryAmount} style={{ padding: "8px 18px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: addingEntry || !entryAmount ? 0.6 : 1 }}>
+                      <button onClick={() => setShowAddEntry(false)} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                      <button onClick={handleAddBudgetEntry} disabled={addingEntry || !entryAmount} style={{ padding: "8px 18px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: addingEntry || !entryAmount ? 0.6 : 1 }}>
                         {addingEntry ? "Adding…" : "Add"}
                       </button>
                     </div>
@@ -1235,34 +1248,34 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                 {categorySummary.length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                     {categorySummary.map(c => (
-                      <div key={c.value} style={{ padding: "6px 12px", background: "white", border: "1px solid #ECE8DE", borderRadius: 999, display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ fontSize: 12, color: "#5A5466" }}>{c.label}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#13101A" }}>${c.total.toFixed(2)}</span>
+                      <div key={c.value} style={{ padding: "6px 12px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 999, display: "flex", gap: 6, alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{c.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>${c.total.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {budgetLoading ? <Spinner /> : budgetEntries.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 20px", color: "#8A8497", background: "white", border: "1px solid #ECE8DE", borderRadius: 12 }}>
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted-text)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12 }}>
                     <DollarSign size={24} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
                     <p style={{ fontSize: 14 }}>No budget entries yet</p>
                     <p style={{ fontSize: 12, marginTop: 4 }}>Submitted reimbursement forms are logged automatically.</p>
                   </div>
                 ) : (
-                  <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 12, overflow: "hidden" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "10px 16px", borderBottom: "1px solid #ECE8DE", background: "#F9F7F2" }}>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
                       {["Date", "Description", "Category", "Amount", "Source"].map(h => (
-                        <span key={h} style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>{h}</span>
+                        <span key={h} style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{h}</span>
                       ))}
                     </div>
                     {budgetEntries.map((e, i) => (
-                      <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid #F2EDE0" : "none", alignItems: "center" }}>
-                        <span style={{ fontSize: 12.5, color: "#5A5466" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                        <span style={{ fontSize: 13, color: "#13101A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
-                        <span style={{ fontSize: 12.5, color: "#5A5466" }}>{e.category}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>${Number(e.amount).toFixed(2)}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? "#EDE5F0" : "#F2F0F5", color: e.source === "reimbursement" ? "#3E1540" : "#5A5466", display: "inline-block" }}>
+                      <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--ivory)" : "none", alignItems: "center" }}>
+                        <span style={{ fontSize: 12.5, color: "var(--body)" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
+                        <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>${Number(e.amount).toFixed(2)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? REIMBURSED_TINT : "var(--ivory)", color: e.source === "reimbursement" ? "var(--plum)" : "var(--body)", display: "inline-block" }}>
                           {e.source === "reimbursement" ? "Auto" : "Manual"}
                         </span>
                       </div>
@@ -1423,14 +1436,14 @@ function AllocationSection({
   const overBudget = totalRemaining < 0
 
   const monoLabel: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C",
+    fontFamily: "var(--mono)",
+    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)",
   }
   const cellInput: React.CSSProperties = {
     background: "transparent", border: "none", outline: "none",
-    fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A",
+    fontSize: 14, fontFamily: "var(--sans)", color: "var(--ink)",
     width: "100%", padding: 0,
-    borderBottom: "1px solid #3E1540",
+    borderBottom: "1px solid var(--plum)",
   }
 
   return (
@@ -1438,13 +1451,13 @@ function AllocationSection({
       {/* Section header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Annual Budget · {fiscalYear}
           </p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: -0.4 }}>
+          <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: -0.4 }}>
             Annual Allocation
           </h2>
-          <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8, lineHeight: 1.6 }}>
             Set per-fund targets for each spending category and track progress toward them.
           </p>
         </div>
@@ -1457,9 +1470,9 @@ function AllocationSection({
                 onClick={() => setFiscalYear(y)}
                 style={{
                   padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  background: fiscalYear === y ? "#3E1540" : "#F1ECDE",
-                  color: fiscalYear === y ? "#FBF8F2" : "#5A5466",
-                  border: fiscalYear === y ? "none" : "1px solid #E2DDCF",
+                  background: fiscalYear === y ? "var(--plum)" : "var(--ivory)",
+                  color: fiscalYear === y ? "var(--cream)" : "var(--body)",
+                  border: fiscalYear === y ? "none" : "1px solid var(--line-2)",
                 }}
               >
                 {y}
@@ -1467,13 +1480,13 @@ function AllocationSection({
             ))}
           </div>
           {isPastYear && (
-            <span style={{ fontSize: 11, color: "#8A8497", fontStyle: "italic" }}>Past year — read only</span>
+            <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>Past year — read only</span>
           )}
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
       ) : (
         <>
           {/* Summary stat cards */}
@@ -1487,17 +1500,17 @@ function AllocationSection({
                 key={card.label}
                 style={{
                   padding: 22, borderRadius: 14,
-                  background: card.danger ? "#FDF1F1" : "#FBF8F2",
-                  border: `1px solid ${card.danger ? "#E8C5C5" : "#E8E2D2"}`,
+                  background: card.danger ? DANGER_TINT_BG : "var(--cream)",
+                  border: `1px solid ${card.danger ? DANGER_TINT_BORDER : "var(--line)"}`,
                 }}
               >
-                <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>
+                <p style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
                   {card.label}
                 </p>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, letterSpacing: -0.6, color: card.danger ? "#9F3030" : "#13101A", margin: "10px 0 0" }}>
+                <p style={{ fontFamily: "var(--serif)", fontSize: 40, letterSpacing: -0.6, color: card.danger ? "var(--danger)" : "var(--ink)", margin: "10px 0 0" }}>
                   ${Math.abs(card.value).toFixed(2)}
                 </p>
-                <p style={{ fontSize: 13, color: card.danger ? "#9F3030" : "#8A8497", marginTop: 4 }}>
+                <p style={{ fontSize: 13, color: card.danger ? "var(--danger)" : "var(--muted-text)", marginTop: 4 }}>
                   {card.danger && card.value < 0 ? `$${Math.abs(card.value).toFixed(2)} over · ` : ""}{card.sub}
                 </p>
               </div>
@@ -1507,10 +1520,10 @@ function AllocationSection({
           {/* Progress bar */}
           {totalAllocated > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ height: 4, borderRadius: 99, background: "#E8E2D2", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: overBudget ? "#9F3030" : "#3E1540", transition: "width 0.3s" }} />
+              <div style={{ height: 4, borderRadius: 99, background: "var(--line)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: overBudget ? "var(--danger)" : "var(--plum)", transition: "width 0.3s" }} />
               </div>
-              <p style={{ fontSize: 12, color: "#8A8497", marginTop: 6 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6 }}>
                 {pct.toFixed(0)}% of budget used{overBudget ? " — over budget" : ""}
               </p>
             </div>
@@ -1518,15 +1531,15 @@ function AllocationSection({
 
           {/* Past year banner */}
           {isPastYear && (
-            <div style={{ padding: "10px 16px", background: "#F4F1E8", border: "1px solid #E2DDCF", borderRadius: 10, marginBottom: 20, fontSize: 13, color: "#5A5466" }}>
+            <div style={{ padding: "10px 16px", background: "var(--body-bg)", border: "1px solid var(--line-2)", borderRadius: 10, marginBottom: 20, fontSize: 13, color: "var(--body)" }}>
               Viewing {fiscalYear} — read only. Switch to {currentFiscalYear()} to edit.
             </div>
           )}
 
           {/* Allocation table */}
-          <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" }}>
             {/* Table header */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "10px 16px", borderBottom: "1px solid #E8E2D2", background: "#F8F4EA" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream-2)" }}>
               {["Category", "Church", "CMU", "Pitt", "Total", "Spent", "Remaining", ""].map((h, i) => (
                 <span key={i} style={{ ...monoLabel, display: "block" }}>{h}</span>
               ))}
@@ -1549,15 +1562,15 @@ function AllocationSection({
                       gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px",
                       gap: 0,
                       padding: "13px 16px",
-                      borderTop: catIdx > 0 ? "1px solid #F0EBE0" : "none",
-                      borderLeft: rowOver ? "3px solid #9F3030" : "3px solid transparent",
+                      borderTop: catIdx > 0 ? "1px solid var(--line-3)" : "none",
+                      borderLeft: rowOver ? "3px solid var(--danger)" : "3px solid transparent",
                       alignItems: "center",
-                      background: rowOver ? "#FDF9F9" : "transparent",
+                      background: rowOver ? DANGER_ROW_BG : "transparent",
                     }}
                   >
                     {/* Category label + delete for custom */}
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 14, color: "#13101A" }}>{cat.label}</span>
+                      <span style={{ fontSize: 14, color: "var(--ink)" }}>{cat.label}</span>
                       {!cat.isPermanent && canEdit && !isPastYear && (
                         confirmDeleteCategory === cat.value ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -1572,13 +1585,13 @@ function AllocationSection({
                                 setDeletingCategory(null)
                               }}
                               disabled={deletingCategory === cat.value}
-                              style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
+                              style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
                             >
                               {deletingCategory === cat.value ? "Deleting…" : "Delete"}
                             </button>
                             <button
                               onClick={() => setConfirmDeleteCategory(null)}
-                              style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                              style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
                             >
                               Cancel
                             </button>
@@ -1587,7 +1600,7 @@ function AllocationSection({
                           <button
                             onClick={() => setConfirmDeleteCategory(cat.value)}
                             title="Remove custom category"
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "#C4B8C0", padding: 0, display: "flex", alignItems: "center" }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dashed)", padding: 0, display: "flex", alignItems: "center" }}
                           >
                             <X size={13} />
                           </button>
@@ -1610,7 +1623,7 @@ function AllocationSection({
                         >
                           {canEdit && !isPastYear ? (
                             <div style={{ position: "relative" }}>
-                              <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#A09A8C", pointerEvents: "none", lineHeight: 1 }}>
+                              <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "var(--faint)", pointerEvents: "none", lineHeight: 1 }}>
                                 {draftVal !== "" || (cellKey in drafts) ? "$" : ""}
                               </span>
                               <input
@@ -1634,7 +1647,7 @@ function AllocationSection({
                               />
                             </div>
                           ) : (
-                            <span style={{ fontSize: 14, color: displayAmt > 0 ? "#13101A" : "#A09A8C" }}>
+                            <span style={{ fontSize: 14, color: displayAmt > 0 ? "var(--ink)" : "var(--faint)" }}>
                               {displayAmt > 0 ? `$${displayAmt.toFixed(2)}` : "—"}
                             </span>
                           )}
@@ -1643,17 +1656,17 @@ function AllocationSection({
                     })}
 
                     {/* Total */}
-                    <span style={{ fontSize: 14, color: "#13101A", fontWeight: catTotal > 0 ? 500 : 400 }}>
+                    <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: catTotal > 0 ? 500 : 400 }}>
                       {catTotal > 0 ? `$${catTotal.toFixed(2)}` : "—"}
                     </span>
 
                     {/* Spent */}
-                    <span style={{ fontSize: 14, color: spent > 0 ? "#13101A" : "#A09A8C" }}>
+                    <span style={{ fontSize: 14, color: spent > 0 ? "var(--ink)" : "var(--faint)" }}>
                       {spent > 0 ? `$${spent.toFixed(2)}` : "—"}
                     </span>
 
                     {/* Remaining */}
-                    <span style={{ fontSize: 14, color: rowOver ? "#9F3030" : remaining > 0 ? "#2D5445" : "#A09A8C", fontWeight: rowOver ? 500 : 400 }}>
+                    <span style={{ fontSize: 14, color: rowOver ? "var(--danger)" : remaining > 0 ? BUDGET_GREEN : "var(--faint)", fontWeight: rowOver ? 500 : 400 }}>
                       {catTotal > 0 ? (remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : "—"}
                     </span>
 
@@ -1664,7 +1677,7 @@ function AllocationSection({
                         n.has(cat.value) ? n.delete(cat.value) : n.add(cat.value)
                         return n
                       })}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: notes ? "#3E1540" : "#C4C0B0", fontSize: 13, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: notes ? "var(--plum)" : "var(--dashed)", fontSize: 13, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
                       title="Notes"
                     >
                       {notesExpanded ? "▴" : "▾"}
@@ -1673,17 +1686,17 @@ function AllocationSection({
 
                   {/* Notes row */}
                   {notesExpanded && (
-                    <div style={{ padding: "8px 16px 12px 19px", borderTop: "1px dashed #E8E2D2", background: "#FDFAF5" }}>
+                    <div style={{ padding: "8px 16px 12px 19px", borderTop: "1px dashed var(--line)", background: "var(--cream)" }}>
                       {canEdit && !isPastYear ? (
                         <textarea
                           defaultValue={notes}
                           placeholder="Add context for this category (e.g. 'Church provides full retreat budget, CMU covers supplies')"
                           onBlur={e => handleNotesBlur(cat.value, e.target.value)}
                           rows={2}
-                          style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--font-inter)", fontStyle: notes ? "normal" : "italic", color: "#5A5466", lineHeight: 1.5, boxSizing: "border-box" }}
+                          style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--sans)", fontStyle: notes ? "normal" : "italic", color: "var(--body)", lineHeight: 1.5, boxSizing: "border-box" }}
                         />
                       ) : (
-                        <p style={{ fontSize: 13, color: notes ? "#5A5466" : "#A09A8C", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
+                        <p style={{ fontSize: 13, color: notes ? "var(--body)" : "var(--faint)", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
                           {notes || "No notes for this category."}
                         </p>
                       )}
@@ -1694,23 +1707,23 @@ function AllocationSection({
             })}
 
             {/* Footer totals row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "12px 16px", borderTop: "1px solid #E8E2D2", background: "#F8F4EA" }}>
-              <span style={{ ...monoLabel, fontSize: "11px", color: "#5A5466" }}>Total</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--cream-2)" }}>
+              <span style={{ ...monoLabel, fontSize: "11px", color: "var(--body)" }}>Total</span>
               {FUNDS.map(fund => {
                 const fundTotal = allCategories.reduce((s, cat) => s + getAllocAmount(cat.value, fund.value), 0)
                 return (
-                  <span key={fund.value} style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>
+                  <span key={fund.value} style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
                     {fundTotal > 0 ? `$${fundTotal.toFixed(2)}` : "—"}
                   </span>
                 )
               })}
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#13101A" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
                 {totalAllocated > 0 ? `$${totalAllocated.toFixed(2)}` : "—"}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 500, color: totalSpent > 0 ? "#13101A" : "#A09A8C" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: totalSpent > 0 ? "var(--ink)" : "var(--faint)" }}>
                 {totalSpent > 0 ? `$${totalSpent.toFixed(2)}` : "—"}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: overBudget ? "#9F3030" : totalRemaining > 0 ? "#2D5445" : "#A09A8C" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: overBudget ? "var(--danger)" : totalRemaining > 0 ? BUDGET_GREEN : "var(--faint)" }}>
                 {totalAllocated > 0 ? (totalRemaining < 0 ? `-$${Math.abs(totalRemaining).toFixed(2)}` : `$${totalRemaining.toFixed(2)}`) : "—"}
               </span>
               <span />
@@ -1739,7 +1752,7 @@ function AllocationSection({
                         setNewCategoryName(""); setAddingCategory(false)
                       }
                     }}
-                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", background: "#FDFBF7", outline: "none" }}
+                    style={{ flex: 1, padding: "8px 12px", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", background: "var(--cream)", outline: "none" }}
                   />
                   <button
                     onClick={async () => {
@@ -1751,13 +1764,13 @@ function AllocationSection({
                       setSavingCategory(false)
                     }}
                     disabled={savingCategory || !newCategoryName.trim()}
-                    style={{ padding: "8px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
+                    style={{ padding: "8px 14px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
                   >
                     {savingCategory ? "Adding…" : "Add"}
                   </button>
                   <button
                     onClick={() => { setNewCategoryName(""); setAddingCategory(false) }}
-                    style={{ padding: "8px 12px", background: "#F2EDE0", color: "#5A5466", borderRadius: 10, border: "none", fontSize: 13, cursor: "pointer" }}
+                    style={{ padding: "8px 12px", background: "var(--ivory)", color: "var(--body)", borderRadius: 10, border: "none", fontSize: 13, cursor: "pointer" }}
                   >
                     Cancel
                   </button>
@@ -1765,7 +1778,7 @@ function AllocationSection({
               ) : (
                 <button
                   onClick={() => setAddingCategory(true)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "transparent", border: "1px dashed #C4BFB0", borderRadius: 10, color: "#8A8497", fontSize: 13, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "transparent", border: "1px dashed var(--dashed)", borderRadius: 10, color: "var(--muted-text)", fontSize: 13, cursor: "pointer", fontFamily: "var(--sans)" }}
                 >
                   <Plus size={13} />
                   Add custom category
@@ -1776,7 +1789,7 @@ function AllocationSection({
 
           {/* Empty state hint */}
           {totalAllocated === 0 && !isPastYear && (
-            <p style={{ textAlign: "center", fontSize: 13, color: "#8A8497", marginTop: 20, fontStyle: "italic" }}>
+            <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", marginTop: 20, fontStyle: "italic" }}>
               No budget set for {fiscalYear} yet. Click any Church, CMU, or Pitt cell to start allocating.
             </p>
           )}
