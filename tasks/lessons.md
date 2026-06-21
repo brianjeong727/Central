@@ -61,3 +61,14 @@ Use the inline confirm pattern — first click reveals "Delete / Cancel" inline;
 **How to apply:** See §14 of `skills/design-system/DESIGN_SYSTEM.md` for the exact implementation pattern. Always use two state variables: `confirmId` (pending confirmation) and `deleting` (in-flight). Never use `window.confirm()`.
 
 **Common mistake to avoid:** Using `window.confirm()` or a modal for small items in lists/tables. The inline pattern is always preferred — it keeps focus in place and feels native to the UI.
+
+## Font alias tech debt (Bricolage migration)
+Date: 2026-06-21
+
+After switching to Bricolage Grotesque as the sole typeface, 22 component files that hardcode `var(--font-instrument-serif)` or `var(--font-inter)` were kept untouched. Compatibility is maintained via CSS aliases in `app/globals.css` `:root`:
+```css
+--font-instrument-serif: var(--font-bricolage-grotesque);
+--font-inter:             var(--font-bricolage-grotesque);
+```
+
+**Tech debt:** The variable names now lie — a developer reading `var(--font-instrument-serif)` in a component will not know it renders Bricolage unless they trace the alias in `globals.css`. If the typeface is ever changed again, update the aliases and do NOT introduce a new variable with the old name. If a full per-file migration is done, delete the alias block and remove this lesson.

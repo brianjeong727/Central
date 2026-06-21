@@ -137,7 +137,7 @@ The global skills have rules that conflict with Central's **intentional** design
 |---|---|
 | `taste-skill` / `ui-ux-pro-max` ban emojis entirely | Emojis **are used** for team icons (🏛️, 🎵, etc.) — ban applies only to decorative prose/button-label use |
 | `taste-skill` "Lila Ban" — no purple/AI aesthetics | Plum (`#3E1540`, `#2D0F2E`) is Central's accent, used surgically per DESIGN_SYSTEM.md §0/§1.1 — NOT a surface, background, or brand fill. The blanket anti-purple ban doesn't apply, but plum is scarce by design, not a default. |
-| `taste-skill` recommends Geist/Satoshi fonts | Central uses **Inter** (body) + **Instrument Serif** (display) — do not swap |
+| `taste-skill` recommends Geist/Satoshi fonts | Central uses **Bricolage Grotesque** as the sole typeface — do not swap |
 | `taste-skill` Tailwind v3 guards | Central runs **Tailwind v4** — ignore v3-specific warnings |
 
 ---
