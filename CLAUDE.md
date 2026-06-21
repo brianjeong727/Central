@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 > Multi-tenant church communication platform for college ministries.
 > Mobile-first, warm-minimalist design (cream surfaces, editorial serif, plum as a surgical accent), real-time messaging.
-> Full spec: see `PRD.md` in this directory.
+> Product vision & roadmap: see `PRD.md`. (PRD.md is vision/roadmap only — not a spec. Implementation facts live here in CLAUDE.md.)
 
 ---
 
@@ -20,6 +20,12 @@ This file has four layers. When you learn something new, file it in the right la
 - **Layer 4 — Skills.** Multi-step procedures and workflows, kept as SKILL.md files. Invoked, not memorized.
 
 Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Layer 2; a **mistake/surprise not to repeat** → Layer 3 (`lessons.md`); a **procedure with steps** → Layer 4 (a skill).
+
+**Related docs (each owns its domain — don't duplicate them here):**
+- `DESIGN_SYSTEM.md` — full design contract: colors, typography, components, layout, the warm-minimalist direction. Design questions go here.
+- `permissions.md` — canonical role/access truth; who-can-do-what across every feature.
+- `MINISTRY_CONTEXT.md` — real-world ministry workflows and vocabulary (what DG, DGL, CCSF, rotation, etc. actually mean).
+- `PRD.md` — product vision, feature intent (the "why" behind features), and roadmap. NOT implementation detail — CLAUDE.md owns the "how."
 
 ---
 
@@ -44,6 +50,19 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 8. **Commit and push** — after every completed task, commit the relevant files and push to the CURRENT branch (never directly to `main`). Never leave completed work uncommitted.
 
 ## Capture — propose where new knowledge goes
+## Capture & self-maintenance — keep this file current (propose, never silently edit)
+This file must stay true to the codebase. You help maintain it, but the user approves every change — never edit CLAUDE.md without explicit approval in that task.
+
+At the END of every task, run this check and proactively raise anything it surfaces:
+
+1. **New knowledge to capture.** Did you learn something from a mistake, hit a non-obvious constraint, or get taught a multi-step workflow? Propose: (a) what was learned, (b) which layer it belongs in (Layer 1 fact / Layer 2 rule / Layer 3 lesson / Layer 4 skill), (c) the exact text to add. Complex repeatable workflow → propose a skill. A lesson that's proven general and stable → propose promoting it from lessons.md into a Layer 2 rule.
+
+2. **Facts your own work just made stale.** Did this task add/rename/move a file, add a route, add or change a DB table/column, add a realtime channel, change a convention, or alter the shell/architecture? If so, the relevant Layer 1 entry (Key Files, Architecture, Schema index, Realtime, Routing, etc.) is now out of date. Propose the specific correction. Do NOT let Layer 1 drift behind the code you just wrote.
+
+3. **Drift you noticed in passing.** If at any point during the task you saw CLAUDE.md contradict the actual code (a wrong path, an outdated rule, a renamed thing), flag it — even if it wasn't what you were working on. Don't silently work around a stale doc; surface it so it can be fixed.
+
+For each item: state it plainly, propose the exact edit, and wait for approval. The user decides what gets written. Keep proposals short — a one-line "FYI, this is now stale: …" is better than skipping it. Err toward surfacing; an ignored proposal costs nothing, an un-surfaced staleness costs a future audit.
+
 When you learn something from a mistake, discover a non-obvious constraint, or are taught a multi-step workflow, do NOT file it silently. At the end of the task, PROACTIVELY propose: (a) what was learned, (b) which layer it belongs in (Layer 1 fact / Layer 2 rule / Layer 3 lesson / Layer 4 skill), and (c) the exact text to add. The user approves before anything is written. If a workflow is complex enough to re-explain more than once, propose making it a skill. If a lesson has proven general and stable, propose promoting it from `lessons.md` into a Layer 2 rule.
 
 ## Critical Conventions

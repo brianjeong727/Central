@@ -7,7 +7,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline } from "@/components/central"
+import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
@@ -329,18 +329,8 @@ export function HomeTab({
         <>
           {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
 
-          {/* Hairline below breadcrumb, above greeting */}
-          <div className="hidden md:block"><InsetHairline /></div>
-
           {/* Desktop: hero header */}
-          <div
-            className="hidden md:flex items-center justify-between px-14"
-            style={{
-              paddingTop: "var(--space-8)",
-              paddingBottom: "var(--space-8)",
-              gap: "var(--space-8)",
-            }}
-          >
+          <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
             <PageTitle eyebrow={dateLabel} title={greeting} style={{ maxWidth: 640 }}>
               <span
                 style={{
@@ -366,10 +356,7 @@ export function HomeTab({
                 <StatCard eyebrow="Members" value={memberCount} sub="in ministry" valueSize={32} />
               )}
             </div>
-          </div>
-
-          {/* Inset hairline between greeting block and body */}
-          <div className="hidden md:block"><InsetHairline /></div>
+          </TabPageHeader>
 
           {/* Desktop: main content */}
           <div
