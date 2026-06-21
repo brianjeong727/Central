@@ -1296,7 +1296,7 @@ export function StudentOrgTeamHome({
     <>
     <div>
       {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
-      <div style={{ marginBottom: 24, marginLeft: -56, marginRight: -56 }}>
+      <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={[
             { key: "General", label: "General" },
@@ -1311,7 +1311,7 @@ export function StudentOrgTeamHome({
       </div>
 
       {/* ── Tab content ── */}
-      <div style={{ padding: "30px 0 60px" }}>
+      <div className="md:px-14" style={{ paddingTop: 30, paddingBottom: 60 }}>
 
         {/* GENERAL — calendar + sidebar + meeting notes */}
         {teamTab === "General" && (
@@ -1359,24 +1359,23 @@ export function StudentOrgTeamHome({
                 {upNext ? (
                   <button
                     onClick={() => onPlanningEventChange(upNext)}
-                    style={{ position: "relative", textAlign: "left", border: "none", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)", color: "#FBF8F2" }}
+                    style={{ width: "100%", textAlign: "left", border: "1px solid #E5E0D2", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "var(--cream)", color: "var(--ink)" }}
                   >
-                    <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }} />
-                    <div style={{ position: "relative", padding: "22px 22px 20px" }}>
-                      <p style={{ ...mono, color: "rgba(251,248,242,0.65)" }}>
+                    <div style={{ padding: "18px 20px 16px" }}>
+                      <p style={{ ...mono, color: "var(--muted-text)" }}>
                         {new Date(upNext.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()} · {upNext.category.toUpperCase()}
                       </p>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, marginTop: 6, letterSpacing: "-0.01em", color: "#FBF8F2" }}>{upNext.title}</p>
-                      {upNext.location && <p style={{ fontSize: 13, color: "rgba(251,248,242,0.72)", marginTop: 6 }}>{upNext.location}</p>}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
-                        <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(251,248,242,0.12)", fontSize: 11 }}>
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 26, marginTop: 6, letterSpacing: "-0.01em", color: "var(--ink)" }}>{upNext.title}</p>
+                      {upNext.location && <p style={{ fontSize: 13, color: "var(--body)", marginTop: 4 }}>{upNext.location}</p>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                        <span style={{ padding: "3px 9px", borderRadius: 999, background: "#EDE8DC", fontSize: 11, color: "#5A5466" }}>
                           {plannedIds.has(upNext.id) ? "Plan exists" : "Needs planning"}
                         </span>
-                        <span style={{ fontSize: 11, color: "rgba(251,248,242,0.55)" }}>
+                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>
                           {Math.max(0, Math.ceil((new Date(upNext.start_date).getTime() - now.getTime()) / 86400000))} days out
                         </span>
                       </div>
-                      <div style={{ marginTop: 18, padding: "10px 14px", borderRadius: 10, background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "#3E1540", color: "#FDFCF8", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         Open plan <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </div>
@@ -1957,18 +1956,15 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             <TechTeamTab ministryId={ministryId} userId={userId} />
           </div>
         ) : isPraiseTeam && activeTeamId ? (
-          <div className="px-14 py-7">
-            <PraiseTeamTab
-              teamId={activeTeamId}
-              ministryId={ministryId}
-              userId={userId}
-              canManage={canManageWorship}
-              canManageSchedule={canManageSchedule}
-            />
-          </div>
+          <PraiseTeamTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            canManage={canManageWorship}
+            canManageSchedule={canManageSchedule}
+          />
         ) : isStudentOrgBoard ? (
-          <div className="px-14 py-7">
-            <StudentOrgTeamHome
+          <StudentOrgTeamHome
               teamId={activeTeamId}
               teamName={activeTeamName}
               teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
@@ -1985,10 +1981,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               refreshSignal={studentOrgRefreshSignal}
               onOpenChat={onOpenChat}
             />
-          </div>
         ) : isDGLTeam && activeTeamId ? (
-          <div className="px-14 py-7">
-            <SmallGroupLeadersTab
+          <SmallGroupLeadersTab
               teamId={activeTeamId}
               ministryId={ministryId}
               userId={userId}
@@ -2004,7 +1998,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                 )?.id ?? null
               }
             />
-          </div>
         ) : (
           <div className="px-14 py-7">
             {!activeTeamId ? (
@@ -2723,7 +2716,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
       )}
 
       {/* Sub-tabs */}
-      <div style={{ marginBottom: 24, marginLeft: -56, marginRight: -56 }}>
+      <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={[
             { key: "schedule", label: "Schedule" },
@@ -2735,6 +2728,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
         />
       </div>
 
+      <div className="md:px-14">
       {/* ── Schedule ── */}
       {subTab === "schedule" && (
         <div>
@@ -3203,6 +3197,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -6171,7 +6166,7 @@ export function EventPlanWorkspace({
       </div>}
 
       {/* Underline section tabs */}
-      <div style={{ marginTop: hideHero ? 0 : 22, marginBottom: 24, ...(inline ? { marginLeft: -56, marginRight: -56 } : {}) }}>
+      <div style={{ marginTop: hideHero ? 0 : 22, marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
@@ -11326,7 +11321,7 @@ function SmallGroupLeadersTab({
   return (
     <div>
       {/* Sub-tab switcher */}
-      <div style={{ marginBottom: 24, marginLeft: -56, marginRight: -56 }}>
+      <div style={{ marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={validTabs.map(k => ({
             key: k,
@@ -11337,6 +11332,7 @@ function SmallGroupLeadersTab({
         />
       </div>
 
+      <div className="md:px-14">
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
       {activeSubTab === "bible_study" && (
         <BibleStudySubTab
@@ -12034,6 +12030,7 @@ function SmallGroupLeadersTab({
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
