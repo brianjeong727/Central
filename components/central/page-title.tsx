@@ -8,7 +8,7 @@ interface PageTitleProps {
   style?: CSSProperties
 }
 
-export function PageTitle({ eyebrow, title, titleSize = 52, children, style }: PageTitleProps) {
+export function PageTitle({ eyebrow, title, titleSize = 36, children, style }: PageTitleProps) {
   return (
     <div style={style}>
       <div
@@ -26,8 +26,8 @@ export function PageTitle({ eyebrow, title, titleSize = 52, children, style }: P
         style={{
           fontFamily: "var(--serif)",
           fontSize: titleSize,
-          fontWeight: 400,
-          letterSpacing: titleSize >= 44 ? "-0.6px" : "-0.4px",
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
           color: "var(--ink)",
           lineHeight: 1.05,
           margin: "12px 0 0",

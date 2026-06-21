@@ -25,9 +25,9 @@ export function SectionHeader({ eyebrow, title, titleSize = 28, action, style }:
           style={{
             fontFamily: "var(--serif)",
             fontSize: titleSize,
-            fontWeight: 400,
+            fontWeight: 600,
             margin: "4px 0 0",
-            letterSpacing: "-0.3px",
+            letterSpacing: "-0.02em",
             color: "var(--ink)",
             lineHeight: 1.1,
           }}
