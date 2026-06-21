@@ -551,7 +551,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           )}
 
           {activeTab === "plan" && showPlanTab && (
-            <div className="md:h-full md:overflow-y-auto">
+            <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
               <PlanTab
                 userId={userId}
                 userName={initialProfile.name}
