@@ -2196,7 +2196,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 // ── PlanSubTabStrip ────────────────────────────────────────────────────────────
 // Single canonical tab strip used by every team page in the Plan tab.
 // Implements §4.2 exactly: underline only, no pills, no segmented backgrounds.
-function PlanSubTabStrip({
+export function PlanSubTabStrip({
   tabs,
   active,
   onChange,

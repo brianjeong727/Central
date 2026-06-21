@@ -2,25 +2,35 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
-import { getInitials, getAvatarColor } from "../utils"
+import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { RoleDescriptionEditor } from "./plan-tab"
+import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
+import { CentralButton, InsetHairline } from "@/components/central"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  praying:  { label: "Praying",  bg: "#EDE5F0", text: "#3E1540" },
-  answered: { label: "Answered", bg: "#F4F1E8", text: "#3E1540" },
-  ongoing:  { label: "Ongoing",  bg: "#FBF8F2", text: "#5A5466" },
+  praying:  { label: "Praying",  bg: "var(--ivory)", text: "var(--plum)" },
+  answered: { label: "Answered", bg: "var(--cream)", text: "var(--body)" },
+  ongoing:  { label: "Ongoing",  bg: "var(--cream)", text: "var(--muted-text)" },
 }
+
+const JOURNAL_TABS = [
+  { key: "devotionals", label: "Devotionals" },
+  { key: "prayers",     label: "Prayers" },
+  { key: "verses",      label: "Verses" },
+] as const
+
+type JournalTabId = "devotionals" | "prayers" | "verses"
 
 function fmtJournalDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
+
+// ── Journal Devotionals Tab ───────────────────────────────────────────────────
 
 export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void }) {
   const supabase = createClient()
@@ -91,21 +101,21 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
     <div>
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       <div style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", letterSpacing: "1.4px", textTransform: "uppercase", fontWeight: 400, margin: "0 0 6px" }}>Devotionals · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: 32, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>Reflections</h2>
+        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Devotionals · {entries.length}</p>
+        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>Reflections</h2>
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
-          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New entry
-        </button>
+        </CentralButton>
       </div>
 
       {showEditor && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
           <RoleDescriptionEditor
             key={editingEntry?.id ?? "new"}
             initialContent={draft.content}
@@ -113,8 +123,8 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
             placeholder="Write your reflections here…"
           >
             <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 6, letterSpacing: "-0.02em" }} />
-              <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#3E1540", borderBottom: "1px solid #F0EDE8", marginBottom: 0, paddingBottom: 10 }} />
+              <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 6, letterSpacing: "-0.02em" }} />
+              <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 14, color: "var(--plum)", borderBottom: "1px solid var(--line)", marginBottom: 0, paddingBottom: 10 }} />
             </div>
           </RoleDescriptionEditor>
           <div style={{ padding: "0 26px 20px" }}>
@@ -124,13 +134,13 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                 <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
               </div>
             ) : (
-              <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8A8497", background: "transparent", border: "1px dashed #D4CFC7", borderRadius: 7, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
+              <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
                 <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
               </button>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</button>
+              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
+              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</CentralButton>
             </div>
           </div>
         </div>
@@ -140,9 +150,9 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
         <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No entries match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No devotionals yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Write your first entry to get started.</p></>
+          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No entries match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No devotionals yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Write your first entry to get started.</p></>
           )}
         </div>
       ) : (
@@ -152,26 +162,26 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
             const menuOpen = openMenuId === entry.id
             return (
-              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
                 <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isExpanded ? 19 : 15, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.25, margin: 0, marginBottom: entry.passage ? 3 : 0 }}>{entry.title}</h3>
-                      {entry.passage && <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 13, color: "#3E1540", lineHeight: 1.4, margin: 0 }}>{entry.passage}</p>}
+                      <h3 style={{ fontFamily: "var(--serif)", fontSize: isExpanded ? 19 : 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.25, margin: 0, marginBottom: entry.passage ? 3 : 0 }}>{entry.title}</h3>
+                      {entry.passage && <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 13, color: "var(--plum)", lineHeight: 1.4, margin: 0 }}>{entry.passage}</p>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
-                            <div style={{ height: 1, background: "#F0EDE8" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "var(--line)" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
-                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                      {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
                 </div>
@@ -189,6 +199,8 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
     </div>
   )
 }
+
+// ── Journal Prayers Tab ───────────────────────────────────────────────────────
 
 export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number) => void }) {
   const supabase = createClient()
@@ -258,15 +270,15 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     const isOpen = statusMenuId === entryId
     return (
       <div style={{ position: "relative", display: "inline-block" }}>
-        <button onClick={e => { e.stopPropagation(); setStatusMenuId(isOpen ? null : entryId); setOpenMenuId(null) }} style={{ padding: "2px 9px", borderRadius: 20, background: cfg.bg, color: cfg.text, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer", letterSpacing: "0.03em" }}>
+        <button onClick={e => { e.stopPropagation(); setStatusMenuId(isOpen ? null : entryId); setOpenMenuId(null) }} style={{ padding: "2px 9px", borderRadius: 20, background: cfg.bg, color: cfg.text, fontSize: 11, fontWeight: 600, border: "1px solid var(--line)", cursor: "pointer", letterSpacing: "0.03em" }}>
           {cfg.label}
         </button>
         {isOpen && (
-          <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, overflow: "hidden", minWidth: 130 }}>
+          <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, overflow: "hidden", minWidth: 130 }}>
             {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => (
-              <button key={s} onClick={e => { e.stopPropagation(); updateStatus(entryId, s) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: s === status ? "#F8F5FF" : "transparent", border: "none", cursor: "pointer" }}>
+              <button key={s} onClick={e => { e.stopPropagation(); updateStatus(entryId, s) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: s === status ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer" }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_CONFIG[s].text, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: "#13101A" }}>{STATUS_CONFIG[s].label}</span>
+                <span style={{ fontSize: 13, color: "var(--ink)" }}>{STATUS_CONFIG[s].label}</span>
               </button>
             ))}
           </div>
@@ -280,15 +292,15 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", letterSpacing: "1.4px", textTransform: "uppercase", fontWeight: 400, margin: "0 0 6px" }}>Prayers · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: 32, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>What you&apos;re praying</h2>
+        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Prayers · {entries.length}</p>
+        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>What you&apos;re praying</h2>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {(["all", "praying", "answered", "ongoing"] as const).map(f => {
           const isActive = filterStatus === f
           const label = f === "all" ? "All" : STATUS_CONFIG[f].label
           return (
-            <button key={f} onClick={() => setFilterStatus(f)} style={{ padding: "4px 12px", borderRadius: 20, border: "none", background: isActive ? "#3E1540" : "#F0EDE8", color: isActive ? "#F6F4EF" : "#5A5466", fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: "pointer", transition: "background 150ms" }}>
+            <button key={f} onClick={() => setFilterStatus(f)} style={{ padding: "4px 12px", borderRadius: 20, border: isActive ? "none" : "1px solid var(--line-2)", background: isActive ? "var(--plum-2)" : "var(--ivory)", color: isActive ? "var(--cream)" : "var(--body)", fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: "pointer", transition: "background 150ms" }}>
               {label}
             </button>
           )
@@ -296,16 +308,16 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
-          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New prayer
-        </button>
+        </CentralButton>
       </div>
 
       {showEditor && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)", overflow: "hidden" }}>
+        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
           <RoleDescriptionEditor
             key={editingEntry?.id ?? "new"}
             initialContent={draft.content}
@@ -314,22 +326,22 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             minHeight={152}
           >
             <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid #F0EDE8", paddingBottom: 10 }} />
+              <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid var(--line)", paddingBottom: 10 }} />
             </div>
           </RoleDescriptionEditor>
           <div style={{ padding: "0 26px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <span style={{ fontSize: 12, color: "#8A8497" }}>Status</span>
+              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Status</span>
               {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
                 const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
                 return (
-                  <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "#8A8497", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "none" : "1px solid #ECE8DE", cursor: "pointer" }}>{cfg.label}</button>
+                  <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "var(--muted-text)", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "1px solid var(--line)" : "1px solid var(--line-2)", cursor: "pointer" }}>{cfg.label}</button>
                 )
               })}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.title.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</button>
+              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
+              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</CentralButton>
             </div>
           </div>
         </div>
@@ -339,9 +351,9 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
         <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No prayers match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No prayers yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Record your first prayer request.</p></>
+          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No prayers match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No prayers yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Record your first prayer request.</p></>
           )}
         </div>
       ) : (
@@ -352,26 +364,26 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             const menuOpen = openMenuId === entry.id
             const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
-              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
                 <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
+                      <h3 style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
                       <div onClick={e => e.stopPropagation()}><StatusBadge status={entry.status} entryId={entry.id} /></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id); setStatusMenuId(null) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id); setStatusMenuId(null) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
-                            <div style={{ height: 1, background: "#F0EDE8" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "var(--line)" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
-                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                      {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
                 </div>
@@ -388,6 +400,8 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     </div>
   )
 }
+
+// ── Journal Verses Tab ────────────────────────────────────────────────────────
 
 export function JournalVersesTab({ userId, ministryId }: { userId: string; ministryId: string }) {
   const supabase = createClient()
@@ -446,22 +460,22 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
-          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8A8497", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 10, fontSize: 13, color: "#13101A", outline: "none", fontFamily: "inherit" }} />
+          <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
+          <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />Add verse
-        </button>
+        </CentralButton>
       </div>
 
       {showEditor && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", padding: "26px 26px 20px", marginBottom: 20, boxShadow: "0 2px 12px rgba(19,16,26,0.06)" }}>
-          <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#3E1540", marginBottom: 12, letterSpacing: "-0.01em" }} />
-          <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#13101A", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
-          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "#5A5466", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
+        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", padding: "26px 26px 20px", marginBottom: 20 }}>
+          <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 20, color: "var(--plum)", marginBottom: 12, letterSpacing: "-0.01em" }} />
+          <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid var(--line)", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
+          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "var(--body)", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #ECE8DE", background: "transparent", fontSize: 13, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", borderRadius: 8, background: "#3E1540", color: "#F6F4EF", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving || !draft.reference.trim() || !draft.verse_text.trim() ? 0.5 : 1 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</button>
+            <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
+            <CentralButton onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</CentralButton>
           </div>
         </div>
       )}
@@ -470,9 +484,9 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
         <Spinner />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "#C4C4C4", margin: "0 auto 12px" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "#8A8497" }}>No verses match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4 }}>No verses saved yet</p><p style={{ fontSize: 13, color: "#8A8497" }}>Save a verse that has spoken to you.</p></>
+          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
+          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No verses match &ldquo;{searchQuery}&rdquo;</p> : (
+            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No verses saved yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Save a verse that has spoken to you.</p></>
           )}
         </div>
       ) : (
@@ -483,38 +497,38 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
             const menuOpen = openMenuId === entry.id
             const preview = entry.verse_text.length > 90 ? entry.verse_text.slice(0, 90) + "…" : entry.verse_text
             return (
-              <div key={entry.id} style={{ background: "white", borderRadius: 14, border: "1px solid #ECE8DE", boxShadow: "0 1px 3px rgba(19,16,26,0.04)" }}>
+              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
                 <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isExpanded ? 18 : 15, fontWeight: 400, color: "#3E1540", letterSpacing: "-0.01em", margin: 0, marginBottom: !isExpanded ? 3 : 0 }}>{entry.reference}</p>
-                      {!isExpanded && <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 13, color: "#5A5466", lineHeight: 1.5, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</p>}
+                      <p style={{ fontFamily: "var(--serif)", fontSize: isExpanded ? 18 : 15, fontWeight: 400, color: "var(--plum)", letterSpacing: "-0.01em", margin: 0, marginBottom: !isExpanded ? 3 : 0 }}>{entry.reference}</p>
+                      {!isExpanded && <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</p>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
+                      <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "#F4F1E8" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8A8497" }}><MoreHorizontal size={15} /></button>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#13101A", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
-                            <div style={{ height: 1, background: "#F0EDE8" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "#EF4444", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <div style={{ height: 1, background: "var(--line)" }} />
+                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
-                      {!isFirst && <span style={{ color: "#C4C4C4", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
+                      {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
                 </div>
                 {isExpanded && (
                   <div style={{ padding: "14px 20px 20px" }}>
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 16, color: "#13101A", lineHeight: 1.75, margin: 0, marginBottom: entry.note ? 16 : 0 }}>
+                    <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: 0, marginBottom: entry.note ? 16 : 0 }}>
                       &ldquo;{entry.verse_text}&rdquo;
                     </p>
                     {entry.note && (
-                      <div style={{ paddingTop: 14, borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: "#F5F2EC" }}>
-                        <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 0 }}>Reflection</p>
-                        <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{entry.note}</p>
+                      <div style={{ paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+                        <p style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, marginTop: 0 }}>Reflection</p>
+                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{entry.note}</p>
                       </div>
                     )}
                   </div>
@@ -527,6 +541,8 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     </div>
   )
 }
+
+// ── Journal Section ───────────────────────────────────────────────────────────
 
 export function JournalSection({
   userId,
@@ -543,7 +559,7 @@ export function JournalSection({
   onToggleEntries: (v: boolean) => void
   onToggleStreak: (v: boolean) => void
 }) {
-  const [journalTab, setJournalTab] = useState<"devotionals" | "prayers" | "verses">("devotionals")
+  const [journalTab, setJournalTab] = useState<JournalTabId>("devotionals")
   const [entryCount, setEntryCount] = useState(0)
   const [entryDates, setEntryDates] = useState<string[]>([])
   const [prayerCount, setPrayerCount] = useState(0)
@@ -580,7 +596,6 @@ export function JournalSection({
 
   const streak = computeStreak(entryDates)
   const showStats = showEntries || showStreak
-  const monoSm: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase" as const, fontWeight: 400 }
 
   const statsItems = [
     ...(showEntries ? [{ label: "Entries", value: entryCount }] : []),
@@ -588,19 +603,13 @@ export function JournalSection({
     ...(showStreak ? [{ label: "Streak", value: streak }] : []),
   ]
 
-  const tabs = [
-    { id: "devotionals" as const, label: "Devotionals" },
-    { id: "prayers" as const, label: "Prayers" },
-    { id: "verses" as const, label: "Verses" },
-  ]
-
   function VerseCard() {
     if (!homeVerse) return null
     return (
-      <div style={{ marginTop: 32, padding: "20px 24px", background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 14 }}>
-        <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 10px" }}>Today&apos;s Verse</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 16, color: "#13101A", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 13, color: "#3E1540", margin: 0 }}>— {homeVerse.reference}</p>
+      <div style={{ marginTop: 32, padding: "20px 24px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)" }}>
+        <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>Today&apos;s Verse</p>
+        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
+        <p style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--plum)", margin: 0 }}>— {homeVerse.reference}</p>
       </div>
     )
   }
@@ -610,29 +619,29 @@ export function JournalSection({
       {/* Settings gear + stats bar */}
       <div style={{ position: "relative", paddingTop: 4 }}>
         <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
-          <button onClick={() => setShowSettingsMenu(v => !v)} style={{ width: 28, height: 28, borderRadius: 7, background: showSettingsMenu ? "#ECE8DE" : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497" }}>
+          <button onClick={() => setShowSettingsMenu(v => !v)} style={{ width: 28, height: 28, borderRadius: 7, background: showSettingsMenu ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
             <Settings size={14} />
           </button>
           {showSettingsMenu && (
-            <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "white", border: "1px solid #ECE8DE", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
-              <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 12px" }}>Display settings</p>
+            <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
+              <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
               <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "#13101A" }}>Show entry count</span>
-                <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#3E1540" }} />
+                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>
+                <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
               </label>
               <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "#13101A" }}>Show streak</span>
-                <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#3E1540" }} />
+                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show streak</span>
+                <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
               </label>
             </div>
           )}
         </div>
         {showStats && (
-          <div style={{ display: "flex", background: "#FBF8F2", border: "1px solid #ECE8DE", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
             {statsItems.map((item, i) => (
-              <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid #ECE8DE" : "none" }}>
-                <p style={{ ...monoSm, color: "#8A8497", margin: "0 0 4px" }}>{item.label}</p>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", margin: 0, lineHeight: 1 }}>{item.value}</p>
+              <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
+                <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
+                <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
               </div>
             ))}
           </div>
@@ -641,12 +650,12 @@ export function JournalSection({
 
       {/* Mobile: tab strip + single column */}
       <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
-        <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottomWidth: 1, borderBottomStyle: "solid", borderBottomColor: "#ECE8DE" }}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setJournalTab(t.id)} style={{ padding: "8px 18px", background: "transparent", border: "none", borderBottomWidth: 2, borderBottomStyle: "solid", borderBottomColor: journalTab === t.id ? "#3E1540" : "transparent", color: journalTab === t.id ? "#3E1540" : "#8A8497", fontSize: 13, fontWeight: journalTab === t.id ? 600 : 400, cursor: "pointer", marginBottom: -1, letterSpacing: "-0.01em" }}>
-              {t.label}
-            </button>
-          ))}
+        <div style={{ marginBottom: 24 }}>
+          <PlanSubTabStrip
+            tabs={JOURNAL_TABS}
+            active={journalTab}
+            onChange={k => setJournalTab(k as JournalTabId)}
+          />
         </div>
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
         {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
@@ -665,6 +674,8 @@ export function JournalSection({
     </>
   )
 }
+
+// ── Profile field config ──────────────────────────────────────────────────────
 
 type ProfileDraftField = "phone" | "graduation_year" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
 
@@ -707,6 +718,8 @@ const PROFILE_SECTIONS: {
   },
 ]
 
+// ── Danger Zone (§4.19 editorial inline rule) ─────────────────────────────────
+
 function DangerZone({
   ministryName,
   leaveConfirm,
@@ -725,44 +738,34 @@ function DangerZone({
   onConfirm: () => void
 }) {
   return (
-    <div className="mt-8 pt-6 border-t border-[#E8E2D2]">
-      <p style={{ ...MONO_STYLE, fontSize: "10px", color: "#A09A8C", marginBottom: "12px", letterSpacing: "0.08em" }}>DANGER ZONE</p>
-      {!leaveConfirm ? (
-        <button
-          onClick={onShowConfirm}
-          className="flex items-center gap-2 text-[#9F3030] text-[13px] font-medium px-4 py-2 rounded-xl border border-[#9F3030]/25 bg-[#9F3030]/5 hover:bg-[#9F3030]/10 transition-colors"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Leave {ministryName}
-        </button>
-      ) : (
-        <div className="rounded-xl border border-[#9F3030]/25 bg-[#9F3030]/5 p-4 flex flex-col gap-3">
-          <p className="text-[13px] text-[#9F3030] font-medium">Leave {ministryName}?</p>
-          <p className="text-[12px] text-[#5A5466] leading-relaxed">
-            Your messages will remain visible until an admin runs cleanup. You can rejoin with an invite code.
+    <div style={{ marginTop: 48 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase" as const, color: "var(--danger)" }}>Danger Zone</span>
+        <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Leave {ministryName}</p>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: 0, lineHeight: 1.55 }}>
+            Your messages remain visible until an admin runs cleanup. You can rejoin with an invite code.
           </p>
-          {leaveError && <p className="text-[12px] text-[#9F3030]">{leaveError}</p>}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onConfirm}
-              disabled={leaving}
-              className="flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#9F3030] hover:bg-[#7A2525] transition-colors disabled:opacity-50"
-            >
-              {leaving ? "Leaving…" : "Yes, leave"}
-            </button>
-            <button
-              onClick={onCancel}
-              disabled={leaving}
-              className="text-[#5A5466] text-[13px] font-medium px-4 py-1.5 rounded-lg hover:bg-[#E8E2D2] transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
+          {leaveError && <p style={{ fontSize: 12, color: "var(--danger)", margin: "6px 0 0" }}>{leaveError}</p>}
         </div>
-      )}
+        {!leaveConfirm ? (
+          <CentralButton variant="destructive" onClick={onShowConfirm} style={{ flexShrink: 0 }}>Leave</CentralButton>
+        ) : (
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <CentralButton variant="destructive" onClick={onConfirm} disabled={leaving}>{leaving ? "Leaving…" : "Confirm"}</CentralButton>
+            <CentralButton variant="secondary" onClick={onCancel} disabled={leaving}>Cancel</CentralButton>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+
+// ── Profile Tab ───────────────────────────────────────────────────────────────
 
 export function ProfileTab({
   userId,
@@ -910,11 +913,7 @@ export function ProfileTab({
   }
 
   const monoFieldLabel: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 10,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
+    ...MONO_STYLE,
     margin: 0,
     marginBottom: 4,
   }
@@ -930,13 +929,13 @@ export function ProfileTab({
           return (
             <div key={section.id}>
               <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>{section.label}</p>
-              <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+              <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }}>
                 {fieldsToRender.map((field, i) => (
-                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid #E5E0D2" : "none" }}>
+                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
                     {editing ? (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                         <p style={monoFieldLabel}>{field.label}</p>
-                        <p style={{ ...monoFieldLabel, color: "#C4C4C4", marginBottom: 0 }}>Optional</p>
+                        <p style={{ ...monoFieldLabel, color: "var(--muted-text)", marginBottom: 0 }}>Optional</p>
                       </div>
                     ) : (
                       <p style={monoFieldLabel}>{field.label}</p>
@@ -948,7 +947,7 @@ export function ProfileTab({
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
                           rows={field.key === "testimony" ? 5 : 3}
-                          style={{ display: "block", width: "100%", fontSize: 14, color: "#13101A", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
                         />
                       ) : (
                         <input
@@ -956,11 +955,11 @@ export function ProfileTab({
                           value={draft[field.key]}
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
-                          style={{ display: "block", width: "100%", fontSize: 14, color: "#13101A", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0 }}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0 }}
                         />
                       )
                     ) : (
-                      <p style={{ fontSize: 14, color: "#13101A", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0 }}>
+                      <p style={{ fontSize: 14, color: "var(--ink)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0 }}>
                         {getFieldValue(field.key)}
                       </p>
                     )}
@@ -974,12 +973,12 @@ export function ProfileTab({
         {editing && schoolOptions.length > 0 && (
           <div>
             <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>School</p>
-            <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+            <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }}>
               <div style={{ padding: "14px 18px" }}>
                 <select
                   value={currentSchoolId ?? ""}
                   onChange={e => handleSchoolChange(e.target.value)}
-                  style={{ width: "100%", fontSize: 14, color: "#13101A", background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                  style={{ width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
                 >
                   <option value="">Other / Not a student</option>
                   {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -991,8 +990,8 @@ export function ProfileTab({
 
         {!editing && !hasAnyContent && (
           <div style={{ textAlign: "center", padding: "40px 0 24px" }}>
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 4, marginTop: 0 }}>Nothing here yet</p>
-            <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Edit your profile to share details with your community.</p>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4, marginTop: 0 }}>Nothing here yet</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Edit your profile to share details with your community.</p>
           </div>
         )}
       </div>
@@ -1002,136 +1001,117 @@ export function ProfileTab({
   return (
     <div className="pb-6 md:pb-0">
 
-
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
           {/* Mobile header */}
           <div className="md:hidden px-5 pt-14 pb-5">
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
-            <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>Your prayers, reflections, and devotionals.</p>
+            <p style={{ ...MONO_STYLE, marginBottom: 6 }}>Your Journal</p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
+            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Your prayers, reflections, and devotionals.</p>
           </div>
 
           {/* Desktop header */}
-          <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
-            <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
+          <div className="hidden md:block px-14 pt-11 pb-8" style={{ borderBottom: "1px solid var(--line)" }}>
+            <p style={{ ...MONO_STYLE, marginBottom: 6 }}>Your Journal</p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 52, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
+            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
           </div>
 
           <div className="px-5 md:px-14">
             <JournalSection
-                userId={userId}
-                ministryId={initialProfile.ministry_id ?? ""}
-                showEntries={profile.show_journal_entries ?? false}
-                showStreak={profile.show_journal_streak ?? false}
-                onToggleEntries={handleToggleEntries}
-                onToggleStreak={handleToggleStreak}
-              />
+              userId={userId}
+              ministryId={initialProfile.ministry_id ?? ""}
+              showEntries={profile.show_journal_entries ?? false}
+              showStreak={profile.show_journal_streak ?? false}
+              onToggleEntries={handleToggleEntries}
+              onToggleStreak={handleToggleStreak}
+            />
           </div>
         </div>
       )}
 
       {activeSection === "spiritual-profile" && <>
-        {/* Mobile header */}
-        <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
+
+        {/* ── Mobile: top bar ── */}
+        <div className="flex items-center gap-2.5 px-5 pt-14 pb-3 md:hidden">
           <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-            <RingCrossLogo size={26} />
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+            <RingCrossLogo size={26} color="var(--plum)" />
+            <span style={{ fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
           </a>
         </div>
 
-        {/* Desktop hero banner */}
-        <div className="hidden md:block px-7 pt-7 pb-0">
-          <div
-            className="relative overflow-hidden rounded-2xl text-[#F6F4EF]"
-            style={{ background: "linear-gradient(135deg, #4A1B4D 0%, #3E1540 60%, #1A0820 100%)", padding: "40px 40px 36px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center" }}
-          >
-            <div className="absolute rounded-full pointer-events-none" style={{ top: -120, right: 100, width: 380, height: 380, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
-            <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.06, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
-            <label className="relative group flex-shrink-0" style={{ width: 110, height: 110, borderRadius: 22, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+        {/* ── Mobile: cream identity block ── */}
+        <div className="md:hidden px-5 pb-6">
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+            <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
               <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-              {profile.avatar_url ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" /> : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "44px" }}>{getInitials(profile.name)}</span>}
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Camera className="w-6 h-6 text-white" /></div>
-              {uploadingAvatar && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
+              }
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
+                <Camera style={{ width: 14, height: 14, color: "white" }} />
+              </div>
+              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
             </label>
-            <div className="relative">
-              {avatarError && <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6, maxWidth: 220 }}>{avatarError}</p>}
-              <h1 style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1, letterSpacing: "-0.01em" }}>{profile.name}</h1>
-              <div style={{ marginTop: 12, display: "flex", gap: 24, color: "rgba(246,244,239,0.85)", fontSize: 13.5, flexWrap: "wrap" }}>
-                <div><span style={{ color: "rgba(246,244,239,0.55)" }}>Role · </span>{profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}</div>
-                {profile.graduation_year && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>Class · </span>{profile.graduation_year}</div>}
-                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <div><span style={{ color: "rgba(246,244,239,0.55)" }}>School · </span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</div>}
-                <div style={{ opacity: 0.7, fontSize: 13 }}>{profile.email}</div>
-              </div>
-              <div style={{ marginTop: 20, display: "flex", gap: 8 }}>
-                {editing ? (
-                  <>
-                    <button onClick={cancelEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] transition-colors" style={{ border: "1px solid rgba(246,244,239,0.25)", background: "transparent", color: "rgba(246,244,239,0.75)", cursor: "pointer" }}>
-                      <X className="w-3.5 h-3.5" />Cancel
-                    </button>
-                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors disabled:opacity-50" style={{ background: "rgba(246,244,239,0.15)", border: "1px solid rgba(246,244,239,0.3)", color: "#F6F4EF", cursor: saving ? "not-allowed" : "pointer" }}>
-                      <Check className="w-3.5 h-3.5" />{saving ? "Saving…" : "Save"}
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors" style={{ background: "rgba(246,244,239,0.15)", border: "1px solid rgba(246,244,239,0.3)", color: "#F6F4EF", cursor: "pointer" }}>
-                    <Edit3 className="w-3.5 h-3.5" />Edit profile
-                  </button>
-                )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.1 }}>{profile.name}</h1>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{profile.role}</span>
+                {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
+                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
               </div>
             </div>
           </div>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 14px" }}>{profile.email}</p>
+          {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "0 0 10px" }}>{avatarError}</p>}
+          {editing ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <CentralButton variant="secondary" onClick={cancelEdit} style={{ fontSize: 13 }}><X size={12} />Cancel</CentralButton>
+              <CentralButton onClick={saveEdit} disabled={saving} style={{ fontSize: 13 }}><Check size={12} />{saving ? "Saving…" : "Save"}</CentralButton>
+            </div>
+          ) : (
+            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Edit3 size={13} />Edit profile</CentralButton>
+          )}
         </div>
 
-        {/* Mobile identity card */}
-        <div className="md:hidden px-5">
-          <div className="rounded-2xl overflow-hidden border border-[#ECE8DE] shadow-[0_2px_8px_rgba(19,16,26,0.06)] mb-5">
-            <div className="bg-[#3E1540] px-6 pt-8 pb-8 relative overflow-hidden">
-              <div className="absolute -top-[70px] left-1/2 -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.16)_0%,transparent_65%)]" />
-              <div className="relative z-10 flex flex-col items-center gap-4">
-                <label className="relative w-24 h-24 rounded-full overflow-hidden bg-[#3E1540] border-[3px] border-white/20 group flex-shrink-0" style={{ cursor: uploadingAvatar ? "not-allowed" : "pointer", display: "block" }} aria-label="Change profile photo">
-                  <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-                  {profile.avatar_url ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" /> : <span className="flex items-center justify-center w-full h-full text-[#F6F4EF]" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400 }}>{getInitials(profile.name)}</span>}
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Camera className="w-5 h-5 text-white" /></div>
-                  {uploadingAvatar && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
-                </label>
-                <div className="text-center">
-                  {avatarError && <p style={{ fontSize: 11, color: "#FCA5A5", marginBottom: 6 }}>{avatarError}</p>}
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#F6F4EF", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "10px" }}>{profile.name}</h2>
-                  <div className="flex items-center justify-center gap-2 flex-wrap mb-2">
-                    <span className="text-[10px] bg-white/15 text-[#F6F4EF] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">{profile.role}</span>
-                    {profile.graduation_year && <span className="text-[12px] text-[#8A8497] font-medium">Class of {profile.graduation_year}</span>}
-                    {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <span className="text-[12px] text-[#8A8497] font-medium">{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
-                  </div>
-                  <p className="text-[12px] text-[#8A8497]">{profile.email}</p>
-                </div>
-              </div>
+        {/* ── Desktop: cream identity header ── */}
+        <div className="hidden md:block"><InsetHairline /></div>
+        <div className="hidden md:flex items-center gap-6 px-14" style={{ paddingTop: 36, paddingBottom: 36 }}>
+          <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: 14, background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+            <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+            {profile.avatar_url
+              ? <img src={profile.avatar_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
+            }
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
+              <Camera style={{ width: 16, height: 16, color: "white" }} />
             </div>
-            <div className="px-4 py-2.5 bg-[#FDFBF7] border-t border-[#ECE8DE] flex items-center justify-between gap-2">
-              <div className="flex gap-1">
-                <button style={{ padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "#3E1540", color: "#F6F4EF", border: "none", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>Profile</button>
-              </div>
-              <div className="flex items-center gap-2">
-                {editing ? (
-                  <>
-                    <button onClick={cancelEdit} className="w-8 h-8 rounded-full bg-[#F2EDE0] flex items-center justify-center hover:bg-[#ECE8DE] transition-colors"><X className="w-3.5 h-3.5 text-[#5A5466]" /></button>
-                    <button onClick={saveEdit} disabled={saving} className="flex items-center gap-1.5 bg-[#3E1540] text-white text-[12px] font-semibold px-4 py-1.5 rounded-full hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50">
-                      <Check className="w-3 h-3" />{saving ? "Saving…" : "Save"}
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={startEdit} className="flex items-center gap-1.5 text-[#3E1540] text-[12px] font-semibold px-4 py-1.5 rounded-full border border-[#3E1540]/25 bg-[#3E1540]/5 hover:bg-[#3E1540]/10 transition-colors">
-                    <Edit3 className="w-3 h-3" />Edit
-                  </button>
-                )}
-              </div>
+            {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
+          </label>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Your Profile · {profile.role}</p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 44, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.05 }}>{profile.name}</h1>
+            <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
+              {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
+              {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId) && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+              <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
             </div>
+            {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
           </div>
+          {editing ? (
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
+              <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
+            </div>
+          ) : (
+            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Edit3 size={13} />Edit profile</CentralButton>
+          )}
         </div>
+        <div className="hidden md:block"><InsetHairline /></div>
 
-        {/* Desktop: profile sections */}
-        <div className="hidden md:block px-7 pt-6 pb-6">
+        {/* ── Desktop: profile sections ── */}
+        <div className="hidden md:block px-14 pt-6 pb-6">
           {renderProfileSections()}
           <DangerZone
             ministryName={ministryName}
@@ -1144,7 +1124,7 @@ export function ProfileTab({
           />
         </div>
 
-        {/* Mobile: profile sections */}
+        {/* ── Mobile: profile sections ── */}
         <div className="md:hidden px-5 pb-6">
           {renderProfileSections()}
           <DangerZone
