@@ -103,11 +103,11 @@ Central is a daily-driver tool that an entire church community lives in for comm
 
 ### 2.1 Three-column workspace
 ```
-[ 76px dark icon rail ] [ 304px cream sidebar ] [ flexible main ]
+[ 76px dark icon rail ] [ 220px cream sidebar ] [ flexible main ]
 ```
 
 - **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Chat, People, Profile, Pray, Plan). Active icon: `rgba(251,248,242,0.08)` background + 2px cream stripe on the left edge.
-- **Sidebar** — cream `#FDFCF8`, 304px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
+- **Sidebar** — cream `#FDFCF8`, 220px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
 - **Main column** — cream `#FDFCF8`. Top header strip is breadcrumbs left, search/header-actions right, then content.
 
 ### 2.2 Sidebar variants

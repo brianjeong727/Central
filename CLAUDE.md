@@ -166,7 +166,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/announcements-tab.tsx` | Announcements tab — full feed, RSVP, admin/leader CRUD, pinning, announcement detail view |
 | `app/home/tabs/chats-tab.tsx` | Chats tab — Church/My Chats sub-tabs, search, unread badges; includes `ChatScreen` and `ChatSettings` components |
 | `app/home/tabs/plan-tab.tsx` | Plan tab — team planning (Praise Team, Student Org Board, Small Groups, DGL rotation, worship sets, event planning) |
-| `app/home/tabs/directory-tab.tsx` | Directory tab — searchable member list, member profile sheet |
+| `app/home/tabs/directory-tab.tsx` | Directory tab — master/detail: member list in shell context panel (DirectoryMemberListPanel), member detail in content area (TabPageHeader + PageTitle); mobile path unchanged |
 | `app/home/tabs/giving-tab.tsx` | Finance tab — giving info, reimbursements, budget, fund allocation |
 | `app/home/tabs/profile-tab.tsx` | Profile tab — spiritual profile fields, journal (devotionals/prayers/verses sub-tabs), sign out |
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
