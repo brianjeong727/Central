@@ -13,9 +13,9 @@ export function CardTitle({ children, size = 20, italic = false, style }: CardTi
       style={{
         fontFamily: "var(--serif)",
         fontSize: size,
-        fontWeight: 400,
+        fontWeight: 600,
         lineHeight: 1.2,
-        letterSpacing: "-0.2px",
+        letterSpacing: "-0.02em",
         color: "var(--ink)",
         ...(italic && { fontStyle: "italic" }),
         ...style,

@@ -7,10 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Sans → Inter; Mono → system monospace (not Inter) */
-  --font-sans: var(--font-inter);
+  /* Single font: Bricolage Grotesque carries everything */
+  --font-sans: var(--font-bricolage-grotesque);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: var(--font-instrument-serif), "Cormorant Garamond", Georgia, serif;
+  --font-serif: var(--font-bricolage-grotesque), system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,12 +65,13 @@
   --faint:       #A09A8C;
 
   /* Cream surface family */
-  --cream:       #FBF8F2;
+  --cream:       #FDFCF8;
   --cream-2:     #F8F4EA;
   --cream-3:     #F6F2E8;
   --body-bg:     #F4F1E8;  /* desktop body/sidebar surface — between cream-3 and ivory */
   --ivory:       #F1ECDE;
   --canvas:      #F1ECDE;
+  --rail:        #ECE6D6;  /* dedicated icon-rail surface — darker than ivory */
 
   /* Hairline family */
   --line:        #E8E2D2;
@@ -85,10 +86,16 @@
   --gold:        #D4A45C;
   --danger:      #9F3030;
 
-  /* ── Font stack aliases (§1.3) ──────────────────────────────────────────── */
-  --serif: var(--font-instrument-serif), "Cormorant Garamond", Georgia, serif;
-  --sans:  var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* ── Font stack aliases (§1.3) — Bricolage Grotesque carries everything ─── */
+  --serif: var(--font-bricolage-grotesque), system-ui, sans-serif;
+  --sans:  var(--font-bricolage-grotesque), system-ui, sans-serif;
   --mono:  ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Backward-compat aliases — 22 files hardcode these names; they resolve to
+     Bricolage via this alias so no per-file edits are needed. Tech-debt: these
+     token names lie (they render Bricolage, not Instrument/Inter). Rename in a
+     future cleanup pass. */
+  --font-instrument-serif: var(--font-bricolage-grotesque);
+  --font-inter:             var(--font-bricolage-grotesque);
 
   /* ── Spacing scale (§1.4) ───────────────────────────────────────────────── */
   --space-1:  4px;
@@ -114,14 +121,14 @@
   --r-hero:   18px;  /* hero banner, full-bleed modal */
 
   /* ── shadcn semantic aliases → Central palette ──────────────────────────── */
-  --background:          #FBF8F2; /* cream — never white */
+  --background:          #FDFCF8; /* cream — never white */
   --foreground:          #13101A; /* ink */
-  --card:                #FBF8F2; /* cream */
+  --card:                #FDFCF8; /* cream */
   --card-foreground:     #13101A;
-  --popover:             #FBF8F2;
+  --popover:             #FDFCF8;
   --popover-foreground:  #13101A;
   --primary:             #2D0F2E; /* plum-2 */
-  --primary-foreground:  #FBF8F2; /* cream */
+  --primary-foreground:  #FDFCF8; /* cream */
   --secondary:           #F1ECDE; /* ivory */
   --secondary-foreground: #2D0F2E;
   --muted:               #F1ECDE; /* ivory surface — shadcn uses this as a bg */
@@ -138,10 +145,10 @@
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.625rem; /* 10px base — used by shadcn radius-* calc() aliases */
-  --sidebar:                  #FBF8F2;
+  --sidebar:                  #FDFCF8;
   --sidebar-foreground:       #13101A;
   --sidebar-primary:          #2D0F2E;
-  --sidebar-primary-foreground: #FBF8F2;
+  --sidebar-primary-foreground: #FDFCF8;
   --sidebar-accent:           #F1ECDE;
   --sidebar-accent-foreground: #2D0F2E;
   --sidebar-border:           #E8E2D2;
