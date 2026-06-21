@@ -21,6 +21,12 @@ This file has four layers. When you learn something new, file it in the right la
 
 Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Layer 2; a **mistake/surprise not to repeat** → Layer 3 (`lessons.md`); a **procedure with steps** → Layer 4 (a skill).
 
+**Related docs (each owns its domain — don't duplicate them here):**
+- `DESIGN_SYSTEM.md` — full design contract: colors, typography, components, layout, the warm-minimalist direction. Design questions go here.
+- `permissions.md` — canonical role/access truth; who-can-do-what across every feature.
+- `MINISTRY_CONTEXT.md` — real-world ministry workflows and vocabulary (what DG, DGL, CCSF, rotation, etc. actually mean).
+- `PRD.md` — product vision, feature intent (the "why" behind features), and roadmap. NOT implementation detail — CLAUDE.md owns the "how."
+
 ---
 
 # LAYER 2 — STANDING RULES / GUARDRAILS
