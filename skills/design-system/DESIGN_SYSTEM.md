@@ -33,12 +33,13 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
 | `--faint`       | `#A09A8C` | Disabled, helper text, timestamps |
-| `--cream`       | `#FBF8F2` | Primary surface (page bg, cards) |
+| `--cream`       | `#FDFCF8` | Primary surface (page bg, cards) |
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
-| `--body-bg`     | `#F4F1E8` | Desktop body surface + context sidebar — one continuous field |
-| `--ivory`       | `#F1ECDE` | Icon rail bg (distinctly darker step), active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) — the one surface that needs to lead the column |
+| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface |
+| `--ivory`       | `#F1ECDE` | Active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
+| `--rail`        | `#ECE6D6` | Desktop icon rail — darkest step of three-tone desktop surface |
 | `--line`        | `#E8E2D2` | Primary hairline |
 | `--line-2`      | `#E2DDCF` | Card border, input border |
 | `--line-3`      | `#EFE9DA` | Faint row divider |
@@ -54,22 +55,22 @@ Central is a daily-driver tool that an entire church community lives in for comm
 ### 1.3 Typography
 
 ```
---serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
---sans:  "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+--serif: "Bricolage Grotesque", system-ui, sans-serif;  /* display/heading role */
+--sans:  "Bricolage Grotesque", system-ui, sans-serif;  /* body/UI role */
 --mono:  ui-monospace, SFMono-Regular, Menlo, monospace;
 ```
 
 | Role | Family | Size | Weight | Letter-spacing | Use |
 |---|---|---|---|---|---|
-| Display    | serif | 56–64 | 400 | -0.6 to -1   | Hero banner names ("SSO", "Student Org Board") |
-| H1         | serif | 44–52 | 400 | -0.5 to -0.6 | Page titles ("Choose a ministry", "Write") |
-| H2         | serif | 32–36 | 400 | -0.3 to -0.4 | Section titles inside a page |
+| Display    | serif | 56–64 | 600 | -0.02em      | Hero banner names ("SSO", "Student Org Board") |
+| H1         | serif | 36–52 | 600 | -0.02em      | Page titles (PageTitle component default: 36px) |
+| H2         | serif | 28–36 | 600 | -0.02em      | Section titles inside a page |
 | H3         | sans  | 16–18 | 500 | 0            | UI-chrome card titles, role names, list headings. Serif H3 only for genuine editorial section heads within long-form content. |
 | Body L     | serif | 19    | 400 | 0.1          | Long-form quotes, editorial body, transition notes, chat reading-room |
 | Body       | sans  | 14–15 | 400 | 0            | UI copy, descriptions |
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
 | Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
-| Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes |
+| Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
@@ -77,9 +78,9 @@ Central is a daily-driver tool that an entire church community lives in for comm
 - Long bodies (announcements, transition notes, chat thread) are set in **serif at 17–19px** for a reading-room feel — not sans body.
 - Stat card numbers are serif, not bold sans.
 
-**Serif usage threshold:** Serif is the warmth carrier — it must feel deliberate, not wallpaper. Use it for: page H1, major section H2 (always with eyebrow), editorial long-form body, stat card numbers, display/hero text. Do NOT use it for: card titles in list views, role name labels, metadata lines, navigation text, helper copy, or any text under 16px. If more than two or three text nodes on a single screen are serif, the hierarchy collapses and the effect is diluted.
+**Display weight threshold:** Weight 600 is the heading emphasis carrier — use it at the top of the hierarchy only. Reserve weight 600 for: page H1, section H2, display/hero text. Use weight 400 for: editorial long-form body, stat card numbers, and all UI-chrome text (card titles in list views, role badges, metadata rows, tab labels, navigation items, helper copy). If more than two or three text nodes on a single screen carry weight 600, the hierarchy collapses and the effect is diluted.
 
-**Do not:** use Inter for H1 or genuine H2 section titles. Do not use system serif fallbacks alone. Do not bold serif text — weight 400 only. Do not all-caps anything except mono eyebrows. Do not use serif for UI-chrome elements: card titles in list views, role badges, metadata rows, tab labels, navigation items, or any functional label — those are Inter/sans.
+**Do not:** mix typefaces — Central uses Bricolage Grotesque exclusively; never import additional font families. Do not use weight 600 for body copy, UI labels, or metadata — reserve it for heading hierarchy (H1, H2, display). Do not all-caps anything except mono eyebrows.
 
 ### 1.4 Spacing & radius
 - **Scale:** 4, 6, 8, 10, 12, 14, 18, 22, 28, 36, 40, 56. Do not invent in-between values.
@@ -106,8 +107,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 ```
 
 - **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Chat, People, Profile, Pray, Plan). Active icon: `rgba(251,248,242,0.08)` background + 2px cream stripe on the left edge.
-- **Sidebar** — cream `#FBF8F2`, 304px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
-- **Main column** — cream `#FBF8F2`. Top header strip is breadcrumbs left, search/header-actions right, then content.
+- **Sidebar** — cream `#FDFCF8`, 304px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
+- **Main column** — cream `#FDFCF8`. Top header strip is breadcrumbs left, search/header-actions right, then content.
 
 ### 2.2 Sidebar variants
 
@@ -160,10 +161,10 @@ The highest-weight identity statement in the app. Reserved for **at most one** g
 border-radius: 18
 overflow: hidden
 background: radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)
-color: #FBF8F2
+color: #FDFCF8
 padding: 30px 36px 32px
 ```
-- **Dot texture overlay** (required): absolute inset, opacity 0.18, `radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px`.
+- **Dot texture overlay** (required): absolute inset, opacity 0.18, `radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px`.
 - **Layout:** flex row, gap 24. Square monogram (84–92px, radius 16–18, `rgba(251,248,242,0.08)` bg, `rgba(251,248,242,0.18)` border, serif initial 46px) + identity column (mono eyebrow `rgba(251,248,242,0.65)` + serif title 48–56 + meta 15px `rgba(251,248,242,0.78)`) + actions column right-aligned.
 - **Action buttons inside hero:** primary uses cream bg / plum-2 text; secondary uses `rgba(251,248,242,0.08)` bg with cream text and 1px `rgba(251,248,242,0.25)` border. Radius 10.
 
@@ -188,7 +189,7 @@ This rule exists because tab styling has broken multiple times due to duplicate 
 
 | Variant | Padding | BG | Color | Border | Radius |
 |---|---|---|---|---|---|
-| Primary | 12×22 (or 10×16 compact) | `#2D0F2E` | `#FBF8F2` | none | 10–12 |
+| Primary | 12×22 (or 10×16 compact) | `#2D0F2E` | `#FDFCF8` | none | 10–12 |
 | Secondary | 10×16 | transparent | `#5A5466` | 1px `#E2DDCF` | 10 |
 | Plum-outline | 8×14 | transparent | `#3E1540` | 1px `#3E1540` | 10 |
 | Dashed placeholder | 12×16 | transparent | `#5A5466` | 1px dashed `#C4C0B0` | 10–14 |
@@ -201,13 +202,13 @@ This rule exists because tab styling has broken multiple times due to duplicate 
 - Inside callout cards (cream-3), primary buttons remain plum-2.
 
 ### 4.4 Inputs
-- **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FBF8F2` bg, 15px sans.
+- **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
 - **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 40px serif, letter-spacing -0.5.
 - **Textarea body** (announcement, transition note): 19px serif, line-height 1.65, no border, transparent bg, vertical resize, min-height 540 for full-page editors.
 - **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#2D0F2E` bg, cream text.
 
 ### 4.5 Cards
-- **Standard card:** `#FBF8F2` bg, 1px `#E8E2D2` border, radius 12–14, padding 18–22.
+- **Standard card:** `#FDFCF8` bg, 1px `#E8E2D2` border, radius 12–14, padding 18–22. Shares the same tone as the page body — separation from the background is by hairline border alone, not by tone contrast.
 - **Soft callout card:** `#F1ECDE` bg, 1px `#E2DDCF` border (used for emphasized stat cards, readiness).
 - **Inset card:** `#F6F2E8` bg, 1px `#E8E2D2` border (verse callout, accent panels).
 - **Hero card** (Up Next): use full §4.1 hero banner treatment at smaller scale.
@@ -218,7 +219,7 @@ Used in clusters at the top-right of editorial pages (event overview, settings o
 padding: 14–22
 border: 1px solid #E8E2D2
 border-radius: 12–14
-background: #FBF8F2
+background: #FDFCF8
 ```
 - Mono eyebrow
 - Serif number 28–40
@@ -370,7 +371,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 1. **No modal-in-the-middle-of-navigation.** Clicking an event must open the plan page directly. Modals are for *creation*, peeks are hover popovers.
 2. **No tabbed kitchen-sink under "Plan".** Each event is a destination; the workflow tabs (Overview/Checklist/Roles/Notes) belong to that destination, not to a global Plan tab.
 3. **No white cards on white bg.** Always cream surface; differentiate with hairlines and inset shades.
-4. **No bold sans headlines.** Headlines are serif, weight 400. Bold sans implies SaaS chrome.
+4. **Headlines are Bricolage Grotesque at weight 600, body/UI text at weight 400.** Do not use weight 600 for body copy, labels, or metadata — reserve it for heading hierarchy (H1, H2, display).
 5. **No emoji-led status pills, no traffic-light colors.** Use the limited semantic palette (success sage, warm-tan social, sage outreach, plum ministry).
 6. **No red filled "Delete" buttons.** Destructive actions are outline-only in `#9F3030`.
 7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13) and the timeline rail (§4.12).
@@ -386,7 +387,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 17. **Pages never start without a mono eyebrow.** Every H1 is preceded by mono context.
 18. **Verse callout is permanent.** Don't drop it to save space.
 19. **Underline tabs only.** Never pill tabs, never boxed tabs.
-20. **Cream bg `#FBF8F2`, page bg `#F1ECDE`** — never invert.
+20. **Cream bg `#FDFCF8`, page bg `#F1ECDE`** — never invert.
 
 ---
 
@@ -394,7 +395,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 
 - Minimum hit target 30 sq for chrome buttons, 34 sq for primary header buttons.
 - Body text minimum 13px; sub-labels minimum 11px (mono eyebrows excepted as labels).
-- Color contrast: ink `#13101A` on cream `#FBF8F2` is the primary text pair; do not use `#8A8497` on `#FBF8F2` for anything longer than a label.
+- Color contrast: ink `#13101A` on cream `#FDFCF8` is the primary text pair; do not use `#8A8497` on `#FDFCF8` for anything longer than a label.
 - Layouts are designed at 1440 width and scale by content reflow, not by hiding columns.
 
 ---
@@ -452,7 +453,7 @@ const mono = {
 <div>
   <div style={mono}>MINISTRY ADMIN</div>
   <h1 style={{ fontFamily: "var(--serif)", fontSize: 48, margin: "6px 0 0",
-               letterSpacing: -0.6, color: "#13101A" }}>
+               letterSpacing: "-0.02em", color: "#13101A" }}>
     Church Settings
   </h1>
   <div style={{ fontSize: 15, color: "#5A5466", marginTop: 8 }}>
@@ -467,25 +468,25 @@ const mono = {
   position: "relative", marginTop: 18,
   borderRadius: 18, overflow: "hidden",
   background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-  color: "#FBF8F2", padding: "30px 36px 32px",
+  color: "#FDFCF8", padding: "30px 36px 32px",
 }}>
   {/* dot texture — required */}
   <div style={{
     position: "absolute", inset: 0, opacity: 0.18, pointerEvents: "none",
-    background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
+    background: "radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
   }}/>
   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
     <span style={{
       width: 92, height: 92, borderRadius: 18,
-      background: "rgba(251,248,242,0.08)",
-      border: "1px solid rgba(251,248,242,0.18)",
+      background: "rgba(253,252,248,0.08)",
+      border: "1px solid rgba(253,252,248,0.18)",
       display: "grid", placeItems: "center",
-      fontFamily: "var(--serif)", fontSize: 46, color: "#FBF8F2", flexShrink: 0,
+      fontFamily: "var(--serif)", fontSize: 46, color: "#FDFCF8", flexShrink: 0,
     }}>S</span>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ ...mono, color: "rgba(251,248,242,0.65)" }}>SATURDAY, MAY 16 · SOCIAL</div>
+      <div style={{ ...mono, color: "rgba(253,252,248,0.65)" }}>SATURDAY, MAY 16 · SOCIAL</div>
       <h1 style={{ fontFamily: "var(--serif)", fontSize: 56, lineHeight: 1,
-                   margin: "8px 0 0", letterSpacing: -0.6, color: "#FBF8F2" }}>SSO</h1>
+                   margin: "8px 0 0", letterSpacing: "-0.02em", color: "#FDFCF8" }}>SSO</h1>
       <div style={{ fontSize: 15, color: "rgba(251,248,242,0.78)", marginTop: 10 }}>
         Senior Send Off &nbsp;·&nbsp; 5:00 AM – 6:00 AM &nbsp;·&nbsp; Church Courtyard
       </div>
@@ -520,7 +521,7 @@ const mono = {
   <div>
     <div style={mono}>EVENT BRIEF</div>
     <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, margin: "6px 0 0",
-                 letterSpacing: -0.4, color: "#13101A" }}>Planning Details</h2>
+                 letterSpacing: "-0.02em", color: "#13101A" }}>Planning Details</h2>
     {/* body 15 sans #5A5466 line-height 1.7 */}
   </div>
   <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -531,7 +532,7 @@ const mono = {
 
 ### 11.7 Stat card
 ```jsx
-<div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+<div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FDFCF8" }}>
   <div style={mono}>EXPECTED TURNOUT</div>
   <div style={{ fontFamily: "var(--serif)", fontSize: 40, marginTop: 10,
                 color: "#13101A", letterSpacing: -0.6 }}>100</div>
@@ -543,7 +544,7 @@ const mono = {
 ```jsx
 const btnPrimary = {
   padding: "12px 22px", borderRadius: 10, border: "none",
-  background: "#2D0F2E", color: "#FBF8F2",
+  background: "#2D0F2E", color: "#FDFCF8",
   fontSize: 14, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer",
 };
 const btnSecondary = {
@@ -585,7 +586,7 @@ const btnDestructive = {
     <article key={i} style={{ position: "relative", paddingBottom: 28 }}>
       <span style={{ position: "absolute", left: -23, top: 4,
                      width: 14, height: 14, borderRadius: 99,
-                     background: "#FBF8F2", border: "2px solid #3E1540" }}/>
+                     background: "#FDFCF8", border: "2px solid #3E1540" }}/>
       {/* author row + serif 15 body */}
     </article>
   ))}
@@ -598,8 +599,8 @@ const btnDestructive = {
   <button key={p.label} style={{
     padding: "7px 12px", borderRadius: 999,
     border: "1px solid " + (p.on ? "#3E1540" : "#E2DDCF"),
-    background:  p.on ? "#2D0F2E" : "#FBF8F2",
-    color:       p.on ? "#FBF8F2" : "#5A5466",
+    background:  p.on ? "#2D0F2E" : "#FDFCF8",
+    color:       p.on ? "#FDFCF8" : "#5A5466",
     fontSize: 12, fontWeight: p.on ? 500 : 400,
     fontFamily: "var(--sans)", cursor: "pointer",
   }}>{p.label}</button>
@@ -616,7 +617,7 @@ const btnDestructive = {
   }}>
     <span style={{
       position: "absolute", width: 16, height: 16, borderRadius: 999,
-      background: "#FBF8F2", top: 2, [on ? "right" : "left"]: 2,
+      background: "#FDFCF8", top: 2, [on ? "right" : "left"]: 2,
     }}/>
   </span>
   <div>
@@ -706,19 +707,19 @@ const MyNewPage = () => (
       position: "relative", marginTop: 18,
       borderRadius: 18, overflow: "hidden",
       background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-      color: "#FBF8F2", padding: "30px 36px 32px",
+      color: "#FDFCF8", padding: "30px 36px 32px",
     }}>
       <div style={{ position: "absolute", inset: 0, opacity: 0.18, pointerEvents: "none",
-        background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }}/>
+        background: "radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }}/>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
         <span style={{ width: 84, height: 84, borderRadius: 16,
-          background: "rgba(251,248,242,0.08)", border: "1px solid rgba(251,248,242,0.18)",
+          background: "rgba(253,252,248,0.08)", border: "1px solid rgba(253,252,248,0.18)",
           display: "grid", placeItems: "center", fontFamily: "var(--serif)", fontSize: 40,
-          color: "#FBF8F2", flexShrink: 0 }}>X</span>
+          color: "#FDFCF8", flexShrink: 0 }}>X</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ ...chromeMono, color: "rgba(251,248,242,0.65)" }}>EYEBROW · CONTEXT</div>
+          <div style={{ ...chromeMono, color: "rgba(253,252,248,0.65)" }}>EYEBROW · CONTEXT</div>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: 48, lineHeight: 1,
-            margin: "8px 0 0", letterSpacing: -0.5, color: "#FBF8F2" }}>Page Title</h1>
+            margin: "8px 0 0", letterSpacing: "-0.02em", color: "#FDFCF8" }}>Page Title</h1>
           <div style={{ fontSize: 14, color: "rgba(251,248,242,0.78)", marginTop: 10 }}>
             One-sentence meta · with · separators
           </div>
@@ -743,7 +744,7 @@ const MyNewPage = () => (
     <section style={{ marginTop: 36 }}>
       <div style={chromeMono}>SECTION CONTEXT</div>
       <h2 style={{ fontFamily: "var(--serif)", fontSize: 32, margin: "4px 0 0",
-        letterSpacing: -0.3 }}>Section title</h2>
+        letterSpacing: "-0.02em" }}>Section title</h2>
 
       {/* content here — refer to §4 for any component */}
     </section>
