@@ -1,25 +1,34 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, ArrowLeft, MessageCircle, Heart, ChevronRight, Users } from "lucide-react"
+import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle } from "@/components/central"
 import { getInitials, getAvatarColor } from "../utils"
 import type { DirectoryMember } from "../types"
 
-export function DirectoryTab({ currentUserId, currentUserName, ministryId, ministryName, initialMemberId, onMemberSelect, onOpenChat, onBack }: { currentUserId: string; currentUserName: string; ministryId: string; ministryName: string; initialMemberId?: string; onMemberSelect?: (id: string | null) => void; onOpenChat: (id: string, name: string) => void; onBack?: () => void }) {
+// ── DirectoryMemberListPanel — lives in the shell context panel on desktop ─────
+
+export function DirectoryMemberListPanel({
+  ministryId,
+  currentUserId,
+  selectedId,
+  initialMemberId,
+  onSelect,
+}: {
+  ministryId: string
+  currentUserId: string
+  selectedId: string | null | undefined
+  initialMemberId?: string | null
+  onSelect: (member: DirectoryMember) => void
+}) {
   const supabase = createClient()
   const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<DirectoryMember | null>(null)
-
-  function selectMember(member: DirectoryMember | null) {
-    setSelected(member)
-    onMemberSelect?.(member?.id ?? null)
-  }
 
   useEffect(() => {
     async function load() {
@@ -30,8 +39,10 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
         .order("name")
       const list = data ?? []
       setMembers(list)
+      // Restore from URL param, else select first
       const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
-      setSelected(restored ?? list[0] ?? null)
+      const toSelect = restored ?? list[0] ?? null
+      if (toSelect) onSelect(toSelect)
       setLoading(false)
     }
     load()
@@ -42,166 +53,238 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
     m.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  useEffect(() => {
-    if (search && filtered.length === 0) selectMember(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered.length, search])
-
   return (
-    <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-
-      {/* ── Desktop: split-pane row ── */}
-      <div className="hidden md:flex md:flex-1 md:overflow-hidden">
-
-      {/* ── Desktop: left member list panel ── */}
-      <div className="flex flex-col w-[260px] flex-shrink-0 border-r border-[#ECE8DE] h-full overflow-hidden" style={{ background: "#F4F1E8" }}>
-        {/* Search */}
-        <div className="px-3 py-3 border-b border-[#ECE8DE]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8A8497]" />
-            <input
-              type="text"
-              placeholder="Search members"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-white rounded-lg border border-[#E5E0D2] text-[12.5px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-            />
-          </div>
-        </div>
-
-        {/* Member list */}
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="p-4"><Spinner /></div>
-          ) : filtered.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                icon={<Users size={20} strokeWidth={1.5} />}
-                title="No members found"
-                subtitle={search ? "Try a different name" : "No members in the directory yet"}
-              />
-            </div>
-          ) : (
-            filtered.map((member) => {
-              const isActive = selected?.id === member.id
-              return (
-                <button
-                  key={member.id}
-                  onClick={() => selectMember(member)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-[#ECE8DE]/60 active:bg-[#ECE8DE] transition-colors duration-100"
-                  style={{
-                    borderLeft: isActive ? "2px solid #3E1540" : "2px solid transparent",
-                    background: isActive ? "rgba(62,21,64,0.06)" : undefined,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                      background: "#13101A",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {member.avatar_url
-                      ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 13, color: "#F6F4EF", fontWeight: 400 }}>{getInitials(member.name)}</span>
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#13101A] truncate leading-tight">
-                      {member.name}
-                      {member.id === currentUserId && <span className="ml-1.5 text-[10px] text-[#8A8497] font-normal">you</span>}
-                    </p>
-                    <p className="text-[11px] text-[#8A8497] truncate leading-tight mt-0.5">
-                      {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : ""}
-                      {member.graduation_year && member.role ? " · " : ""}
-                      {member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : ""}
-                    </p>
-                  </div>
-                </button>
-              )
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ── Desktop: right detail panel ── */}
-      <div className="flex flex-1 overflow-y-auto flex-col" style={{ background: "#FDFBF7" }}>
-        {selected ? (
-          <MemberDetailPanel
-            member={selected}
-            currentUserId={currentUserId}
-            currentUserName={currentUserName}
-            onOpenChat={onOpenChat}
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Search */}
+      <div className="px-3 py-3 border-b" style={{ borderColor: "var(--line)" }}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--muted-text)" }} />
+          <input
+            type="text"
+            placeholder="Search members"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+            style={{
+              background: "var(--cream)",
+              borderColor: "var(--line-2)",
+              color: "var(--ink)",
+            }}
           />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <Users className="w-9 h-9 text-[#C4C4C4] mx-auto mb-3" />
-              <p className="text-[14px] font-semibold text-[#8A8497]">Select a member</p>
-              <p className="text-[12px] text-[#C4C4C4] mt-1">Choose someone from the list</p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      </div>{/* end split-pane row */}
-
-      {/* ── Mobile: header + card list ── */}
-      <div className="md:hidden">
-        <div className="px-5 pt-14 pb-5">
-          <div className="flex items-center gap-2.5 mb-4">
-            {onBack && (
-              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
-                <ArrowLeft className="w-5 h-5 text-[#3E1540]" />
-              </button>
-            )}
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>Directory</span>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
-            <input
-              type="text"
-              placeholder="Search members…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#EFEFEF] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
-            />
-          </div>
-        </div>
-
+      {/* Member list */}
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="px-5"><Spinner /></div>
+          <div className="p-4"><Spinner /></div>
         ) : filtered.length === 0 ? (
-          <div className="px-5">
+          <div className="p-4">
             <EmptyState
-              icon={<Users className="w-7 h-7" />}
+              icon={<Users size={20} strokeWidth={1.5} />}
               title="No members found"
               subtitle={search ? "Try a different name" : "No members in the directory yet"}
             />
           </div>
         ) : (
-          <div className="px-5 pb-4 flex flex-col gap-3">
-            {filtered.map((member) => (
+          filtered.map((member) => {
+            const isActive = selectedId === member.id
+            return (
               <button
                 key={member.id}
-                onClick={() => setSelected(member)}
-                className="w-full bg-white rounded-2xl border border-[#EFEFEF] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all text-left"
+                onClick={() => onSelect(member)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors duration-100"
+                style={{
+                  borderLeft: isActive ? "2px solid var(--plum)" : "2px solid transparent",
+                  background: isActive ? "rgba(62,21,64,0.06)" : undefined,
+                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--cream-3)" }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "" }}
+              >
+                <div
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                    background: "var(--ink)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    overflow: "hidden",
+                  }}
+                >
+                  {member.avatar_url
+                    ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--cream)", fontWeight: 400 }}>{getInitials(member.name)}</span>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium truncate leading-tight" style={{ color: "var(--ink)" }}>
+                    {member.name}
+                    {member.id === currentUserId && <span className="ml-1.5 text-[10px] font-normal" style={{ color: "var(--muted-text)" }}>you</span>}
+                  </p>
+                  <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: "var(--muted-text)" }}>
+                    {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : ""}
+                    {member.graduation_year && member.role ? " · " : ""}
+                    {member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : ""}
+                  </p>
+                </div>
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── DirectoryTab — desktop: header + detail only; mobile: full self-contained ──
+
+export function DirectoryTab({
+  currentUserId,
+  currentUserName,
+  ministryId,
+  ministryName,
+  initialMemberId,
+  selectedMember,
+  onMemberSelect,
+  onOpenChat,
+  onBack,
+}: {
+  currentUserId: string
+  currentUserName: string
+  ministryId: string
+  ministryName: string
+  initialMemberId?: string
+  selectedMember?: DirectoryMember | null
+  onMemberSelect?: (id: string | null) => void
+  onOpenChat: (id: string, name: string) => void
+  onBack?: () => void
+}) {
+  // Mobile-only state — desktop selection is driven by home-app via selectedMember prop
+  const supabase = createClient()
+  const [mobileMembers, setMobileMembers] = useState<DirectoryMember[]>([])
+  const [mobileSearch, setMobileSearch] = useState("")
+  const [mobileLoading, setMobileLoading] = useState(true)
+  const [mobileSelected, setMobileSelected] = useState<DirectoryMember | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
+        .eq("ministry_id", ministryId)
+        .order("name")
+      const list = data ?? []
+      setMobileMembers(list)
+      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
+      setMobileSelected(restored ?? null)
+      setMobileLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const mobileFiltered = mobileMembers.filter((m) =>
+    m.name.toLowerCase().includes(mobileSearch.toLowerCase())
+  )
+
+  return (
+    <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+
+      {/* ── Desktop: TabPageHeader + detail pane only ── */}
+      <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
+
+        {/* Page header — matches Finance/Profile exactly */}
+        <TabPageHeader>
+          <PageTitle eyebrow={`PEOPLE · ${ministryName.toUpperCase()}`} title="Directory" />
+        </TabPageHeader>
+
+        {/* Detail area */}
+        <div className="flex-1 overflow-y-auto">
+          {selectedMember ? (
+            <MemberDetailPanel
+              member={selectedMember}
+              currentUserId={currentUserId}
+              currentUserName={currentUserName}
+              onOpenChat={onOpenChat}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div style={{
+                border: "1px dashed var(--dashed)",
+                borderRadius: 14,
+                padding: "32px 48px",
+                textAlign: "center",
+                maxWidth: 320,
+              }}>
+                <Users style={{ width: 24, height: 24, color: "var(--muted-text)", margin: "0 auto 12px" }} />
+                <p style={{ fontSize: 14, color: "var(--body)", fontWeight: 500 }}>Select a member</p>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>Choose someone from the list on the left.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* ── Mobile: full self-contained layout (unchanged) ── */}
+      <div className="md:hidden">
+        <div className="px-5 pt-14 pb-5">
+          <div className="flex items-center gap-2.5 mb-4">
+            {onBack && (
+              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
+                <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
+              </button>
+            )}
+            <span style={{ fontFamily: "var(--serif)", fontSize: "36px", color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1, fontWeight: 600 }}>Directory</span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
+            <input
+              type="text"
+              placeholder="Search members…"
+              value={mobileSearch}
+              onChange={(e) => setMobileSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
+              style={{ background: "var(--cream)", borderColor: "var(--line)", color: "var(--ink)" }}
+            />
+          </div>
+        </div>
+
+        {mobileLoading ? (
+          <div className="px-5"><Spinner /></div>
+        ) : mobileFiltered.length === 0 ? (
+          <div className="px-5">
+            <EmptyState
+              icon={<Users className="w-7 h-7" />}
+              title="No members found"
+              subtitle={mobileSearch ? "Try a different name" : "No members in the directory yet"}
+            />
+          </div>
+        ) : (
+          <div className="px-5 pb-4 flex flex-col gap-3">
+            {mobileFiltered.map((member) => (
+              <button
+                key={member.id}
+                onClick={() => setMobileSelected(member)}
+                className="w-full rounded-2xl border p-4 text-left transition-all"
+                style={{
+                  background: "var(--cream)",
+                  borderColor: "var(--line)",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                }}
               >
                 <div className="flex items-center gap-3.5">
-                  <Avatar className="w-11 h-11 bg-[#3E1540]">
+                  <Avatar className={`w-11 h-11 ${getAvatarColor(member.name)}`} style={{ background: "var(--plum)" }}>
                     {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
                     <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">{getInitials(member.name)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-[#13101A] text-[14px] tracking-tight">{member.name}</h3>
+                      <h3 className="font-semibold text-[14px] tracking-tight" style={{ color: "var(--ink)" }}>{member.name}</h3>
                       {member.id === currentUserId && (
-                        <span className="text-[10px] bg-[#FBF8F2] text-[#9CA3AF] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide">You</span>
+                        <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide" style={{ background: "var(--ivory)", color: "var(--muted-text)" }}>You</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {member.graduation_year && <span className="text-[11px] text-[#8A8497] font-medium">Class of {member.graduation_year}</span>}
+                      {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
                         <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[#3E1540] border-transparent"}`}>
                           {member.role}
@@ -209,7 +292,6 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
                 </div>
               </button>
             ))}
@@ -218,15 +300,15 @@ export function DirectoryTab({ currentUserId, currentUserName, ministryId, minis
       </div>
 
       {/* Mobile: full-screen member sheet */}
-      {selected && (
+      {mobileSelected && (
         <div className="md:hidden">
           <MemberSheet
-            member={selected}
+            member={mobileSelected}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
-            onClose={() => selectMember(null)}
+            onClose={() => setMobileSelected(null)}
             onOpenChat={(id, name) => {
-              selectMember(null)
+              setMobileSelected(null)
               onOpenChat(id, name)
             }}
           />
@@ -302,30 +384,30 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
       <div
         style={{
           width: 120, height: 120, borderRadius: "50%",
-          background: "#3E1540",
+          background: "var(--plum)",
           display: "flex", alignItems: "center", justifyContent: "center",
           marginBottom: 28, overflow: "hidden", flexShrink: 0,
         }}
       >
         {member.avatar_url
           ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", fontWeight: 400 }}>{getInitials(member.name)}</span>
+          : <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--cream)", fontWeight: 400 }}>{getInitials(member.name)}</span>
         }
       </div>
 
-      {/* Name */}
-      <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 42, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1, textAlign: "center" }}>
+      {/* Member name — prominent heading in the detail body */}
+      <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1, textAlign: "center" }}>
         {member.name}
-      </h1>
+      </h2>
 
       {/* Subtitle */}
-      <p style={{ fontSize: 13.5, color: "#8A8497", margin: "0 0 28px", textAlign: "center" }}>
+      <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: "0 0 28px", textAlign: "center" }}>
         {[
           member.graduation_year ? `Class of ${member.graduation_year}` : null,
           member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null,
         ].filter(Boolean).join(" · ")}
       </p>
-      <p style={{ fontSize: 12, color: "#8A8497", margin: "-16px 0 28px", textAlign: "center", maxWidth: 360, lineHeight: 1.45 }}>
+      <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "-16px 0 28px", textAlign: "center", maxWidth: 360, lineHeight: 1.45 }}>
         Shared profile details are visible to members in this ministry.
       </p>
 
@@ -338,7 +420,7 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "10px 22px", borderRadius: 9999,
-              background: "#3E1540", color: "#F6F4EF",
+              background: "var(--plum)", color: "var(--cream)",
               border: "none", fontSize: 13.5, fontWeight: 500,
               cursor: dmLoading ? "not-allowed" : "pointer",
               opacity: dmLoading ? 0.6 : 1,
@@ -352,28 +434,27 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "10px 22px", borderRadius: 9999,
-              background: prayingFor ? "#F4F1E8" : "white",
-              color: prayingFor ? "#3E1540" : "#5A5466",
-              border: "1.5px solid #ECE8DE",
+              background: prayingFor ? "var(--ivory)" : "var(--cream)",
+              color: prayingFor ? "var(--plum)" : "var(--body)",
+              border: "1.5px solid var(--line)",
               fontSize: 13.5, fontWeight: 500, cursor: "pointer",
             }}
           >
-            <Heart style={{ width: 15, height: 15, fill: prayingFor ? "#3E1540" : "none" }} />
+            <Heart style={{ width: 15, height: 15, fill: prayingFor ? "var(--plum)" : "none" }} />
             {prayingFor ? "Praying" : "Pray for"}
           </button>
         </div>
       )}
 
       {/* Info rows */}
-      <div style={{ width: "100%", maxWidth: 480, borderTop: "1px solid #ECE8DE" }}>
+      <div style={{ width: "100%", maxWidth: 480, borderTop: "1px solid var(--line)" }}>
         {infoRows.map((row) => (
-          <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
-            <span style={{ fontSize: 14, color: "#13101A" }}>{row.value}</span>
+          <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+            <span style={{ fontSize: 14, color: "var(--ink)" }}>{row.value}</span>
           </div>
         ))}
 
-        {/* Profile fields — new fields with fallback to legacy */}
         {(() => {
           const aboutVal = member.bio || member.about_me
           const verseVal = member.favorite_verse || member.bible_verse
@@ -385,9 +466,9 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
           if (member.favorite_book_of_bible) rows.push({ label: "FAVORITE BOOK", value: member.favorite_book_of_bible })
           if (member.prayer_request) rows.push({ label: "PRAYER", value: member.prayer_request })
           return rows.map(row => (
-            <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid #ECE8DE", alignItems: "start" }}>
-              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
-              <span style={{ fontSize: 14, color: row.italic ? "#3E1540" : "#5A5466", lineHeight: 1.65, fontStyle: row.italic ? "italic" : "normal", fontFamily: row.italic ? "var(--font-instrument-serif)" : "inherit" }}>{row.value}</span>
+            <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+              <span style={{ fontSize: 14, color: row.italic ? "var(--plum)" : "var(--body)", lineHeight: 1.65, fontStyle: row.italic ? "italic" : "normal", fontFamily: row.italic ? "var(--serif)" : "inherit" }}>{row.value}</span>
             </div>
           ))
         })()}

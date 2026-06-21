@@ -21,6 +21,7 @@ import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-t
 import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
 import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
+import type { DirectoryMember } from "./types"
 import { GivingTab } from "./tabs/giving-tab"
 import { ProfileTab } from "./tabs/profile-tab"
 import { SettingsTab } from "./tabs/settings-tab"
@@ -73,6 +74,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     return initialUserTeams?.[0]?.teamId ?? null
   })
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
+  const [selectedDirectoryMember, setSelectedDirectoryMember] = useState<DirectoryMember | null>(null)
   const validSections = ["spiritual-profile", "journal"] as const
   const initialSection = searchParams.get("section") as "spiritual-profile" | "journal" | null
   const [profileSection, setProfileSection] = useState<"spiritual-profile" | "journal">(
@@ -92,6 +94,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   function handleMemberSelect(memberId: string | null) {
     setActiveMemberId(memberId)
     replaceParam("member", memberId)
+  }
+
+  function handleDirectoryMemberSelect(member: DirectoryMember) {
+    setSelectedDirectoryMember(member)
+    handleMemberSelect(member.id)
   }
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [ministryIsPublic, setMinistryIsPublic] = useState(false)
@@ -452,6 +459,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         isTreasurer={isTreasurer}
         isDGL={isDGL}
         userId={userId}
+        directoryMinistryId={ministryId}
+        directoryCurrentUserId={userId}
+        directorySelectedMemberId={selectedDirectoryMember?.id ?? activeMemberId}
+        directoryInitialMemberId={activeMemberId}
+        onDirectoryMemberSelect={handleDirectoryMemberSelect}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -561,13 +573,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           )}
 
           {activeTab === "directory" && (
-            <div className="md:h-full md:overflow-y-auto">
+            <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
               <DirectoryTab
                 currentUserId={userId}
                 currentUserName={initialProfile.name}
                 ministryId={ministryId}
                 ministryName={ministryName}
                 initialMemberId={activeMemberId ?? undefined}
+                selectedMember={selectedDirectoryMember}
                 onMemberSelect={handleMemberSelect}
                 onBack={() => setActiveTab("chats")}
                 onOpenChat={(id, name) => {

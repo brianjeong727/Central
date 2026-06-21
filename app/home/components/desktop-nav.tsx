@@ -5,6 +5,7 @@ import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
+import { DirectoryMemberListPanel } from "../tabs/directory-tab"
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
 
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
@@ -58,6 +59,8 @@ export function DesktopSidebar({
   onActiveTeamChange, profileSection, onProfileSectionChange,
   financeSection, onFinanceSectionChange, isTreasurer, isDGL,
   canCreateTeam, userId,
+  directoryMinistryId, directoryCurrentUserId,
+  directorySelectedMemberId, directoryInitialMemberId, onDirectoryMemberSelect,
 }: DesktopSidebarProps) {
   const supabase = createClient()
   const [note, setNote] = useState("")
@@ -232,9 +235,17 @@ export function DesktopSidebar({
       )
     }
 
-    // ── Directory: no sub-nav in panel ───────────────────────────────────────
-    if (activeTab === "directory") {
-      return <div className="flex-1 overflow-y-auto px-2 pb-3" />
+    // ── Directory: member list ───────────────────────────────────────────────
+    if (activeTab === "directory" && directoryMinistryId && directoryCurrentUserId && onDirectoryMemberSelect) {
+      return (
+        <DirectoryMemberListPanel
+          ministryId={directoryMinistryId}
+          currentUserId={directoryCurrentUserId}
+          selectedId={directorySelectedMemberId}
+          initialMemberId={directoryInitialMemberId}
+          onSelect={onDirectoryMemberSelect}
+        />
+      )
     }
 
     // ── Finance (giving tab): sub-sections — Reimbursements + Budget only ──────
@@ -430,7 +441,7 @@ export function DesktopSidebar({
 
       {/* ── Context Panel ─────────────────────────────────────────────────── */}
       <div
-        className={`hidden flex-col w-[220px] flex-shrink-0 h-screen ${activeTab === "chats" || activeTab === "directory" ? "" : "md:flex"}`}
+        className={`hidden flex-col w-[220px] flex-shrink-0 h-screen ${activeTab === "chats" ? "" : "md:flex"}`}
         style={{ background: PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Section header */}

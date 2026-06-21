@@ -601,6 +601,12 @@ export interface DesktopSidebarProps {
   isDGL: boolean
   canCreateTeam?: boolean
   userId: string
+  // Directory panel
+  directoryMinistryId?: string
+  directoryCurrentUserId?: string
+  directorySelectedMemberId?: string | null
+  directoryInitialMemberId?: string | null
+  onDirectoryMemberSelect?: (member: DirectoryMember) => void
 }
 
 export interface HomeAppProps {
