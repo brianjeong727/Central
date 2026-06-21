@@ -2195,7 +2195,7 @@ export function PlanSubTabStrip({
   onChange: (key: string) => void
 }) {
   return (
-    <div style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
+    <div className="md:pl-14" style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
       {tabs.map(({ key, label }) => (
         <button
           key={key}
