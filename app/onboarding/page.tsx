@@ -2,21 +2,59 @@
 
 import { useState } from "react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
+import { RingCrossLogo } from "@/app/home/components/shared"
 
-// ─── design tokens ──────────────────────────────────────────────
-const SANS = "var(--font-inter), system-ui, sans-serif"
+const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
   fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
 }
-const serif: React.CSSProperties = {
-  fontFamily: SERIF, fontWeight: 400, color: "#13101A", margin: 0,
+
+// ─── Rail stepper ────────────────────────────────────────────────
+const STEPS = [
+  { label: "Basic info",  sub: "Name, campus, size"  },
+  { label: "Structure",   sub: "Visibility & access" },
+  { label: "Teams",       sub: "Starting groups"     },
+  { label: "Review",      sub: "Confirm & submit"    },
+]
+
+function RailStep({ i, label, sub, status }: {
+  i: number; label: string; sub: string; status: "active" | "done" | "pending"
+}) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "8px 4px" }}>
+        <span style={{
+          width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center",
+          fontSize: 12, flexShrink: 0, transition: "all .14s ease",
+          border: status === "pending" ? "1px solid #E2DDCF" : "none",
+          background: status === "active" ? "#2D0F2E" : status === "done" ? "#F1ECDE" : "#FDFCF8",
+          color:      status === "active" ? "#FDFCF8"  : status === "done" ? "#3E1540" : "#8A8497",
+        }}>
+          {status === "done"
+            ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5L20 7"/></svg>
+            : i + 1}
+        </span>
+        <span style={{ paddingTop: 4 }}>
+          <span style={{
+            display: "block", fontSize: 14, transition: "color .14s ease",
+            color: status === "active" ? "#13101A" : "#8A8497",
+            fontWeight: status === "active" ? 500 : 400,
+          }}>{label}</span>
+          <span style={{ display: "block", fontSize: 12, color: "#A09A8C", marginTop: 1 }}>{sub}</span>
+        </span>
+      </div>
+      {i < STEPS.length - 1 && (
+        <div style={{ width: 1, height: 14, background: "#E2DDCF", marginLeft: 16 }} />
+      )}
+    </>
+  )
 }
 
-// ─── icon helper ─────────────────────────────────────────────────
-function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke?: number }) {
+// ─── Icon helper ─────────────────────────────────────────────────
+function Icon({ d, size = 16, stroke = 1.6 }: { d: string; size?: number; stroke?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -25,392 +63,213 @@ function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke
   )
 }
 
-// ─── wordmark ────────────────────────────────────────────────────
-function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
-  const isInk = tone === "ink"
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: isInk ? "#3E1540" : "rgba(251,248,242,0.10)",
-        color: "#FBF8F2", display: "grid", placeItems: "center",
-        fontFamily: SERIF, fontSize: 15, flexShrink: 0,
-      }}>C</span>
-      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "#13101A" : "#FBF8F2" }}>
-        Central
-      </span>
-    </div>
-  )
-}
-
-// ─── stepper (cream circles on plum) ─────────────────────────────
-const STEP_LABELS = ["Basic info", "Structure", "Teams", "Review"]
-
-function Stepper({ step }: { step: number }) {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-start" }}>
-      {STEP_LABELS.map((label, i) => {
-        const done = i < step, current = i === step
-        return (
-          <div key={label} style={{ display: "contents" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, minWidth: 72 }}>
-              <span style={{
-                width: 30, height: 30, borderRadius: 999, display: "grid", placeItems: "center",
-                fontFamily: SANS, fontSize: 13, fontWeight: 600,
-                background: (done || current) ? "#FBF8F2" : "rgba(251,248,242,0.08)",
-                color: done ? "#3E1540" : current ? "#2D0F2E" : "rgba(251,248,242,0.5)",
-                border: (done || current) ? "none" : "1px solid rgba(251,248,242,0.25)",
-              }}>
-                {done ? <Icon d="M5 12l5 5L20 7" size={14} stroke={2.4}/> : i + 1}
-              </span>
-              <span style={{
-                fontFamily: SANS, fontSize: 12, textAlign: "center",
-                color: current ? "#FBF8F2" : "rgba(251,248,242,0.55)",
-                fontWeight: current ? 600 : 400,
-              }}>{label}</span>
-            </div>
-            {i < STEP_LABELS.length - 1 && (
-              <span style={{ flex: 1, height: 1, background: "rgba(251,248,242,0.25)", marginTop: 15 }}/>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── checkbox ────────────────────────────────────────────────────
-function CheckBox({ on }: { on: boolean }) {
-  return (
-    <span style={{
-      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-      border: `1.5px solid ${on ? "#3E1540" : "#C4C0B0"}`,
-      background: on ? "#3E1540" : "transparent",
-      display: "grid", placeItems: "center", color: "#FBF8F2",
-    }}>
-      {on && <Icon d="M5 12l5 5L20 7" size={12} stroke={2.4}/>}
-    </span>
-  )
-}
-
-// ─── field ───────────────────────────────────────────────────────
-function Field({ label, value, onChange, placeholder, autoFocus, error }: {
-  label: string; value: string; onChange: (v: string) => void
-  placeholder?: string; autoFocus?: boolean; error?: boolean
-}) {
-  return (
-    <label style={{ display: "block" }}>
-      <div style={{ ...mono, marginBottom: 8 }}>{label}</div>
-      <div style={{
-        display: "flex", alignItems: "center",
-        background: "#FBF8F2",
-        border: `1px solid ${error ? "#E53E3E" : "#E2DDCF"}`,
-        borderRadius: 10, padding: "0 14px",
-      }}>
-        <input
-          value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder} autoFocus={autoFocus}
-          style={{
-            flex: 1, border: "none", outline: "none", background: "transparent",
-            padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A",
-          }}
-        />
-      </div>
-    </label>
-  )
-}
-
-// ─── select tile ─────────────────────────────────────────────────
-function SelectTile({ title, sub, on, onClick, big }: {
-  title: string; sub?: string; on: boolean; onClick: () => void; big?: boolean
-}) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      flex: 1, textAlign: "left", padding: "16px 18px", borderRadius: 12,
-      border: `1px solid ${on ? "#2D0F2E" : "#E2DDCF"}`,
-      background: on ? "#2D0F2E" : "#FBF8F2",
-      cursor: "pointer", transition: "all .12s ease",
-    }}>
-      <div style={{
-        fontFamily: SERIF, fontWeight: 400,
-        fontSize: big ? 26 : 20, letterSpacing: -0.3, lineHeight: 1.1,
-        color: on ? "#FBF8F2" : "#13101A",
-      }}>{title}</div>
-      {sub && (
-        <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "#8A8497" }}>{sub}</div>
-      )}
-    </button>
-  )
-}
-
-// ─── struct row ──────────────────────────────────────────────────
-function StructRow({ title, body, on, soon, onClick }: {
-  title: string; body: string; on?: boolean; soon?: boolean; onClick?: () => void
-}) {
-  return (
-    <button type="button" onClick={soon ? undefined : onClick} disabled={soon} style={{
-      width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 16,
-      padding: "18px 20px", borderRadius: 12,
-      border: `1px solid ${on ? "#3E1540" : "#E2DDCF"}`,
-      background: on ? "#F6F2E8" : "#FBF8F2",
-      cursor: soon ? "default" : "pointer",
-      opacity: soon ? 0.55 : 1,
-      transition: "all .12s ease",
-    }}>
-      <CheckBox on={!!on}/>
-      <span style={{ flex: 1 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontFamily: SERIF, fontSize: 20, letterSpacing: -0.2, color: "#13101A" }}>{title}</span>
-          {soon && (
-            <span style={{
-              ...mono, fontSize: 10, background: "#F1ECDE",
-              border: "1px solid #E2DDCF", borderRadius: 999, padding: "3px 8px",
-            }}>Coming soon</span>
-          )}
-        </span>
-        <span style={{ display: "block", fontSize: 13.5, color: "#8A8497", marginTop: 3 }}>{body}</span>
-      </span>
-    </button>
-  )
-}
-
-// ─── team row ────────────────────────────────────────────────────
-function TeamRow({ team, onRemove, onChangeName }: {
-  team: Team; onRemove: () => void; onChangeName: (name: string) => void
-}) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 14, padding: "12px 14px",
-      borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
-    }}>
-      <span style={{
-        width: 38, height: 38, borderRadius: 10, background: "#F1ECDE", color: "#3E1540",
-        display: "grid", placeItems: "center", flexShrink: 0,
-        fontFamily: SERIF, fontSize: 18,
-      }}>
-        {team.name.charAt(0) || "T"}
-      </span>
-      <input
-        value={team.name}
-        onChange={(e) => onChangeName(e.target.value)}
-        style={{
-          flex: 1, border: "none", outline: "none", background: "transparent",
-          fontFamily: SANS, fontSize: 15, fontWeight: 500, color: "#13101A",
-        }}
-      />
-      <button type="button" onClick={onRemove} aria-label="Remove team" style={{
-        width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent",
-        color: "#8A8497", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0,
-      }}>
-        <Icon d="M18 6L6 18M6 6l12 12" size={14}/>
-      </button>
-    </div>
-  )
-}
-
-// ─── toggle ──────────────────────────────────────────────────────
+// ─── Toggle ──────────────────────────────────────────────────────
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} style={{
-      width: 44, height: 26, borderRadius: 999, border: "none", padding: 0, cursor: "pointer",
-      background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0,
-      transition: "background .15s ease",
+      width: 36, height: 22, borderRadius: 999, border: "none", padding: 0,
+      cursor: "pointer", position: "relative", flexShrink: 0,
+      background: on ? "#3E1540" : "#D6D0C0", transition: "background .14s ease",
+      marginTop: 1,
     }}>
       <span style={{
-        position: "absolute", width: 20, height: 20, borderRadius: 999, background: "#FBF8F2",
-        top: 3, left: on ? 21 : 3, transition: "left .15s ease",
+        position: "absolute", width: 18, height: 18, borderRadius: "50%", background: "#FDFCF8",
+        top: 2, left: on ? 16 : 2, transition: "left .14s ease",
       }}/>
     </button>
   )
 }
 
-// ─── primary button ──────────────────────────────────────────────
-function Primary({ children, onClick, disabled }: {
-  children: React.ReactNode; onClick?: () => void; disabled?: boolean
+// ─── Toggle row ──────────────────────────────────────────────────
+function ToggleRow({ title, desc, on, onClick }: {
+  title: string; desc: string; on: boolean; onClick: () => void
 }) {
   return (
-    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
-      width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
-      background: disabled ? "#E2DDCF" : "#2D0F2E",
-      color: disabled ? "#A09A8C" : "#FBF8F2",
-      fontSize: 15, fontWeight: 500, fontFamily: SANS,
-      cursor: disabled ? "not-allowed" : "pointer",
-      transition: "background .15s ease",
-      marginTop: 6,
-    }}>{children}</button>
-  )
-}
-
-// ─── back link ───────────────────────────────────────────────────
-function BackLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      background: "transparent", border: "none", cursor: "pointer", padding: 0,
-      display: "inline-flex", alignItems: "center", gap: 8,
-      fontFamily: SANS, fontSize: 14, color: "#8A8497",
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 14, padding: 18,
+      border: "1px solid #E8E2D2", borderRadius: 12, background: "#FDFCF8", marginTop: 12,
     }}>
-      <Icon d="M19 12H5M12 19l-7-7 7-7" size={15}/> Back
-    </button>
+      <Toggle on={on} onClick={onClick}/>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{title}</div>
+        <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+      </div>
+    </div>
   )
 }
 
-// ─── step head ───────────────────────────────────────────────────
-function StepHead({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) {
+// ─── Team row ────────────────────────────────────────────────────
+interface Team { id: string; icon: string; name: string; desc: string }
+
+const DEFAULT_TEAMS: Team[] = [
+  { id: "praise",      icon: "🎵", name: "Praise Team",          desc: "Worship & set planning"          },
+  { id: "smallgroups", icon: "📖", name: "Small Group Leaders",  desc: "Bible study & discipleship"      },
+  { id: "outreach",    icon: "🤝", name: "Outreach & Welcome",   desc: "First-time visitors & events"    },
+]
+
+function TeamRowItem({ team, onRemove }: { team: Team; onRemove: () => void }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+      border: "1px solid #E8E2D2", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
+    }}>
+      <span style={{
+        width: 38, height: 38, borderRadius: 10, background: "#F6F2E8",
+        display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0,
+      }}>
+        {team.icon}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, color: "#13101A" }}>{team.name}</div>
+        <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>{team.desc}</div>
+      </div>
+      <button type="button" onClick={onRemove} aria-label="Remove team" style={{
+        marginLeft: "auto", color: "#8A8497", background: "transparent", border: "none",
+        cursor: "pointer", display: "grid", placeItems: "center", padding: 4, flexShrink: 0,
+      }}>
+        <Icon d="M18 6L6 18M6 6l12 12" size={18}/>
+      </button>
+    </div>
+  )
+}
+
+// ─── Field ───────────────────────────────────────────────────────
+function Field({ label, value, onChange, placeholder, readOnly, mono: monoFont, error }: {
+  label: string; value: string; onChange?: (v: string) => void
+  placeholder?: string; readOnly?: boolean; mono?: boolean; error?: boolean
+}) {
+  return (
+    <div>
+      <label style={{ ...mono, display: "block", marginBottom: 9 }}>{label}</label>
+      <input
+        value={value}
+        readOnly={readOnly}
+        onChange={e => onChange?.(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%", padding: "13px 15px",
+          border: `1px solid ${error ? "#E53E3E" : "#E2DDCF"}`,
+          borderRadius: 10, background: "#FDFCF8",
+          fontFamily: monoFont ? "ui-monospace, SFMono-Regular, Menlo, monospace" : SANS,
+          fontSize: 15, color: "#13101A", outline: "none",
+          letterSpacing: monoFont ? "2px" : undefined,
+          boxSizing: "border-box",
+        }}
+      />
+    </div>
+  )
+}
+
+// ─── Review row ──────────────────────────────────────────────────
+function ReviewRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+      padding: "15px 0",
+      borderBottom: last ? "none" : "1px solid #EFE9DA",
+    }}>
+      <span style={{ ...mono }}>{label}</span>
+      <span style={{ fontSize: 15, color: "#13101A", textAlign: "right" }}>{value}</span>
+    </div>
+  )
+}
+
+// ─── Step header ─────────────────────────────────────────────────
+function StepHeader({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) {
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={mono}>{eyebrow}</div>
-      <h2 style={{ ...serif, fontSize: 34, lineHeight: 1.1, letterSpacing: "-0.02em", marginTop: 4 }}>{title}</h2>
-      <p style={{ fontSize: 15, color: "#5A5466", marginTop: 8, marginBottom: 0 }}>{sub}</p>
+      <h1 style={{
+        fontFamily: SERIF, fontWeight: 600, fontSize: 38, letterSpacing: "-0.02em",
+        color: "#13101A", margin: "12px 0 8px", lineHeight: 1.1,
+      }}>{title}</h1>
+      <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.6, margin: 0 }}>{sub}</p>
     </div>
   )
 }
 
-// ─── review card ────────────────────────────────────────────────
-function ReviewCard({ children }: { children: React.ReactNode }) {
+// ─── Nav row ─────────────────────────────────────────────────────
+function NavRow({ onBack, onNext, nextLabel, disabled }: {
+  onBack?: () => void; onNext: () => void; nextLabel: string; disabled?: boolean
+}) {
   return (
-    <div style={{ padding: 22, borderRadius: 14, border: "1px solid #E8E2D2", background: "#FBF8F2" }}>
-      {children}
-    </div>
-  )
-}
-
-// ─── soft pill (review teams) ────────────────────────────────────
-function SoftPill({ name }: { name: string }) {
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px 6px 8px",
-      borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", color: "#2D0F2E",
-      fontSize: 13, fontWeight: 500,
-    }}>
-      <span style={{
-        width: 24, height: 24, borderRadius: 7, background: "#FBF8F2", color: "#3E1540",
-        display: "grid", placeItems: "center",
-        fontFamily: SERIF, fontSize: 14,
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 36, gap: 14 }}>
+      {onBack ? (
+        <button type="button" onClick={onBack} style={{
+          background: "none", border: "none", fontFamily: SANS, fontSize: 14,
+          color: "#8A8497", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
+          padding: 0,
+        }}>
+          <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
+        </button>
+      ) : <span/>}
+      <button type="button" onClick={onNext} disabled={disabled} style={{
+        padding: "14px 32px", border: "none", borderRadius: 10,
+        background: disabled ? "#E2DDCF" : "#2D0F2E",
+        color: disabled ? "#A09A8C" : "#FDFCF8",
+        fontFamily: SANS, fontSize: 15, fontWeight: 500,
+        cursor: disabled ? "not-allowed" : "pointer",
+        transition: "opacity .12s ease",
       }}>
-        {name.charAt(0) || "T"}
-      </span>
-      {name}
-    </span>
+        {nextLabel}
+      </button>
+    </div>
   )
 }
 
-// ─── data ────────────────────────────────────────────────────────
+// ─── Size options ────────────────────────────────────────────────
 const SIZE_OPTIONS = [
-  { value: "small" as const, label: "Under 50", sub: "Small fellowship" },
-  { value: "medium" as const, label: "50–100", sub: "Mid-size ministry" },
-  { value: "large" as const, label: "100+", sub: "Large campus group" },
+  { value: "small"  as const, label: "Under 50", sub: "Small fellowship"    },
+  { value: "medium" as const, label: "50–100",   sub: "Mid-size ministry"   },
+  { value: "large"  as const, label: "100+",     sub: "Large campus group"  },
 ]
 
-const STRUCTURE_QUESTIONS = [
-  { id: "smallGroups",label: "Small Groups",       desc: "Bible study groups or cells",              soon: false },
-  { id: "leadership", label: "Leadership Team",    desc: "Core leadership board and oversight",      soon: false },
-  { id: "worship",    label: "Worship / Music",    desc: "Worship leading and music ministry",       soon: true  },
-  { id: "media",      label: "Media & Tech",       desc: "Sound, projection, and live streaming",    soon: true  },
-]
-
-const TEAM_PRESETS: Record<string, { name: string; icon: string }> = {
-  worship:     { name: "Worship",        icon: "🎵" },
-  media:       { name: "Media & Tech",   icon: "🎬" },
-  smallGroups: { name: "Small Groups",   icon: "👥" },
-  leadership:  { name: "Leadership",     icon: "✝️" },
-}
-
-function mapLandingSize(s: string): "small" | "medium" | "large" {
-  if (s === "100+") return "large"
-  if (s === "50–100") return "medium"
-  return "small"
-}
-
-function readPendingMinistry(): { name: string; universities: string[]; size: "small" | "medium" | "large" } {
-  if (typeof window === "undefined") return { name: "", universities: [], size: "small" }
-  try {
-    const raw = sessionStorage.getItem("pending_ministry")
-    if (!raw) return { name: "", universities: [], size: "small" }
-    const saved = JSON.parse(raw) as { name?: string; university?: string; size?: string }
-    return {
-      name: saved.name ?? "",
-      universities: saved.university ? [saved.university] : [],
-      size: saved.size ? mapLandingSize(saved.size) : "small",
-    }
-  } catch {
-    return { name: "", universities: [], size: "small" }
-  }
-}
-
-interface Team {
-  id: string
-  name: string
-  icon: string
-}
-
-// ─── page ────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────
 export default function OnboardingPage() {
-  const pendingMinistry = useState(readPendingMinistry)[0]
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState(0) // 0-indexed
 
   // Step 1
-  const [name, setName] = useState(pendingMinistry.name)
-  const [universities, setUniversities] = useState<string[]>(pendingMinistry.universities)
-  const [uniInput, setUniInput] = useState("")
-  const [location, setLocation] = useState("")
-  const [size, setSize] = useState<"small" | "medium" | "large">(pendingMinistry.size)
+  const [name, setName]             = useState("")
+  const [universities, setUniversities] = useState<string[]>([])
+  const [uniInput, setUniInput]     = useState("")
+  const [location, setLocation]     = useState("")
+  const [size, setSize]             = useState<"small" | "medium" | "large">("small")
   const [step1Touched, setStep1Touched] = useState(false)
 
   // Step 2
-  const [structure, setStructure] = useState<Record<string, boolean>>({
-    worship: false, media: false, smallGroups: false, leadership: false,
-  })
+  const [isPublic, setIsPublic]         = useState(true)
+  const [allowInviteCode, setAllowInviteCode] = useState(true)
+  const [requireApproval, setRequireApproval] = useState(false)
 
   // Step 3
-  const [teams, setTeams] = useState<Team[]>([])
-
-  // Step 4
-  const [isPublic, setIsPublic] = useState(false)
+  const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS)
 
   // Submit
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]           = useState<string | null>(null)
 
-  function toggleStructure(id: string) {
-    setStructure((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
+  const step1Valid = name.trim() !== "" && universities.length > 0 && location.trim() !== ""
 
-  function buildTeamsFromStructure(): Team[] {
-    const result: Team[] = []
-    for (const [key, yes] of Object.entries(structure)) {
-      if (yes && TEAM_PRESETS[key]) {
-        result.push({ id: key, name: TEAM_PRESETS[key].name, icon: TEAM_PRESETS[key].icon })
-      }
-    }
-    return result
+  function addUniversity() {
+    const val = uniInput.trim()
+    if (!val || universities.includes(val)) { setUniInput(""); return }
+    setUniversities(prev => [...prev, val])
+    setUniInput("")
   }
 
   function addTeam() {
-    setTeams((prev) => [...prev, { id: `c-${Date.now()}`, name: "New team", icon: "🙏" }])
-  }
-
-  function removeTeam(id: string) {
-    setTeams((prev) => prev.filter((t) => t.id !== id))
-  }
-
-  function updateTeamName(id: string, newName: string) {
-    setTeams((prev) => prev.map((t) => t.id === id ? { ...t, name: newName } : t))
+    setTeams(prev => [...prev, { id: `c-${prev.length}`, icon: "✦", name: "New team", desc: "Tap to edit" }])
   }
 
   function next() {
-    if (step === 1) {
+    if (step === 0) {
       if (!step1Valid) { setStep1Touched(true); return }
-      setStep(2)
-    } else if (step === 2) {
-      setTeams(buildTeamsFromStructure())
-      setStep(3)
-    } else if (step === 3) {
-      setStep(4)
     }
+    setStep(s => Math.min(s + 1, 3))
   }
 
   function back() {
-    setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4)
+    setStep(s => Math.max(s - 1, 0))
   }
 
   async function handleSubmit() {
@@ -421,292 +280,299 @@ export default function OnboardingPage() {
       university: universities[0] ?? "",
       universities,
       location, size,
-      teams: teams.map((t) => ({ name: t.name, icon: t.icon })),
+      teams: teams.map(t => ({ name: t.name, icon: t.icon })),
       isPublic,
     })
-    if (err) {
-      setError(err)
-      setSubmitting(false)
-      return
-    }
-    sessionStorage.removeItem("pending_ministry")
+    if (err) { setError(err); setSubmitting(false); return }
     window.location.assign("/pending")
   }
 
-  const step1Valid = name.trim() && universities.length > 0 && location.trim()
-
-  function addUniversity() {
-    const val = uniInput.trim()
-    if (!val || universities.includes(val)) { setUniInput(""); return }
-    setUniversities(prev => [...prev, val])
-    setUniInput("")
-  }
-
-  function removeUniversity(uni: string) {
-    setUniversities(prev => prev.filter(u => u !== uni))
-  }
-  const stepIndex = step - 1
+  const sizeLabel = SIZE_OPTIONS.find(o => o.value === size)?.label ?? ""
+  const discoveryLabel = isPublic
+    ? `Public${allowInviteCode ? " · invite code" : ""}`
+    : "Private"
 
   return (
-    <div style={{ minHeight: "100svh", background: "#FBF8F2", fontFamily: SANS }}>
+    <div style={{ display: "flex", height: "100svh", overflow: "hidden", fontFamily: SANS, color: "#13101A" }}>
 
-      {/* ── Plum hero band ── */}
+      {/* ── Left cream rail ── */}
       <div style={{
-        position: "relative", overflow: "hidden", color: "#FBF8F2",
-        background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, #3E1540 55%, #2A0E2C 100%)",
-        padding: "40px 0 44px",
+        width: 320, flexShrink: 0,
+        background: "#F4F1E8", borderRight: "1px solid #E8E2D2",
+        display: "flex", flexDirection: "column",
       }}>
-        {/* dot texture */}
-        <div aria-hidden style={{
-          position: "absolute", inset: 0, opacity: 0.16, pointerEvents: "none",
-          background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
-        }}/>
-
-        <div style={{ position: "relative", maxWidth: 760, margin: "0 auto", padding: "0 24px" }}>
-          <Wordmark tone="plum"/>
-
-          <div style={{ ...mono, color: "rgba(251,248,242,0.55)", marginTop: 28 }}>
-            Register your ministry
+        {/* Brand */}
+        <div style={{ padding: "30px 28px 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            <span style={{
+              width: 34, height: 34, borderRadius: 9, display: "grid", placeItems: "center",
+              background: "#2D0F2E", flexShrink: 0,
+            }}>
+              <RingCrossLogo size={20} color="#F1ECDE"/>
+            </span>
+            <span style={{ fontFamily: SERIF, fontSize: 21, letterSpacing: "-0.01em", color: "#13101A" }}>Central</span>
           </div>
-          <h1 style={{
-            fontFamily: SERIF, fontWeight: 400, color: "#FBF8F2",
-            fontSize: 52, letterSpacing: "-0.03em", lineHeight: 1.04, margin: "10px 0 0",
-          }}>
-            Set up your ministry workspace.
-          </h1>
-          <p style={{ fontSize: 15, color: "rgba(251,248,242,0.78)", marginTop: 12, marginBottom: 0 }}>
-            It only takes a few minutes. We&apos;ll get your team ready to go.
-          </p>
+        </div>
+
+        {/* Register eyebrow */}
+        <div style={{ ...mono, padding: "0 28px", margin: "0 0 16px" }}>Register your ministry</div>
+
+        {/* Step list */}
+        <div style={{ padding: "0 24px" }}>
+          {STEPS.map((s, i) => (
+            <RailStep
+              key={s.label} i={i} label={s.label} sub={s.sub}
+              status={i < step ? "done" : i === step ? "active" : "pending"}
+            />
+          ))}
+        </div>
+
+        {/* Verse callout (pushed to bottom) */}
+        <div style={{
+          margin: "auto 18px 18px",
+          background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 14, padding: 18,
+        }}>
+          <div style={{ ...mono, color: "#8A8497", marginBottom: 10 }}>Verse · Psalm 127:1</div>
           <div style={{
-            ...mono, color: "rgba(251,248,242,0.45)", marginTop: 8,
-            letterSpacing: "0.06em", textTransform: "none" as const,
+            fontFamily: SERIF, fontStyle: "italic", fontSize: 16, lineHeight: 1.45, color: "#2D0F2E",
           }}>
-            Approved within 24–48 hours · Free during beta
-          </div>
-          <div style={{ marginTop: 32 }}>
-            <Stepper step={stepIndex}/>
+            Unless the Lord builds the house, those who build it labor in vain.
           </div>
         </div>
       </div>
 
-      {/* ── Form body ── */}
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 72px" }}>
+      {/* ── Content area ── */}
+      <div style={{ flex: 1, background: "#FDFCF8", overflowY: "auto" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "56px 40px 80px" }}>
 
-        {/* Step 1 — Basic info */}
-        {step === 1 && (
-          <div>
-            <StepHead
-              eyebrow="Step 1 · Basic info"
-              title="Basic information"
-              sub="Tell us the basics about your ministry."
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              <Field
-                label="Ministry name"
-                value={name} onChange={setName}
-                placeholder="e.g. Central Student Fellowship"
-                autoFocus
-                error={step1Touched && !name.trim()}
+          {/* ── Step 1 — Basic info ── */}
+          {step === 0 && (
+            <>
+              <StepHeader
+                eyebrow="Step 1 of 4 · Basic info"
+                title="Set up your ministry workspace."
+                sub="It only takes a few minutes — we'll get your team ready to go."
               />
-              {/* Multi-university input */}
-              <div>
-                <div style={{ ...mono, marginBottom: 8 }}>Universities</div>
-                {universities.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                    {universities.map(u => (
-                      <span key={u} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px 5px 12px", background: "#F1ECDE", border: "1px solid #E2DDCF", borderRadius: 999, fontSize: 13, color: "#2D0F2E", fontFamily: SANS }}>
-                        {u}
-                        <button type="button" onClick={() => removeUniversity(u)} style={{ width: 16, height: 16, borderRadius: "50%", border: "none", background: "rgba(62,21,64,0.12)", color: "#3E1540", cursor: "pointer", display: "grid", placeItems: "center", padding: 0, flexShrink: 0 }}>
-                          <Icon d="M18 6L6 18M6 6l12 12" size={9} stroke={2.2}/>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#FBF8F2", border: `1px solid ${step1Touched && universities.length === 0 ? "#E53E3E" : "#E2DDCF"}`, borderRadius: 10, padding: "0 14px" }}>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+                {/* Ministry name */}
+                <Field
+                  label="Ministry name"
+                  value={name} onChange={setName}
+                  placeholder="e.g. Central Student Fellowship"
+                  error={step1Touched && !name.trim()}
+                />
+
+                {/* Universities */}
+                <div>
+                  <label style={{ ...mono, display: "block", marginBottom: 9 }}>Universities</label>
+                  <div style={{ display: "flex", gap: 10 }}>
                     <input
                       value={uniInput}
                       onChange={e => setUniInput(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addUniversity() } }}
                       placeholder="e.g. University of Pittsburgh"
-                      style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A" }}
+                      style={{
+                        flex: 1, padding: "13px 15px",
+                        border: `1px solid ${step1Touched && universities.length === 0 ? "#E53E3E" : "#E2DDCF"}`,
+                        borderRadius: 10, background: "#FDFCF8",
+                        fontFamily: SANS, fontSize: 15, color: "#13101A", outline: "none",
+                        boxSizing: "border-box",
+                      }}
                     />
+                    <button type="button" onClick={addUniversity} style={{
+                      padding: "0 20px", border: "1px solid #E2DDCF", borderRadius: 10,
+                      background: "#F1ECDE", color: "#2D0F2E",
+                      fontFamily: SANS, fontSize: 14, fontWeight: 500, cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}>Add</button>
                   </div>
-                  <button type="button" onClick={addUniversity} disabled={!uniInput.trim()} style={{ padding: "0 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: uniInput.trim() ? "#2D0F2E" : "#E2DDCF", color: uniInput.trim() ? "#FBF8F2" : "#A09A8C", fontSize: 13, fontWeight: 500, fontFamily: SANS, cursor: uniInput.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
-                    Add
-                  </button>
+                  {universities.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+                      {universities.map(u => (
+                        <span key={u} style={{
+                          display: "inline-flex", alignItems: "center", gap: 8,
+                          padding: "7px 8px 7px 14px", borderRadius: 999,
+                          background: "#F6F2E8", border: "1px solid #E8E2D2",
+                          fontSize: 13, color: "#13101A",
+                        }}>
+                          {u}
+                          <span
+                            onClick={() => setUniversities(prev => prev.filter(x => x !== u))}
+                            style={{
+                              width: 18, height: 18, borderRadius: "50%",
+                              display: "grid", placeItems: "center",
+                              cursor: "pointer", color: "#8A8497",
+                            }}
+                          >×</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {step1Touched && universities.length === 0 && (
+                    <p style={{ fontSize: 12, color: "#E53E3E", marginTop: 5, marginBottom: 0 }}>Add at least one university.</p>
+                  )}
                 </div>
-                {step1Touched && universities.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#E53E3E", marginTop: 5, marginBottom: 0 }}>Add at least one university.</p>
-                )}
+
+                {/* Location */}
+                <Field
+                  label="Location"
+                  value={location} onChange={setLocation}
+                  placeholder="e.g. Pittsburgh, PA"
+                  error={step1Touched && !location.trim()}
+                />
+
+                {/* Size */}
+                <div>
+                  <div style={{ ...mono, marginBottom: 9 }}>Approximate size</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                    {SIZE_OPTIONS.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setSize(opt.value)} style={{
+                        border: `1px solid ${size === opt.value ? "#2D0F2E" : "#E2DDCF"}`,
+                        borderRadius: 10, background: size === opt.value ? "#2D0F2E" : "#FDFCF8",
+                        padding: 18, cursor: "pointer", textAlign: "left",
+                        transition: "all .12s ease",
+                      }}>
+                        <div style={{
+                          fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "#FDFCF8" : "#13101A",
+                        }}>{opt.label}</div>
+                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "#5A5466" }}>{opt.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <Field
-                label="Location"
-                value={location} onChange={setLocation}
-                placeholder="e.g. Pittsburgh, PA"
-                error={step1Touched && !location.trim()}
+
+              <NavRow nextLabel="Continue" onNext={next}/>
+            </>
+          )}
+
+          {/* ── Step 2 — Structure ── */}
+          {step === 1 && (
+            <>
+              <StepHeader
+                eyebrow="Step 2 of 4 · Structure"
+                title="Visibility & access."
+                sub="Decide how new members find and enter your ministry. You can change this anytime in settings."
               />
 
               <div>
-                <div style={{ ...mono, marginBottom: 10 }}>Approximate size</div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {SIZE_OPTIONS.map((opt) => (
-                    <SelectTile
-                      key={opt.value} big
-                      title={opt.label} sub={opt.sub}
-                      on={size === opt.value}
-                      onClick={() => setSize(opt.value)}
-                    />
-                  ))}
+                <div style={mono}>Discovery</div>
+                <ToggleRow
+                  title="List in the public directory"
+                  desc="Students can find your ministry by name or university on the Ministries page."
+                  on={isPublic} onClick={() => setIsPublic(v => !v)}
+                />
+                <ToggleRow
+                  title="Allow joining by invite code"
+                  desc="Leaders share a code for direct entry without browsing."
+                  on={allowInviteCode} onClick={() => setAllowInviteCode(v => !v)}
+                />
+                <ToggleRow
+                  title="Require admin approval to join"
+                  desc="New requests wait for a leader to approve before they're in."
+                  on={requireApproval} onClick={() => setRequireApproval(v => !v)}
+                />
+              </div>
+
+              <div style={{ marginTop: 26 }}>
+                <Field
+                  label="Member invite code"
+                  value={name.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5) || "CODE"}
+                  readOnly
+                  mono
+                />
+                <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 8 }}>
+                  Auto-generated — edit it to something memorable for your campus.
                 </div>
               </div>
 
-              <Primary onClick={next}>Continue</Primary>
-            </div>
-          </div>
-        )}
+              <NavRow onBack={back} onNext={next} nextLabel="Continue"/>
+            </>
+          )}
 
-        {/* Step 2 — Structure */}
-        {step === 2 && (
-          <div>
-            <StepHead
-              eyebrow="Step 2 · Structure"
-              title="Ministry structure"
-              sub="Select everything that applies to your ministry."
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {STRUCTURE_QUESTIONS.map((q) => (
-                <StructRow
-                  key={q.id}
-                  title={q.label} body={q.desc}
-                  on={structure[q.id]}
-                  soon={q.soon}
-                  onClick={() => toggleStructure(q.id)}
-                />
-              ))}
-              <Primary onClick={next}>Continue</Primary>
-              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
-            </div>
-          </div>
-        )}
+          {/* ── Step 3 — Teams ── */}
+          {step === 2 && (
+            <>
+              <StepHeader
+                eyebrow="Step 3 of 4 · Teams"
+                title="Start with a few teams."
+                sub="Teams organize your ministry's work — worship, outreach, hospitality. Add a starter set now; you can build out roles later."
+              />
 
-        {/* Step 3 — Teams */}
-        {step === 3 && (
-          <div>
-            <StepHead
-              eyebrow="Step 3 · Teams"
-              title="Your teams"
-              sub={`We'll create ${teams.length} ${teams.length === 1 ? "team" : "teams"} in your workspace.`}
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {teams.map((t) => (
-                <TeamRow
-                  key={t.id}
-                  team={t}
-                  onRemove={() => removeTeam(t.id)}
-                  onChangeName={(n) => updateTeamName(t.id, n)}
-                />
-              ))}
+              <div style={mono}>Starting teams</div>
+              <div style={{ marginTop: 12 }}>
+                {teams.map(t => (
+                  <TeamRowItem
+                    key={t.id} team={t}
+                    onRemove={() => setTeams(prev => prev.filter(x => x.id !== t.id))}
+                  />
+                ))}
+                <button type="button" onClick={addTeam} style={{
+                  width: "100%", padding: 13, border: "1px dashed #C4C0B0", borderRadius: 10,
+                  background: "transparent", color: "#5A5466",
+                  fontFamily: SANS, fontSize: 14, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}>
+                  <Icon d="M12 5v14M5 12h14"/> Add a team
+                </button>
+              </div>
 
-              <button type="button" onClick={addTeam} style={{
-                padding: "14px 16px", borderRadius: 12, border: "1px dashed #C4C0B0",
-                background: "transparent", color: "#5A5466", fontSize: 14, fontFamily: SANS,
-                cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", gap: 8, width: "100%",
-              }}>
-                <Icon d="M12 5v14M5 12h14" size={16}/> Add team
-              </button>
+              <NavRow onBack={back} onNext={next} nextLabel="Continue"/>
+            </>
+          )}
 
-              <Primary onClick={next}>Continue</Primary>
-              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
-            </div>
-          </div>
-        )}
+          {/* ── Step 4 — Review ── */}
+          {step === 3 && (
+            <>
+              <StepHeader
+                eyebrow="Step 4 of 4 · Review"
+                title="Review & submit."
+                sub="Confirm the details below. You can refine everything once your workspace is live."
+              />
 
-        {/* Step 4 — Review & Submit */}
-        {step === 4 && (
-          <div>
-            <StepHead
-              eyebrow="Step 4 · Review"
-              title="Review & submit"
-              sub="Review your details before submitting."
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {error && (
                 <div style={{
-                  borderRadius: 10, background: "rgba(220,38,38,0.08)",
-                  padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500,
-                }}>
-                  {error}
-                </div>
+                  borderRadius: 10, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)",
+                  padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500, marginBottom: 16,
+                }}>{error}</div>
               )}
 
-              <ReviewCard>
-                <div style={mono}>Ministry</div>
-                <div style={{
-                  fontFamily: SERIF, fontSize: 26, letterSpacing: -0.3,
-                  color: "#13101A", marginTop: 8,
-                }}>
-                  {name}
-                </div>
-                <div style={{ fontSize: 14, color: "#5A5466", marginTop: 8, lineHeight: 1.7 }}>
-                  {universities.join(" · ")}<br/>
-                  {location}<br/>
-                  {SIZE_OPTIONS.find((o) => o.value === size)?.label} members
-                </div>
-              </ReviewCard>
-
-              {teams.length > 0 && (
-                <ReviewCard>
-                  <div style={mono}>Teams · {teams.length}</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
-                    {teams.map((t) => (
-                      <SoftPill key={t.id} name={t.name}/>
-                    ))}
-                  </div>
-                </ReviewCard>
-              )}
-
-              <ReviewCard>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18 }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 500, color: "#13101A" }}>List in public directory</div>
-                    <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>Anyone can find and request to join.</div>
-                  </div>
-                  <Toggle on={isPublic} onClick={() => setIsPublic((v) => !v)}/>
-                </div>
-              </ReviewCard>
-
-              {/* Beta banner */}
+              {/* Review card */}
               <div style={{
-                display: "flex", alignItems: "center", gap: 14, padding: "16px 20px",
-                borderRadius: 14, background: "#F6F2E8", border: "1px solid #E8E2D2",
+                border: "1px solid #E8E2D2", borderRadius: 12, background: "#FDFCF8",
+                padding: "6px 20px", marginTop: 14,
               }}>
-                <span style={{
-                  width: 28, height: 28, borderRadius: 999,
-                  background: "#2D0F2E", color: "#FBF8F2",
-                  display: "grid", placeItems: "center", flexShrink: 0,
-                }}>
-                  <Icon d="M5 12l5 5L20 7" size={14} stroke={2.2}/>
-                </span>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>
-                    Free during beta · No credit card required
-                  </div>
-                  <div style={{ fontSize: 13, color: "#8A8497", marginTop: 2 }}>
-                    Your application will be reviewed within 24–48 hours.
-                  </div>
-                </div>
+                <ReviewRow label="Ministry"  value={name || "—"}/>
+                <ReviewRow label="University" value={universities.join(", ") || "—"}/>
+                <ReviewRow label="Location"  value={location || "—"}/>
+                <ReviewRow label="Size"       value={sizeLabel}/>
+                <ReviewRow label="Discovery"  value={discoveryLabel}/>
+                <ReviewRow label="Teams"      value={teams.map(t => t.name).join(", ") || "None"} last/>
               </div>
 
-              <Primary onClick={handleSubmit} disabled={submitting}>
-                {submitting ? "Submitting…" : "Submit application"}
-              </Primary>
-              <div style={{ textAlign: "center" }}><BackLink onClick={back}/></div>
-            </div>
-          </div>
-        )}
+              {/* Approval notice */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                marginTop: 22, fontSize: 13.5, color: "#5A5466",
+                background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10, padding: "14px 16px",
+              }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#7FA67F" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+                </svg>
+                New ministries are approved within 24–48 hours. Free during beta.
+              </div>
+
+              <NavRow
+                onBack={back}
+                onNext={handleSubmit}
+                nextLabel={submitting ? "Submitting…" : "Submit for review"}
+                disabled={submitting}
+              />
+            </>
+          )}
+
+        </div>
       </div>
     </div>
   )
