@@ -2108,7 +2108,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[var(--cream)] border-b border-[#E8E2D2]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[var(--cream)] border-b border-[#E8E2D2]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}

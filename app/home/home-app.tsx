@@ -481,8 +481,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {/* Content + bottom nav wrapper */}
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
-        {/* Shell topbar — breadcrumbs + ⌘K search, always present on desktop */}
-        <DesktopTopbar crumbs={getShellCrumbs()} />
+        {/* Shell topbar — breadcrumbs + ⌘K search; intentionally suppressed on chats (chat header is its own context line) */}
+        {activeTab !== "chats" && <DesktopTopbar crumbs={getShellCrumbs()} />}
 
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
