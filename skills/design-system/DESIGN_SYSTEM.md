@@ -395,6 +395,27 @@ Two-panel layout: 320px cream context rail (left, fixed height) + scrollable con
 
 **NavRow:** Flex row with `justify-content: space-between, margin-top: 36px`. Step 1: empty `<span>` left + Continue right. Steps 2–4: Back link (muted text, back-arrow icon, `gap: 8`) left + plum-2 CTA right. Back and CTA are always inline peers — never stacked vertically.
 
+### 7.8 Marketing landing page (`/`, `components/landing-page.tsx`)
+Type-led editorial layout on a flat cream background — no full-bleed photo hero. Implemented in `components/landing-page.tsx`, rendered by `app/page.tsx`.
+
+**Nav:** Sticky, `height: 72px`, `background: rgba(253,252,248,0.92)`, `backdrop-filter: blur(16px)`. Border-bottom (`--line`) appears on scroll. Brand (logo + serif "Central") left; center links (Platform, Rhythm, Ministries); right: muted "Sign in" + plum-2 pill "Get started". Logged-in state: muted "Sign out" text + outline "Open app" button. Color never inverts — nav is always cream since the hero beneath it is also cream.
+
+**Hero:** Asymmetric 2-column grid (`1.15fr 0.85fr`, `gap: 56`, `align-items: center`), inside a `max-width: 1100px` wrapper with `padding: 96px 0 64px`.
+- *Left column:* Mono eyebrow → serif H1 72px/weight 600/`-0.025em`, ink, with `<em>` in plum-2 italic for the turn-of-phrase clause → serif subtitle 20px/`--body`/`max-width: 460` → CTA row (`gap: 12, margin-top: 34`): plum-2 pill primary (h 50, `padding: 0 26`) + ghost text link in plum-2.
+- *Right column:* Framed photo — `aspect-ratio: 4/5`, `border-radius: 18px` (`--r-hero`), `border: 1px solid --line-2`, `overflow: hidden`. Gradient tint overlay (`linear-gradient(180deg, transparent 40%, rgba(27,10,30,0.72) 100%)`). Verse pinned bottom-left: serif italic 17px ivory + mono 10px reference at 1.4px letter-spacing. Hidden on mobile (`< 900px`).
+
+**Rule:** 1px `--line` hairline divider between hero and features, inset to the `max-width: 1100px` column.
+
+**Feature rows:** `padding: 84px 0`. Eyebrow + serif H2 44px/weight 600/`-0.02em`. Four numbered editorial rows, each `display: grid; grid-template-columns: 56px 1fr 1.4fr; gap: 28; align-items: baseline; padding: 30px 0`. First row `border-top: 1px solid --line`; subsequent rows `border-top: 1px solid --line-3`. Columns: serif italic numeral (i/ii/iii/iv, 20px) in `--muted-text` → serif feature title 26px/`--ink` → body copy 15px/`--body`/1.65 line-height.
+
+**Rhythm section:** Background `--cream-3` (`#F6F2E8`), `padding: 84px 0`. Eyebrow + serif H2 40px/weight 600/`-0.02em`. List: `border-top: 1px solid --line`. Each row: `display: flex; align-items: baseline; gap: 24; padding: 22px 0; border-bottom: 1px solid --line`. Three columns: mono day label fixed `width: 150px` in `--muted-text` → serif action 24px/`--ink`/`flex: 1` → muted attribution 13px.
+
+**CTA section:** Cream background (never plum here), `text-align: center`, `padding: 96px 0`. "BEGIN" mono eyebrow → serif H3 60px/weight 600/`-0.025em`/`--ink` → serif italic subtitle 20px/`--body` → CTA row (`gap: 14`, `justify-content: center`): plum-2 pill primary (h 50) + ghost text link in plum-2.
+
+**Footer:** Single row, `padding: 48px 0`, `border-top: 1px solid --line`. Brand lockup (`RingCrossLogo` + serif "Central") left; italic serif tagline + "© Central" right in `--muted-text`.
+
+**Do not:** put a full-bleed photo behind the hero — the photo is contained inside the right-column frame only. Do not use a plum background for the CTA section — this page uses cream throughout. Do not add a dot-texture overlay anywhere on this page.
+
 ---
 
 ## 8. Specific "do not" — fixes that were applied across redesigns
