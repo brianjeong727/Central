@@ -971,7 +971,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   const monoStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
-    <div className="pb-28 md:pb-0 md:h-full md:overflow-y-auto">
+    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={monoStyle}>Finance · 2 Corinthians 9:7</p>
@@ -986,7 +986,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
         </PageTitle>
       </TabPageHeader>
 
-      <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none">
+      <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
 
         {/* Mobile section tab strip */}
         {visibleSections.length > 1 && (
@@ -1005,52 +1005,51 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {activeSection === "give" && (
               <>
                 <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
-                  <div style={{ background: "radial-gradient(circle at 90% 20%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(246,244,239,0.08) 0%, transparent 35%), #3E1540", borderRadius: 20, padding: "28px 28px 24px", position: "relative", overflow: "hidden", marginBottom: 16 }} className="md:mb-0">
-                    <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.18) 1px, transparent 1.4px)", backgroundSize: "18px 18px", opacity: 0.35, pointerEvents: "none" }} />
-                    <div style={{ position: "relative", zIndex: 1 }}>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 20, padding: "28px 28px 24px", marginBottom: 16 }} className="md:mb-0">
+                    <div>
                       {editing ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                          <label style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
-                          <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" autoFocus style={{ background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }} />
+                          <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
+                          <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" autoFocus style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "var(--cream)", color: "var(--plum)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
-                            <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 16px", background: "transparent", color: "rgba(246,244,239,0.6)", borderRadius: 10, fontSize: 13, border: "1px solid rgba(246,244,239,0.2)", cursor: "pointer" }}>Cancel</button>
+                            <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
+                            <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
                       ) : !zelleInfo && !isAdmin ? (
                         <div>
-                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--cream)", marginBottom: 8 }}>Giving info coming soon</p>
-                          <p style={{ fontSize: 13, color: "rgba(246,244,239,0.6)", lineHeight: 1.5 }}>Check back later for ways to give.</p>
+                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 8 }}>Giving info coming soon</p>
+                          <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Check back later for ways to give.</p>
                         </div>
                       ) : !zelleInfo && isAdmin ? (
                         <div>
-                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--cream)", marginBottom: 8 }}>Set up giving</p>
-                          <p style={{ fontSize: 13, color: "rgba(246,244,239,0.6)", marginBottom: 20, lineHeight: 1.5 }}>Add your Zelle email or phone number so members can give.</p>
-                          <button onClick={() => { setEditValue(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "var(--cream)", color: "var(--plum)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 8 }}>Set up giving</p>
+                          <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>Add your Zelle email or phone number so members can give.</p>
+                          <button onClick={() => { setEditValue(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                             <Pencil style={{ width: 13, height: 13 }} /> Add Zelle info
                           </button>
                         </div>
                       ) : (
                         <>
-                          <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)", marginBottom: 12 }}>Your gift</p>
+                          <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
-                            <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "rgba(246,244,239,0.55)", lineHeight: 1 }}>$</span>
-                            <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--cream)", width: "100%", padding: 0, lineHeight: 1 }} />
+                            <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
+                            <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
                           </div>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
                             {PRESET_AMOUNTS.map(v => (
-                              <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "rgba(246,244,239,0.95)" : "transparent", color: amount === v ? "var(--plum)" : "var(--cream)", border: "1px solid rgba(246,244,239,0.25)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 600 : 400 }}>${v}</button>
+                              <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 600 : 400 }}>${v}</button>
                             ))}
                           </div>
-                          <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--cream)", color: "var(--plum)", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+                          <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                             <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
                           </button>
-                          {zelleFallback && <p style={{ fontSize: 13, color: "rgba(246,244,239,0.75)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--cream)" }}>{zelleInfo}</strong></p>}
-                          <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "transparent", color: copied ? "var(--cream)" : "rgba(246,244,239,0.6)", borderRadius: 10, fontSize: 13, border: `1px solid ${copied ? "rgba(246,244,239,0.45)" : "rgba(246,244,239,0.15)"}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                          {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleInfo}</strong></p>}
+                          <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                             {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
                             {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
                           </button>
-                          {isAdmin && <button onClick={() => { setEditValue(zelleInfo ?? ""); setEditing(true) }} style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "rgba(246,244,239,0.4)", fontSize: 12, cursor: "pointer", padding: 0 }}><Pencil style={{ width: 11, height: 11 }} /> Edit Zelle info</button>}
+                          {isAdmin && <button onClick={() => { setEditValue(zelleInfo ?? ""); setEditing(true) }} style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", padding: 0 }}><Pencil style={{ width: 11, height: 11 }} /> Edit Zelle info</button>}
                         </>
                       )}
                     </div>

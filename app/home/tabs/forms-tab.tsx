@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Check, ChevronDown, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle } from "@/components/central"
 import type { FormsTabProps, FieldType } from "../types"
 
 interface FormFieldRow {
@@ -530,68 +531,69 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="pb-28 md:pb-0">
+    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={MONO_STYLE}>Forms</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Forms</h1>
-        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 8 }}>Announcements that include a form for you to fill out.</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Forms</h1>
+        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Announcements that include a form for you to fill out.</p>
       </div>
 
-      {/* Desktop header */}
-      <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        <p style={MONO_STYLE}>{items.length} form{items.length !== 1 ? 's' : ''} attached</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "#13101A", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Forms</h1>
-        <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 560 }}>Announcements that include a form to fill out.</p>
-      </div>
+      <TabPageHeader>
+        <PageTitle eyebrow={`${items.length} form${items.length !== 1 ? 's' : ''} attached`} title="Forms">
+          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Announcements that include a form to fill out.</p>
+        </PageTitle>
+      </TabPageHeader>
 
-      {loading ? (
-        <div className="px-5 md:px-14"><Spinner /></div>
-      ) : items.length === 0 ? (
-        <div className="px-5 md:px-14">
-          <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="When a form is attached to an announcement it appears here." />
-        </div>
-      ) : (
-        <div className="px-5 md:px-14 py-6 flex flex-col gap-3" style={{ maxWidth: 800 }}>
-          {items.map(item => (
-            <div key={item.id} style={{ border: '1px solid #E8E2D2', borderRadius: 14, background: '#FBF8F2', padding: '18px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontFamily: 'var(--font-instrument-serif)', fontSize: 20, color: '#13101A', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
-                  <p style={{ fontSize: 13, color: '#8A8497', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.body}</p>
-                </div>
-                {item.user_has_responded ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, color: '#2E7D32', fontSize: 13, fontWeight: 500 }}>
-                    <Check style={{ width: 14, height: 14 }} />
-                    Submitted
+      <div className="md:flex-1 md:overflow-y-auto">
+        {loading ? (
+          <div className="px-5 md:px-14"><Spinner /></div>
+        ) : items.length === 0 ? (
+          <div className="px-5 md:px-14">
+            <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="When a form is attached to an announcement it appears here." />
+          </div>
+        ) : (
+          <div className="px-5 md:px-14 py-6 flex flex-col gap-3" style={{ maxWidth: 800 }}>
+            {items.map(item => (
+              <div key={item.id} style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
+                    <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.body}</p>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setFillState({ formId: item.form_id, announcementId: item.id, title: item.title })}
-                    style={{
-                      flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: '1px solid #3E1540',
-                      background: 'transparent', color: '#3E1540', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Fill out form
-                  </button>
+                  {item.user_has_responded ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, color: '#2E7D32', fontSize: 13, fontWeight: 500 }}>
+                      <Check style={{ width: 14, height: 14 }} />
+                      Submitted
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setFillState({ formId: item.form_id, announcementId: item.id, title: item.title })}
+                      style={{
+                        flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--plum)',
+                        background: 'transparent', color: 'var(--plum)', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Fill out form
+                    </button>
+                  )}
+                </div>
+                {isAdmin && item.response_count !== undefined && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>{item.response_count} response{item.response_count !== 1 ? 's' : ''}</span>
+                    <button
+                      onClick={() => setResponsesState({ formId: item.form_id, title: item.title })}
+                      style={{ fontSize: 13, fontWeight: 500, color: 'var(--plum)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                    >
+                      View responses →
+                    </button>
+                  </div>
                 )}
               </div>
-              {isAdmin && item.response_count !== undefined && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #EFEAE0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, color: '#8A8497' }}>{item.response_count} response{item.response_count !== 1 ? 's' : ''}</span>
-                  <button
-                    onClick={() => setResponsesState({ formId: item.form_id, title: item.title })}
-                    style={{ fontSize: 13, fontWeight: 500, color: '#3E1540', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  >
-                    View responses →
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {fillState && (
         <FormFillView
