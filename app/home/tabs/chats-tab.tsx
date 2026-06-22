@@ -2213,7 +2213,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           </>
         )}
       </div>
-      {inline && <div className="hidden md:block"><InsetHairline /></div>}
+      {inline && <div className="hidden md:block"><InsetHairline style={{ margin: "0 16px" }} /></div>}
 
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
