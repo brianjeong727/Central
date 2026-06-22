@@ -5,10 +5,9 @@ interface TabPageHeaderProps {
   children: ReactNode
   className?: string
   style?: CSSProperties
-  hideBottomBorder?: boolean
 }
 
-export function TabPageHeader({ children, className, style, hideBottomBorder }: TabPageHeaderProps) {
+export function TabPageHeader({ children, className, style }: TabPageHeaderProps) {
   return (
     <>
       <div className="hidden md:block"><InsetHairline /></div>
@@ -18,7 +17,7 @@ export function TabPageHeader({ children, className, style, hideBottomBorder }: 
       >
         {children}
       </div>
-      {!hideBottomBorder && <div className="hidden md:block"><InsetHairline /></div>}
+      <div className="hidden md:block"><InsetHairline /></div>
     </>
   )
 }

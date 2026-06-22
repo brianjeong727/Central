@@ -1877,7 +1877,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
         {/* Shared page header */}
-        <TabPageHeader hideBottomBorder={isPraiseTeam || isStudentOrgBoard || isDGLTeam}>
+        <TabPageHeader>
           <PageTitle
             eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
             title={activeTeamName}
@@ -2195,9 +2195,9 @@ export function PlanSubTabStrip({
   onChange: (key: string) => void
 }) {
   return (
-    // Outer div: zero horizontal padding so borderBottom spans the full content width (§4.2)
-    <div style={{ borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
-      {/* Inner div: md:pl-14 aligns labels with TabPageHeader's px-14 (56px) on desktop */}
+    // Outer div: scroll container only — no border (replaced by soft hairline below)
+    <div style={{ overflowX: "auto", scrollbarWidth: "none" as const }}>
+      {/* Label row: 56px left inset on desktop, aligns with TabPageHeader's px-14 */}
       <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
         {tabs.map(({ key, label }) => (
           <button
@@ -2223,6 +2223,8 @@ export function PlanSubTabStrip({
           </button>
         ))}
       </div>
+      {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
+      <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
     </div>
   )
 }
