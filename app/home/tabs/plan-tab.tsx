@@ -1877,7 +1877,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
         {/* Shared page header */}
-        <TabPageHeader>
+        <TabPageHeader hideBottomBorder={isPraiseTeam || isStudentOrgBoard || isDGLTeam}>
           <PageTitle
             eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
             title={activeTeamName}
