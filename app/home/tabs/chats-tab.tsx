@@ -2803,7 +2803,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Reply preview bar ── */}
       {replyingTo && (
-        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-2 flex items-start gap-3">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
           <div className="flex-1 border-l-2 border-[#3E1540] pl-2.5 min-w-0">
             <p className="text-[11px] font-semibold text-[#3E1540] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
@@ -2819,7 +2819,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Attachment preview bar ── */}
       {pendingAttachment && (
-        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center gap-3">
           {pendingAttachment.file.type.startsWith("image/") ? (
             <>
               <div className="relative flex-shrink-0">
@@ -2897,11 +2897,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Input bar ── */}
       {groupArchived ? (
-        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center justify-center">
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 md:px-10 md:py-3.5 relative">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
             <div className="absolute bottom-full left-4 mb-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[#ECE8DE] overflow-hidden min-w-[180px] z-10">
