@@ -62,6 +62,30 @@ Use the inline confirm pattern — first click reveals "Delete / Cancel" inline;
 
 **Common mistake to avoid:** Using `window.confirm()` or a modal for small items in lists/tables. The inline pattern is always preferred — it keeps focus in place and feels native to the UI.
 
+## Tab strip / hairline mounting — proven structure, do not re-derive
+Date: 2026-06-21
+
+The `PlanSubTabStrip` + `TabPageHeader` interaction is the most failure-prone pattern in the app. Five iterations to get right (alignment, border-on-wrong-div, duplicate hairline, wrong-line-removed, finally correct) because each attempt re-derived padding/margins from scratch instead of copying the proven structure.
+
+**Proven structure (copy exactly, never re-derive):**
+- `TabPageHeader` keeps its soft inset bottom `InsetHairline` (`var(--line)`, 0.65 opacity, 56px inset) on **every** page including strip-bearing ones — never suppress it.
+- The strip's under-tabs divider must match that treatment exactly:
+  ```tsx
+  <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
+  ```
+  NOT a hard full-width `borderBottom: "1px solid #E8E2D2"`.
+- Tab labels are inset via an **inner** `md:pl-14` div; the hairline div is a **sibling** below the label row — never mix padding and the hairline on the same element.
+- Active 2px plum marker sits on the hairline via `marginBottom: -1` on buttons (the button row height = H-1; the 1px hairline div below absorbs that 1px, so the button's active border overlaps the hairline).
+
+**When touching any tab strip or header hairline:** copy this structure exactly.
+
+## Visual/layout changes — defer screenshot sign-off to the user
+Date: 2026-06-21
+
+Multiple times in the planning-migration session, a layout fix was reported "verified" when the screenshot showed it was still wrong (wrong line removed, duplicate hairline, misalignment). Browser-MCP self-verification consistently missed what the human eye caught immediately.
+
+**Rule:** For any layout, alignment, hairline, or spacing change — describe what changed and exactly what to look for, then hand back to the user for screenshot confirmation. Do not self-certify visual correctness. End with "I changed X, look for Y" — not "verified correct."
+
 ## Font alias tech debt (Bricolage migration)
 Date: 2026-06-21
 

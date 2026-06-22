@@ -42,6 +42,8 @@ import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
 import { getInitials, getAvatarColor } from "../utils"
+import { TabPageHeader } from "@/components/central/tab-page-header"
+import { PageTitle } from "@/components/central/page-title"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -1309,7 +1311,7 @@ export function StudentOrgTeamHome({
       </div>
 
       {/* ── Tab content ── */}
-      <div style={{ padding: "30px 0 60px" }}>
+      <div className="md:px-14" style={{ paddingTop: 30, paddingBottom: 60 }}>
 
         {/* GENERAL — calendar + sidebar + meeting notes */}
         {teamTab === "General" && (
@@ -1357,24 +1359,23 @@ export function StudentOrgTeamHome({
                 {upNext ? (
                   <button
                     onClick={() => onPlanningEventChange(upNext)}
-                    style={{ position: "relative", textAlign: "left", border: "none", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)", color: "#FBF8F2" }}
+                    style={{ width: "100%", textAlign: "left", border: "1px solid #E5E0D2", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "var(--cream)", color: "var(--ink)" }}
                   >
-                    <div style={{ position: "absolute", inset: 0, opacity: 0.14, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }} />
-                    <div style={{ position: "relative", padding: "22px 22px 20px" }}>
-                      <p style={{ ...mono, color: "rgba(251,248,242,0.65)" }}>
+                    <div style={{ padding: "18px 20px 16px" }}>
+                      <p style={{ ...mono, color: "var(--muted-text)" }}>
                         {new Date(upNext.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()} · {upNext.category.toUpperCase()}
                       </p>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, marginTop: 6, letterSpacing: "-0.01em", color: "#FBF8F2" }}>{upNext.title}</p>
-                      {upNext.location && <p style={{ fontSize: 13, color: "rgba(251,248,242,0.72)", marginTop: 6 }}>{upNext.location}</p>}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
-                        <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(251,248,242,0.12)", fontSize: 11 }}>
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 26, marginTop: 6, letterSpacing: "-0.01em", color: "var(--ink)" }}>{upNext.title}</p>
+                      {upNext.location && <p style={{ fontSize: 13, color: "var(--body)", marginTop: 4 }}>{upNext.location}</p>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                        <span style={{ padding: "3px 9px", borderRadius: 999, background: "#EDE8DC", fontSize: 11, color: "#5A5466" }}>
                           {plannedIds.has(upNext.id) ? "Plan exists" : "Needs planning"}
                         </span>
-                        <span style={{ fontSize: 11, color: "rgba(251,248,242,0.55)" }}>
+                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>
                           {Math.max(0, Math.ceil((new Date(upNext.start_date).getTime() - now.getTime()) / 86400000))} days out
                         </span>
                       </div>
-                      <div style={{ marginTop: 18, padding: "10px 14px", borderRadius: 10, background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "#3E1540", color: "#FDFCF8", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         Open plan <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </div>
@@ -1830,7 +1831,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
   return (
-    <div className="pb-2 md:pb-0">
+    <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
@@ -1853,70 +1854,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
       </div>
 
-      {/* Desktop Editorial Header — swaps to event header when an event plan is open */}
-      <div className="hidden md:flex items-start justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        {isStudentOrgBoard && studentOrgPlanningEvent ? (() => {
-          const ev = studentOrgPlanningEvent
-          const evStart = new Date(ev.start_date)
-          const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-          const evCfg = getEventConfig(ev)
-          const evDesc = [ev.description, ev.location].filter(Boolean).join(" · ")
-          return (
-            <>
-              <div>
-                <button
-                  onClick={() => setStudentOrgPlanningEvent(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] text-[#5A5466] text-[13px] hover:bg-[#ECE8DE] hover:text-[#3E1540] transition-colors"
-                  style={{ cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Back to calendar
-                </button>
-                <p style={{ ...monoStyle, marginTop: 12 }}>{evCfg.label.toUpperCase()} · {evDateStr.toUpperCase()}</p>
-                <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-                  {ev.title}
-                </h1>
-                {evDesc && <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>{evDesc}</p>}
-              </div>
-              {canEditStudentOrg && (
-                <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-                  title="Edit event"
-                  onClick={() => setShowEditEvent(true)}
-                >
-                  <Pencil className="w-3.5 h-3.5 text-[#5A5466]" />
-                </button>
-              )}
-            </>
-          )
-        })() : (
-          <>
-            <div>
-              <p style={monoStyle}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-              <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>
-                {activeTeamName}
-              </h1>
-              {isStudentOrgBoard && studentOrgRole && (
-                <span style={{ display: "inline-block", marginTop: 10, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#3E1540", background: "rgba(62,21,64,0.07)", borderRadius: 999, padding: "3px 10px" }}>
-                  {studentOrgRole}
-                </span>
-              )}
-              <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>
-                The week as it stands. Groups to prepare, people to thank.
-              </p>
-            </div>
-            {activeTeamFull && canOpenTeamSettings && (
-              <button
-                onClick={() => openSettings(activeTeamFull)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-                title="Team settings"
-              >
-                <Settings className="w-4 h-4 text-[#5A5466]" />
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
       {/* Edit planning event modal */}
       {showEditEvent && studentOrgPlanningEvent && (
         <AddEventModal
@@ -1937,8 +1874,65 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
         />
       )}
 
-      {/* Desktop content */}
-      <div className="hidden md:block">
+      {/* Desktop section — shell pattern */}
+      <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
+        {/* Shared page header */}
+        <TabPageHeader>
+          <PageTitle
+            eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
+            title={activeTeamName}
+          />
+          {activeTeamFull && canOpenTeamSettings && (
+            <button
+              onClick={() => openSettings(activeTeamFull)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              title="Team settings"
+            >
+              <Settings className="w-4 h-4 text-[#5A5466]" />
+            </button>
+          )}
+        </TabPageHeader>
+
+        {/* Cream event header — replaces the old bespoke header swap (Option B: no plum gradient) */}
+        {isStudentOrgBoard && studentOrgPlanningEvent && (() => {
+          const ev = studentOrgPlanningEvent
+          const evStart = new Date(ev.start_date)
+          const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+          const evCfg = getEventConfig(ev)
+          const evDesc = [ev.description, ev.location].filter(Boolean).join(" · ")
+          return (
+            <div style={{ padding: "16px 56px 14px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+              <button
+                onClick={() => setStudentOrgPlanningEvent(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] text-[#5A5466] text-[13px] hover:bg-[#ECE8DE] hover:text-[#3E1540] transition-colors"
+                style={{ cursor: "pointer", fontFamily: "var(--font-inter)" }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to calendar
+              </button>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 }}>
+                <div>
+                  <p style={{ ...monoStyle, marginTop: 0 }}>{evCfg.label.toUpperCase()} · {evDateStr.toUpperCase()}</p>
+                  <h2 style={{ margin: "8px 0 0", fontFamily: "var(--serif)", fontWeight: 600, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+                    {ev.title}
+                  </h2>
+                  {evDesc && <p style={{ marginTop: 6, color: "var(--body)", fontSize: 14 }}>{evDesc}</p>}
+                </div>
+                {canEditStudentOrg && (
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+                    title="Edit event"
+                    onClick={() => setShowEditEvent(true)}
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-[#5A5466]" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Scrollable team content */}
+        <div className="flex-1 overflow-y-auto">
         {isDgPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
@@ -1962,18 +1956,15 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             <TechTeamTab ministryId={ministryId} userId={userId} />
           </div>
         ) : isPraiseTeam && activeTeamId ? (
-          <div className="px-14 py-7">
-            <PraiseTeamTab
-              teamId={activeTeamId}
-              ministryId={ministryId}
-              userId={userId}
-              canManage={canManageWorship}
-              canManageSchedule={canManageSchedule}
-            />
-          </div>
+          <PraiseTeamTab
+            teamId={activeTeamId}
+            ministryId={ministryId}
+            userId={userId}
+            canManage={canManageWorship}
+            canManageSchedule={canManageSchedule}
+          />
         ) : isStudentOrgBoard ? (
-          <div className="px-14 py-7">
-            <StudentOrgTeamHome
+          <StudentOrgTeamHome
               teamId={activeTeamId}
               teamName={activeTeamName}
               teamIcon={activeUserTeam?.teamIcon ?? activeTeamFull?.icon ?? "🏛️"}
@@ -1990,10 +1981,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               refreshSignal={studentOrgRefreshSignal}
               onOpenChat={onOpenChat}
             />
-          </div>
         ) : isDGLTeam && activeTeamId ? (
-          <div className="px-14 py-7">
-            <SmallGroupLeadersTab
+          <SmallGroupLeadersTab
               teamId={activeTeamId}
               ministryId={ministryId}
               userId={userId}
@@ -2009,7 +1998,6 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
                 )?.id ?? null
               }
             />
-          </div>
         ) : (
           <div className="px-14 py-7">
             {!activeTeamId ? (
@@ -2050,6 +2038,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             })()}
           </div>
         )}
+      </div>
       </div>
 
       {/* Mobile content */}
@@ -2206,30 +2195,36 @@ export function PlanSubTabStrip({
   onChange: (key: string) => void
 }) {
   return (
-    <div style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
-      {tabs.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => onChange(key)}
-          style={{
-            padding: "12px 0 14px",
-            fontSize: 15,
-            fontFamily: "var(--font-inter)",
-            fontWeight: active === key ? 600 : 400,
-            color: active === key ? "#2D0F2E" : "#8A8497",
-            border: "none",
-            borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
-            marginBottom: -1,
-            background: "none",
-            cursor: "pointer",
-            whiteSpace: "nowrap" as const,
-            outline: "none",
-            flexShrink: 0,
-          }}
-        >
-          {label}
-        </button>
-      ))}
+    // Outer div: scroll container only — no border (replaced by soft hairline below)
+    <div style={{ overflowX: "auto", scrollbarWidth: "none" as const }}>
+      {/* Label row: 56px left inset on desktop, aligns with TabPageHeader's px-14 */}
+      <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
+        {tabs.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            style={{
+              padding: "12px 0 14px",
+              fontSize: 15,
+              fontFamily: "var(--font-inter)",
+              fontWeight: active === key ? 600 : 400,
+              color: active === key ? "#2D0F2E" : "#8A8497",
+              border: "none",
+              borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
+              marginBottom: -1,
+              background: "none",
+              cursor: "pointer",
+              whiteSpace: "nowrap" as const,
+              outline: "none",
+              flexShrink: 0,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
+      <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
     </div>
   )
 }
@@ -2739,6 +2734,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
         />
       </div>
 
+      <div className="md:px-14">
       {/* ── Schedule ── */}
       {subTab === "schedule" && (
         <div>
@@ -3207,6 +3203,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -11341,6 +11338,7 @@ function SmallGroupLeadersTab({
         />
       </div>
 
+      <div className="md:px-14">
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
       {activeSubTab === "bible_study" && (
         <BibleStudySubTab
@@ -12038,6 +12036,7 @@ function SmallGroupLeadersTab({
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

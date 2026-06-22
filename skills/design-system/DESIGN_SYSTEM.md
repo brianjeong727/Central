@@ -170,6 +170,8 @@ padding: 30px 36px 32px
 
 **Do not:** use the hero as a default card treatment or a repeated pattern within a view. Do not place it on list pages, settings pages, or secondary surfaces. Do not use it more than once in the same view — two full-bleed plum moments cancel each other. Do not change the gradient stops or direction when it appears.
 
+**Status (June 2026):** The plum gradient hero has been retired from all Planning surfaces. Team home headers, event-context sub-headers, and the "Up Next" event card are now cream (`var(--cream)`, `#FDFCF8`). Plum remains a surgical accent (CTA button fills, active tab underlines) but is never a card background, hero fill, or surface gradient on these pages. The §4.1 spec is preserved for other valid hero contexts (profile, give page) but should not be re-introduced to Plan tab surfaces.
+
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
 - Tab: `padding: 12px 0 14px; font-size: 15;`
