@@ -1831,7 +1831,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
   return (
-    <div className="pb-2 md:pb-0">
+    <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
