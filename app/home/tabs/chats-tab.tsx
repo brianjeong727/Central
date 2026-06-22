@@ -3923,7 +3923,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
       </div>
 
       {/* Count + plus button */}
-      <div className="flex items-center justify-between px-2 pt-4 pb-2 flex-shrink-0">
+      <div className="flex items-center justify-between px-3 pt-4 pb-2 flex-shrink-0">
         <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
           {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
         </p>
