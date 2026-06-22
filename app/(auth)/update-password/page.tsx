@@ -4,7 +4,7 @@ import { useState } from "react"
 import { AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { RingCrossLogo } from "@/app/home/components/shared"
-import { PasswordToggle } from "../shared"
+import { EyeButton } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 
@@ -118,7 +118,9 @@ export default function UpdatePasswordPage() {
                     autoComplete="new-password"
                     className={inputClass + " pr-10"}
                   />
-                  <PasswordToggle show={showPw} onToggle={() => setShowPw((v) => !v)} />
+                  <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)" }}>
+                    <EyeButton show={showPw} onToggle={() => setShowPw((v) => !v)} />
+                  </div>
                 </div>
                 <p style={{ fontSize: 11, color: "#8A8497", marginTop: 2 }}>At least 6 characters</p>
               </div>
@@ -135,7 +137,9 @@ export default function UpdatePasswordPage() {
                     autoComplete="new-password"
                     className={inputClass + " pr-10"}
                   />
-                  <PasswordToggle show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} />
+                  <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)" }}>
+                    <EyeButton show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} />
+                  </div>
                 </div>
               </div>
 

@@ -372,6 +372,29 @@ Mandatory elements above the fold:
 ### 7.5 Settings page
 - Two-column `1fr 280–320px`. Left: ministry profile card + members list + danger zone. Right: stat cards + discovery toggle + invite code card.
 
+### 7.6 Auth/onboarding split-screen (login, signup, update-password)
+Two-column split layout: photo panel on the left, form column on the right. Right column is wider than left (roughly 56/44). Implemented via `SplitShell` in `app/(auth)/shared.tsx` — use that component; do not reimplement the outer layout in individual auth pages.
+
+**Photo panel (left):** Full-bleed chapel photo with plum gradient overlay. Brand lockup at top (`RingCrossLogo` inside a translucent square badge + "Central" in serif). Tagline at bottom in large-weight serif, followed by an italic scripture verse + mono reference. Panel is sticky so it stays fixed while a long form scrolls. Hidden on mobile.
+
+**Form column (right):** Two-section structure:
+- *Top bar* — persistent `min-height: 64` strip, always visible regardless of scroll. Contains navigation: a Back link (with `marginRight: auto` to push it left) + a secondary link ("Already have an account?" / "New to Central?") right-aligned. Both links in muted body color; the action link is plum-2, no underline until hover.
+- *Form body* — flex-centered content area with `max-width: 460`. Starts with a mono eyebrow, then a large serif H1, then a subtitle in muted body color. Google OAuth button, then an OR divider (no built-in margin — callers add vertical spacing), then the field stack, then the primary plum CTA.
+- Mobile wordmark (hidden on md+): `RingCrossLogo`-adjacent "Central" in serif, shown inline at top of form body when the photo panel is hidden.
+
+**Component ownership:** `AuthPhotoPanel` owns the panel. `SplitShell` owns the grid + right column shell. Callers pass `topBar` (React node) and `children` (form body content). Shared primitives: `GoogleButton`, `OrDivider`, `EyeButton` — all from `app/(auth)/shared.tsx`.
+
+### 7.7 Ministry registration wizard (`/onboarding`)
+Two-panel layout: 320px cream context rail (left, fixed height) + scrollable content area (right, `flex: 1`). Entry is always via `/register-ministry` — never link directly to `/onboarding`.
+
+**Context rail (left):** Background `--body-bg` (`#F4F1E8`), `border-right: 1px solid var(--line)`. Contains from top to bottom: brand lockup (`RingCrossLogo` in a 34px plum-2 square badge + "Central" in serif 21px); "REGISTER YOUR MINISTRY" mono eyebrow; vertical step list; verse callout card pushed to bottom with `margin: auto 18px 18px`. The rail does not scroll.
+
+**Vertical step list:** Each step is a flex row: numbered dot (26px circle) + label text + small subtitle. Dots between steps are connected by a 1px × 14px vertical hairline. Dot states: *pending* = cream bg / muted text / hairline border; *active* = plum-2 bg / cream text / no border; *done* = ivory bg / plum checkmark. Label is muted and weight 400 when pending, ink and weight 500 when active.
+
+**Content area (right):** Background `--cream`, `overflow-y: auto`. Content is `max-width: 560px, margin: 0 auto, padding: 56px 40px 80px`. Each step opens with a mono eyebrow ("Step N of 4 · Label"), then a serif H1 at 38px/weight 600/`-0.02em` tracking, then a subtitle in `--body` color.
+
+**NavRow:** Flex row with `justify-content: space-between, margin-top: 36px`. Step 1: empty `<span>` left + Continue right. Steps 2–4: Back link (muted text, back-arrow icon, `gap: 8`) left + plum-2 CTA right. Back and CTA are always inline peers — never stacked vertically.
+
 ---
 
 ## 8. Specific "do not" — fixes that were applied across redesigns

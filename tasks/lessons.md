@@ -103,3 +103,22 @@ Date: 2026-06-22
 Learned from the Planning tab scroll bug: when a tab is migrated onto the standard desktop shell pattern, the `md:flex md:flex-col md:h-full md:overflow-hidden` classes must be on the **tab component's own root div**, not only on the wrapper in `home-app.tsx`. If missing from the root div, the content area grows to full content height and gets clipped by the wrapper's `overflow: hidden` instead of scrolling — the page looks broken on desktop.
 
 **Rule:** When migrating any tab, match `DirectoryTab`'s root div structure exactly: `<div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">`. Check this first when a migrated tab shows clipped or non-scrolling content on desktop. See CLAUDE.md Convention #13.
+
+## Role-gated public routes — never route CTAs directly to auth or wizard pages
+Date: 2026-06-22
+
+"Register your ministry" CTAs previously pointed to `/signup?intent=register`. This broke for logged-in users: `proxy.ts` bounces ALL logged-in users off `/signup` to `/home`, ignoring query params. Admins trying to register a second ministry got silently redirected home with no error.
+
+**Rule:** When a CTA should behave differently based on auth state or role, create a dedicated server-component route in the public paths list that does the routing:
+- Not logged in → redirect to appropriate auth flow
+- Correct role → redirect to the feature
+- Wrong role → render a gate page with a clear explanation
+
+**Applied to:** `/register-ministry` (→ no auth: `/signup?intent=register`, admin-tier: `/onboarding`, non-admin: gate UI). See `app/register-ministry/page.tsx` and CLAUDE.md Convention #14.
+
+## Auth shared components — `EyeButton` replaced `PasswordToggle`
+Date: 2026-06-22
+
+When `app/(auth)/shared.tsx` was rewritten to be the canonical shared file, the old exports (`GoogleIcon`, `PasswordToggle`) were removed. `update-password/page.tsx` still imported `PasswordToggle` — the build failed. The new canonical export is `EyeButton` (same props interface: `show`, `onToggle`).
+
+**Rule:** After replacing or renaming exports in a shared file, grep for all import sites before marking the task done: `grep -r "from.*/(auth)/shared"`. This catches pages like `update-password` that were not part of the immediate refactor.
