@@ -61,6 +61,7 @@ export function DesktopSidebar({
   canCreateTeam, userId,
   directoryMinistryId, directoryCurrentUserId,
   directorySelectedMemberId, directoryInitialMemberId, onDirectoryMemberSelect,
+  chatPanelContent,
 }: DesktopSidebarProps) {
   const supabase = createClient()
   const [note, setNote] = useState("")
@@ -128,57 +129,11 @@ export function DesktopSidebar({
   }
 
   function renderPanelBody() {
-    // ── Chats: recent chat list ──────────────────────────────────────────────
+    // ── Chats: full list panel (ChatListPanel rendered by home-app) ───────────
     if (activeTab === "chats") {
-      return (
+      return chatPanelContent ?? (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
-          <p style={{ ...MONO, padding: "8px 8px 6px" }}>Recent</p>
-          {recentChats.length === 0 ? (
-            <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px" }}>No chats yet</p>
-          ) : (
-            recentChats.slice(0, 6).map((c, i) => {
-              const isActive = activeGroupId === c.id
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => onOpenChat(c.id, c.groupName)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 8px", borderRadius: "var(--r-chip)", cursor: "pointer",
-                    background: isActive ? IVORY : "transparent",
-                    border: "none",
-                    borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
-                    width: "100%", textAlign: "left",
-                    transition: "background 100ms ease",
-                  }}
-                >
-                  <div style={{
-                    width: 28, height: 28, borderRadius: "var(--r-chip)", flexShrink: 0,
-                    background: i % 2 === 0 ? PLUM : INK,
-                    color: "var(--cream)", display: "grid", placeItems: "center",
-                    fontSize: 10, fontWeight: 600, fontFamily: "var(--sans)",
-                  }}>
-                    {c.initials}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: c.unreadCount ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>
-                      {c.groupName}
-                    </div>
-                    {c.lastMessage && (
-                      <div style={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)" }}>
-                        {c.lastMessage}
-                      </div>
-                    )}
-                  </div>
-                  {c.unreadCount > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: INK, background: "var(--gold)", padding: "1px 6px", borderRadius: 999, fontFamily: "var(--sans)" }}>
-                      {c.unreadCount}
-                    </span>
-                  )}
-                </button>
-              )
-            })
-          )}
+          <p style={{ ...MONO, padding: "8px 8px 6px" }}>No chats yet</p>
         </div>
       )
     }
@@ -441,8 +396,8 @@ export function DesktopSidebar({
 
       {/* ── Context Panel ─────────────────────────────────────────────────── */}
       <div
-        className={`hidden flex-col w-[220px] flex-shrink-0 h-screen ${activeTab === "chats" ? "" : "md:flex"}`}
-        style={{ background: PANEL_BG, borderRight: `1px solid ${LINE}` }}
+        className="hidden md:flex flex-col w-[220px] flex-shrink-0 h-screen"
+        style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Section header */}
         <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>

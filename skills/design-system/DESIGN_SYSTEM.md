@@ -36,7 +36,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--cream`       | `#FDFCF8` | Primary surface (page bg, cards) |
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
-| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface |
+| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface. **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
 | `--ivory`       | `#F1ECDE` | Active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
 | `--rail`        | `#ECE6D6` | Desktop icon rail — darkest step of three-tone desktop surface |
@@ -51,6 +51,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--danger`      | `#9F3030` | Destructive text/border only — never as filled button bg |
 
 **Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except in the rare full-identity hero (§4.1). Do not use plum as a repeated surface, card background, or decorative fill — it is a surgical accent appearing in at most one or two intentional moments per view.
+
+> **Chat panel exception (intentional):** The Messages context panel uses the body background token (`--cream`) instead of the standard `--body-bg` panel tone. This is deliberate — the conversation list and thread are one master/detail activity; giving them a continuous surface (vs. a tonal step) creates the Messenger/iMessage feel where list and thread read as one connected space. All other section panels keep `--body-bg`.
 
 ### 1.3 Typography
 
@@ -276,12 +278,13 @@ For meeting notes, transition notes, activity feeds.
 - **Other (left):** cream bg, ink text, 1px `#E8E2D2` border, radius 14.
 - **Reply quote inside bubble:** 8×10 inset, left rule 2px (cream on own, plum on other), radius 8.
 - **Reactions row:** flat pills, 3×8 padding, radius 999, soft-tint bg matching bubble side.
-- **Date divider:** serif italic 14px centered between two flex-1 hairlines.
+- **Date divider:** standalone centered date — no flanking hairlines. Serif italic, muted text color, comfortable vertical spacing above and below. The date floats as its own calm separator (Messenger-style).
 
 ### 4.16 Composer
 - Pill: 1px `#E2DDCF`, radius 16, `#F8F4EA` bg, padding 10/12/10/16.
 - `+` attachment button left, formatting micro-toolbar middle, plum-2 send button (38 sq, radius 10).
 - Helper line below: 11px `#A09A8C`, left = keyboard hint, right = audience scope.
+- **Composer bar container:** no top divider, background continuous with the chat body background token. The bar blends into the thread — only the input pill itself carries a distinct affordance. The reply preview, attachment preview, and archived-state bars use the same background and no top border.
 
 ### 4.17 Modal (for **creation only**, never navigation)
 Modals are reserved for *new-X* flows where context needs to be preserved (e.g. quick-add behind a calendar). For opening existing entities, **always navigate to a page**. Use sparingly.
