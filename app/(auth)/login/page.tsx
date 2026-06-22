@@ -25,16 +25,12 @@ function PhotoPanel() {
     <div className="hidden md:flex" style={{
       width: "44%", minWidth: 440, position: "relative", flexShrink: 0,
       overflow: "hidden", background: "#1E0A20", color: "#FBF8F2",
-      padding: "44px 56px", flexDirection: "column", justifyContent: "space-between",
+      padding: "44px", flexDirection: "column", justifyContent: "space-between",
     }}>
       <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(155deg, rgba(27,10,30,0.62) 0%, rgba(45,15,46,0.80) 58%, rgba(27,10,30,0.96) 100%)",
-      }}/>
-      <div aria-hidden style={{
-        position: "absolute", inset: 0, opacity: 0.12, pointerEvents: "none",
-        background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
+        background: "linear-gradient(155deg, rgba(27,10,30,0.58) 0%, rgba(45,15,46,0.76) 58%, rgba(27,10,30,0.93) 100%)",
       }}/>
       {/* Brand */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 11 }}>
@@ -59,7 +55,7 @@ function PhotoPanel() {
           <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "rgba(253,252,248,0.92)" }}>
             &ldquo;And let us consider how to stir up one another to love and good works.&rdquo;
           </div>
-          <div style={{ ...mono, marginTop: 12, color: "rgba(253,252,248,0.60)" }}>Hebrews 10 : 24</div>
+          <div style={{ ...mono, marginTop: 12, color: "rgba(253,252,248,0.60)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
         </div>
       </div>
     </div>

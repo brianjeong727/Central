@@ -56,27 +56,37 @@ function PlumPanel() {
     <div className="hidden md:flex" style={{
       position: "sticky", top: 0, alignSelf: "start", height: "100vh",
       overflow: "hidden", color: "#FBF8F2", background: "#1E0A20",
-      padding: "44px 56px", flexDirection: "column", justifyContent: "space-between",
+      padding: "44px", flexDirection: "column", justifyContent: "space-between",
     }}>
       <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(155deg, rgba(27,10,30,0.62) 0%, rgba(45,15,46,0.80) 58%, rgba(27,10,30,0.96) 100%)",
+        background: "linear-gradient(155deg, rgba(27,10,30,0.58) 0%, rgba(45,15,46,0.76) 58%, rgba(27,10,30,0.93) 100%)",
       }}/>
-      <div aria-hidden style={{
-        position: "absolute", inset: 0, opacity: 0.12, pointerEvents: "none",
-        background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
-      }}/>
-      <div style={{ position: "relative" }}><Wordmark tone="plum"/></div>
+      {/* Brand */}
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 11 }}>
+        <span style={{
+          width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
+          background: "rgba(253,252,248,0.12)", border: "1px solid rgba(253,252,248,0.22)",
+        }}>
+          <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="44" stroke="#F1ECDE" strokeWidth="7"/>
+            <rect x="46" y="20" width="8" height="60" fill="#F1ECDE"/>
+            <rect x="20" y="46" width="60" height="8" fill="#F1ECDE"/>
+          </svg>
+        </span>
+        <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#FBF8F2" }}>Central</span>
+      </div>
+      {/* Tagline + verse */}
       <div style={{ position: "relative" }}>
-        <h2 style={{ ...serif, color: "#FBF8F2", fontSize: 60, lineHeight: 1.02, letterSpacing: "-0.04em", maxWidth: 560, margin: 0 }}>
-          Your ministry, all in one place.
-        </h2>
-        <div style={{ marginTop: 36 }}>
-          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 19, lineHeight: 1.45, color: "rgba(251,248,242,0.92)", maxWidth: 460 }}>
+        <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.03, letterSpacing: "-0.02em", color: "#FBF8F2" }}>
+          Your ministry,<br/>all in one place.
+        </div>
+        <div style={{ marginTop: 26, maxWidth: 360 }}>
+          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "rgba(253,252,248,0.92)" }}>
             &ldquo;And let us consider how to stir up one another to love and good works.&rdquo;
           </div>
-          <div style={{ ...mono, marginTop: 12, color: "rgba(251,248,242,0.55)" }}>HEBREWS 10 : 24</div>
+          <div style={{ ...mono, marginTop: 12, color: "rgba(253,252,248,0.60)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
         </div>
       </div>
     </div>
@@ -84,26 +94,33 @@ function PlumPanel() {
 }
 
 // ─── split shell ───────────────────────────────────────────────
-function SplitShell({ children }: { children: React.ReactNode }) {
+function SplitShell({ topBar, children }: { topBar?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div style={{
       width: "100%", minHeight: "100svh",
-      display: "grid", gridTemplateColumns: "1.05fr 1fr", alignItems: "start",
+      display: "grid", gridTemplateColumns: "0.786fr 1fr", alignItems: "start",
       background: "#FBF8F2", fontFamily: SANS,
     }}>
       {/* PlumPanel is a direct grid item — sticky works correctly */}
       <PlumPanel/>
-      <div style={{
-        minHeight: "100svh", padding: "64px 56px",
-        display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-      }}
-        className="px-6 py-16 md:px-14"
-      >
-        {/* Mobile wordmark */}
-        <div className="md:hidden mb-10 self-start">
-          <Wordmark tone="ink"/>
+      <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column" }}>
+        {/* Top bar — back link left, secondary link right */}
+        <div className="px-6 md:px-12" style={{
+          display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6,
+          paddingTop: 26, minHeight: 64, fontSize: 14, color: "#5A5466",
+        }}>
+          {topBar}
         </div>
-        <div style={{ width: "100%", maxWidth: 400 }}>{children}</div>
+        {/* Body — vertically centered */}
+        <div className="px-6 md:px-14" style={{
+          flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+          paddingTop: 24, paddingBottom: 48,
+        }}>
+          <div className="md:hidden" style={{ marginBottom: 36, alignSelf: "flex-start" }}>
+            <Wordmark tone="ink"/>
+          </div>
+          <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
+        </div>
       </div>
     </div>
   )
@@ -259,18 +276,18 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
   return (
     <button type="button" onClick={onClick} style={{
       width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 18,
-      padding: "20px 22px", borderRadius: 14, border: "1px solid #E2DDCF",
+      padding: "22px 24px", borderRadius: 14, border: "1px solid #E2DDCF",
       background: "#FBF8F2", cursor: "pointer", fontFamily: SANS, transition: "border-color .15s",
     }}
       className="hover:border-[#3E1540]"
     >
       <span style={{
-        width: 46, height: 46, borderRadius: 12, background: iconBg, color: iconFg,
+        width: 52, height: 52, borderRadius: 13, background: iconBg, color: iconFg,
         display: "grid", placeItems: "center", flexShrink: 0,
       }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontFamily: SERIF, fontSize: 23, letterSpacing: "-0.01em", color: "#13101A", lineHeight: 1.1 }}>{title}</span>
-        <span style={{ display: "block", fontSize: 14, color: "#5A5466", marginTop: 5, lineHeight: 1.5 }}>{body}</span>
+        <span style={{ display: "block", fontFamily: SANS, fontSize: 19, fontWeight: 500, color: "#13101A", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 14, color: "#5A5466", marginTop: 3, lineHeight: 1.5 }}>{body}</span>
       </span>
       <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "#A09A8C" }}/>
     </button>
@@ -361,18 +378,27 @@ function SignupContent() {
     { key: "elder"  as const, title: "Elder",   sub: "Elder board" },
   ]
 
+  const alreadyHaveAccount = (
+    <span>
+      Already have an account?{" "}
+      <Link href="/login" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+        Sign in
+      </Link>
+    </span>
+  )
+
   // ── ROLE CHOICE ────────────────────────────────────────────────
   if (view === "role-choice") return (
-    <SplitShell>
+    <SplitShell topBar={alreadyHaveAccount}>
       <div style={mono}>GET STARTED · CENTRAL</div>
-      <h1 style={{ ...serif, fontSize: 48, lineHeight: 1.08, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+      <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         How are you joining?
       </h1>
-      <p style={{ fontSize: 15, color: "#5A5466", marginTop: 10, marginBottom: 32 }}>
+      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 0" }}>
         Two ways into Central — start a ministry, or join one that&apos;s already here.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 34 }}>
         <PathRow
           icon={<Icon d="M3 11l9-8 9 8M5 10v10h14V10" size={20}/>}
           iconBg="#3E1540" iconFg="#FBF8F2"
@@ -388,27 +414,26 @@ function SignupContent() {
           onClick={() => setView("member")}
         />
       </div>
-
-      <div style={{ marginTop: 28, fontSize: 14, color: "#5A5466", textAlign: "center" }}>
-        Already have an account?{" "}
-        <Link href="/login" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
-          Sign in
-        </Link>
-      </div>
     </SplitShell>
   )
 
   // ── ADMIN (register a church) ──────────────────────────────────
   if (view === "admin") return (
-    <SplitShell>
+    <SplitShell topBar={<>
       {intent !== "register" && (
-        <div style={{ marginBottom: 22 }}><BackLink onClick={() => setView("role-choice")}/></div>
+        <span style={{ marginRight: "auto" }}>
+          <BackLink onClick={() => setView("role-choice")}/>
+        </span>
       )}
+      <Link href="/login?intent=register" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+        Sign in
+      </Link>
+    </>}>
       <div style={mono}>REGISTER A CHURCH · STEP 1 OF 2</div>
-      <h1 style={{ ...serif, fontSize: 44, lineHeight: 1.08, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+      <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         Register your church.
       </h1>
-      <p style={{ fontSize: 15, color: "#5A5466", marginTop: 10, marginBottom: 30 }}>
+      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 30px" }}>
         Create your admin account — you&apos;ll set up the workspace next.
       </p>
 
@@ -452,25 +477,22 @@ function SignupContent() {
           Join a ministry instead →
         </button>
       </div>
-
-      <div style={{ marginTop: 12, fontSize: 13, color: "#5A5466", textAlign: "center" }}>
-        Already have an account?{" "}
-        <Link href="/login?intent=register" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
-          Sign in
-        </Link>
-      </div>
     </SplitShell>
   )
 
   // ── MEMBER (join a ministry) ────────────────────────────────────
   return (
-    <SplitShell>
-      <div style={{ marginBottom: 22 }}><BackLink onClick={() => setView("role-choice")}/></div>
+    <SplitShell topBar={<>
+      <span style={{ marginRight: "auto" }}>
+        <BackLink onClick={() => setView("role-choice")}/>
+      </span>
+      {alreadyHaveAccount}
+    </>}>
       <div style={mono}>JOIN A MINISTRY · CENTRAL</div>
-      <h1 style={{ ...serif, fontSize: 44, lineHeight: 1.08, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+      <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         Create your account.
       </h1>
-      <p style={{ fontSize: 15, color: "#5A5466", marginTop: 10, marginBottom: 30 }}>
+      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 30px" }}>
         Get started with Central in minutes.
       </p>
 
@@ -517,12 +539,6 @@ function SignupContent() {
         )}
       </form>
 
-      <div style={{ marginTop: 28, fontSize: 14, color: "#5A5466", textAlign: "center" }}>
-        Already have an account?{" "}
-        <Link href="/login" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
-          Sign in
-        </Link>
-      </div>
     </SplitShell>
   )
 }
