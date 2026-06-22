@@ -6,8 +6,8 @@ import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
 import { signUpWithAutoConfirm } from "@/app/actions/auth"
+import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
 
-// ─── design tokens ─────────────────────────────────────────────
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
 
@@ -29,100 +29,6 @@ function Icon({ d, size = 16, stroke = 1.8, style }: {
       style={{ flexShrink: 0, ...style }}>
       <path d={d}/>
     </svg>
-  )
-}
-
-// ─── monogram wordmark ─────────────────────────────────────────
-function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
-  const isInk = tone === "ink"
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: isInk ? "#3E1540" : "rgba(251,248,242,0.10)",
-        color: "#FBF8F2", display: "grid", placeItems: "center",
-        fontFamily: SERIF, fontSize: 15, flexShrink: 0,
-      }}>C</span>
-      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "#13101A" : "#FBF8F2" }}>
-        Central
-      </span>
-    </div>
-  )
-}
-
-// ─── sticky photo panel (direct grid item — no wrapper) ────────
-function PlumPanel() {
-  return (
-    <div className="hidden md:flex" style={{
-      position: "sticky", top: 0, alignSelf: "start", height: "100vh",
-      overflow: "hidden", color: "#FBF8F2", background: "#1E0A20",
-      padding: "44px", flexDirection: "column", justifyContent: "space-between",
-    }}>
-      <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-      <div aria-hidden style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(155deg, rgba(27,10,30,0.58) 0%, rgba(45,15,46,0.76) 58%, rgba(27,10,30,0.93) 100%)",
-      }}/>
-      {/* Brand */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 11 }}>
-        <span style={{
-          width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
-          background: "rgba(253,252,248,0.12)", border: "1px solid rgba(253,252,248,0.22)",
-        }}>
-          <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#F1ECDE" strokeWidth="7"/>
-            <rect x="46" y="20" width="8" height="60" fill="#F1ECDE"/>
-            <rect x="20" y="46" width="60" height="8" fill="#F1ECDE"/>
-          </svg>
-        </span>
-        <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#FBF8F2" }}>Central</span>
-      </div>
-      {/* Tagline + verse */}
-      <div style={{ position: "relative" }}>
-        <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.03, letterSpacing: "-0.02em", color: "#FBF8F2" }}>
-          Your ministry,<br/>all in one place.
-        </div>
-        <div style={{ marginTop: 26, maxWidth: 360 }}>
-          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "rgba(253,252,248,0.92)" }}>
-            &ldquo;And let us consider how to stir up one another to love and good works.&rdquo;
-          </div>
-          <div style={{ ...mono, marginTop: 12, color: "rgba(253,252,248,0.60)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── split shell ───────────────────────────────────────────────
-function SplitShell({ topBar, children }: { topBar?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div style={{
-      width: "100%", minHeight: "100svh",
-      display: "grid", gridTemplateColumns: "0.786fr 1fr", alignItems: "start",
-      background: "#FBF8F2", fontFamily: SANS,
-    }}>
-      {/* PlumPanel is a direct grid item — sticky works correctly */}
-      <PlumPanel/>
-      <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column" }}>
-        {/* Top bar — back link left, secondary link right */}
-        <div className="px-6 md:px-12" style={{
-          display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6,
-          paddingTop: 26, minHeight: 64, fontSize: 14, color: "#5A5466",
-        }}>
-          {topBar}
-        </div>
-        {/* Body — vertically centered */}
-        <div className="px-6 md:px-14" style={{
-          flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-          paddingTop: 24, paddingBottom: 48,
-        }}>
-          <div className="md:hidden" style={{ marginBottom: 36, alignSelf: "flex-start" }}>
-            <Wordmark tone="ink"/>
-          </div>
-          <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -152,53 +58,6 @@ function Field({ label, hint, helper, value, onChange, placeholder, type = "text
       </div>
       {helper && <div style={{ fontSize: 12, color: "#A09A8C", marginTop: 8 }}>{helper}</div>}
     </label>
-  )
-}
-
-// ─── eye toggle ────────────────────────────────────────────────
-function EyeButton({ show, onToggle }: { show: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" onClick={onToggle} aria-label={show ? "Hide password" : "Show password"}
-      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#8A8497", display: "grid", placeItems: "center", marginRight: -4 }}>
-      {show
-        ? <Icon d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22" size={16}/>
-        : <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 100-6 3 3 0 000 6z" size={16}/>
-      }
-    </button>
-  )
-}
-
-// ─── google button ─────────────────────────────────────────────
-function GoogleButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      width: "100%", padding: "13px 18px", borderRadius: 12,
-      background: "#FBF8F2", border: "1px solid #E2DDCF", color: "#13101A",
-      fontSize: 15, fontWeight: 500, fontFamily: SANS, cursor: "pointer",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
-      transition: "background .15s",
-    }}
-      className="hover:bg-[#F1ECDE]"
-    >
-      <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
-        <path fill="#4285F4" d="M23.06 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h6.2a5.3 5.3 0 01-2.3 3.48v2.9h3.72c2.18-2 3.44-4.96 3.44-8.39z"/>
-        <path fill="#34A853" d="M12 23.5c3.1 0 5.7-1.03 7.62-2.79l-3.72-2.89c-1.03.69-2.35 1.1-3.9 1.1-3 0-5.54-2.02-6.45-4.74H1.7v2.98A11.5 11.5 0 0012 23.5z"/>
-        <path fill="#FBBC05" d="M5.55 14.18A6.91 6.91 0 015.18 12c0-.76.13-1.5.37-2.18V6.84H1.7A11.5 11.5 0 00.5 12c0 1.86.44 3.62 1.2 5.16l3.85-2.98z"/>
-        <path fill="#EA4335" d="M12 5.07c1.69 0 3.2.58 4.4 1.72l3.3-3.3C17.7 1.6 15.1.5 12 .5 7.4.5 3.42 3.14 1.7 6.84l3.85 2.98C6.46 7.1 9 5.07 12 5.07z"/>
-      </svg>
-      Continue with Google
-    </button>
-  )
-}
-
-// ─── or divider ────────────────────────────────────────────────
-function OrDivider() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, color: "#A09A8C" }}>
-      <span style={{ flex: 1, height: 1, background: "#E8E2D2" }}/>
-      <span style={{ ...mono, color: "#A09A8C", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
-      <span style={{ flex: 1, height: 1, background: "#E8E2D2" }}/>
-    </div>
   )
 }
 
