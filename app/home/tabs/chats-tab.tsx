@@ -3707,32 +3707,38 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
         </div>
       </div>
 
-      {/* Desktop panel item style */}
+      {/* Desktop panel item — proportioned for 220px context panel (matches DirectoryMemberListPanel) */}
       <div
-        className="hidden md:flex items-center gap-3.5 px-4 py-3.5 hover:bg-[#F4F1E8] transition-colors"
+        className="hidden md:flex items-center gap-2.5 px-3 py-2.5 transition-colors duration-100"
         style={{
-          background: isActive ? "#EFEAE0" : "transparent",
-          borderLeft: isActive ? "3px solid #3E1540" : "3px solid transparent",
+          borderLeft: isActive ? "2px solid var(--plum)" : "2px solid transparent",
+          background: isActive ? "rgba(62,21,64,0.06)" : undefined,
         }}
+        onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
+        onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "" }}
       >
         <div style={{
-          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-          background: avatarBg, color: "#F6F4EF",
-          display: "grid", placeItems: "center",
-          fontFamily: "var(--font-instrument-serif)", fontSize: "21px",
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: avatarBg, color: "var(--cream)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "var(--serif)", fontSize: "14px",
         }}>
           {firstInitial}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "15px", fontWeight: group.unread_count ? 700 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "#13101A" }}>{group.name}</div>
-          {group.last_message && (
-            <div style={{ fontSize: "13px", color: group.unread_count ? "#5A5466" : "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: group.unread_count ? 500 : 400, marginTop: 2 }}>
-              {group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message}
-            </div>
-          )}
+          <p className="text-[13px] font-medium truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500 }}>
+            {group.name}
+          </p>
+          <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: "var(--muted-text)", fontWeight: group.unread_count ? 500 : 400 }}>
+            {group.last_message
+              ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
+              : <span style={{ fontStyle: "italic" }}>No messages yet</span>}
+          </p>
         </div>
         {group.unread_count > 0 && (
-          <span style={{ fontSize: "11px", fontWeight: 700, color: "#13101A", background: "#C9A34B", minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>{group.unread_count}</span>
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--ink)", background: "var(--gold)", minWidth: 18, height: 18, padding: "0 4px", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {group.unread_count}
+          </span>
         )}
       </div>
     </button>
@@ -3875,16 +3881,19 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Search */}
-      <div className="flex items-center gap-2 mx-2 my-2 px-2.5 py-1.5 border border-[var(--line)] rounded-lg bg-[var(--cream-2)] flex-shrink-0">
-        <Search className="w-3.5 h-3.5 flex-shrink-0 text-[var(--muted-text)]" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search chats"
-          className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[var(--muted-text)] text-[var(--ink)]"
-        />
+      {/* Search — matches DirectoryMemberListPanel */}
+      <div className="px-3 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--line)" }}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--muted-text)" }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search chats"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+            style={{ background: "var(--cream)", borderColor: "var(--line-2)", color: "var(--ink)" }}
+          />
+        </div>
       </div>
 
       {/* Church / My tab strip */}
