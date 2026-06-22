@@ -3738,3 +3738,264 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
     </button>
   )
 }
+
+// ── ChatListPanel ────────────────────────────────────────────────────────────
+// Self-contained panel component for the 220px DesktopSidebar context panel.
+// Mirrors DirectoryMemberListPanel: own state + data fetching, minimal props.
+
+export interface ChatListPanelProps {
+  userId: string
+  ministryId: string
+  activeGroupId?: string | null
+  onOpenChat: (id: string, name: string) => void
+  refreshKey: number
+  canCreateChurchChat: boolean
+  userProfile: Profile
+  userRole: string
+}
+
+export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole }: ChatListPanelProps) {
+  const supabase = createClient()
+  const router = useRouter()
+  const [subTab, setSubTab] = useState<"church" | "my">(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
+    return (p === "church" || p === "my") ? p : "church"
+  })
+  const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
+  const [archivedChurchChats, setArchivedChurchChats] = useState<ChatGroup[]>([])
+  const [myChats, setMyChats] = useState<ChatGroup[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [search, setSearch] = useState("")
+
+  function clearUnread(groupId: string) {
+    const zero = (list: ChatGroup[]) => list.map(g => g.id === groupId ? { ...g, unread_count: 0 } : g)
+    setChurchChats(zero)
+    setMyChats(zero)
+  }
+
+  function handleOpenChatPanel(groupId: string, groupName: string) {
+    clearUnread(groupId)
+    onOpenChat(groupId, groupName)
+  }
+
+  useEffect(() => {
+    if (activeGroupId) clearUnread(activeGroupId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroupId])
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("group_members")
+        .select("groups(id, name, type, archived, ministry_id), last_read_at")
+        .eq("user_id", userId)
+
+      type RawMember = {
+        groups: { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null } | { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null }[] | null
+        last_read_at: string | null
+      }
+
+      const allWithLastRead = (data ?? [])
+        .map((m: RawMember) => {
+          if (!m.groups) return null
+          const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
+          if (!g || g.ministry_id !== ministryId) return null
+          return {
+            id: g.id,
+            name: g.name,
+            type: g.type,
+            archived: g.archived ?? false,
+            last_message: null,
+            last_sender: null,
+            last_message_time: null,
+            unread_count: 0,
+            _lastReadAt: m.last_read_at,
+          }
+        })
+        .filter(Boolean) as (ChatGroup & { _lastReadAt: string | null })[]
+
+      const withUnread = await Promise.all(
+        allWithLastRead.map(async ({ _lastReadAt, ...group }) => {
+          let countQuery = supabase
+            .from("messages")
+            .select("*", { count: "exact", head: true })
+            .eq("group_id", group.id)
+            .neq("sender_id", userId)
+            .eq("message_type", "user")
+          if (_lastReadAt) countQuery = countQuery.gt("created_at", _lastReadAt)
+
+          const [{ count }, { data: lastMsgData }] = await Promise.all([
+            countQuery,
+            supabase
+              .from("messages")
+              .select("content, created_at, profiles!sender_id(name)")
+              .eq("group_id", group.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ])
+
+          const senderProfile = lastMsgData
+            ? (Array.isArray(lastMsgData.profiles) ? lastMsgData.profiles[0] : lastMsgData.profiles) as { name: string } | null
+            : null
+
+          return {
+            ...group,
+            unread_count: count ?? 0,
+            last_message: lastMsgData?.content ?? null,
+            last_sender: senderProfile?.name ?? null,
+            last_message_time: lastMsgData?.created_at ?? null,
+          }
+        })
+      )
+
+      withUnread.sort((a, b) => {
+        if (!a.last_message_time && !b.last_message_time) return 0
+        if (!a.last_message_time) return 1
+        if (!b.last_message_time) return -1
+        return b.last_message_time.localeCompare(a.last_message_time)
+      })
+
+      setChurchChats(withUnread.filter((g) => g.type === "church" && !g.archived))
+      setArchivedChurchChats(withUnread.filter((g) => g.type === "church" && g.archived))
+      setMyChats(withUnread.filter((g) => g.type !== "church"))
+      setLoading(false)
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, refreshKey])
+
+  const rawActive = subTab === "church" ? churchChats : myChats
+  const active = search.trim()
+    ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : rawActive
+  const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Search */}
+      <div className="flex items-center gap-2 mx-2 my-2 px-2.5 py-1.5 border border-[var(--line)] rounded-lg bg-[var(--cream-2)] flex-shrink-0">
+        <Search className="w-3.5 h-3.5 flex-shrink-0 text-[var(--muted-text)]" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search chats"
+          className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-[var(--muted-text)] text-[var(--ink)]"
+        />
+      </div>
+
+      {/* Church / My tab strip */}
+      <div className="flex border-b border-[var(--line)] flex-shrink-0">
+        {(["church", "my"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => {
+              setSubTab(t)
+              setSearch("")
+              const sp = new URLSearchParams(window.location.search)
+              sp.set("chats", t)
+              router.replace(`?${sp.toString()}`, { scroll: false })
+            }}
+            style={{
+              flex: 1,
+              padding: "9px 0",
+              fontSize: "11px",
+              fontWeight: 600,
+              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
+              background: "transparent",
+              border: "none",
+              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
+              cursor: "pointer",
+              fontFamily: "var(--sans)",
+            }}
+          >
+            {t === "church" ? "Church" : "My Chats"}
+          </button>
+        ))}
+      </div>
+
+      {/* Count + plus button */}
+      <div className="flex items-center justify-between px-2 pt-2 pb-1 flex-shrink-0">
+        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
+          {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
+        </p>
+        {showPlusButton && (
+          <button
+            onClick={() => setShowCreateChat(subTab)}
+            style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", borderRadius: "var(--r-pill)", padding: 0 }}
+            title="New chat"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="px-2 pt-2"><Spinner /></div>
+        ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
+          <p style={{ fontSize: 12, color: "var(--muted-text)", padding: "8px 12px", fontFamily: "var(--sans)" }}>
+            {search.trim() ? "No results" : subTab === "church" ? "No church chats" : "No personal chats"}
+          </p>
+        ) : (
+          <>
+            {active.map((group) => (
+              <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
+            ))}
+            {subTab === "church" && archivedChurchChats.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowArchived(s => !s)}
+                  className="w-full flex items-center justify-between px-4 py-2"
+                >
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>
+                    Archived · {archivedChurchChats.length}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-[var(--faint)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
+                </button>
+                {showArchived && archivedChurchChats.map((group) => (
+                  <div key={group.id} className="opacity-50">
+                    <ChatGroupCard group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {showCreateChat && (
+        <CreateChatScreen
+          userId={userId}
+          userName={userProfile.name}
+          ministryId={ministryId}
+          groupType={showCreateChat}
+          onClose={() => setShowCreateChat(null)}
+          onCreated={(group) => {
+            const newGroup: ChatGroup = {
+              id: group.id,
+              name: group.name,
+              type: showCreateChat!,
+              last_message: null,
+              last_sender: null,
+              last_message_time: null,
+              unread_count: 0,
+              archived: false,
+            }
+            if (showCreateChat === "church") {
+              setChurchChats(prev => [newGroup, ...prev])
+            } else {
+              setMyChats(prev => [newGroup, ...prev])
+            }
+            setShowCreateChat(null)
+            onOpenChat(group.id, group.name)
+          }}
+        />
+      )}
+    </div>
+  )
+}

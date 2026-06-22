@@ -18,7 +18,7 @@ import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 // Tabs
 import { HomeTab } from "./tabs/home-tab"
 import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
-import { ChatsTab, ChatScreen } from "./tabs/chats-tab"
+import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
 import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
@@ -464,6 +464,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         directorySelectedMemberId={selectedDirectoryMember?.id ?? activeMemberId}
         directoryInitialMemberId={activeMemberId}
         onDirectoryMemberSelect={handleDirectoryMemberSelect}
+        chatPanelContent={
+          <ChatListPanel
+            userId={userId}
+            ministryId={ministryId}
+            activeGroupId={globalOpenChat?.id}
+            onOpenChat={handleOpenChat}
+            refreshKey={chatRefreshKey}
+            canCreateChurchChat={canCreateChurchChat}
+            userProfile={initialProfile}
+            userRole={initialProfile.role}
+          />
+        }
       />
 
       {/* Content + bottom nav wrapper */}
@@ -502,11 +514,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             </div>
           )}
 
-          {/* Chats tab: mobile = normal stack, desktop = two-column split */}
+          {/* Chats tab — Convention #13: shell mount on root div */}
           {activeTab === "chats" && (
-            <div className="md:flex md:h-full md:overflow-hidden">
-              {/* Left: chat list */}
-              <div className="md:w-[360px] md:flex-shrink-0 md:border-r md:border-[var(--line)] md:overflow-y-auto md:h-full md:bg-[var(--cream)]">
+            <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+              {/* Mobile only: full ChatsTab list view */}
+              <div className="md:hidden">
                 <ChatsTab
                   userId={userId}
                   userProfile={initialProfile}
@@ -521,9 +533,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   canCreateChurchChat={canCreateChurchChat}
                 />
               </div>
-              {/* Right: chat content — desktop only */}
-              {globalOpenChat ? (
-                <div className="hidden md:flex md:flex-1 md:overflow-hidden">
+              {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
+              <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
+                {globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.id}
                     groupId={globalOpenChat.id}
@@ -537,16 +549,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                     onNameChange={handleChatNameChange}
                     inline
                   />
-                </div>
-              ) : (
-                <div className="hidden md:flex md:flex-1 md:items-center md:justify-center bg-[var(--cream)]">
-                  <div className="text-center">
-                    <MessageCircle className="w-10 h-10 text-[var(--line)] mx-auto mb-3" />
-                    <p className="text-[14px] font-semibold text-[var(--muted-text)]">Select a chat</p>
-                    <p className="text-[12px] text-[var(--faint)] mt-1">Choose a conversation on the left</p>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center bg-[var(--cream)]">
+                    <div className="text-center">
+                      <MessageCircle className="w-10 h-10 text-[var(--line)] mx-auto mb-3" />
+                      <p className="text-[14px] font-semibold text-[var(--muted-text)]">Select a chat</p>
+                      <p className="text-[12px] text-[var(--faint)] mt-1">Choose a conversation from the panel</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 

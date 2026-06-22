@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
@@ -607,6 +608,8 @@ export interface DesktopSidebarProps {
   directorySelectedMemberId?: string | null
   directoryInitialMemberId?: string | null
   onDirectoryMemberSelect?: (member: DirectoryMember) => void
+  // Chat panel
+  chatPanelContent?: ReactNode
 }
 
 export interface HomeAppProps {
