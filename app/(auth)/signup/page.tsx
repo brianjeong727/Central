@@ -248,7 +248,15 @@ function SignupContent() {
 
   // ── ROLE CHOICE ────────────────────────────────────────────────
   if (view === "role-choice") return (
-    <SplitShell topBar={alreadyHaveAccount}>
+    <SplitShell topBar={<>
+      <Link href="/" style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        color: "#5A5466", textDecoration: "none", marginRight: "auto", fontSize: 14,
+      }}>
+        <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
+      </Link>
+      {alreadyHaveAccount}
+    </>}>
       <div style={mono}>GET STARTED · CENTRAL</div>
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         How are you joining?
