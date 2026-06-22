@@ -1,12 +1,14 @@
 {
   "pkg": "central",
-  "projectId": "dcea8ad6-fab7-427f-afdb-65ab63943d15",
+  "projectId": "3f7155d7-56f5-4df3-9281-8a5f21e5c35c",
   "shape": "package",
   "srcDir": "components/ui",
   "tsconfig": "tsconfig.json",
   "cssEntry": ".design-sync/tailwind-compiled.css",
   "overrides": {
-    "BottomNav": { "viewport": "390x80" }
+    "BottomNav": { "viewport": "390x80" },
+    "Avatar": { "cardMode": "column" },
+    "AvatarImage": { "cardMode": "column" }
   },
   "entry": ".ds-entry.tsx",
   "readmeHeader": ".design-sync/conventions.md",
@@ -22,9 +24,17 @@
     "CardDescription": "components/ui/card.tsx",
     "CardFooter": "components/ui/card.tsx",
     "CardHeader": "components/ui/card.tsx",
-    "CardTitle": "components/ui/card.tsx",
     "ChatsSection": "components/ui/chats-section.tsx",
     "Input": "components/ui/input.tsx",
-    "Label": "components/ui/label.tsx"
+    "Label": "components/ui/label.tsx",
+    "CentralButton": "components/central/button.tsx",
+    "CentralCard": "components/central/card.tsx",
+    "CardTitle": "components/central/card-title.tsx",
+    "ChatStrip": "components/central/chat-strip.tsx",
+    "InsetHairline": "components/central/hairline.tsx",
+    "PageTitle": "components/central/page-title.tsx",
+    "SectionHeader": "components/central/section-header.tsx",
+    "StatCard": "components/central/stat-card.tsx",
+    "UpNextCard": "components/central/up-next-card.tsx"
   }
 }
