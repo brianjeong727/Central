@@ -425,9 +425,12 @@ function SignupContent() {
           <BackLink onClick={() => setView("role-choice")}/>
         </span>
       )}
-      <Link href="/login?intent=register" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
-        Sign in
-      </Link>
+      <span>
+        Already have an account?{" "}
+        <Link href="/login?intent=register" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+          Sign in
+        </Link>
+      </span>
     </>}>
       <div style={mono}>REGISTER A CHURCH · STEP 1 OF 2</div>
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
