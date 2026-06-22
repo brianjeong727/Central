@@ -50,17 +50,21 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
   )
 }
 
-// ─── sticky plum panel (direct grid item — no wrapper) ────────
+// ─── sticky photo panel (direct grid item — no wrapper) ────────
 function PlumPanel() {
   return (
     <div className="hidden md:flex" style={{
       position: "sticky", top: 0, alignSelf: "start", height: "100vh",
-      overflow: "hidden", color: "#FBF8F2",
-      background: "radial-gradient(120% 100% at 0% 0%, #5A2860 0%, #3E1540 55%, #2A0E2C 100%)",
+      overflow: "hidden", color: "#FBF8F2", background: "#1E0A20",
       padding: "44px 56px", flexDirection: "column", justifyContent: "space-between",
     }}>
+      <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       <div aria-hidden style={{
-        position: "absolute", inset: 0, opacity: 0.18, pointerEvents: "none",
+        position: "absolute", inset: 0, pointerEvents: "none",
+        background: "linear-gradient(155deg, rgba(27,10,30,0.62) 0%, rgba(45,15,46,0.80) 58%, rgba(27,10,30,0.96) 100%)",
+      }}/>
+      <div aria-hidden style={{
+        position: "absolute", inset: 0, opacity: 0.12, pointerEvents: "none",
         background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
       }}/>
       <div style={{ position: "relative" }}><Wordmark tone="plum"/></div>
