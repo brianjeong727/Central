@@ -88,7 +88,7 @@ export function DesktopSidebar({
   }, [userId, supabase])
 
   const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: "home",      label: "Overview",   icon: Home },
+    { id: "home",      label: "Home",        icon: Home },
     { id: "chats",     label: "Messages",  icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
@@ -259,7 +259,7 @@ export function DesktopSidebar({
 
     // ── Home section: Home, Announcements, Give, Forms, Settings ────────────
     const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
-      { label: "Home",              tab: "home" },
+      { label: "Overview",          tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
       { label: "Forms",           tab: "forms" },
