@@ -2104,11 +2104,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   return (
     <>
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[#FBF8F2] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[#FBF8F2] border-b border-[#E8E2D2]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-10 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[var(--cream)] border-b border-[#E8E2D2]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -2807,7 +2807,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Reply preview bar ── */}
       {replyingTo && (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-2 flex items-start gap-3">
+        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-2 flex items-start gap-3">
           <div className="flex-1 border-l-2 border-[#3E1540] pl-2.5 min-w-0">
             <p className="text-[11px] font-semibold text-[#3E1540] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
@@ -2823,7 +2823,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Attachment preview bar ── */}
       {pendingAttachment && (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
+        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-3 flex items-center gap-3">
           {pendingAttachment.file.type.startsWith("image/") ? (
             <>
               <div className="relative flex-shrink-0">
@@ -2901,7 +2901,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── Input bar ── */}
       {groupArchived ? (
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
+        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[#E8E2D2] px-4 py-3 flex items-center justify-center">
           <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
         </div>
       ) : (
