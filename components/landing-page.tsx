@@ -3,77 +3,54 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, ChevronDown } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
-const C = {
-  plum: "#3E1540",
-  plumDarker: "#240920",
-  ink: "#13101A",
-  surface: "#FBF8F2",
-  surface2: "#F6F4EF",
-  border: "#ECE8DE",
-  body: "#5A5466",
-  muted: "#8A8497",
-  ivory: "#F6F4EF",
-}
+const INK     = "#13101A"
+const BODY    = "#5A5466"
+const MUTED   = "#8A8497"
+const CREAM   = "#FDFCF8"
+const CREAM3  = "#F6F2E8"
+const IVORY   = "#F1ECDE"
+const LINE    = "#E8E2D2"
+const LINE2   = "#E2DDCF"
+const LINE3   = "#EFE9DA"
+const PLUM    = "#3E1540"
+const PLUM2   = "#2D0F2E"
 
 const SERIF = "var(--font-instrument-serif)"
-const SANS = "var(--font-inter)"
+const SANS  = "var(--font-inter)"
+const MONO  = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
 const FEATURES = [
-  {
-    num: "i",
-    title: "Chats that match ministry life.",
-    body: "Church-wide rooms, small groups, direct messages, and threaded replies — the way students actually talk during the week.",
-  },
-  {
-    num: "ii",
-    title: "Announcements with follow-through.",
-    body: "Pinned updates, event context, and RSVP tracking, so the right people see the right thing without another spreadsheet.",
-  },
-  {
-    num: "iii",
-    title: "A living directory of your people.",
-    body: "Names, roles, prayer requests, and spiritual profiles — leaders and students can care for each other well.",
-  },
-  {
-    num: "iv",
-    title: "Planning, beside the conversation.",
-    body: "Team roles, worship rosters, and event tasks live next to the chats that move them forward — not in a second app.",
-  },
+  { num: "i",   title: "Chats that match ministry life.",       body: "Church-wide rooms, small groups, direct messages, and threaded replies — the way students actually talk during the week, not a generic inbox." },
+  { num: "ii",  title: "Announcements with follow-through.",    body: "Pinned updates, event context, and RSVP tracking, so the right people see the right thing without another spreadsheet." },
+  { num: "iii", title: "A living directory of your people.",    body: "Names, roles, prayer requests, and spiritual profiles — so leaders and students can genuinely care for one another." },
+  { num: "iv",  title: "Planning, beside the conversation.",    body: "Team roles, worship rosters, and event tasks live next to the chats that move them forward — never in a second app." },
 ]
 
 const RHYTHM = [
-  { day: "Sun · service", what: "Welcome new students.", who: "— the welcome team" },
-  { day: "Mon · planning", what: "Publish the week ahead.", who: "— campus leads" },
-  { day: "Wed · rehearsal", what: "Coordinate worship.", who: "— praise team" },
-  { day: "Fri · cells", what: "Keep small groups close.", who: "— cell leaders" },
+  { day: "Sun · service",   what: "Welcome new students.",    who: "— the welcome team" },
+  { day: "Mon · planning",  what: "Publish the week ahead.", who: "— campus leads" },
+  { day: "Wed · rehearsal", what: "Coordinate worship.",      who: "— praise team" },
+  { day: "Fri · cells",     what: "Keep small groups close.", who: "— cell leaders" },
 ]
 
 export default function LandingPage() {
   const router = useRouter()
-  const [scrolled, setScrolled] = useState(false)
-  const [authUser, setAuthUser] = useState<boolean | null>(null)
-  const [authChecked, setAuthChecked] = useState(false)
+  const [scrolled, setScrolled]           = useState(false)
+  const [authUser, setAuthUser]           = useState<boolean | null>(null)
+  const [authChecked, setAuthChecked]     = useState(false)
   const [ministryCount, setMinistryCount] = useState<number | null>(null)
-  const [heroVisible, setHeroVisible] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen]           = useState(false)
 
   useEffect(() => {
-    function onScroll() {
-      setScrolled(window.scrollY > 56)
-    }
+    function onScroll() { setScrolled(window.scrollY > 40) }
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
-  }, [])
-
-  useEffect(() => {
-    const t = setTimeout(() => setHeroVisible(true), 80)
-    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
@@ -88,10 +65,7 @@ export default function LandingPage() {
     })
   }, [])
 
-  // Close mobile menu on scroll
-  useEffect(() => {
-    if (scrolled) setMenuOpen(false)
-  }, [scrolled])
+  useEffect(() => { if (scrolled) setMenuOpen(false) }, [scrolled])
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -100,143 +74,96 @@ export default function LandingPage() {
   }
 
   function handleOpenApp() {
-    if (ministryCount === 0) {
-      router.push("/ministries")
-    } else if (ministryCount !== null && ministryCount > 1) {
-      router.push("/pick-ministry")
-    } else {
-      router.push("/home")
-    }
+    if (ministryCount === 0) router.push("/ministries")
+    else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
+    else router.push("/home")
   }
 
-  const navColor = scrolled ? C.ink : C.ivory
-  const navMuted = scrolled ? "rgba(90,84,102,0.9)" : "rgba(246,244,239,0.85)"
-
   return (
-    <main style={{ minHeight: "100vh", background: C.surface, color: C.ink, fontFamily: SANS }}>
+    <main style={{ minHeight: "100vh", background: CREAM, color: INK, fontFamily: SANS }}>
 
       {/* ── NAV ── */}
-      <nav
-        style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-          borderBottom: scrolled ? `1px solid ${C.border}` : "1px solid transparent",
-          background: scrolled ? "rgba(251,248,242,0.92)" : "transparent",
-          backdropFilter: scrolled ? "blur(16px)" : "none",
-          WebkitBackdropFilter: scrolled ? "blur(16px)" : "none",
-          transition: "background 180ms ease, border-color 180ms ease",
-        }}
-      >
-        <div style={{ maxWidth: 1192, margin: "0 auto", padding: "0 56px", display: "flex", alignItems: "center", height: 72, gap: 24 }}>
+      <nav className="cl-nav" style={{
+        position: "sticky", top: 0, zIndex: 50, height: 72,
+        background: "rgba(253,252,248,0.92)",
+        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        borderBottom: scrolled ? `1px solid ${LINE}` : "1px solid transparent",
+        transition: "border-color 180ms ease",
+      }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px", height: 72, display: "flex", alignItems: "center" }}>
           {/* Brand */}
-          <Link
-            href="/"
-            className="cl-brand-link"
-            style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: navColor, fontFamily: SERIF, fontSize: 22, transition: "color 180ms ease, opacity 150ms ease", flexShrink: 0 }}
-          >
-            <RingCrossLogo size={28} color={scrolled ? C.plum : C.ivory} />
+          <Link href="/" className="cl-brand-link" style={{
+            display: "flex", alignItems: "center", gap: 10,
+            textDecoration: "none", color: INK,
+            fontFamily: SERIF, fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em",
+          }}>
+            <RingCrossLogo size={26} color={PLUM2}/>
             Central
           </Link>
 
-          {/* Center links — hidden on mobile */}
-          <div className="cl-nav-links" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 28 }}>
-            {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
-              <a key={label} href={href} className="cl-nav-link" style={{ fontSize: 13, color: navMuted, textDecoration: "none" }}>
+          {/* Center links */}
+          <div className="cl-nav-links" style={{ flex: 1, display: "flex", justifyContent: "center", gap: 28 }}>
+            {([["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
+              <a key={label} href={href} className="cl-nav-link" style={{ fontSize: 14, color: BODY, textDecoration: "none" }}>
                 {label}
               </a>
             ))}
           </div>
 
-          {/* Right CTAs — desktop */}
-          <div className="cl-nav-right" style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+          {/* Right CTAs */}
+          <div className="cl-nav-right" style={{ display: "flex", gap: 12, alignItems: "center" }}>
             {authChecked && authUser ? (
               <>
-                <button
-                  onClick={handleSignOut}
-                  className="cl-nav-sign-out cl-desktop-only"
-                  style={{ background: "transparent", border: 0, color: navMuted, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}
-                >
+                <button onClick={handleSignOut} className="cl-desktop-only cl-nav-text-btn" style={{ background: "transparent", border: 0, color: BODY, cursor: "pointer", fontFamily: SANS, fontSize: 14 }}>
                   Sign out
                 </button>
-                <button
-                  onClick={handleOpenApp}
-                  className="cl-nav-cta-outline"
-                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.border}` : "1px solid rgba(246,244,239,0.5)", color: navColor, background: "transparent", cursor: "pointer", fontFamily: SANS }}
-                >
+                <button onClick={handleOpenApp} className="cl-desktop-only cl-btn-outline" style={{ height: 38, padding: "0 18px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${LINE}`, background: "transparent", color: INK, cursor: "pointer", fontFamily: SANS }}>
                   Open app
                 </button>
               </>
             ) : (
               <>
-                <a
-                  href="/login"
-                  className="cl-nav-signin cl-desktop-only"
-                  style={{ height: 36, padding: "0 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, textDecoration: "none", border: "none", background: "transparent", color: navColor, fontFamily: SANS }}
-                >
-                  Sign in
-                </a>
-                <button
-                  onClick={() => router.push("/signup")}
-                  className="cl-nav-get-started cl-desktop-only"
-                  style={{ height: 36, padding: "0 16px", borderRadius: 999, display: "inline-flex", alignItems: "center", fontSize: 13.5, fontWeight: 500, border: scrolled ? `1px solid ${C.plum}` : `1px solid ${C.ivory}`, background: scrolled ? C.plum : C.ivory, color: scrolled ? C.ivory : C.plum, cursor: "pointer", fontFamily: SANS }}
-                >
+                <a href="/login" className="cl-desktop-only cl-signin" style={{ fontSize: 14, color: BODY, textDecoration: "none" }}>Sign in</a>
+                <button onClick={() => router.push("/signup")} className="cl-desktop-only cl-btn-pill" style={{ height: 38, padding: "0 18px", borderRadius: 999, fontSize: 14, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS }}>
                   Get started
                 </button>
               </>
             )}
-
-            {/* Hamburger — mobile only */}
-            <button
-              className="cl-hamburger"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: navColor, display: "none", alignItems: "center", justifyContent: "center" }}
-            >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {/* Hamburger */}
+            <button className="cl-hamburger" onClick={() => setMenuOpen(v => !v)} aria-label={menuOpen ? "Close menu" : "Open menu"}
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: INK, display: "none", alignItems: "center", justifyContent: "center" }}>
+              {menuOpen ? <X size={22}/> : <Menu size={22}/>}
             </button>
           </div>
         </div>
       </nav>
 
       {/* ── Mobile drawer ── */}
-      <div
-        className="cl-mobile-drawer"
-        style={{
-          display: "none",
-          position: "fixed", top: 72, left: 0, right: 0, zIndex: 49,
-          background: "rgba(251,248,242,0.97)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderBottom: `1px solid ${C.border}`,
-          flexDirection: "column",
-          padding: "16px 24px 24px",
-          gap: 4,
-          opacity: menuOpen ? 1 : 0,
-          pointerEvents: menuOpen ? "all" : "none",
-          transform: menuOpen ? "translateY(0)" : "translateY(-8px)",
-          transition: "opacity 200ms ease, transform 200ms ease",
-        }}
-      >
-        {[["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]].map(([label, href]) => (
-          <a
-            key={label}
-            href={href}
-            onClick={() => setMenuOpen(false)}
-            style={{ fontSize: 16, color: C.ink, textDecoration: "none", padding: "12px 0", borderBottom: `1px solid ${C.border}`, fontWeight: 500 }}
-          >
+      <div className="cl-mobile-drawer" style={{
+        display: "none", position: "fixed", top: 72, left: 0, right: 0, zIndex: 49,
+        background: "rgba(253,252,248,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        borderBottom: `1px solid ${LINE}`, flexDirection: "column", padding: "16px 24px 24px", gap: 4,
+        opacity: menuOpen ? 1 : 0, pointerEvents: menuOpen ? "all" : "none",
+        transform: menuOpen ? "translateY(0)" : "translateY(-8px)",
+        transition: "opacity 200ms ease, transform 200ms ease",
+      }}>
+        {([["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
+          <a key={label} href={href} onClick={() => setMenuOpen(false)}
+            style={{ fontSize: 16, color: INK, textDecoration: "none", padding: "12px 0", borderBottom: `1px solid ${LINE}`, fontWeight: 500 }}>
             {label}
           </a>
         ))}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
           {authChecked && authUser ? (
-            <button onClick={() => { setMenuOpen(false); handleOpenApp() }} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: SANS, width: "100%" }}>
+            <button onClick={() => { setMenuOpen(false); handleOpenApp() }} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: PLUM2, color: CREAM, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: SANS }}>
               Open app
             </button>
           ) : (
             <>
-              <a href="/ministries" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: C.plum, color: C.ivory, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+              <a href="/ministries" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: PLUM2, color: CREAM, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                 Find my ministry
               </a>
-              <a href="/login" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: C.ink, borderRadius: 12, fontSize: 14, fontWeight: 500, textDecoration: "none", border: `1px solid ${C.border}` }}>
+              <a href="/login" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: INK, borderRadius: 12, fontSize: 14, fontWeight: 500, textDecoration: "none", border: `1px solid ${LINE}` }}>
                 Sign in
               </a>
             </>
@@ -244,385 +171,216 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ── HERO ── */}
-      <section className="cl-hero" style={{ position: "relative", minHeight: 760, overflow: "hidden" }}>
-        <img
-          src="/chapel.jpg"
-          alt=""
-          aria-hidden
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        />
-        <div
-          aria-hidden
-          style={{ position: "absolute", inset: 0, background: "linear-gradient(110deg, rgba(62,21,64,0.52) 0%, rgba(62,21,64,0.26) 42%, rgba(62,21,64,0.07) 68%, transparent 88%)", zIndex: 1 }}
-        />
-        <div
-          aria-hidden
-          style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 220, background: "linear-gradient(180deg, transparent 0%, rgba(251,245,234,0.5) 50%, #FBF8F2 100%)", zIndex: 1 }}
-        />
-
-        <div className="cl-hero-container" style={{ position: "relative", zIndex: 2, maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
-          <div
-            className="cl-hero-body"
-            style={{ padding: "148px 0 96px", maxWidth: 460 }}
-          >
-            <p
-              className={`cl-hero-eyebrow${heroVisible ? " cl-anim-in" : ""}`}
-              style={{ margin: "0 0 22px", fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.72)" }}
-            >
+      {/* ── HERO — type-led cream, framed photo ── */}
+      <section className="cl-hero-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "96px 56px 64px" }}>
+        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 56, alignItems: "center" }}>
+          {/* Left — type */}
+          <div>
+            <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
               For college ministries
             </p>
-            <h1
-              className={`cl-hero-title${heroVisible ? " cl-anim-in" : ""}`}
-              style={{ fontFamily: SERIF, fontSize: 76, lineHeight: 0.96, letterSpacing: "-0.018em", color: C.ivory, margin: 0, fontWeight: 400, "--anim-delay": "0.12s" } as React.CSSProperties}
-            >
-              The hub for your ministry —{" "}
-              <span className="cl-rhythm-italic" style={{ fontStyle: "italic" }}>between Sundays.</span>
+            <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 72, lineHeight: 0.98, letterSpacing: "-0.025em", margin: "22px 0 0", color: INK }}>
+              One calm place,<br/>
+              <em style={{ fontStyle: "italic", color: PLUM2 }}>between Sundays.</em>
             </h1>
-            <p
-              className={`cl-hero-sub${heroVisible ? " cl-anim-in" : ""}`}
-              style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.ivory, marginTop: 24, maxWidth: 380, lineHeight: 1.5, "--anim-delay": "0.24s" } as React.CSSProperties}
-            >
-              Replace scattered chats, announcement threads, RSVP lists, and planning docs with one calm weekly workspace.
+            <p className="cl-hero-sub" style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.55, color: BODY, marginTop: 26, maxWidth: 460 }}>
+              Central replaces scattered chats, announcement threads, RSVP lists, and planning docs with a single weekly workspace your whole ministry lives in.
             </p>
-            <div
-              className={`cl-hero-ctas${heroVisible ? " cl-anim-in" : ""}`}
-              style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap", "--anim-delay": "0.36s" } as React.CSSProperties}
-            >
-              {/* Primary — students find their ministry */}
-              <a
-                href="/ministries"
-                className="cl-btn-hero-primary"
-                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-              >
-                Find my ministry
-              </a>
-              {/* Secondary — leaders register */}
-              <button
-                onClick={() => router.push("/register-ministry")}
-                className="cl-btn-hero-secondary"
-                style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
-              >
-                Register your ministry
-              </button>
+            <div className="cl-hero-ctas" style={{ display: "flex", gap: 12, marginTop: 34, alignItems: "center", flexWrap: "wrap" }}>
+              {authChecked && authUser ? (
+                <>
+                  <button onClick={handleOpenApp} className="cl-btn-primary" style={{ height: 50, padding: "0 26px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
+                    Open app
+                  </button>
+                  <a href="/ministries" className="cl-ghost" style={{ fontSize: 14.5, fontWeight: 500, color: PLUM2, textDecoration: "none" }}>
+                    Find a ministry →
+                  </a>
+                </>
+              ) : (
+                <>
+                  <a href="/ministries" className="cl-btn-primary" style={{ height: 50, padding: "0 26px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, background: PLUM2, color: CREAM, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                    Find my ministry
+                  </a>
+                  <button onClick={() => router.push("/register-ministry")} className="cl-ghost" style={{ fontSize: 14.5, fontWeight: 500, color: PLUM2, background: "none", border: "none", cursor: "pointer", fontFamily: SANS, padding: 0 }}>
+                    Register your ministry →
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Verse — pinned upper-right */}
-          <div
-            className="cl-verse-anchor"
-            style={{ position: "absolute", right: 56, top: 130, maxWidth: 240, textAlign: "right", zIndex: 2 }}
-          >
-            <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14.5, color: C.ivory, lineHeight: 1.5, margin: 0 }}>
-              &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
-            </p>
-            <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.68)", margin: "12px 0 0" }}>
-              Matthew 18 : 20
-            </p>
+          {/* Right — framed photo */}
+          <div className="cl-photo" style={{ position: "relative", borderRadius: 18, overflow: "hidden", aspectRatio: "4 / 5", border: `1px solid ${LINE2}` }}>
+            <img src="/chapel.jpg" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}/>
+            <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 40%, rgba(27,10,30,0.72) 100%)" }}/>
+            <div style={{ position: "absolute", left: 24, right: 24, bottom: 24 }}>
+              <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: IVORY, margin: 0 }}>
+                &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
+              </p>
+              <p style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(246,244,239,0.72)", margin: "12px 0 0" }}>
+                Matthew 18 : 20
+              </p>
+            </div>
           </div>
         </div>
-
-        {/* Scroll indicator */}
-        <div
-          className="cl-scroll-indicator"
-          style={{
-            position: "absolute", bottom: 48, left: "50%", transform: "translateX(-50%)",
-            zIndex: 2, opacity: scrolled ? 0 : 1, transition: "opacity 300ms ease",
-            pointerEvents: "none",
-          }}
-        >
-          <ChevronDown size={24} color="rgba(246,244,239,0.6)" className="cl-bounce" />
-        </div>
       </section>
 
-      {/* ── PLATFORM ── */}
-      <section id="platform" className="cl-platform" style={{ maxWidth: 1192, margin: "0 auto", padding: "96px 56px" }}>
-        <p style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted, margin: 0 }}>
-          One calm system
-        </p>
-        <h2 className="cl-section-h" style={{ fontFamily: SERIF, fontSize: 60, lineHeight: 0.98, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400, color: C.ink }}>
-          Less drift between<br />Sunday and the next gathering.
-        </h2>
-        <p style={{ fontSize: 16, color: C.body, marginTop: 22, maxWidth: 580, lineHeight: 1.6 }}>
-          Central gives leaders one place to post updates, track responses, care for people, and coordinate the teams that carry the week.
-        </p>
+      {/* ── Rule ── */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px" }}>
+        <div style={{ height: 1, background: LINE }}/>
+      </div>
 
-        <div
-          className="cl-feat-grid"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: C.border, marginTop: 56, border: `1px solid ${C.border}`, borderRadius: 18, overflow: "hidden" }}
-        >
-          {FEATURES.map(({ num, title, body }) => (
-            <div key={num} className="cl-feat-card" style={{ background: C.surface, padding: "40px 36px", minHeight: 220 }}>
-              <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, color: C.muted }}>{num}</div>
-              <h4 style={{ fontFamily: SERIF, fontSize: 28, lineHeight: 1.1, fontWeight: 400, margin: "14px 0 10px", color: C.ink }}>{title}</h4>
-              <p style={{ color: C.body, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{body}</p>
-            </div>
-          ))}
+      {/* ── FEATURES — editorial rows ── */}
+      <section id="platform" style={{ maxWidth: 1100, margin: "0 auto", padding: "84px 56px" }}>
+        <div style={{ maxWidth: 620, marginBottom: 8 }}>
+          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
+            One calm system
+          </p>
+          <h2 className="cl-sec-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 44, lineHeight: 1.02, letterSpacing: "-0.02em", margin: "14px 0 0", color: INK }}>
+            Less drift between Sunday and the next gathering.
+          </h2>
         </div>
+
+        {FEATURES.map(({ num, title, body }, i) => (
+          <div key={num} className="cl-feat-row" style={{
+            display: "grid", gridTemplateColumns: "56px 1fr 1.4fr", gap: 28,
+            alignItems: "baseline", padding: "30px 0",
+            borderTop: `1px solid ${i === 0 ? LINE : LINE3}`,
+            marginTop: i === 0 ? 40 : 0,
+          }}>
+            <span style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 20, color: MUTED }}>{num}</span>
+            <span className="cl-feat-title" style={{ fontFamily: SERIF, fontSize: 26, lineHeight: 1.15, color: INK }}>{title}</span>
+            <span style={{ fontSize: 15, color: BODY, lineHeight: 1.65 }}>{body}</span>
+          </div>
+        ))}
       </section>
 
-      {/* ── RHYTHM ── */}
-      <section id="rhythm" style={{ background: C.surface2, padding: "96px 0" }}>
-        <div className="cl-rhythm-inner" style={{ maxWidth: 1192, margin: "0 auto", padding: "0 56px" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted, margin: 0 }}>
+      {/* ── RHYTHM — serif list ── */}
+      <section id="rhythm" style={{ background: CREAM3, padding: "84px 0" }}>
+        <div className="cl-rhythm-inner" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px" }}>
+          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
             A week with Central
           </p>
-          <h2 className="cl-rhythm-h" style={{ fontFamily: SERIF, fontSize: 52, lineHeight: 0.98, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400, color: C.ink }}>
-            Built for the rhythms<br />you repeat every week.
+          <h2 className="cl-rhythm-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 40, lineHeight: 1.02, letterSpacing: "-0.02em", margin: "14px 0 36px", color: INK }}>
+            Built for the rhythms you repeat every week.
           </h2>
-
-          <div className="cl-rhythm-strip" style={{ marginTop: 48, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
-            {RHYTHM.map(({ day, what, who }, i) => (
-              <div
-                key={day}
-                className="cl-rhythm-item"
-                style={{ padding: "32px 24px", borderRight: i < RHYTHM.length - 1 ? `1px solid ${C.border}` : "none" }}
-              >
-                <div style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.muted }}>{day}</div>
-                <div style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.2, marginTop: 10, color: C.ink }}>{what}</div>
-                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{who}</div>
+          <div style={{ borderTop: `1px solid ${LINE}` }}>
+            {RHYTHM.map(({ day, what, who }) => (
+              <div key={day} className="cl-rli" style={{ display: "flex", alignItems: "baseline", gap: 24, padding: "22px 0", borderBottom: `1px solid ${LINE}` }}>
+                <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, width: 150, flexShrink: 0 }}>{day}</span>
+                <span className="cl-rli-what" style={{ fontFamily: SERIF, fontSize: 24, color: INK, flex: 1 }}>{what}</span>
+                <span style={{ fontSize: 13, color: MUTED }}>{who}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="cl-cta" style={{ padding: "110px 56px", background: C.plum, color: C.ivory, position: "relative", overflow: "hidden" }}>
-        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.16) 1px, transparent 1.4px)", backgroundSize: "22px 22px", opacity: 0.28, pointerEvents: "none" }} />
-        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 88% 16%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 6% 88%, rgba(246,244,239,0.08) 0%, transparent 35%)", pointerEvents: "none" }} />
-        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
-          <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(246,244,239,0.7)", margin: 0 }}>
+      {/* ── CTA — cream, centered ── */}
+      <section className="cl-cta" style={{ padding: "96px 0", textAlign: "center" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px" }}>
+          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
             Begin
           </p>
-          <h3 className="cl-cta-title" style={{ fontFamily: SERIF, fontSize: 72, lineHeight: 1, letterSpacing: "-0.012em", margin: "16px 0 0", fontWeight: 400 }}>
-            Give your ministry<br />one place to gather.
+          <h3 className="cl-cta-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 60, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "16px 0 0", color: INK }}>
+            Give your ministry<br/>one place to gather.
           </h3>
-          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 19, color: "rgba(246,244,239,0.82)", marginTop: 24, maxWidth: 520, lineHeight: 1.5 }}>
+          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 20, color: BODY, margin: "22px auto 0", maxWidth: 520, lineHeight: 1.5 }}>
             Register a ministry, invite your students, and keep the week moving with a little less friction.
           </p>
-          <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <button
-              onClick={() => router.push("/register-ministry")}
-              className="cl-btn-cta-primary"
-              style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
-            >
+          <div style={{ marginTop: 36, display: "flex", gap: 14, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={{ height: 50, padding: "0 26px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
               Register your ministry
             </button>
-            <a
-              href="/login"
-              className="cl-btn-cta-secondary"
-              style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: "1px solid rgba(246,244,239,0.35)", background: "rgba(36,9,32,0.85)", color: C.ivory, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-            >
-              Sign in
-            </a>
-            <a
-              href="/ministries"
-              className="cl-btn-cta-tertiary"
-              style={{ height: 52, padding: "0 20px", borderRadius: 999, fontSize: 14, fontWeight: 500, color: "rgba(246,244,239,0.75)", textDecoration: "none", display: "inline-flex", alignItems: "center", border: "none", background: "transparent" }}
-            >
+            <a href="/ministries" className="cl-ghost" style={{ fontSize: 14.5, fontWeight: 500, color: PLUM2, textDecoration: "none" }}>
               Find an existing ministry →
             </a>
           </div>
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer className="cl-footer" style={{ padding: "56px 56px" }}>
-        <div style={{ maxWidth: 1192, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingBottom: 22, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: SERIF, fontSize: 22, color: C.ink }}>
-              <RingCrossLogo size={24} color={C.plum} />
-              Central
-            </div>
-            <div className="cl-footer-links" style={{ display: "flex", gap: 28, fontSize: 13, color: C.body, flexWrap: "wrap" }}>
-              {[["Log in", "/login"], ["Find ministry", "/ministries"], ["Platform", "#platform"], ["Rhythm", "#rhythm"]].map(([label, href]) => (
-                <a key={label} href={href} className="cl-footer-link" style={{ textDecoration: "none", color: "inherit" }}>{label}</a>
-              ))}
-            </div>
+      {/* ── FOOTER — minimal ── */}
+      <footer style={{ padding: "48px 0", borderTop: `1px solid ${LINE}` }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px", display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: SERIF, fontSize: 20, fontWeight: 600, color: INK }}>
+            <RingCrossLogo size={22} color={PLUM2}/>
+            Central
           </div>
-          <div style={{ paddingTop: 22, display: "flex", justifyContent: "space-between", fontSize: 12.5, color: C.muted, flexWrap: "wrap", gap: 8 }}>
-            <em style={{ fontFamily: SERIF, fontStyle: "italic", color: C.ink }}>Built for the rhythms you repeat every week.</em>
-            <span>© Central · College ministry communication</span>
+          <div style={{ fontSize: 12.5, color: MUTED }}>
+            <em style={{ fontFamily: SERIF, fontStyle: "italic", color: INK }}>Built for the rhythms you repeat every week.</em>
+            {" "}·{" "}© Central
           </div>
         </div>
       </footer>
 
       <style>{`
-        /* ── Underline on hero italic ── */
-        .cl-rhythm-italic {
-          position: relative;
-        }
-        .cl-rhythm-italic::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 6px;
-          bottom: 4px;
-          height: 2px;
-          background: rgba(246,244,239,0.72);
-          border-radius: 2px;
-        }
+        /* ── Button hover states ── */
+        .cl-btn-primary { transition: transform 140ms ease, opacity 140ms ease; }
+        .cl-btn-primary:hover { transform: scale(1.03); opacity: 0.9; }
+        .cl-btn-primary:active { transform: scale(0.97); }
+        .cl-ghost { transition: opacity 140ms ease; }
+        .cl-ghost:hover { opacity: 0.65; }
+        .cl-btn-pill { transition: transform 140ms ease, box-shadow 140ms ease; }
+        .cl-btn-pill:hover { transform: scale(1.03); box-shadow: 0 4px 14px rgba(45,15,46,0.25); }
+        .cl-btn-pill:active { transform: scale(0.97); }
+        .cl-btn-outline { transition: background 140ms ease; }
+        .cl-btn-outline:hover { background: rgba(62,21,64,0.06) !important; }
 
-        /* ── Scroll indicator bounce ── */
-        @keyframes cl-bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(6px); }
-        }
-        .cl-bounce { animation: cl-bounce 1.8s ease-in-out infinite; }
-        .cl-scroll-indicator { animation: cl-fadein 0.6s ease 1.2s both; }
-        @keyframes cl-fadein { from { opacity: 0; } to { opacity: 1; } }
+        /* ── Nav link hover ── */
+        .cl-brand-link { transition: opacity 140ms ease; }
+        .cl-brand-link:hover { opacity: 0.7; }
+        .cl-nav-link { transition: color 140ms ease; }
+        .cl-nav-link:hover { color: ${INK} !important; }
+        .cl-signin { transition: opacity 140ms ease; }
+        .cl-signin:hover { opacity: 0.6; }
+        .cl-nav-text-btn { transition: opacity 140ms ease; }
+        .cl-nav-text-btn:hover { opacity: 0.6; }
 
-        /* ── Hero entrance animation ── */
-        .cl-hero-eyebrow,
-        .cl-hero-title,
-        .cl-hero-sub,
-        .cl-hero-ctas {
-          opacity: 0;
-          transform: translateY(18px);
-          transition: none;
-        }
-        .cl-hero-eyebrow.cl-anim-in,
-        .cl-hero-title.cl-anim-in,
-        .cl-hero-sub.cl-anim-in,
-        .cl-hero-ctas.cl-anim-in {
-          opacity: 1;
-          transform: translateY(0);
-          transition: opacity 0.65s cubic-bezier(0.23, 1, 0.32, 1) var(--anim-delay, 0s),
-                      transform 0.65s cubic-bezier(0.23, 1, 0.32, 1) var(--anim-delay, 0s);
-        }
-        .cl-hero-eyebrow { --anim-delay: 0s; }
+        /* ── Feature row hover ── */
+        .cl-feat-row { transition: background 120ms ease; }
+        .cl-feat-row:hover { background: rgba(62,21,64,0.03); }
 
-        /* ── Hero text shadows ── */
-        .cl-hero-eyebrow { text-shadow: 0 1px 4px rgba(20,5,18,0.3); }
-        .cl-hero-title   { text-shadow: 0 2px 8px rgba(20,5,18,0.4), 0 8px 32px rgba(20,5,18,0.22); }
-        .cl-hero-sub     { text-shadow: 0 1px 4px rgba(20,5,18,0.32), 0 4px 16px rgba(20,5,18,0.18); }
-
-        /* ── Nav interactive states ── */
-        .cl-brand-link:hover { opacity: 0.75; }
-        .cl-nav-link {
-          transition: color 150ms ease, opacity 150ms ease;
-          position: relative;
-        }
-        .cl-nav-link:hover { opacity: 1; color: #F6F4EF !important; }
-        .cl-nav-get-started {
-          transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
-        }
-        .cl-nav-get-started:hover {
-          transform: scale(1.03);
-          box-shadow: 0 4px 14px rgba(62,21,64,0.25);
-        }
-        .cl-nav-get-started:active { transform: scale(0.97); }
-        .cl-nav-cta-outline {
-          transition: background 150ms ease, color 150ms ease;
-        }
-        .cl-nav-cta-outline:hover { background: rgba(62,21,64,0.06) !important; }
-        .cl-nav-signin {
-          transition: opacity 150ms ease;
-        }
-        .cl-nav-signin:hover { opacity: 0.65; }
-        .cl-nav-sign-out { transition: opacity 150ms ease; }
-        .cl-nav-sign-out:hover { opacity: 0.65; }
-
-        /* ── Hero CTA buttons ── */
-        .cl-btn-hero-primary {
-          transition: transform 150ms ease, box-shadow 150ms ease;
-        }
-        .cl-btn-hero-primary:hover {
-          transform: scale(1.04);
-          box-shadow: 0 6px 20px rgba(246,244,239,0.3);
-        }
-        .cl-btn-hero-primary:active { transform: scale(0.97); }
-        .cl-btn-hero-secondary {
-          transition: transform 150ms ease, background 150ms ease;
-        }
-        .cl-btn-hero-secondary:hover {
-          transform: scale(1.03);
-          background: rgba(36,9,32,0.95) !important;
-        }
-        .cl-btn-hero-secondary:active { transform: scale(0.97); }
-
-        /* ── Feature cards ── */
-        .cl-feat-card {
-          transition: background 200ms ease, transform 200ms ease;
-          cursor: default;
-          position: relative;
-        }
-        .cl-feat-card:hover {
-          background: #F7F4EE !important;
-          z-index: 1;
-        }
-
-        /* ── Rhythm strip items ── */
-        .cl-rhythm-item {
-          transition: background 150ms ease;
-          cursor: default;
-        }
-        .cl-rhythm-item:hover {
-          background: rgba(62,21,64,0.04);
-        }
-
-        /* ── CTA section buttons ── */
-        .cl-btn-cta-primary {
-          transition: transform 150ms ease, box-shadow 150ms ease;
-        }
-        .cl-btn-cta-primary:hover {
-          transform: scale(1.04);
-          box-shadow: 0 8px 28px rgba(246,244,239,0.35);
-        }
-        .cl-btn-cta-primary:active { transform: scale(0.97); }
-        .cl-btn-cta-secondary {
-          transition: transform 150ms ease, background 150ms ease;
-        }
-        .cl-btn-cta-secondary:hover {
-          transform: scale(1.03);
-          background: rgba(20,8,18,0.95) !important;
-        }
-        .cl-btn-cta-secondary:active { transform: scale(0.97); }
-        .cl-btn-cta-tertiary {
-          transition: color 150ms ease;
-        }
-        .cl-btn-cta-tertiary:hover { color: rgba(246,244,239,1) !important; }
-
-        /* ── Footer links ── */
-        .cl-footer-link {
-          transition: color 150ms ease;
-        }
-        .cl-footer-link:hover { color: #3E1540 !important; }
+        /* ── Rhythm item hover ── */
+        .cl-rli { transition: background 120ms ease; }
+        .cl-rli:hover { background: rgba(62,21,64,0.03); }
 
         /* ── Responsive ── */
         @media (max-width: 900px) {
-          .cl-nav-links { display: none !important; }
+          .cl-nav-links  { display: none !important; }
           .cl-desktop-only { display: none !important; }
           .cl-hamburger { display: flex !important; }
           .cl-mobile-drawer { display: flex !important; }
 
-          .cl-hero { min-height: 520px !important; }
-          .cl-hero-container { padding: 0 24px !important; }
-          .cl-hero-body { padding: 112px 0 72px !important; max-width: 100% !important; }
+          .cl-hero-wrap { padding: 64px 24px 48px !important; }
+          .cl-hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
           .cl-hero-title { font-size: 46px !important; }
-          .cl-hero-sub { font-size: 16px !important; max-width: 100% !important; }
-          .cl-verse-anchor { display: none !important; }
+          .cl-hero-sub { font-size: 17px !important; max-width: 100% !important; }
+          .cl-photo { display: none !important; }
 
-          .cl-platform { padding: 64px 24px !important; }
-          .cl-section-h { font-size: 36px !important; }
-          .cl-feat-grid { grid-template-columns: 1fr !important; }
+          #platform { padding: 64px 24px !important; }
+          .cl-sec-h { font-size: 32px !important; }
+          .cl-feat-row { grid-template-columns: 40px 1fr !important; gap: 16px !important; }
+          .cl-feat-title { grid-column: 2 !important; }
+          .cl-feat-row > span:last-child { grid-column: 2 !important; }
 
           .cl-rhythm-inner { padding: 0 24px !important; }
-          .cl-rhythm-h { font-size: 34px !important; }
-          .cl-rhythm-strip { grid-template-columns: 1fr 1fr !important; }
+          .cl-rhythm-h { font-size: 28px !important; }
+          .cl-rli { flex-direction: column !important; gap: 6px !important; }
+          .cl-rli > span:first-child { width: auto !important; }
+          .cl-rli-what { font-size: 20px !important; }
 
-          .cl-cta { padding: 72px 24px !important; }
-          .cl-cta-title { font-size: 44px !important; }
+          .cl-cta { padding: 72px 0 !important; }
+          .cl-cta-h { font-size: 40px !important; }
 
-          .cl-footer { padding: 40px 24px !important; }
+          footer { padding: 36px 0 !important; }
+          footer > div { padding: 0 24px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
         }
 
         @media (max-width: 560px) {
           .cl-hero-title { font-size: 38px !important; }
-          .cl-rhythm-strip { grid-template-columns: 1fr !important; }
-          .cl-rhythm-strip > div { border-right: none !important; border-bottom: 1px solid ${C.border}; }
-          .cl-cta-title { font-size: 34px !important; }
+          .cl-cta-h { font-size: 32px !important; }
+          .cl-feat-row { grid-template-columns: 1fr !important; }
+          .cl-feat-row > span:first-child { display: none; }
         }
       `}</style>
     </main>
