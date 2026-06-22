@@ -82,6 +82,7 @@ When you learn something from a mistake, discover a non-obvious constraint, or a
 10. **RSVP is a toggle:** one row per (user, announcement). Insert on first click, delete on second. Never allow duplicate RSVPs.
 11. **Middleware is `proxy.ts`:** never recreate `middleware.ts` — it was intentionally deleted.
 12. **URL state for tabs:** Every tabbed view must sync active tab to URL query params. Implement at the same time as building tabs — never skip this. Lazy-init state from `new URLSearchParams(window.location.search).get("key")` and write via `router.replace`. One atomic replace only (see Workflow item 5 above). See `tasks/lessons.md` §URL State Persistence for the full param map and patterns.
+14. **"Register your ministry" CTAs must route to `/register-ministry`:** Never point these directly to `/signup?intent=register` or `/onboarding` — the middleware bounces logged-in users off `/signup` to `/home`, silently breaking the flow. `/register-ministry` is the canonical entry point that handles routing by auth state and role. Any new "Register" CTA anywhere in the codebase must point here.
 13. **Shell migration — pattern must be on the tab component's own root div:** When migrating a tab onto the shell mount pattern, `md:flex md:flex-col md:h-full md:overflow-hidden` must be on the **tab component's own root div**, not only the wrapper in `home-app.tsx`. Without it, `md:flex-1` on the desktop section has no flex parent to resolve against — the root div grows to full content height and gets clipped by the wrapper's `overflow: hidden` instead of scrolling. Match `DirectoryTab`'s root div structure exactly: `<div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">`. Tabs migrated: Directory, Planning, Chat.
 
 ## Database Migrations
@@ -186,7 +187,8 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/landing/page.tsx` | Redirects to `/` (landing content now lives at root) |
 | `app/page.tsx` | Public landing / marketing page (renders `LandingPage` component) |
 | `app/ministries/page.tsx` | Public ministry discovery + My Ministries |
-| `app/onboarding/page.tsx` | Ministry registration wizard |
+| `app/onboarding/page.tsx` | Ministry registration wizard — 4-step (Basic info, Structure, Teams, Review); cream context rail + scrollable content. Accessed only via `/register-ministry`, never linked directly. |
+| `app/register-ministry/page.tsx` | Role-gated ministry registration entry point (server component). Not logged in → `/signup?intent=register`; admin-tier → `/onboarding`; non-admin logged-in → "only admins can register" gate. **All "Register your ministry" CTAs must point here.** |
 | `app/admin/page.tsx` | Founder-only admin panel (gated by hardcoded email in proxy.ts) |
 | `app/announcements/[id]/page.tsx` | Shareable announcement detail route |
 | `app/not-admin/page.tsx` | Shown when a non-admin tries to reach an admin route |
@@ -210,7 +212,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 ### Middleware
 The auth middleware lives in `proxy.ts` — **not** `middleware.ts` (that file was deleted).
 
-Public routes allowed through: `/`, `/landing`, `/ministries`, `/login`, `/signup`, `/forgot-password`, `/update-password`, `/auth/`, `/api/calendar/`, `/not-admin`.
+Public routes allowed through: `/`, `/landing`, `/ministries`, `/login`, `/signup`, `/forgot-password`, `/update-password`, `/auth/`, `/api/calendar/`, `/not-admin`, `/register-ministry`.
 
 ### Multi-tenant model
 Every workspace is a **ministry**. All tenant data carries a `ministry_id` FK. RLS policies enforce isolation. Two SECURITY DEFINER helpers bypass profile-table RLS without recursion:
@@ -227,7 +229,8 @@ New users with no `ministry_id` are redirected to `/join` by middleware.
 /join          → invite code or register new ministry
 /home          → main app shell (requires auth + ministry_id)
 /ministries    → public ministry discovery
-/onboarding    → ministry registration wizard
+/register-ministry → role-gated entry point (public); server-side: no auth → /signup?intent=register, admin-tier → /onboarding, non-admin → gate page
+/onboarding    → ministry registration wizard (requires auth; reached only via /register-ministry)
 /admin         → founder-only admin panel
 /pending       → ministry status = pending
 /pick-ministry → multi-ministry switcher
