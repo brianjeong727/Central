@@ -2301,12 +2301,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 return (
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                     {showDateSep && (
-                      <div className="flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-[#E8E2D2]" />
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
+                      <div className="flex justify-center my-6">
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                           {formatDateLabel(msg.created_at)}
                         </span>
-                        <div className="flex-1 h-px bg-[#E8E2D2]" />
                       </div>
                     )}
                     <div className="flex flex-col items-center mt-4 mb-1">
@@ -2416,12 +2414,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 return (
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                     {showDateSep && (
-                      <div className="flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-[#E8E2D2]" />
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
+                      <div className="flex justify-center my-6">
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                           {formatDateLabel(msg.created_at)}
                         </span>
-                        <div className="flex-1 h-px bg-[#E8E2D2]" />
                       </div>
                     )}
                     <div className="flex items-center gap-3 my-2 px-1">
@@ -2439,12 +2435,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                   {/* Date separator */}
                   {showDateSep && (
-                    <div className="flex items-center gap-3 my-4">
-                      <div className="flex-1 h-px bg-[#E8E2D2]" />
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "#8A8497", whiteSpace: "nowrap" }}>
+                    <div className="flex justify-center my-6">
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                         {formatDateLabel(msg.created_at)}
                       </span>
-                      <div className="flex-1 h-px bg-[#E8E2D2]" />
                     </div>
                   )}
 
