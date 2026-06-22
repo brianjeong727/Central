@@ -96,3 +96,10 @@ After switching to Bricolage Grotesque as the sole typeface, 22 component files 
 ```
 
 **Tech debt:** The variable names now lie — a developer reading `var(--font-instrument-serif)` in a component will not know it renders Bricolage unless they trace the alias in `globals.css`. If the typeface is ever changed again, update the aliases and do NOT introduce a new variable with the old name. If a full per-file migration is done, delete the alias block and remove this lesson.
+
+## Shell migration — tab root div must be a flex container
+Date: 2026-06-22
+
+Learned from the Planning tab scroll bug: when a tab is migrated onto the standard desktop shell pattern, the `md:flex md:flex-col md:h-full md:overflow-hidden` classes must be on the **tab component's own root div**, not only on the wrapper in `home-app.tsx`. If missing from the root div, the content area grows to full content height and gets clipped by the wrapper's `overflow: hidden` instead of scrolling — the page looks broken on desktop.
+
+**Rule:** When migrating any tab, match `DirectoryTab`'s root div structure exactly: `<div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">`. Check this first when a migrated tab shows clipped or non-scrolling content on desktop. See CLAUDE.md Convention #13.

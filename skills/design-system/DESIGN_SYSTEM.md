@@ -112,6 +112,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 - **Sidebar** — cream `#FDFCF8`, 220px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
 - **Main column** — cream `#FDFCF8`. Top header strip is breadcrumbs left, search/header-actions right, then content.
 
+**Three-tone surface system:** The three shell zones use three tonal steps that recede left-to-right, making the content area feel forward and primary: icon rail (`--rail`, darkest) → context panel (`--body-bg`, middle) → content area (`--cream`, lightest). Each zone is one step lighter than the one to its left. **Chat exception:** the Messages context panel uses `--cream` to match its content area — the conversation list and thread are one continuous master/detail activity, so they share a surface rather than stepping tonally (see §1.2 note).
+
 ### 2.2 Sidebar variants
 
 Two modes, controlled by a `navMode` prop:
@@ -130,6 +132,8 @@ Both modes share:
 
 ### 2.3 Breadcrumbs
 `Central / Student Org Board / Plan / SSO` — last crumb in `#2D0F2E` weight 500; rest in `#8A8497` weight 400. Slash separator in `#8A8497`.
+
+**Chat exception (intentional):** The Messages tab omits the breadcrumb strip entirely. The chat header (group name + member row) is the page's context line — a "Central / Chats" breadcrumb above it would duplicate that context. This is a stated exception, not a bug.
 
 ### 2.4 Header search
 Right-side header element. Pill: 1px `#E2DDCF`, radius 10, padding 8/14, min-width 320. Icon + "Jump to anything" placeholder + `⌘K` chip. Show on every page except creation/full-page editors (announcement composer hides it).
@@ -172,7 +176,7 @@ padding: 30px 36px 32px
 
 **Do not:** use the hero as a default card treatment or a repeated pattern within a view. Do not place it on list pages, settings pages, or secondary surfaces. Do not use it more than once in the same view — two full-bleed plum moments cancel each other. Do not change the gradient stops or direction when it appears.
 
-**Status (June 2026):** The plum gradient hero has been retired from all Planning surfaces. Team home headers, event-context sub-headers, and the "Up Next" event card are now cream (`var(--cream)`, `#FDFCF8`). Plum remains a surgical accent (CTA button fills, active tab underlines) but is never a card background, hero fill, or surface gradient on these pages. The §4.1 spec is preserved for other valid hero contexts (profile, give page) but should not be re-introduced to Plan tab surfaces.
+**Status (June 2026):** The plum gradient hero has been retired from all app shell surfaces — team home headers, section headers, event sub-headers, tab headers, and identity cards inside the shell are now cream. Plum remains a surgical accent (CTA button fills, active tab underlines, icon chip backgrounds) but is never a card background, section header, or surface gradient anywhere in the shell. The §4.1 gradient spec is preserved only for rare standalone full-identity moments where the surface genuinely needs to own the room (e.g., a dedicated profile identity card or give-page hero) — never as a default treatment for a section or team.
 
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
@@ -253,6 +257,7 @@ background: #FDFCF8
 - Section dividers: 1px `#E8E2D2`.
 - Row dividers inside lists: 1px `#EFE9DA`.
 - Last row in a list: **no border**, not a fading edge.
+- **Hairline sizing principle:** a hairline is always inset from the hard container edges so it reads as a floating rule, not a wall-to-wall border. The inset amount should match the content it underlines — a hairline below a header that spans `px-6` content should be inset roughly to that content width, not fixed to an arbitrary page-margin constant. A hairline sized to the wrong content width looks truncated or overlong; size it to what it's separating.
 
 ### 4.12 Timeline rail
 For meeting notes, transition notes, activity feeds.
