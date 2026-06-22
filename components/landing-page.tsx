@@ -299,7 +299,7 @@ export default function LandingPage() {
               </a>
               {/* Secondary — leaders register */}
               <button
-                onClick={() => router.push("/signup?intent=register")}
+                onClick={() => router.push("/register-ministry")}
                 className="cl-btn-hero-secondary"
                 style={{ height: 48, padding: "0 22px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "1px solid rgba(246,244,239,0.52)", background: "rgba(36,9,32,0.82)", color: C.ivory, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
               >
@@ -403,7 +403,7 @@ export default function LandingPage() {
           </p>
           <div style={{ marginTop: 36, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button
-              onClick={() => router.push("/signup?intent=register")}
+              onClick={() => router.push("/register-ministry")}
               className="cl-btn-cta-primary"
               style={{ height: 52, padding: "0 28px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: `1px solid ${C.ivory}`, background: C.ivory, color: C.plum, cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}
             >

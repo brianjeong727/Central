@@ -424,7 +424,7 @@ function MinistriesContent() {
       <div style={{ borderTop: "1px solid #E8E2D2", padding: "18px 24px" }}>
         <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "center", gap: 24 }}>
           <a href="/" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>← Back to home</a>
-          <a href="/onboarding" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>Register a ministry</a>
+          <a href="/register-ministry" style={{ fontSize: 13, color: "#8A8497", textDecoration: "none" }}>Register a ministry</a>
         </div>
       </div>
     </div>
