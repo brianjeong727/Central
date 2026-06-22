@@ -397,7 +397,7 @@ export function DesktopSidebar({
       {/* ── Context Panel ─────────────────────────────────────────────────── */}
       <div
         className="hidden md:flex flex-col w-[220px] flex-shrink-0 h-screen"
-        style={{ background: PANEL_BG, borderRight: `1px solid ${LINE}` }}
+        style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Section header */}
         <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
