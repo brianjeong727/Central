@@ -124,7 +124,7 @@ export function DesktopSidebar({
       case "giving":       return "Finance"
       case "congregation": return "Congregation"
       case "profile":      return profileSection === "journal" ? "Journal" : "Profile"
-      default:             return "Overview"
+      default:             return "Home"
     }
   }
 
@@ -259,7 +259,7 @@ export function DesktopSidebar({
 
     // ── Home section: Home, Announcements, Give, Forms, Settings ────────────
     const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
-      { label: "Overview",         tab: "home" },
+      { label: "Home",              tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
       { label: "Forms",           tab: "forms" },
