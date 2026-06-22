@@ -69,11 +69,11 @@ function LoginContent() {
     })
   }
 
-  const backHref = intent ? `/signup?intent=${intent}` : "/signup"
+  const signupHref = intent ? `/signup?intent=${intent}` : "/signup"
 
   return (
     <SplitShell topBar={<>
-      <Link href={backHref} style={{
+      <Link href="/" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
         color: "#5A5466", textDecoration: "none", marginRight: "auto", fontSize: 14,
       }}>
@@ -84,7 +84,7 @@ function LoginContent() {
       </Link>
       <span>
         New to Central?{" "}
-        <Link href={backHref} style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+        <Link href={signupHref} style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
           Create an account
         </Link>
       </span>
