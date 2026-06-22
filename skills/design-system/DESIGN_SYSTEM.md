@@ -372,6 +372,18 @@ Mandatory elements above the fold:
 ### 7.5 Settings page
 - Two-column `1fr 280–320px`. Left: ministry profile card + members list + danger zone. Right: stat cards + discovery toggle + invite code card.
 
+### 7.6 Auth/onboarding split-screen (login, signup, update-password)
+Two-column split layout: photo panel on the left, form column on the right. Right column is wider than left (roughly 56/44). Implemented via `SplitShell` in `app/(auth)/shared.tsx` — use that component; do not reimplement the outer layout in individual auth pages.
+
+**Photo panel (left):** Full-bleed chapel photo with plum gradient overlay. Brand lockup at top (`RingCrossLogo` inside a translucent square badge + "Central" in serif). Tagline at bottom in large-weight serif, followed by an italic scripture verse + mono reference. Panel is sticky so it stays fixed while a long form scrolls. Hidden on mobile.
+
+**Form column (right):** Two-section structure:
+- *Top bar* — persistent `min-height: 64` strip, always visible regardless of scroll. Contains navigation: a Back link (with `marginRight: auto` to push it left) + a secondary link ("Already have an account?" / "New to Central?") right-aligned. Both links in muted body color; the action link is plum-2, no underline until hover.
+- *Form body* — flex-centered content area with `max-width: 460`. Starts with a mono eyebrow, then a large serif H1, then a subtitle in muted body color. Google OAuth button, then an OR divider (no built-in margin — callers add vertical spacing), then the field stack, then the primary plum CTA.
+- Mobile wordmark (hidden on md+): `RingCrossLogo`-adjacent "Central" in serif, shown inline at top of form body when the photo panel is hidden.
+
+**Component ownership:** `AuthPhotoPanel` owns the panel. `SplitShell` owns the grid + right column shell. Callers pass `topBar` (React node) and `children` (form body content). Shared primitives: `GoogleButton`, `OrDivider`, `EyeButton` — all from `app/(auth)/shared.tsx`.
+
 ---
 
 ## 8. Specific "do not" — fixes that were applied across redesigns

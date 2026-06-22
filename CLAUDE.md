@@ -179,6 +179,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/types.ts` | All shared TypeScript types for home and tabs |
 | `app/home/utils.ts` | Shared utility functions (formatRelativeTime, getInitials, getAvatarColor) |
 | `app/home/page.tsx` | Server component — auth check, profile load, renders `<HomeApp>` |
+| `app/(auth)/shared.tsx` | Canonical shared auth components: `AuthPhotoPanel`, `SplitShell`, `GoogleButton`, `OrDivider`, `EyeButton`. All auth pages must use these — do not reimplement the split layout inline. |
 | `app/(auth)/login/page.tsx` | Email + password login |
 | `app/(auth)/signup/page.tsx` | Signup with name, email, password, graduation year |
 | `app/join/page.tsx` | Post-signup — enter invite code OR register new ministry |
