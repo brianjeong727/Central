@@ -13,6 +13,7 @@ import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REA
 import Picker from "@emoji-mart/react"
 import data from "@emoji-mart/data"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
+import { InsetHairline } from "@/components/central/hairline"
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
@@ -2108,7 +2109,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3" : "pt-12 pb-3 md:py-3.5"} bg-[var(--cream)] border-b border-[#E8E2D2]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-12 pb-3 md:py-3.5 border-b border-[#E8E2D2]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -2160,13 +2161,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             {/* Group avatar */}
             <div
               className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
-              style={{ width: 40, height: 40, borderRadius: 10, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 16, display: "grid", placeItems: "center" }}
+              style={{ width: 32, height: 32, borderRadius: 8, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 13, display: "grid", placeItems: "center" }}
             >
               {getInitials(displayName)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", color: "#13101A", letterSpacing: "-0.02em" }}>{displayName}</h2>
+                <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#13101A", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
@@ -2212,6 +2213,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           </>
         )}
       </div>
+      {inline && <div className="hidden md:block"><InsetHairline /></div>}
 
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
