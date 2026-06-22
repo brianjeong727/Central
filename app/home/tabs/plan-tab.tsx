@@ -2195,30 +2195,34 @@ export function PlanSubTabStrip({
   onChange: (key: string) => void
 }) {
   return (
-    <div className="md:pl-14" style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
-      {tabs.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => onChange(key)}
-          style={{
-            padding: "12px 0 14px",
-            fontSize: 15,
-            fontFamily: "var(--font-inter)",
-            fontWeight: active === key ? 600 : 400,
-            color: active === key ? "#2D0F2E" : "#8A8497",
-            border: "none",
-            borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
-            marginBottom: -1,
-            background: "none",
-            cursor: "pointer",
-            whiteSpace: "nowrap" as const,
-            outline: "none",
-            flexShrink: 0,
-          }}
-        >
-          {label}
-        </button>
-      ))}
+    // Outer div: zero horizontal padding so borderBottom spans the full content width (§4.2)
+    <div style={{ borderBottom: "1px solid #E8E2D2", overflowX: "auto", scrollbarWidth: "none" as const }}>
+      {/* Inner div: md:pl-14 aligns labels with TabPageHeader's px-14 (56px) on desktop */}
+      <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
+        {tabs.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            style={{
+              padding: "12px 0 14px",
+              fontSize: 15,
+              fontFamily: "var(--font-inter)",
+              fontWeight: active === key ? 600 : 400,
+              color: active === key ? "#2D0F2E" : "#8A8497",
+              border: "none",
+              borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
+              marginBottom: -1,
+              background: "none",
+              cursor: "pointer",
+              whiteSpace: "nowrap" as const,
+              outline: "none",
+              flexShrink: 0,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
