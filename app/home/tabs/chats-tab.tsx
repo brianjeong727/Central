@@ -1236,10 +1236,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   async function handleDeletePoll(msgId: string, pollId: string) {
     setPollMenuFor(null)
     setMessages(prev => prev.filter(m => m.id !== msgId))
+    console.log("[DeletePoll] start", { msgId, pollId })
     // Delete message before poll — messages.poll_id FK prevents deleting poll while message exists
-    await supabase.from("poll_votes").delete().eq("poll_id", pollId)
-    await supabase.from("messages").delete().eq("id", msgId)
-    await supabase.from("polls").delete().eq("id", pollId)
+    const { error: e1 } = await supabase.from("poll_votes").delete().eq("poll_id", pollId)
+    console.log("[DeletePoll] poll_votes", e1 ?? "ok")
+    const { error: e2 } = await supabase.from("messages").delete().eq("id", msgId)
+    console.log("[DeletePoll] messages", e2 ?? "ok")
+    const { error: e3 } = await supabase.from("polls").delete().eq("id", pollId)
+    console.log("[DeletePoll] polls", e3 ?? "ok")
   }
 
   async function handleEditMessage() {
@@ -1956,7 +1960,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
       if (e.key === "Escape") { setMentionQuery(null); return }
     }
-    if (e.key === "Enter" && e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
@@ -2562,7 +2566,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         onPointerUp={() => handlePointerUp(msg)}
                         onPointerLeave={handlePointerCancel}
                         onPointerCancel={handlePointerCancel}
-                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${editingId === msg.id ? "w-full" : ""} ${
+                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
                           msg.deleted
                             ? isOwn
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
@@ -2961,7 +2965,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     data={data}
                     onEmojiSelect={(emoji: { native: string }) => {
                       insertEmojiAtCursor(emoji.native)
-                      setShowComposerEmojiPicker(false)
                     }}
                     theme="light"
                     previewPosition="none"
