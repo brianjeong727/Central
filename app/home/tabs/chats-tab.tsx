@@ -3493,7 +3493,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       {/* Desktop full-width tab bar */}
-      <div className="hidden md:flex border-b border-[#E5E0D2] flex-shrink-0">
+      <div className="hidden md:flex flex-shrink-0">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
