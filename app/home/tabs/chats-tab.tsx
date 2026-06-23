@@ -1062,6 +1062,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [gifResults, setGifResults] = useState<{ id: string; previewUrl: string; fullUrl: string }[]>([])
   const [gifLoading, setGifLoading] = useState(false)
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevMsgCountRef = useRef(0)
   // Departed members — show "left" indicator on their messages
   const [departedIds, setDepartedIds] = useState<Set<string>>(new Set())
   // Link previews
@@ -1236,7 +1237,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   async function handleDeletePoll(msgId: string, pollId: string) {
     setPollMenuFor(null)
-    setMessages(prev => prev.filter(m => m.id !== msgId))
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, deleted: true, poll_id: null } : m))
     // Delete message before poll — messages.poll_id FK prevents deleting poll while message exists
     await supabase.from("poll_votes").delete().eq("poll_id", pollId)
     await supabase.from("messages").delete().eq("id", msgId)
@@ -1818,9 +1819,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
 
-  // Auto-scroll on new messages (suppressed while in search mode)
+  // Auto-scroll only when messages are added, not on deletions/edits
   useEffect(() => {
-    if (!searchMode) scrollToBottom()
+    if (!searchMode && messages.length > prevMsgCountRef.current) scrollToBottom()
+    prevMsgCountRef.current = messages.length
   }, [messages, scrollToBottom, searchMode])
 
   // Scroll to the current search match
@@ -1878,7 +1880,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     const replyTarget = replyingTo
     setReplyingTo(null)
 
-    // Attachment message (with optional caption)
+    // Attachment message — no caption embedded; caption sent as separate message below
     if (pa) {
       setUploading(true)
       const ext = pa.file.name.split(".").pop() ?? "bin"
@@ -1891,7 +1893,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const optimisticId = `optimistic-att-${Date.now()}`
         const optimisticMsg: Message = {
           id: optimisticId, group_id: groupId, sender_id: userId,
-          content, created_at: new Date().toISOString(), sender_name: userName,
+          content: "", created_at: new Date().toISOString(), sender_name: userName,
           reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget?.content ?? null,
           reply_to_sender: replyTarget?.sender_name ?? null,
           message_type: "user", attachment_url: publicUrl,
@@ -1899,12 +1901,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         }
         setMessages(prev => [...prev, optimisticMsg])
         const { data } = await supabase.from("messages").insert({
-          group_id: groupId, sender_id: userId, content,
+          group_id: groupId, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
           attachment_url: publicUrl, attachment_type: pa.file.type,
           attachment_name: pa.file.name, attachment_size: pa.file.size,
         }).select("id").single()
         if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+
+        // Send caption as a separate plain text message immediately after
+        if (content) {
+          const captionOptimisticId = `optimistic-cap-${Date.now()}`
+          const captionMsg: Message = {
+            id: captionOptimisticId, group_id: groupId, sender_id: userId,
+            content, created_at: new Date().toISOString(), sender_name: userName,
+            reply_to_id: null, reply_to_content: null, reply_to_sender: null,
+            message_type: "user", attachment_url: null,
+            attachment_type: null, attachment_name: null, attachment_size: null,
+          }
+          setMessages(prev => [...prev, captionMsg])
+          const { data: capData } = await supabase.from("messages").insert({
+            group_id: groupId, sender_id: userId, content,
+          }).select("id").single()
+          if (capData) setMessages(prev => prev.map(m => m.id === captionOptimisticId ? { ...m, id: capData.id } : m))
+        }
       }
       setUploading(false)
       setSending(false)
@@ -2277,6 +2296,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
               const rxGroups = groupedReactions(msg.id)
               const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
+
+              // Deleted poll tombstone
+              if (msg.message_type === "poll" && msg.deleted) {
+                return (
+                  <div key={msg.id} className={`flex justify-center ${groupGap}`}>
+                    <span style={{ fontStyle: "italic", fontSize: 12, color: "var(--muted-text)", padding: "5px 14px", border: "1px solid var(--line)", borderRadius: 999 }}>
+                      Poll deleted
+                    </span>
+                  </div>
+                )
+              }
 
               // Poll message — full-width card with vote buttons
               if (msg.message_type === "poll" && msg.poll_id) {
@@ -2651,7 +2681,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1"
-                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onPointerUp={(e) => {
+                                      e.stopPropagation()
+                                      // Short-tap: clear timer so link opens instead of emoji picker
+                                      if (longPressTimer.current !== null) {
+                                        clearTimeout(longPressTimer.current)
+                                        longPressTimer.current = null
+                                      }
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[#F1ECDE]"}`}>
