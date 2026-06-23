@@ -601,9 +601,9 @@ export function SettingsTab({
 
   return (
     <div className="md:h-full md:overflow-y-auto">
-      <div className="py-6 md:py-10 pb-28 md:pb-10">
+      <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
-        <div className="px-5 md:px-14">
+        <div>
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 400, letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>
             {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
           </p>
@@ -613,7 +613,7 @@ export function SettingsTab({
         </div>
 
         {/* ── Tab strip — edge-to-edge per §4.2 ── */}
-        <div style={{ marginTop: 28 }}>
+        <div className="-mx-5 md:-mx-14" style={{ marginTop: 28 }}>
           <PlanSubTabStrip
             tabs={TABS}
             active={activeSettingsTab}
@@ -622,13 +622,13 @@ export function SettingsTab({
         </div>
 
         {loading ? (
-          <div className="px-5 md:px-14" style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
+          <div style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
           <>
 
           {/* ══════════════════ GENERAL TAB ══════════════════ */}
           {activeSettingsTab === "general" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Ministry Profile */}
               <section>
@@ -833,7 +833,7 @@ export function SettingsTab({
 
           {/* ══════════════════ PEOPLE TAB ══════════════════ */}
           {activeSettingsTab === "people" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
                 <p style={SECTION_LABEL}>People · {totalMembers}</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Members and roles</h2>
@@ -972,7 +972,7 @@ export function SettingsTab({
 
           {/* ══════════════════ AUTOMATIONS TAB ══════════════════ */}
           {activeSettingsTab === "automations" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
                 <p style={SECTION_LABEL}>Automations</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Chat &amp; membership rules</h2>
@@ -1096,7 +1096,7 @@ export function SettingsTab({
 
           {/* ══════════════════ WORKSPACE TAB ══════════════════ */}
           {activeSettingsTab === "workspace" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Join codes */}
               <section>
@@ -1263,7 +1263,7 @@ export function SettingsTab({
           )}
 
           {activeSettingsTab === "audit" && isAdmin && (
-            <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
+            <div style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
                 <p style={SECTION_LABEL}>Audit Log</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Admin activity</h2>
