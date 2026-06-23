@@ -23,7 +23,7 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { getInitials } from "../utils"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, PageTitle, SectionHeader } from "@/components/central"
 import { PlanSubTabStrip } from "./plan-tab"
 
 interface MemberRow {
@@ -603,14 +603,7 @@ export function SettingsTab({
     <div className="md:h-full md:overflow-y-auto">
       <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 400, letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>
-            {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
-          </p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(34px, 4vw, 52px)", color: "#13101A", fontWeight: 400, margin: 0, letterSpacing: "-0.01em" }}>
-            Church Settings
-          </h1>
-        </div>
+        <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
 
         {/* ── Tab strip — edge-to-edge per §4.2 ── */}
         <div className="-mx-5 md:-mx-14" style={{ marginTop: 28 }}>
@@ -633,8 +626,7 @@ export function SettingsTab({
               {/* Ministry Profile */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <p style={SECTION_LABEL}>Ministry Identity</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Profile</h2>
+                  <SectionHeader eyebrow="Ministry Identity" title="Profile" />
                   <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
                 </div>
                 <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
@@ -671,8 +663,7 @@ export function SettingsTab({
                   {/* Discovery */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <p style={SECTION_LABEL}>Discovery</p>
-                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Who can find {ministryInfo?.name ?? ministryName}</h2>
+                      <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} />
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                       <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
@@ -687,14 +678,8 @@ export function SettingsTab({
 
                   {/* Schools */}
                   <div>
-                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
-                      <div>
-                        <p style={SECTION_LABEL}>Schools</p>
-                        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Linked campuses</h2>
-                      </div>
-                      {isAdmin && !addingSchool && (
-                        <button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>
-                      )}
+                    <div style={{ marginBottom: 16 }}>
+                      <SectionHeader eyebrow="Schools" title="Linked campuses" action={isAdmin && !addingSchool ? (<button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>) : undefined} />
                     </div>
                     <div style={{ ...CARD, overflow: "hidden" }}>
                       {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No schools added yet.</p></div>}
@@ -730,13 +715,9 @@ export function SettingsTab({
               {/* Daily Verse Rotation */}
               {isAdmin && (
                 <section>
-                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
-                    <div>
-                      <p style={SECTION_LABEL}>Daily Verse Rotation</p>
-                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Verses on the sidebar</h2>
-                      <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
-                    </div>
-                    {!addingVerse && <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button>}
+                  <div style={{ marginBottom: 20 }}>
+                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
                   <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                     {homeVerses.length === 0 && !addingVerse && (
@@ -835,8 +816,7 @@ export function SettingsTab({
           {activeSettingsTab === "people" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
-                <p style={SECTION_LABEL}>People · {totalMembers}</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Members and roles</h2>
+                <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
               </div>
 
@@ -974,8 +954,7 @@ export function SettingsTab({
           {activeSettingsTab === "automations" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
-                <p style={SECTION_LABEL}>Automations</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Chat &amp; membership rules</h2>
+                <SectionHeader eyebrow="Automations" title="Chat & membership rules" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
               </div>
 
@@ -1101,8 +1080,7 @@ export function SettingsTab({
               {/* Join codes */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <p style={SECTION_LABEL}>Join Codes</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>How people get in</h2>
+                  <SectionHeader eyebrow="Join Codes" title="How people get in" />
                   <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Share these codes to let people join {ministryInfo?.name ?? ministryName}. Staff codes assign admin-tier roles automatically.</p>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: isAdmin && staffCode ? "1fr 1fr" : "1fr", gap: 18, maxWidth: isAdmin && staffCode ? undefined : 480 }}>
@@ -1165,8 +1143,7 @@ export function SettingsTab({
               {/* Calendar integration */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <p style={SECTION_LABEL}>Calendar Integration</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Sync events to your calendar</h2>
+                  <SectionHeader eyebrow="Calendar Integration" title="Sync events to your calendar" />
                   <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
                 </div>
                 <div style={{ ...CARD, padding: 22 }}>
@@ -1187,13 +1164,9 @@ export function SettingsTab({
               {/* Receipt limits */}
               {isAdmin && (
                 <section>
-                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
-                    <div>
-                      <p style={SECTION_LABEL}>Receipt Limits</p>
-                      <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Per-event reimbursement caps</h2>
-                      <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
-                    </div>
-                    {!addingLimit && <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button>}
+                  <div style={{ marginBottom: 20 }}>
+                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
                   <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                     {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
@@ -1265,8 +1238,7 @@ export function SettingsTab({
           {activeSettingsTab === "audit" && isAdmin && (
             <div style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
-                <p style={SECTION_LABEL}>Audit Log</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Admin activity</h2>
+                <SectionHeader eyebrow="Audit Log" title="Admin activity" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
               </div>
               {auditLoading ? (
