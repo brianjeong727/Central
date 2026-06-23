@@ -22,16 +22,6 @@ const EYEBROW: React.CSSProperties = {
   textTransform: "uppercase",
 }
 
-function getRoleBadgeStyle(role: string): React.CSSProperties {
-  const r = role.toLowerCase()
-  if (["admin", "deacon", "elder", "pastor"].includes(r)) {
-    return { background: "var(--plum-2)", color: "var(--cream)", border: "none" }
-  }
-  if (["leader", "dgl"].includes(r)) {
-    return { background: "var(--ivory)", color: "var(--plum)", border: "1px solid var(--line-2)" }
-  }
-  return { background: "var(--ivory)", color: "var(--muted-text)", border: "1px solid var(--line-2)" }
-}
 
 function pulseTypeLabel(type: string) {
   if (type === "poll") return "Poll"
@@ -110,15 +100,13 @@ export function HomeTab({
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
   const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
-  const roleBadge = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
+  const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
-  const greeting =
-    hour < 12 ? `Good morning, ${firstName}`
-    : hour < 17 ? `Good afternoon, ${firstName}`
-    : hour < 21 ? `Good evening, ${firstName}`
-    : `Good night, ${firstName}`
+  const greetingPrefix = hour < 12 ? "Good morning, " : hour < 17 ? "Good afternoon, " : hour < 21 ? "Good evening, " : "Good night, "
+  const greetingNode = <>{greetingPrefix}<span style={{ color: "var(--plum)" }}>{roleLabel}</span> {firstName}</>
+
 
   useEffect(() => {
     async function load() {
@@ -322,22 +310,7 @@ export function HomeTab({
 
           {/* Desktop: hero header */}
           <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
-            <PageTitle eyebrow={dateLabel} title={greeting} style={{ maxWidth: 640 }}>
-              <span
-                style={{
-                  display: "inline-block",
-                  marginTop: 12,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  padding: "3px 10px",
-                  borderRadius: 999,
-                  fontFamily: "var(--sans)",
-                  ...getRoleBadgeStyle(userRole),
-                }}
-              >
-                {roleBadge}
-              </span>
-            </PageTitle>
+            <PageTitle eyebrow={dateLabel} title={greetingNode} style={{ maxWidth: 640 }} />
 
           </TabPageHeader>
 
@@ -664,31 +637,21 @@ export function HomeTab({
           <div className="md:hidden px-5 pb-4">
 
             {/* Mobile greeting header */}
-            <PageTitle eyebrow={dateLabel} title={greeting} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    fontFamily: "var(--sans)",
-                    ...getRoleBadgeStyle(userRole),
-                  }}
-                >
-                  {roleBadge}
-                </span>
-                {eventCount > 0 && (
-                  <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                    {eventCount} event{eventCount !== 1 ? "s" : ""}
-                  </span>
-                )}
-                {totalUnread > 0 && (
-                  <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                    {totalUnread} unread
-                  </span>
-                )}
-              </div>
+            <PageTitle eyebrow={dateLabel} title={greetingNode} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
+              {(eventCount > 0 || totalUnread > 0) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  {eventCount > 0 && (
+                    <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                      {eventCount} event{eventCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {totalUnread > 0 && (
+                    <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                      {totalUnread} unread
+                    </span>
+                  )}
+                </div>
+              )}
             </PageTitle>
 
             <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
