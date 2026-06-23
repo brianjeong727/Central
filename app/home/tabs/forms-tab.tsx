@@ -553,7 +553,7 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
             <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="When a form is attached to an announcement it appears here." />
           </div>
         ) : (
-          <div className="px-5 md:px-14 py-6 flex flex-col gap-3" style={{ maxWidth: 800 }}>
+          <div className="px-5 md:px-14 py-6 flex flex-col gap-3">
             {items.map(item => (
               <div key={item.id} style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>

@@ -1004,8 +1004,11 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {/* ── Give ── */}
             {activeSection === "give" && (
               <>
-                <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
-                  <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 20, padding: "28px 28px 24px", marginBottom: 16 }} className="md:mb-0">
+                <div className="md:grid md:gap-5" style={{ gridTemplateColumns: !zelleInfo && !isAdmin ? "1fr" : "1.3fr 1fr" }}>
+                  <div style={!zelleInfo && !isAdmin
+                    ? { border: "1px dashed var(--dashed)", borderRadius: 12, background: "transparent", padding: "20px 24px", marginBottom: 16 }
+                    : { background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 20, padding: "28px 28px 24px", marginBottom: 16 }
+                  } className="md:mb-0">
                     <div>
                       {editing ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1018,8 +1021,8 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                         </div>
                       ) : !zelleInfo && !isAdmin ? (
                         <div>
-                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 8 }}>Giving info coming soon</p>
-                          <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Check back later for ways to give.</p>
+                          <p style={{ fontSize: 14, color: "var(--body)", fontWeight: 500, marginBottom: 4 }}>Giving info coming soon</p>
+                          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry hasn&apos;t set up giving info yet — check back later.</p>
                         </div>
                       ) : !zelleInfo && isAdmin ? (
                         <div>
