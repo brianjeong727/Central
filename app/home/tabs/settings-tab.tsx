@@ -23,7 +23,7 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { getInitials } from "../utils"
-import { MonogramChip, PageTitle, SectionHeader } from "@/components/central"
+import { MonogramChip, PageTitle, SectionHeader, TabPageHeader } from "@/components/central"
 import { PlanSubTabStrip } from "./plan-tab"
 
 interface MemberRow {
@@ -600,11 +600,22 @@ export function SettingsTab({
   ]
 
   return (
-    <div className="md:h-full md:overflow-y-auto">
-      <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
-        {/* ── Page header ── */}
-        <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
+    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+      {/* Mobile header */}
+      <div className="md:hidden px-5 pt-14 pb-5">
+        <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase" }}>
+          {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
+        </p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, margin: "12px 0 0" }}>Church Settings</h1>
+      </div>
 
+      {/* Desktop header */}
+      <TabPageHeader>
+        <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
+      </TabPageHeader>
+
+      {/* Scrollable content: tab strip + tab panels */}
+      <div className="px-5 md:px-14 md:flex-1 md:overflow-y-auto">
         {/* ── Tab strip — edge-to-edge per §4.2 ── */}
         <div className="-mx-5 md:-mx-14" style={{ marginTop: 28 }}>
           <PlanSubTabStrip
