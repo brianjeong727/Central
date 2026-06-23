@@ -2597,18 +2597,30 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               </div>
                             )}
                             {editingId === msg.id ? (
-                              <div className="px-3 py-2.5 flex flex-col gap-2" onPointerDown={(e) => e.stopPropagation()}>
+                              <div
+                                className={`flex flex-col gap-1.5 ${msg.reply_to_id ? "px-3 pb-2.5 pt-1.5" : ""}`}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
                                 <textarea
                                   autoFocus
+                                  rows={1}
                                   value={editText}
-                                  onChange={(e) => setEditText(e.target.value)}
+                                  onChange={(e) => {
+                                    setEditText(e.target.value)
+                                    e.target.style.height = "auto"
+                                    e.target.style.height = e.target.scrollHeight + "px"
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.height = "auto"
+                                    e.target.style.height = e.target.scrollHeight + "px"
+                                  }}
                                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditMessage() } else if (e.key === "Escape") { setEditingId(null) } }}
-                                  className="w-full resize-none rounded-lg bg-white/10 text-inherit text-[14px] p-2 outline-none border border-white/20 min-h-[60px]"
-                                  style={{ fontFamily: "inherit" }}
+                                  className="w-full resize-none bg-transparent text-inherit text-[14px] leading-[1.4] outline-none"
+                                  style={{ fontFamily: "inherit", border: "none", overflow: "hidden", padding: 0 }}
                                 />
                                 <div className="flex gap-2 justify-end">
-                                  <button onClick={() => setEditingId(null)} className="text-[12px] opacity-60 hover:opacity-100 transition-opacity">Cancel</button>
-                                  <button onClick={handleEditMessage} className="text-[12px] font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors">Save</button>
+                                  <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[#8A8497] hover:text-[#5A5466]"}`}>Cancel</button>
+                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[#3E1540]"}`}>Save</button>
                                 </div>
                               </div>
                             ) : (
