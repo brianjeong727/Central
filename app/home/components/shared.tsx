@@ -17,9 +17,8 @@ export const MONO_STYLE: React.CSSProperties = {
 export function RingCrossLogo({ size = 32, color = "#3E1540" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden>
-      <circle cx="50" cy="50" r="44" stroke={color} strokeWidth="6" />
-      <rect x="47" y="22" width="6" height="56" fill={color} />
-      <rect x="22" y="47" width="56" height="6" fill={color} />
+      <path d="M70 28 A32 32 0 1 0 70 72" stroke={color} strokeWidth="8" strokeLinecap="round" />
+      <circle cx="50" cy="50" r="6" fill={color} />
     </svg>
   )
 }

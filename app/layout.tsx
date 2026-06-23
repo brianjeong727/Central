@@ -29,6 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={bricolageGrotesque.variable}>
       <head>
+        <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/brand/favicon-32.png" sizes="32x32" type="image/png" />
+        <link rel="icon" href="/brand/favicon-16.png" sizes="16x16" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="antialiased font-sans">

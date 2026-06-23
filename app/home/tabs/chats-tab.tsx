@@ -3487,9 +3487,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       <div className="flex items-center justify-between mb-6 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#3E1540" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="6" fill="#3E1540" />
           </svg>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
@@ -3863,33 +3862,36 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
       </div>
 
       {/* Church / My tab strip */}
-      <div className="flex border-b border-[var(--line)] flex-shrink-0">
-        {(["church", "my"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setSubTab(t)
-              setSearch("")
-              const sp = new URLSearchParams(window.location.search)
-              sp.set("chats", t)
-              router.replace(`?${sp.toString()}`, { scroll: false })
-            }}
-            style={{
-              flex: 1,
-              padding: "9px 0",
-              fontSize: "11px",
-              fontWeight: 600,
-              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
-              background: "transparent",
-              border: "none",
-              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
-              cursor: "pointer",
-              fontFamily: "var(--sans)",
-            }}
-          >
-            {t === "church" ? "Church" : "My Chats"}
-          </button>
-        ))}
+      <div className="px-3 flex-shrink-0">
+        <div className="flex" style={{ borderBottom: "1px solid var(--line)" }}>
+          {(["church", "my"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => {
+                setSubTab(t)
+                setSearch("")
+                const sp = new URLSearchParams(window.location.search)
+                sp.set("chats", t)
+                router.replace(`?${sp.toString()}`, { scroll: false })
+              }}
+              style={{
+                flex: 1,
+                padding: "9px 0",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: subTab === t ? "var(--ink)" : "var(--muted-text)",
+                background: "transparent",
+                border: "none",
+                borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
+                marginBottom: -1,
+                cursor: "pointer",
+                fontFamily: "var(--sans)",
+              }}
+            >
+              {t === "church" ? "Church" : "My Chats"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Count + plus button */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon } from "./shared"
@@ -64,9 +64,31 @@ export function DesktopSidebar({
   chatPanelContent,
 }: DesktopSidebarProps) {
   const supabase = createClient()
+  const [note, setNote] = useState("")
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    supabase.from("profiles").select("sidebar_note").eq("id", userId).maybeSingle().then(({ data }) => {
+      if (data?.sidebar_note) setNote(data.sidebar_note)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  const saveNote = useCallback((value: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    setSaveStatus("saving")
+    saveTimer.current = setTimeout(async () => {
+      await supabase.from("profiles").update({ sidebar_note: value || null }).eq("id", userId)
+      setSaveStatus("saved")
+      flashTimer.current = setTimeout(() => setSaveStatus("idle"), 1500)
+    }, 600)
+  }, [userId, supabase])
 
   const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { id: "home",      label: "Home",        icon: Home },
+    { id: "home",      label: "Overview",   icon: Home },
     { id: "chats",     label: "Messages",  icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
@@ -152,6 +174,7 @@ export function DesktopSidebar({
                     bg={isActive ? PLUM : "var(--line)"}
                     fg={isActive ? "var(--cream)" : INK}
                     size={30}
+                    radius={8}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>
@@ -236,7 +259,7 @@ export function DesktopSidebar({
 
     // ── Home section: Home, Announcements, Give, Forms, Settings ────────────
     const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
-      { label: "Overview",          tab: "home" },
+      { label: "Home",              tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
       { label: "Forms",           tab: "forms" },
@@ -372,7 +395,7 @@ export function DesktopSidebar({
 
       {/* ── Context Panel ─────────────────────────────────────────────────── */}
       <div
-        className="hidden md:flex flex-col w-[var(--sidebar-width)] flex-shrink-0 h-screen"
+        className="hidden md:flex flex-col w-[220px] flex-shrink-0 h-screen"
         style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Section header */}
@@ -385,6 +408,36 @@ export function DesktopSidebar({
 
         {renderPanelBody()}
 
+        {/* Sticky note */}
+        <div
+          style={{
+            margin: "0 10px 12px",
+            padding: "10px 12px",
+            border: `1px solid var(--line-2)`,
+            borderRadius: "var(--r-input)",
+            background: "var(--cream-2)",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <p style={{ ...MONO, color: "var(--faint)" }}>Note</p>
+            {saveStatus === "saved" && (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.05em", color: "var(--success)" }}>SAVED</span>
+            )}
+          </div>
+          <textarea
+            value={note}
+            onChange={e => { setNote(e.target.value); saveNote(e.target.value) }}
+            placeholder="Jot something down…"
+            rows={3}
+            style={{
+              width: "100%", resize: "none", border: "none", outline: "none",
+              background: "transparent", fontFamily: "var(--sans)",
+              fontSize: 12, lineHeight: 1.55, color: INK,
+              padding: 0, boxSizing: "border-box",
+            }}
+          />
+        </div>
       </div>
     </>
   )

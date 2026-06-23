@@ -51,9 +51,8 @@ export default function PendingPage() {
         {/* Logo */}
         <div className="flex items-center gap-2.5 mb-10">
           <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="44" stroke="#3E1540" strokeWidth="6" />
-            <rect x="47" y="22" width="6" height="56" fill="#3E1540" />
-            <rect x="22" y="47" width="56" height="6" fill="#3E1540" />
+            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#3E1540" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="6" fill="#3E1540" />
           </svg>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
             Central
