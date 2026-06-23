@@ -308,16 +308,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   async function loadMembers() {
     setLoading(true)
-    const { data } = await supabase
-      .from("group_members")
-      .select("user_id, muted, pinned, profiles!user_id(name, role, graduation_year, avatar_url)")
-      .eq("group_id", groupId)
+    const [{ data }, { data: prefData }] = await Promise.all([
+      supabase
+        .from("group_members")
+        .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
+        .eq("group_id", groupId),
+      supabase
+        .from("group_members")
+        .select("muted, pinned")
+        .eq("group_id", groupId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ])
 
     if (data) {
       const mapped: GroupMember[] = data.map((m: {
         user_id: string
-        muted: boolean | null
-        pinned: boolean | null
         profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
       }) => {
         const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
@@ -330,13 +336,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         }
       })
       setMembers(mapped)
-      const myRow = data.find((m: { user_id: string; muted: boolean | null; pinned: boolean | null }) => m.user_id === userId)
-      if (myRow) {
-        setMuted(myRow.muted ?? false)
-        setSavedMuted(myRow.muted ?? false)
-        setPinned(myRow.pinned ?? false)
-        setSavedPinned(myRow.pinned ?? false)
-      }
+    }
+    if (prefData) {
+      setMuted(prefData.muted ?? false)
+      setSavedMuted(prefData.muted ?? false)
+      setPinned(prefData.pinned ?? false)
+      setSavedPinned(prefData.pinned ?? false)
     }
     setLoading(false)
   }
