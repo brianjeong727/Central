@@ -12,6 +12,8 @@ This system replaces a more generic, white-card SaaS look with an **editorial cr
 
 Central is a daily-driver tool that an entire church community lives in for communication, giving, and leadership. Warmth comes from tone, materials (cream surfaces, editorial serif), generous whitespace, and human language — NOT from decoration, bold color blocks, or playfulness. When any decision is unclear, default to calm and restraint.
 
+**Scope: built for a medium ministry.** Central is designed for small-to-medium ministries — on the order of a few hundred members and a single-digit number of active events per team at a time. Design decisions optimize for the simplicity and calm that size allows, NOT for unbounded scale. Where serving a very large church (thousands of members, dozens of concurrent events) would force a UI compromise that costs smaller ministries their simplicity, prefer the smaller ministry; large-scale needs are addressed with a separate workspace, not by complicating the core experience. When a "will this scale to N?" objection arises, first ask whether N is within the target size — if not, it is not a reason to reject a design.
+
 ---
 
 ## 1. Foundation
@@ -433,7 +435,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
 10. **No drop shadows on cards.** The only shadow allowed is on a centered modal panel (§4.17).
 11. **No `Inter` for big numbers.** Stat numbers are serif.
-12. **No tab-per-event in the sidebar.** Sidebar holds workspace and teams only — never time-bound entities.
+12. **Sidebar holds workspace, teams, and a team's nested sections/events — never a global event dump.** Within a team's planning workspace, the team's sections (General, Plan, Resources, Groups, Rotations) live in the sidebar, and events nest under the Plan section as children. This is intentional and scoped to the target ministry size (see §0): a team carries a small, bounded set of events (roughly under ten), so nesting them keeps navigation to a single vertical hierarchy and avoids stacked horizontal tab rows. Events are sorted by date. Do NOT nest events in the sidebar OUTSIDE a team's Plan section, and do NOT treat unbounded event growth as a case to design for here — that is explicitly out of scope (§0).
 13. **No "Plan this event" launchpad modal between calendar and event.** Removed.
 14. **No invite-code CTA on the ministry chooser.** Removed.
 15. **Sidebar must change with context** — `navMode="home"` for admin surfaces, `navMode="teams"` for team-scoped surfaces. They are NOT the same component invocation.
