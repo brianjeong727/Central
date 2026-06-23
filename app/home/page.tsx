@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
-import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
+import { formatRelativeTime, getInitials } from "./utils"
 import type { UserTeam, CongregationQuestion } from "./types"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
@@ -62,7 +62,6 @@ export default async function HomePage() {
     lastMessage: row.last_msg_content ?? "",
     lastMessageSender: row.last_msg_sender_name ?? "",
     unreadCount: Number(row.unread_count),
-    avatarColor: getAvatarColor(row.group_name),
     initials: getInitials(row.group_name),
     time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
     _ts: row.last_msg_at ?? "",

@@ -879,7 +879,7 @@ export function SettingsTab({
                   const menuOpen = peopleRoleMenuOpen === m.id
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid #EFE9DA" : "none", position: "relative" }}>
-                      <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: ["admin","deacon","elder","pastor"].includes(m.role.toLowerCase()) ? "#3E1540" : "#13101A", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600 }}>{getInitials(m.name)}</span>
+                      <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: "var(--plum)", color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600 }}>{getInitials(m.name)}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{m.name}</span>

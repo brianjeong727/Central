@@ -7,7 +7,6 @@ export interface ChatPreview {
   lastMessage: string
   lastMessageSender: string
   unreadCount: number
-  avatarColor: string
   initials: string
   time: string
 }
@@ -52,7 +51,6 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
 }
 
 function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; onClick?: () => void }) {
-  const avatarBg = index % 2 === 0 ? "#3E1540" : "#13101A"
   const firstInitial = chat.groupName.charAt(0)
 
   return (
@@ -61,10 +59,10 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
       className="w-full bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
     >
       <div className="flex items-center gap-3.5">
-        <Avatar className="w-12 h-12 rounded-2xl flex-shrink-0" style={{ background: avatarBg, borderRadius: "16px" }}>
+        <Avatar className="w-12 h-12 rounded-2xl flex-shrink-0" style={{ background: "var(--plum)", borderRadius: "16px" }}>
           <AvatarFallback
-            className="text-[#F6F4EF] bg-transparent"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
+            className="bg-transparent"
+            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--cream)" }}
           >
             {firstInitial}
           </AvatarFallback>

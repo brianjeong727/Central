@@ -9,7 +9,7 @@ import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion } from "./types"
-import { formatRelativeTime, getInitials, getAvatarColor } from "./utils"
+import { formatRelativeTime, getInitials } from "./utils"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -208,7 +208,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         lastMessage: row.last_msg_content ?? "",
         lastMessageSender: row.last_msg_sender_name ?? "",
         unreadCount: Number(row.unread_count),
-        avatarColor: getAvatarColor(row.group_name),
         initials: getInitials(row.group_name),
         time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
         _ts: row.last_msg_at ?? "",

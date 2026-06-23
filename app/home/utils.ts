@@ -1,15 +1,5 @@
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮"]
 
-export const AVATAR_COLORS = [
-  "bg-[#3E1540]",
-  "bg-[#13101A]",
-]
-
-export function getAvatarColor(str: string): string {
-  const sum = str.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length]
-}
-
 export function getInitials(name: string): string {
   return name
     .split(" ")
