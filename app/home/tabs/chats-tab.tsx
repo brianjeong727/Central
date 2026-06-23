@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, Download, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
+import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -310,12 +310,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setLoading(true)
     const { data } = await supabase
       .from("group_members")
-      .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
+      .select("user_id, muted, pinned, profiles!user_id(name, role, graduation_year, avatar_url)")
       .eq("group_id", groupId)
 
     if (data) {
       const mapped: GroupMember[] = data.map((m: {
         user_id: string
+        muted: boolean | null
+        pinned: boolean | null
         profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
       }) => {
         const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
@@ -328,6 +330,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         }
       })
       setMembers(mapped)
+      const myRow = data.find((m: { user_id: string; muted: boolean | null; pinned: boolean | null }) => m.user_id === userId)
+      if (myRow) {
+        setMuted(myRow.muted ?? false)
+        setSavedMuted(myRow.muted ?? false)
+        setPinned(myRow.pinned ?? false)
+        setSavedPinned(myRow.pinned ?? false)
+      }
     }
     setLoading(false)
   }
@@ -459,7 +468,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-[#FDFCF8] border-b border-[#E8E2D2]">
           <button
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
@@ -481,7 +490,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               value={searchAdd}
               onChange={(e) => setSearchAdd(e.target.value)}
               autoFocus
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#E8E2D2] focus:border-[#3E1540]/30 transition-all"
             />
           </div>
         </div>
@@ -504,7 +513,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
                       selected
                         ? "bg-[#3E1540]/6 border-[#3E1540]/20"
-                        : "bg-white border-[#EFEFEF]"
+                        : "bg-[#FDFCF8] border-[#E8E2D2]"
                     }`}
                   >
                     <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
@@ -533,7 +542,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
         </div>
 
-        <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4">
+        <div className="flex-shrink-0 bg-[#FDFCF8] border-t border-[#E8E2D2] px-5 py-4">
           <button
             onClick={stageAddMembers}
             disabled={selectedToAdd.length === 0}
@@ -556,7 +565,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
       {/* ── Mobile header (hidden on desktop) ── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-white border-b border-[#ECE8DE]">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-[#FDFCF8] border-b border-[#E8E2D2]">
         <button onClick={onBack} className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
           <ArrowLeft className="w-4 h-4 text-[#13101A]" />
         </button>
@@ -581,13 +590,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         </div>
         {hasChanges ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
+            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
             <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
               {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         ) : (
-          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#ECE8DE] bg-white" style={{ color: "#8A8497" }}>
+          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#E8E2D2] bg-[#FDFCF8]" style={{ color: "#8A8497" }}>
             <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
           </button>
         )}
@@ -595,55 +604,33 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
       <div className="flex-1 overflow-y-auto">
 
-        {/* ── Desktop: plum hero ── */}
+        {/* ── Desktop: page title block (§11.3) ── */}
         <div className="hidden md:block px-10 pt-8 pb-6">
-          <div style={{
-            background: "radial-gradient(circle at 90% 20%, rgba(246,244,239,0.12) 0%, transparent 40%), radial-gradient(circle at 8% 90%, rgba(246,244,239,0.08) 0%, transparent 35%), #3E1540",
-            borderRadius: 20, padding: "28px 32px", position: "relative", overflow: "hidden",
-            display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 24, alignItems: "center",
-          }}>
-            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.18) 1px, transparent 1.4px)", backgroundSize: "18px 18px", opacity: 0.35, pointerEvents: "none" }} />
-            {/* Avatar */}
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <div style={{ width: 72, height: 72, borderRadius: 999, background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-instrument-serif)", fontSize: 24, color: "#F6F4EF" }}>
-                {getInitials(displayGroupName)}
-              </div>
+          <p style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>
+            {typeLabel.toUpperCase()}
+          </p>
+          {renaming ? (
+            <input
+              autoFocus
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+              onBlur={handleRename}
+              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
+            />
+          ) : (
+            <div
+              className="group flex items-center gap-2"
+              style={{ cursor: canManage ? "text" : "default" }}
+              onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
+            >
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", lineHeight: 1.05, fontWeight: 400 }}>{displayGroupName}</h2>
+              {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0, marginTop: 4 }} />}
             </div>
-            {/* Name + meta */}
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(246,244,239,0.6)", marginBottom: 6 }}>{typeLabel}</p>
-              {renaming ? (
-                <input
-                  autoFocus
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
-                  onBlur={handleRename}
-                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid rgba(246,244,239,0.4)", outline: "none", padding: 0 }}
-                />
-              ) : (
-                <div
-                  className="group flex items-center gap-2"
-                  style={{ cursor: canManage ? "text" : "default" }}
-                  onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
-                >
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#F6F4EF", lineHeight: 1.05 }}>{displayGroupName}</h2>
-                  {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "rgba(246,244,239,0.6)", flexShrink: 0, marginTop: 4 }} />}
-                </div>
-              )}
-              <p style={{ color: "rgba(246,244,239,0.65)", fontSize: 13, marginTop: 8 }}>
-                {members.length} member{members.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            {/* Action buttons */}
-            {canManage && (
-              <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(246,244,239,0.08)", border: "1px solid rgba(246,244,239,0.2)", borderRadius: 10, color: "#F6F4EF", fontSize: 13, cursor: "pointer" }}>
-                  <Plus style={{ width: 13, height: 13 }} /> Add members
-                </button>
-              </div>
-            )}
-          </div>
+          )}
+          <p style={{ fontSize: 13, color: "#8A8497", marginTop: 6 }}>
+            {members.length} member{members.length !== 1 ? "s" : ""}
+          </p>
         </div>
 
         {/* ── Desktop: two-column body ── */}
@@ -651,14 +638,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
           {/* Members */}
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
-              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400 }}>Members</h3>
-              <span style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>{members.length + pendingAddMembers.length - pendingRemoveIds.size} people</span>
-            </div>
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MEMBERS · {members.length + pendingAddMembers.length - pendingRemoveIds.size} PEOPLE</p>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Members</h3>
             {loading ? <Spinner /> : (() => {
               const allRows = [...members, ...pendingAddMembers]
               return (
-              <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden" }}>
                 {allRows.map((member, i) => {
                   const isPendingRemove = pendingRemoveIds.has(member.user_id)
                   const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
@@ -671,8 +656,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{
                       display: "grid", gridTemplateColumns: "40px 1fr auto auto",
                       alignItems: "center", gap: 14, padding: "15px 20px",
-                      borderBottom: i < allRows.length - 1 ? "1px solid #ECE8DE" : "none",
-                      background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white",
+                      borderBottom: i < allRows.length - 1 ? "1px solid #EFE9DA" : "none",
+                      background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "#FDFCF8",
                       transition: "background 0.1s",
                     }}>
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
@@ -733,7 +718,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   )
                 })}
                 {canManage && (
-                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", borderTop: "1px solid #ECE8DE", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", borderTop: "1px solid #EFE9DA", cursor: "pointer", textAlign: "left" }}>
                     <Plus style={{ width: 14, height: 14 }} /> Add members from directory
                   </button>
                 )}
@@ -750,18 +735,19 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           {/* Preferences + Manage */}
           <div>
             {/* Preferences */}
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>PREFERENCES</p>
             <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Preferences</h3>
-            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #ECE8DE" }}>
+            <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #EFE9DA" }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Mute notifications</p>
                   <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
                 </div>
                 <div
                   onClick={() => setMuted(!muted)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "#3E1540" : "#ECE8DE", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "#3E1540" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
                 >
-                  <div style={{ position: "absolute", top: 3, left: muted ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                  <div style={{ position: "absolute", top: 2, ...(muted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
@@ -771,48 +757,41 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 </div>
                 <div
                   onClick={() => setPinned(!pinned)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "#3E1540" : "#ECE8DE", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "#3E1540" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
                 >
-                  <div style={{ position: "absolute", top: 3, left: pinned ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+                  <div style={{ position: "absolute", top: 2, ...(pinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
                 </div>
               </div>
             </div>
 
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
-            <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
-              {canManage && (
-                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", borderBottom: "1px solid #ECE8DE", cursor: "pointer" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
-                    <Plus style={{ width: 13, height: 13 }} />
-                  </div>
-                  <div style={{ flex: 1, textAlign: "left" }}>
-                    <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Add members</p>
-                    <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Invite from the directory</p>
-                  </div>
-                  <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
-                </button>
-              )}
-              <button style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer" }}>
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FBF8F2", border: "1px solid #ECE8DE", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
-                  <Download style={{ width: 13, height: 13 }} />
+            {canManage && (
+              <>
+                <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
+                <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
+                <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
+                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer" }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FDFCF8", border: "1px solid #E8E2D2", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
+                      <Plus style={{ width: 13, height: 13 }} />
+                    </div>
+                    <div style={{ flex: 1, textAlign: "left" }}>
+                      <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Add members</p>
+                      <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Invite from the directory</p>
+                    </div>
+                    <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
+                  </button>
                 </div>
-                <div style={{ flex: 1, textAlign: "left" }}>
-                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Export transcript</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Download as a text file</p>
-                </div>
-                <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
-              </button>
-            </div>
+              </>
+            )}
 
             {/* Danger */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {canArchive && (
-                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #E8E2D2", cursor: "pointer" }}>
                   Archive chat
                 </button>
               )}
               {canUnarchive && (
-                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "white", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #E8E2D2", cursor: "pointer" }}>
                   Unarchive chat
                 </button>
               )}
@@ -852,10 +831,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <div className="md:hidden">
           {/* CHAT INFO */}
           <div className="px-5 pt-6 pb-2">
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>CHAT INFO</p>
             <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
               Chat info
             </h3>
-            <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <div className="bg-[#FDFCF8] rounded-2xl border border-[#E8E2D2] p-5 mb-4 flex items-center gap-4">
               <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-bold text-[16px] tracking-wide" />
               <div className="flex-1 min-w-0">
                 {renaming ? (
@@ -891,8 +871,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   return (
                   <div
                     key={member.user_id}
-                    className="rounded-xl border border-[#EFEFEF] p-3.5 flex items-center gap-3"
-                    style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white", transition: "background 0.1s" }}
+                    className="rounded-xl border border-[#E8E2D2] p-3.5 flex items-center gap-3"
+                    style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "#FDFCF8", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
@@ -950,8 +930,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
           {canManage && (
             <div className="px-5 pb-4">
+              <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
               <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
-              <div className="bg-white rounded-2xl border border-[#EFEFEF] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+              <div className="bg-[#FDFCF8] rounded-2xl border border-[#E8E2D2] overflow-hidden">
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
                   <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[#3E1540]" /></div>
                   <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Add Members</span>
@@ -962,10 +943,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="px-5 pb-10 flex flex-col gap-3">
-              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Archive chat</button>}
-              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Unarchive chat</button>}
-              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#5A5466] font-semibold text-[13px] hover:bg-[#FBF8F2] transition-colors border border-[#ECE8DE]">Leave chat</button>}
-              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>}
+              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Archive chat</button>}
+              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Unarchive chat</button>}
+              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Leave chat</button>}
+              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>}
               {confirmAction && (
                 <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>
@@ -2679,20 +2660,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 )}
                                 {/* File attachment */}
                                 {msg.attachment_url && msg.attachment_type && !msg.attachment_type.startsWith("image/") && (
-                                  <a
-                                    href={msg.attachment_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1"
+                                  <div
+                                    className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1 cursor-pointer"
                                     onPointerUp={(e) => {
                                       e.stopPropagation()
-                                      // Short-tap: clear timer so link opens instead of emoji picker
                                       if (longPressTimer.current !== null) {
                                         clearTimeout(longPressTimer.current)
                                         longPressTimer.current = null
+                                        window.open(msg.attachment_url!, "_blank", "noopener,noreferrer")
                                       }
                                     }}
-                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[#F1ECDE]"}`}>
                                       <FileDown className="w-4 h-4" />
@@ -2704,7 +2681,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                       )}
                                     </div>
                                     <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[#C4C4C4]"}`} />
-                                  </a>
+                                  </div>
                                 )}
                                 {/* Text content */}
                                 {msg.content && (() => {
@@ -3036,7 +3013,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker || pollMenuFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[var(--shell-offset)]"
-          onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
+          onPointerDown={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
         />
       )}
 
