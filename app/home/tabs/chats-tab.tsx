@@ -1012,6 +1012,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
+  const [editOriginalText, setEditOriginalText] = useState("")
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
   const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
   const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
@@ -1252,6 +1253,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     if (!trimmed || !id) return
     setEditingId(null)
     setEditText("")
+    setEditOriginalText("")
+    if (trimmed === editOriginalText.trim()) return
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, content: trimmed, is_edited: true } : m))
     await supabase.from("messages").update({ content: trimmed, is_edited: true, edited_at: new Date().toISOString() }).eq("id", id).eq("sender_id", userId)
   }
@@ -2503,7 +2506,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           {isOwn && !msg.deleted && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content) }}
+                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content); setEditOriginalText(msg.content) }}
                               className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                             >
                               <Pencil className="w-4 h-4 text-[#5A5466]" />
@@ -2681,7 +2684,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                         {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
                                           ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
                                           : renderMentions(msg.content, isOwn)}
-                                        {msg.is_edited && <span className="text-[10px] ml-1.5 opacity-50">edited</span>}
                                       </div>
                                       {preview && (
                                         <a
@@ -2712,6 +2714,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         )}
                       </div>
                     </div>
+
+                    {/* Edited label */}
+                    {msg.is_edited && !msg.deleted && (
+                      <div className={`mt-0.5 ${isOwn ? "pr-1 text-right" : "pl-9 text-left"}`}>
+                        <span className="text-[10px]" style={{ color: "var(--muted-text)", fontFamily: "var(--sans)" }}>edited</span>
+                      </div>
+                    )}
 
                     {/* Reactions */}
                     {!msg.deleted && rxGroups.length > 0 && (
