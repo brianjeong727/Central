@@ -2920,7 +2920,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 pb-2 pt-2" style={{ minHeight: 44 }}>
+          <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -2928,10 +2928,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
             />
+            {/* Left icons — outside the bubble */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors disabled:opacity-40"
+              className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors disabled:opacity-40 mb-2"
               title="Attach file"
             >
               {uploading
@@ -2941,61 +2942,62 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             </button>
             <button
               onClick={() => { setShowGifPicker(p => !p); setShowPollCreator(false) }}
-              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors ${showGifPicker ? "bg-[#3E1540] text-white border-[#3E1540]" : "text-[#5A5466] border-[#E2DDCF] hover:border-[#3E1540]/30 hover:text-[#13101A]"}`}
+              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[#3E1540] text-white border-[#3E1540]" : "text-[#5A5466] border-[#E2DDCF] hover:border-[#3E1540]/30 hover:text-[#13101A]"}`}
               title="Send a GIF"
             >
               GIF
             </button>
             <button
               onClick={() => { setShowPollCreator(p => !p); setShowGifPicker(false) }}
-              className={`flex-shrink-0 transition-colors ${showPollCreator ? "text-[#3E1540]" : "text-[#5A5466] hover:text-[#13101A]"}`}
+              className={`flex-shrink-0 transition-colors mb-2 ${showPollCreator ? "text-[#3E1540]" : "text-[#5A5466] hover:text-[#13101A]"}`}
               title="Create a poll"
             >
               <BarChart2 className="w-4 h-4" />
             </button>
-            <textarea
-              ref={textareaRef}
-              value={inputText}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={`Message ${displayName}`}
-              rows={1}
-              className="flex-1 resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-36 overflow-y-auto"
-              style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
-            />
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              {/* Emoji picker trigger */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowComposerEmojiPicker(p => !p)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5A5466] hover:bg-[#E8E2D2] transition-colors"
-                >
-                  <Smile className="w-4 h-4" />
-                </button>
-                {showComposerEmojiPicker && (
-                  <div className="absolute bottom-full right-0 mb-2 z-[160]">
-                    <Picker
-                      data={data}
-                      onEmojiSelect={(emoji: { native: string }) => {
-                        insertEmojiAtCursor(emoji.native)
-                        setShowComposerEmojiPicker(false)
-                      }}
-                      theme="light"
-                      previewPosition="none"
-                      skinTonePosition="none"
-                    />
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={handleSend}
-                disabled={(!inputText.trim() && !pendingAttachment) || sending}
-                className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] ml-1"
-                style={{ width: 34, height: 34, borderRadius: 10 }}
-              >
-                <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
-              </button>
+            {/* Textarea bubble — its own bordered component */}
+            <div className="flex-1 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
+              <textarea
+                ref={textareaRef}
+                value={inputText}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={`Message ${displayName}`}
+                rows={1}
+                className="w-full resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-36 overflow-y-auto block"
+                style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
+              />
             </div>
+            {/* Right icons — outside the bubble */}
+            <div className="relative mb-2">
+              <button
+                onClick={() => setShowComposerEmojiPicker(p => !p)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5A5466] hover:bg-[#E8E2D2] transition-colors"
+              >
+                <Smile className="w-4 h-4" />
+              </button>
+              {showComposerEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2 z-[160]">
+                  <Picker
+                    data={data}
+                    onEmojiSelect={(emoji: { native: string }) => {
+                      insertEmojiAtCursor(emoji.native)
+                      setShowComposerEmojiPicker(false)
+                    }}
+                    theme="light"
+                    previewPosition="none"
+                    skinTonePosition="none"
+                  />
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleSend}
+              disabled={(!inputText.trim() && !pendingAttachment) || sending}
+              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] mb-2"
+              style={{ width: 34, height: 34, borderRadius: 10 }}
+            >
+              <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
+            </button>
           </div>
           <div className="hidden md:flex justify-between mt-2 text-[11px] text-[#A09A8C]">
             <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
