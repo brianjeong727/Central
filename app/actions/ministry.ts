@@ -562,7 +562,7 @@ export async function regenerateStaffCode(): Promise<{ code: string | null; erro
 }
 
 // ─── Admin: change a member's role ──────────────────────────────────────────
-export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder"): Promise<{ error: string | null }> {
+export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor"): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }

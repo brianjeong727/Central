@@ -24,6 +24,7 @@ import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderH
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { getInitials } from "../utils"
 import { MonogramChip } from "@/components/central"
+import { PlanSubTabStrip } from "./plan-tab"
 
 interface MemberRow {
   id: string
@@ -132,12 +133,10 @@ export function SettingsTab({
 
   // Members
   const [members, setMembers] = useState<MemberRow[]>([])
-  const [showMembersOverlay, setShowMembersOverlay] = useState(false)
-  const [overlayInitialFilter, setOverlayInitialFilter] = useState<RoleFilter>("all")
 
   const totalMembers = members.length
   const totalLeaders = members.filter(m => m.role.toLowerCase() === "leader").length
-  const totalAdmins = members.filter(m => ["admin", "deacon", "elder"].includes(m.role.toLowerCase())).length
+  const totalAdmins = members.filter(m => ["admin", "deacon", "elder", "pastor"].includes(m.role.toLowerCase())).length
   const totalVisitors = members.filter(m => m.role.toLowerCase() === "visitor").length
 
   // Invite code
@@ -297,7 +296,7 @@ export function SettingsTab({
   }
 
   // ── Role change ─────────────────────────────────────────────────────────────
-  async function handleRoleChange(memberId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder") {
+  async function handleRoleChange(memberId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor") {
     const target = members.find(m => m.id === memberId)
     const { error } = await updateMemberRole(memberId, newRole)
     if (!error) {
@@ -602,9 +601,9 @@ export function SettingsTab({
 
   return (
     <div className="md:h-full md:overflow-y-auto">
-      <div className="px-5 py-6 md:px-14 md:py-10 pb-28 md:pb-10">
+      <div className="py-6 md:py-10 pb-28 md:pb-10">
         {/* ── Page header ── */}
-        <div>
+        <div className="px-5 md:px-14">
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 400, letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>
             {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
           </p>
@@ -613,26 +612,23 @@ export function SettingsTab({
           </h1>
         </div>
 
-        {/* ── Tab strip ── */}
-        <div style={{ marginTop: 28, display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2" }}>
-          {TABS.map(({ key, label }) => {
-            const on = activeSettingsTab === key
-            return (
-              <button key={key} onClick={() => goToSettingsTab(key)} style={{ background: "none", border: "none", cursor: "pointer", padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--font-inter)", color: on ? "#2D0F2E" : "#8A8497", fontWeight: on ? 600 : 400, borderBottom: on ? "2px solid #3E1540" : "2px solid transparent", marginBottom: -1 }}>
-                {label}
-              </button>
-            )
-          })}
+        {/* ── Tab strip — edge-to-edge per §4.2 ── */}
+        <div style={{ marginTop: 28 }}>
+          <PlanSubTabStrip
+            tabs={TABS}
+            active={activeSettingsTab}
+            onChange={(k) => goToSettingsTab(k as ActiveSettingsTab)}
+          />
         </div>
 
         {loading ? (
-          <div style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
+          <div className="px-5 md:px-14" style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
           <>
 
           {/* ══════════════════ GENERAL TAB ══════════════════ */}
           {activeSettingsTab === "general" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Ministry Profile */}
               <section>
@@ -680,7 +676,7 @@ export function SettingsTab({
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                       <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
-                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: isPublic ? 19 : 3, transition: "left 0.15s" }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Public discovery</div>
@@ -837,7 +833,7 @@ export function SettingsTab({
 
           {/* ══════════════════ PEOPLE TAB ══════════════════ */}
           {activeSettingsTab === "people" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
                 <p style={SECTION_LABEL}>People · {totalMembers}</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Members and roles</h2>
@@ -917,7 +913,7 @@ export function SettingsTab({
                           {menuOpen && (
                             <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #E8E2D2", padding: "6px 0", minWidth: 160 }}>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
-                              {(["visitor", "member", "leader", "admin", "deacon", "elder"] as const).map(r => (
+                              {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
                                 <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                                   {r.charAt(0).toUpperCase() + r.slice(1)}
                                   {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
@@ -976,7 +972,7 @@ export function SettingsTab({
 
           {/* ══════════════════ AUTOMATIONS TAB ══════════════════ */}
           {activeSettingsTab === "automations" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
                 <p style={SECTION_LABEL}>Automations</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Chat &amp; membership rules</h2>
@@ -996,7 +992,7 @@ export function SettingsTab({
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid #3E1540" : "none", outlineOffset: -2 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
-                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: on ? 19 : 3, transition: "left 0.15s" }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{label}</div>
@@ -1015,9 +1011,9 @@ export function SettingsTab({
                     { key: "auto_praise_chat",    label: "Auto-create praise team chats", sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "#F7F4EF", opacity: 0.6, pointerEvents: "none" }}>
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "#F8F4EA", opacity: 0.6, pointerEvents: "none" }}>
                       <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
-                        <span style={{ position: "absolute", width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", top: 3, left: 3 }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, left: 2 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A", display: "flex", alignItems: "center", gap: 8 }}>
@@ -1100,7 +1096,7 @@ export function SettingsTab({
 
           {/* ══════════════════ WORKSPACE TAB ══════════════════ */}
           {activeSettingsTab === "workspace" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Join codes */}
               <section>
@@ -1267,7 +1263,7 @@ export function SettingsTab({
           )}
 
           {activeSettingsTab === "audit" && isAdmin && (
-            <div style={{ marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
                 <p style={SECTION_LABEL}>Audit Log</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: -0.3, lineHeight: 1.05, color: "#13101A" }}>Admin activity</h2>
@@ -1276,8 +1272,8 @@ export function SettingsTab({
               {auditLoading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
               ) : auditLogs.length === 0 ? (
-                <div style={{ ...CARD, padding: "28px 22px", textAlign: "center" }}>
-                  <p style={{ fontSize: 14, color: "#8A8497" }}>No activity recorded yet. Logs appear here as admins take actions.</p>
+                <div style={{ border: "1px dashed #C4C0B0", borderRadius: 14, background: "transparent", padding: "28px 22px", textAlign: "center" }}>
+                  <p style={{ fontSize: 13, color: "#8A8497" }}>No admin actions have been recorded yet.</p>
                 </div>
               ) : (
                 <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
@@ -1324,184 +1320,3 @@ export function SettingsTab({
   )
 }
 
-// ── MembersFullOverlay (kept for potential future use) ─────────────────────────
-
-function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, onRoleChange, onRemoveMember, onExcommunicate }: {
-  members: MemberRow[]
-  userId: string
-  isAdmin: boolean
-  initialFilter: RoleFilter
-  onClose: () => void
-  onRoleChange: (id: string, role: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder") => Promise<void>
-  onRemoveMember: (id: string) => Promise<void>
-  onExcommunicate?: (id: string) => Promise<void>
-}) {
-  const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<RoleFilter>(initialFilter)
-  const [roleMenuOpen, setRoleMenuOpen] = useState<string | null>(null)
-  const [changingRole, setChangingRole] = useState<string | null>(null)
-  const [removeConfirmId, setRemoveConfirmId] = useState<string | null>(null)
-  const [removing, setRemoving] = useState(false)
-  const [excomConfirmId, setExcomConfirmId] = useState<string | null>(null)
-  const [excomming, setExcomming] = useState(false)
-
-  const filtered = members.filter(m => {
-    const role = m.role.toLowerCase()
-    const roleMatch = filter === "all"
-      || (filter === "admin" && ["admin", "deacon", "elder"].includes(role))
-      || (filter !== "admin" && role === filter)
-    const s = search.toLowerCase().trim()
-    return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
-  })
-
-  async function handleRoleChange(memberId: string, role: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder") {
-    setChangingRole(memberId)
-    setRoleMenuOpen(null)
-    await onRoleChange(memberId, role)
-    setChangingRole(null)
-  }
-
-  async function handleRemove() {
-    if (!removeConfirmId) return
-    setRemoving(true)
-    await onRemoveMember(removeConfirmId)
-    setRemoving(false)
-    setRemoveConfirmId(null)
-  }
-
-  async function handleExcom() {
-    if (!excomConfirmId || !onExcommunicate) return
-    setExcomming(true)
-    await onExcommunicate(excomConfirmId)
-    setExcomming(false)
-    setExcomConfirmId(null)
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "#FBF8F2", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <div style={{ padding: "20px 24px 14px", borderBottom: "1px solid #E8E2D2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2", flexShrink: 0 }}>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, margin: 0 }}>
-          Members <span style={{ fontSize: 18, color: "#8A8497", fontFamily: "var(--font-inter)" }}>({members.length})</span>
-        </h2>
-        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E8E2D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <X className="w-4 h-4 text-[#5A5466]" />
-        </button>
-      </div>
-
-      {/* Search + filter bar */}
-      <div style={{ padding: "14px 24px 0", background: "#FBF8F2", flexShrink: 0 }}>
-        <div style={{ position: "relative", marginBottom: 10 }}>
-          <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#8A8497" }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search members…"
-            style={{ width: "100%", boxSizing: "border-box", paddingLeft: 36, paddingRight: 16, paddingTop: 10, paddingBottom: 10, borderRadius: 10, border: "1px solid #E2DDCF", background: "#FBF8F2", fontSize: 13, color: "#13101A", outline: "none", fontFamily: "var(--font-inter)" }}
-          />
-        </div>
-        <div style={{ display: "flex", gap: 6, paddingBottom: 12 }}>
-          {(["all", "visitor", "member", "leader", "admin", "deacon", "elder"] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{ fontSize: 11, fontWeight: 500, padding: "4px 10px", borderRadius: 999, border: `1px solid ${filter === f ? "#2D0F2E" : "#E2DDCF"}`, background: filter === f ? "#2D0F2E" : "#FBF8F2", color: filter === f ? "#FBF8F2" : "#8A8497", cursor: "pointer", fontFamily: "var(--font-inter)" }}
-            >
-              {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Scrollable list */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 32px" }}>
-        {removeConfirmId && (() => {
-          const target = members.find(m => m.id === removeConfirmId)
-          return (
-            <div style={{ margin: "12px 0", borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-              <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
-              <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>Remove <strong style={{ color: "#13101A" }}>{target?.name}</strong> from this ministry?</p>
-              <button onClick={() => setRemoveConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-              <button onClick={handleRemove} disabled={removing} style={{ fontSize: 12, fontWeight: 600, color: "#9F3030", border: "1px solid #9F3030", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: removing ? 0.6 : 1 }}>
-                {removing ? "Removing…" : "Remove"}
-              </button>
-            </div>
-          )
-        })()}
-        {excomConfirmId && (() => {
-          const target = members.find(m => m.id === excomConfirmId)
-          return (
-            <div style={{ margin: "12px 0", borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-              <AlertTriangle style={{ width: 16, height: 16, color: "#9F3030", flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "#13101A" }}>{target?.name}</strong>?</p>
-                <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>Permanent — they can never rejoin this ministry.</p>
-              </div>
-              <button onClick={() => setExcomConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-              <button onClick={handleExcom} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "#FBF8F2", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
-                {excomming ? "Banning…" : "Excommunicate"}
-              </button>
-            </div>
-          )
-        })()}
-
-        <div style={{ background: "#FBF8F2", borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
-          {filtered.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#8A8497", padding: 24, textAlign: "center" }}>
-              {search ? "No members match your search." : "No members found."}
-            </p>
-          ) : filtered.map((m, i) => {
-            const isMe = m.id === userId
-            const menuOpen = roleMenuOpen === m.id
-            return (
-              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid #EFE9DA" : undefined, position: "relative" }}>
-                <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>{m.name}</p>
-                    {isMe && <span style={{ fontSize: 10, color: "#8A8497" }}>you</span>}
-                  </div>
-                  <p style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>{m.email}</p>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  {changingRole === m.id
-                    ? <span style={{ fontSize: 11, color: "#8A8497" }}>Saving…</span>
-                    : roleBadge(m.role)
-                  }
-                  {isAdmin && !isMe && (
-                    <div style={{ position: "relative" }}>
-                      {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setRoleMenuOpen(null)} />}
-                      <button onClick={() => setRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
-                        <MoreHorizontal style={{ width: 16, height: 16, color: "#8A8497" }} />
-                      </button>
-                      {menuOpen && (
-                        <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #E8E2D2", padding: "6px 0", minWidth: 160 }}>
-                          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
-                          {(["visitor", "member", "leader", "admin", "deacon", "elder"] as const).map(r => (
-                            <button key={r} onClick={() => handleRoleChange(m.id, r)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
-                              {r.charAt(0).toUpperCase() + r.slice(1)}
-                              {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
-                            </button>
-                          ))}
-                          <div style={{ margin: "6px 12px", borderTop: "1px solid #EFE9DA" }} />
-                          <button onClick={() => { setRemoveConfirmId(m.id); setRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
-                            Remove from ministry
-                          </button>
-                          {onExcommunicate && (
-                            <button onClick={() => { setExcomConfirmId(m.id); setRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", fontWeight: 600, background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
-                              Excommunicate
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
