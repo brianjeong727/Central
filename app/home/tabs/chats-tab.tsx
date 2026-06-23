@@ -1236,9 +1236,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   async function handleDeletePoll(msgId: string, pollId: string) {
     setPollMenuFor(null)
     setMessages(prev => prev.filter(m => m.id !== msgId))
+    // Delete message before poll — messages.poll_id FK prevents deleting poll while message exists
     await supabase.from("poll_votes").delete().eq("poll_id", pollId)
-    await supabase.from("polls").delete().eq("id", pollId)
     await supabase.from("messages").delete().eq("id", msgId)
+    await supabase.from("polls").delete().eq("id", pollId)
   }
 
   async function handleEditMessage() {
