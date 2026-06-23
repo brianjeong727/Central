@@ -2160,13 +2160,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             {/* Group avatar */}
             <div
               className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
-              style={{ width: 32, height: 32, borderRadius: 8, background: "#2D0F2E", fontFamily: "var(--font-instrument-serif)", fontSize: 13, display: "grid", placeItems: "center" }}
+              style={{ width: 32, height: 32, borderRadius: 8, background: "var(--plum)", fontFamily: "var(--serif)", fontSize: 13, display: "grid", placeItems: "center" }}
             >
               {getInitials(displayName)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "16px", color: "#13101A", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                <h2 className="truncate leading-none" style={{ fontFamily: "var(--serif)", fontSize: "16px", color: "#13101A", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
@@ -2271,19 +2271,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               const showDateSep = !prevMsg || prevDate !== thisDate
 
               const incomingRadius = isFirstInGroup && isLastInGroup
-                ? "rounded-2xl rounded-tl-sm"
+                ? "rounded-[14px] rounded-tl-[4px]"
                 : isFirstInGroup
-                  ? "rounded-2xl rounded-tl-sm rounded-bl-md"
+                  ? "rounded-[14px] rounded-tl-[4px] rounded-bl-[6px]"
                   : isLastInGroup
-                    ? "rounded-2xl rounded-tl-md"
-                    : "rounded-2xl rounded-l-md"
+                    ? "rounded-[14px] rounded-tl-[6px]"
+                    : "rounded-[14px] rounded-l-[6px]"
               const outgoingRadius = isFirstInGroup && isLastInGroup
-                ? "rounded-2xl rounded-tr-sm"
+                ? "rounded-[14px] rounded-tr-[4px]"
                 : isFirstInGroup
-                  ? "rounded-2xl rounded-tr-sm rounded-br-md"
+                  ? "rounded-[14px] rounded-tr-[4px] rounded-br-[6px]"
                   : isLastInGroup
-                    ? "rounded-2xl rounded-tr-md"
-                    : "rounded-2xl rounded-r-md"
+                    ? "rounded-[14px] rounded-tr-[6px]"
+                    : "rounded-[14px] rounded-r-[6px]"
 
               const rxGroups = groupedReactions(msg.id)
               const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
@@ -2301,7 +2301,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                     {showDateSep && (
                       <div className="flex justify-center my-6">
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+                        <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                           {formatDateLabel(msg.created_at)}
                         </span>
                       </div>
@@ -2414,7 +2414,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
                     {showDateSep && (
                       <div className="flex justify-center my-6">
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+                        <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                           {formatDateLabel(msg.created_at)}
                         </span>
                       </div>
@@ -2792,7 +2792,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </div>
-                <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "12px", color: "#8A8497" }}>{name} is typing…</span>
+                <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "12px", color: "#8A8497" }}>{name} is typing…</span>
               </div>
             ))}
 
@@ -3702,38 +3702,45 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
         </div>
       </div>
 
-      {/* Desktop panel item — proportioned for 220px context panel (matches DirectoryMemberListPanel) */}
+      {/* Desktop panel item — proportioned for 220px context panel */}
       <div
-        className="hidden md:flex items-center gap-2.5 px-3 py-2.5 transition-colors duration-100"
+        className="hidden md:flex items-center gap-2.5 px-2.5 py-2 transition-colors duration-100"
         style={{
           borderLeft: isActive ? "2px solid var(--plum)" : "2px solid transparent",
-          background: isActive ? "rgba(62,21,64,0.06)" : undefined,
+          background: isActive ? "var(--ivory)" : undefined,
+          borderRadius: isActive ? "var(--r-callout)" : undefined,
+          margin: "0 4px",
         }}
         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "" }}
       >
         <div style={{
-          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
           background: "var(--plum)", color: "var(--cream)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "var(--serif)", fontSize: "14px",
+          fontFamily: "var(--serif)", fontSize: "16px",
         }}>
           {firstInitial}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p className="text-[13px] font-medium truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500 }}>
-            {group.name}
-          </p>
-          <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: "var(--muted-text)", fontWeight: group.unread_count ? 500 : 400 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
+            <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
+              {group.name}
+            </p>
+            {group.last_message_time && (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--faint)", flexShrink: 0 }}>
+                {formatRelativeTime(group.last_message_time)}
+              </span>
+            )}
+          </div>
+          <p className="text-[11.5px] truncate leading-tight" style={{ color: group.unread_count ? "var(--body)" : "var(--muted-text)" }}>
             {group.last_message
               ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
               : <span style={{ fontStyle: "italic" }}>No messages yet</span>}
           </p>
         </div>
         {group.unread_count > 0 && (
-          <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--ink)", background: "var(--gold)", minWidth: 18, height: 18, padding: "0 4px", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {group.unread_count}
-          </span>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
         )}
       </div>
     </button>
@@ -3971,6 +3978,26 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
           </>
         )}
       </div>
+
+      {/* Dashed "New message" footer — personal tab only */}
+      {subTab === "my" && (
+        <div className="flex-shrink-0 px-3 pb-3 pt-1">
+          <button
+            onClick={() => setShowCreateChat("my")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "10px 14px", border: "1px dashed var(--dashed)", borderRadius: "var(--r-callout)",
+              background: "transparent", color: "var(--body)", fontFamily: "var(--sans)", fontSize: 13,
+              cursor: "pointer", transition: "border-color 0.12s, color 0.12s",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--plum)"; (e.currentTarget as HTMLElement).style.color = "var(--plum)" }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--dashed)"; (e.currentTarget as HTMLElement).style.color = "var(--body)" }}
+          >
+            <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+            New message
+          </button>
+        </div>
+      )}
 
       {showCreateChat && (
         <CreateChatScreen
