@@ -2562,7 +2562,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         onPointerUp={() => handlePointerUp(msg)}
                         onPointerLeave={handlePointerCancel}
                         onPointerCancel={handlePointerCancel}
-                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
+                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${editingId === msg.id ? "w-full" : ""} ${
                           msg.deleted
                             ? isOwn
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
