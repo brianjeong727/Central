@@ -810,7 +810,7 @@ export async function createTeamChatAction(
   } else {
     const { data: group, error: gErr } = await admin
       .from("groups")
-      .insert({ name: chatName, type: "my", ministry_id: ministryId, created_by: createdBy })
+      .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
       .select("id")
       .single()
     if (gErr || !group) return { groupId: null, error: "Failed to create group chat." }
