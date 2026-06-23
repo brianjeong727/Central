@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
+import { MonogramChip } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
 import data from "@emoji-mart/data"
@@ -227,12 +227,12 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                         idx > 0 ? "border-t border-[#F2EDE8]" : ""
                       } ${isSelected ? "bg-[#3E1540]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
                     >
-                      <Avatar className="w-9 h-9 flex-shrink-0 shadow-sm overflow-hidden" style={{ borderRadius: "12px", background: "var(--plum)" }}>
-                        {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover" style={{ borderRadius: "12px" }} />}
-                        <AvatarFallback className="font-bold text-[11px] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", color: "var(--cream)" }}>
-                          {getInitials(member.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <MonogramChip
+                        initials={getInitials(member.name)}
+                        avatarUrl={member.avatar_url}
+                        className="w-9 h-9 font-bold text-[11px] shadow-sm"
+                        style={{ fontFamily: "var(--font-instrument-serif)" }}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold text-[#13101A]">{member.name}</p>
                         {member.graduation_year && (
@@ -507,12 +507,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         : "bg-white border-[#EFEFEF]"
                     }`}
                   >
-                    <Avatar className="w-9 h-9 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
-                      {profile.avatar_url && <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="font-bold text-[10px] bg-transparent" style={{ color: "var(--cream)" }}>
-                        {getInitials(profile.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-[#13101A] truncate">{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -680,10 +675,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white",
                       transition: "background 0.1s",
                     }}>
-                    <Avatar className="w-10 h-10 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
-                      {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="font-bold text-[11px] bg-transparent" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
-                    </Avatar>
+                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <p style={{ fontSize: 14, color: isPendingRemove ? "#9F3030" : "#13101A", fontWeight: 500, textDecoration: isPendingRemove ? "line-through" : "none" }}>{member.name}</p>
@@ -864,9 +856,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               Chat info
             </h3>
             <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <Avatar className="w-14 h-14 flex-shrink-0" style={{ background: "var(--plum)" }}>
-                <AvatarFallback className="font-bold text-[16px] bg-transparent tracking-wide" style={{ color: "var(--cream)" }}>{getInitials(displayGroupName)}</AvatarFallback>
-              </Avatar>
+              <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-bold text-[16px] tracking-wide" />
               <div className="flex-1 min-w-0">
                 {renaming ? (
                   <input
@@ -905,10 +895,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
                   >
-                    <Avatar className="w-9 h-9 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
-                      {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="font-bold text-[10px] bg-transparent" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
-                    </Avatar>
+                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className={`text-[13px] font-semibold truncate ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{member.name}</p>
@@ -2158,12 +2145,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               </button>
             )}
             {/* Group avatar */}
-            <div
-              className="flex-shrink-0 flex items-center justify-center text-[#F6F4EF]"
-              style={{ width: 32, height: 32, borderRadius: 8, background: "var(--plum)", fontFamily: "var(--serif)", fontSize: 13, display: "grid", placeItems: "center" }}
-            >
-              {getInitials(displayName)}
-            </div>
+            <MonogramChip
+              initials={getInitials(displayName)}
+              className="w-8 h-8"
+              style={{ fontFamily: "var(--serif)", fontSize: 13 }}
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="truncate leading-none" style={{ fontFamily: "var(--serif)", fontSize: "16px", color: "#13101A", letterSpacing: "-0.01em" }}>{displayName}</h2>
@@ -2561,17 +2547,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                       {/* Avatar — shown for every incoming message */}
                       {!isOwn && (
-                        <div
-                          className="w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden"
-                          style={{ borderRadius: "10px", alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1, background: "var(--plum)", color: "var(--cream)" }}
-                        >
-                          {msg.sender_id && departedIds.has(msg.sender_id) ? (
-                            <span>{(msg.sender_name || "?").charAt(0).toUpperCase()}</span>
-                          ) : msg.sender_avatar_url
-                            ? <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-full h-full object-cover" />
-                            : (msg.sender_name || "?").charAt(0).toUpperCase()
-                          }
-                        </div>
+                        <MonogramChip
+                          initials={(msg.sender_name || "?").charAt(0).toUpperCase()}
+                          avatarUrl={!(msg.sender_id && departedIds.has(msg.sender_id)) ? (msg.sender_avatar_url || undefined) : undefined}
+                          className="w-7 h-7 text-[11px] font-bold"
+                          style={{ alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1 }}
+                        />
                       )}
 
                       <div
@@ -2753,17 +2734,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         {(readReceiptMap[msg.id]?.length ?? 0) > 0 && (
                           <div className="flex items-center">
                             {readReceiptMap[msg.id].map(({ name, avatarUrl }, idx) => (
-                              <Avatar
+                              <MonogramChip
                                 key={`${name}-${idx}`}
+                                initials={name.charAt(0).toUpperCase()}
+                                avatarUrl={avatarUrl || undefined}
                                 title={`Read by ${name}`}
-                                className={`w-4 h-4 flex-shrink-0 border border-[#F1EDE6] overflow-hidden${idx > 0 ? " -ml-1" : ""}`}
-                                style={{ background: "var(--plum)" }}
-                              >
-                                {avatarUrl && <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />}
-                                <AvatarFallback className="bg-transparent" style={{ fontSize: "6px", fontWeight: 700, color: "var(--cream)" }}>
-                                  {name.charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
+                                className={`w-4 h-4 border border-[#F1EDE6] text-[6px] font-bold${idx > 0 ? " -ml-1" : ""}`}
+                              />
                             ))}
                           </div>
                         )}
@@ -2778,15 +2755,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             {/* Typing indicators */}
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
-                <div
-                  className="w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                  style={{ borderRadius: "10px", background: "var(--plum)", color: "var(--cream)" }}
-                >
-                  {avatarUrl
-                    ? <img src={avatarUrl} alt={name} className="w-full h-full object-cover rounded-[10px]" />
-                    : name.charAt(0).toUpperCase()
-                  }
-                </div>
+                <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-bold" />
                 <div className="bg-[#FBF8F2] border border-[#E8E2D2] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
@@ -2912,9 +2881,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   onClick={() => handleMentionSelect(member.name)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[#FBF8F2]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
                 >
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
-                    {member.name.charAt(0).toUpperCase()}
-                  </div>
+                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
                   <span className="text-[14px] font-medium text-[#13101A]">{member.name.split(" ")[0]}</span>
                 </button>
               ))}
@@ -3274,9 +3241,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#3E1540] flex items-center justify-center text-[12px] font-semibold text-[#F6F4EF] flex-shrink-0">
-                        {g.name.charAt(0).toUpperCase()}
-                      </div>
+                      <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-semibold" />
                       <span className="text-[14px] font-medium text-[#13101A]">{g.name}</span>
                     </div>
                     {forwardSentTo === g.id ? (
@@ -3680,11 +3645,11 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
       {/* Mobile style */}
       <div className="md:hidden bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
-          <Avatar className="w-12 h-12 flex-shrink-0" style={{ background: "var(--plum)", borderRadius: "16px" }}>
-            <AvatarFallback className="bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--cream)" }}>
-              {firstInitial}
-            </AvatarFallback>
-          </Avatar>
+          <MonogramChip
+            initials={firstInitial}
+            className="w-12 h-12 flex-shrink-0"
+            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-[15px] font-semibold text-[#13101A] truncate pr-2">{group.name}</h3>
@@ -3716,14 +3681,11 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "" }}
       >
-        <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          background: "var(--plum)", color: "var(--cream)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "var(--serif)", fontSize: "16px",
-        }}>
-          {firstInitial}
-        </div>
+        <MonogramChip
+          initials={firstInitial}
+          className="flex-shrink-0"
+          style={{ width: 38, height: 38, fontFamily: "var(--serif)", fontSize: "16px" }}
+        />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
             <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
@@ -3886,7 +3848,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Search — matches DirectoryMemberListPanel */}
-      <div className="px-3 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--line)" }}>
+      <div className="px-3 py-3 flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--muted-text)" }} />
           <input
