@@ -41,7 +41,7 @@ import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
-import { getInitials, getAvatarColor } from "../utils"
+import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import type {
@@ -11515,7 +11515,7 @@ function SmallGroupLeadersTab({
                             className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}
                             style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
                           >
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.id), color: "white" }}>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
                               {getInitials(m.name)}
                             </div>
                             <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
@@ -11547,7 +11547,7 @@ function SmallGroupLeadersTab({
                 <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
                         {getInitials(m.name)}
                       </div>
                       <p className="flex-1 text-[14px] text-[#13101A]">{m.name}</p>
@@ -11598,7 +11598,7 @@ function SmallGroupLeadersTab({
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>{getInitials(m.name)}</div>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
                             <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
@@ -11624,7 +11624,7 @@ function SmallGroupLeadersTab({
                         if (!person) return null
                         return (
                           <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[#EFE9DA]" style={{ background: "rgba(62,21,64,0.03)" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(uid), color: "white" }}>{getInitials(person.name)}</div>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(person.name)}</div>
                             <p className="flex-1 text-[14px] text-[#13101A]">{person.name}</p>
                             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
                             <button onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
@@ -11643,7 +11643,7 @@ function SmallGroupLeadersTab({
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
                               <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}>
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(p.id), color: "white" }}>{getInitials(p.name)}</div>
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(p.name)}</div>
                                 <p style={{ fontSize: 13, color: "#13101A" }}>{p.name}</p>
                               </div>
                             ))}
@@ -11678,7 +11678,7 @@ function SmallGroupLeadersTab({
                         <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: getAvatarColor(m.user_id), color: "white" }}>{getInitials(m.name)}</div>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
                           <p className="text-[14px] text-[#13101A]">{m.name}</p>
                         </div>
                       ))}
@@ -12401,7 +12401,7 @@ function BibleStudySubTab({
               return (
                 <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarColor(p.user_id), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
                       {getInitials(p.name)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

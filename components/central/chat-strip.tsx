@@ -75,8 +75,6 @@ function StripCard({ chat, index, onOpen }: {
   index: number
   onOpen: (id: string, name: string) => void
 }) {
-  const monogramBg = index === 0 ? "var(--plum)" : "var(--ink)"
-
   return (
     <button
       onClick={() => onOpen(chat.id, chat.groupName)}
@@ -103,7 +101,7 @@ function StripCard({ chat, index, onOpen }: {
         height: 36,
         borderRadius: 9,
         flexShrink: 0,
-        background: monogramBg,
+        background: "var(--plum)",
         display: "grid",
         placeItems: "center",
         fontSize: 16,

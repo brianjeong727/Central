@@ -7,7 +7,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
-import { getInitials, getAvatarColor } from "../utils"
+import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
 
 // ── DirectoryMemberListPanel — lives in the shell context panel on desktop ─────
@@ -104,7 +104,7 @@ export function DirectoryMemberListPanel({
                 <div
                   style={{
                     width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                    background: "var(--ink)",
+                    background: "var(--plum)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     overflow: "hidden",
                   }}
@@ -272,9 +272,9 @@ export function DirectoryTab({
                 }}
               >
                 <div className="flex items-center gap-3.5">
-                  <Avatar className={`w-11 h-11 ${getAvatarColor(member.name)}`} style={{ background: "var(--plum)" }}>
+                  <Avatar className="w-11 h-11" style={{ background: "var(--plum)" }}>
                     {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                    <AvatarFallback className="text-white font-bold text-[11px] bg-transparent tracking-wide">{getInitials(member.name)}</AvatarFallback>
+                    <AvatarFallback className="font-bold text-[11px] bg-transparent tracking-wide" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -550,9 +550,9 @@ export function MemberSheet({
           >
             <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
           </button>
-          <Avatar className={`w-9 h-9 flex-shrink-0 rounded-full ${getAvatarColor(member.name)}`}>
+          <Avatar className="w-9 h-9 flex-shrink-0 rounded-full" style={{ background: "var(--plum)" }}>
             {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-            <AvatarFallback className="text-white font-bold text-[13px] bg-transparent">
+            <AvatarFallback className="font-bold text-[13px] bg-transparent" style={{ color: "var(--cream)" }}>
               {getInitials(member.name)}
             </AvatarFallback>
           </Avatar>
@@ -564,9 +564,9 @@ export function MemberSheet({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-6">
           <div className="flex flex-col items-center mb-7">
-            <Avatar className={`w-20 h-20 ${getAvatarColor(member.name)} mb-4`}>
+            <Avatar className="w-20 h-20 mb-4" style={{ background: "var(--plum)" }}>
               {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-              <AvatarFallback className="text-white font-bold text-2xl bg-transparent">
+              <AvatarFallback className="font-bold text-2xl bg-transparent" style={{ color: "var(--cream)" }}>
                 {getInitials(member.name)}
               </AvatarFallback>
             </Avatar>

@@ -9,7 +9,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { getInitials, getAvatarColor, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
+import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
 import data from "@emoji-mart/data"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
@@ -227,9 +227,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                         idx > 0 ? "border-t border-[#F2EDE8]" : ""
                       } ${isSelected ? "bg-[#3E1540]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
                     >
-                      <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} shadow-sm overflow-hidden`} style={{ borderRadius: "12px" }}>
+                      <Avatar className="w-9 h-9 flex-shrink-0 shadow-sm overflow-hidden" style={{ borderRadius: "12px", background: "var(--plum)" }}>
                         {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover" style={{ borderRadius: "12px" }} />}
-                        <AvatarFallback className="text-white font-bold text-[11px] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)" }}>
+                        <AvatarFallback className="font-bold text-[11px] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", color: "var(--cream)" }}>
                           {getInitials(member.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -507,9 +507,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         : "bg-white border-[#EFEFEF]"
                     }`}
                   >
-                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(profile.name)} overflow-hidden`}>
+                    <Avatar className="w-9 h-9 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
                       {profile.avatar_url && <img src={profile.avatar_url} alt={profile.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">
+                      <AvatarFallback className="font-bold text-[10px] bg-transparent" style={{ color: "var(--cream)" }}>
                         {getInitials(profile.name)}
                       </AvatarFallback>
                     </Avatar>
@@ -680,9 +680,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white",
                       transition: "background 0.1s",
                     }}>
-                    <Avatar className={`w-10 h-10 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
+                    <Avatar className="w-10 h-10 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
                       {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="text-white font-bold text-[11px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
+                      <AvatarFallback className="font-bold text-[11px] bg-transparent" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
                     </Avatar>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -864,8 +864,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               Chat info
             </h3>
             <div className="bg-white rounded-2xl border border-[#EFEFEF] p-5 mb-4 flex items-center gap-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <Avatar className={`w-14 h-14 flex-shrink-0 ${getAvatarColor(displayGroupName)}`}>
-                <AvatarFallback className="text-white font-bold text-[16px] bg-transparent tracking-wide">{getInitials(displayGroupName)}</AvatarFallback>
+              <Avatar className="w-14 h-14 flex-shrink-0" style={{ background: "var(--plum)" }}>
+                <AvatarFallback className="font-bold text-[16px] bg-transparent tracking-wide" style={{ color: "var(--cream)" }}>{getInitials(displayGroupName)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 {renaming ? (
@@ -905,9 +905,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "white", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
                   >
-                    <Avatar className={`w-9 h-9 flex-shrink-0 ${getAvatarColor(member.name)} overflow-hidden`}>
+                    <Avatar className="w-9 h-9 flex-shrink-0 overflow-hidden" style={{ background: "var(--plum)" }}>
                       {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                      <AvatarFallback className="text-white font-bold text-[10px] bg-transparent">{getInitials(member.name)}</AvatarFallback>
+                      <AvatarFallback className="font-bold text-[10px] bg-transparent" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -2101,7 +2101,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     const others = Object.values(memberReadMap).map(m => m.name.split(" ")[0])
     return [userName.split(" ")[0], ...others]
   }, [memberReadMap, userName])
-  const MEMBER_AVATAR_COLORS = ["#13101A", "#3E1540"]
 
   return (
     <>
@@ -2174,7 +2173,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       key={i}
                       style={{
                         width: 16, height: 16, borderRadius: 99,
-                        background: MEMBER_AVATAR_COLORS[i % MEMBER_AVATAR_COLORS.length],
+                        background: "var(--plum)",
                         color: "#FBF8F2", fontSize: 9, fontWeight: 600,
                         display: "inline-grid", placeItems: "center",
                         marginLeft: i ? -4 : 0,
@@ -2563,8 +2562,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       {/* Avatar — shown for every incoming message */}
                       {!isOwn && (
                         <div
-                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 overflow-hidden ${getAvatarColor(msg.sender_name || "?")}`}
-                          style={{ borderRadius: "10px", alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1 }}
+                          className="w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0 overflow-hidden"
+                          style={{ borderRadius: "10px", alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1, background: "var(--plum)", color: "var(--cream)" }}
                         >
                           {msg.sender_id && departedIds.has(msg.sender_id) ? (
                             <span>{(msg.sender_name || "?").charAt(0).toUpperCase()}</span>
@@ -2757,10 +2756,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               <Avatar
                                 key={`${name}-${idx}`}
                                 title={`Read by ${name}`}
-                                className={`w-4 h-4 flex-shrink-0 border border-[#F1EDE6] overflow-hidden ${getAvatarColor(name)}${idx > 0 ? " -ml-1" : ""}`}
+                                className={`w-4 h-4 flex-shrink-0 border border-[#F1EDE6] overflow-hidden${idx > 0 ? " -ml-1" : ""}`}
+                                style={{ background: "var(--plum)" }}
                               >
                                 {avatarUrl && <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />}
-                                <AvatarFallback className="text-white bg-transparent" style={{ fontSize: "6px", fontWeight: 700 }}>
+                                <AvatarFallback className="bg-transparent" style={{ fontSize: "6px", fontWeight: 700, color: "var(--cream)" }}>
                                   {name.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
@@ -2779,8 +2779,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
                 <div
-                  className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold text-[#F6F4EF] flex-shrink-0 ${getAvatarColor(name)}`}
-                  style={{ borderRadius: "10px" }}
+                  className="w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                  style={{ borderRadius: "10px", background: "var(--plum)", color: "var(--cream)" }}
                 >
                   {avatarUrl
                     ? <img src={avatarUrl} alt={name} className="w-full h-full object-cover rounded-[10px]" />
@@ -2912,7 +2912,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   onClick={() => handleMentionSelect(member.name)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[#FBF8F2]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ${getAvatarColor(member.name)}`}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-[14px] font-medium text-[#13101A]">{member.name.split(" ")[0]}</span>
@@ -3079,10 +3079,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               {optVoters.length > 0 && (
                                 <div className="flex items-center">
                                   {optVoters.map((v, vi) => (
-                                    <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0 ${vi > 0 ? "-ml-1.5" : ""} ${getAvatarColor(v.name)}`}>
+                                    <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0${vi > 0 ? " -ml-1.5" : ""}`} style={{ background: "var(--plum)" }}>
                                       {v.avatar_url
                                         ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
-                                        : <span className="text-white font-bold flex items-center justify-center h-full" style={{ fontSize: 7 }}>{v.name.charAt(0).toUpperCase()}</span>
+                                        : <span className="font-bold flex items-center justify-center h-full" style={{ fontSize: 7, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                                       }
                                     </div>
                                   ))}
@@ -3164,10 +3164,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       <div className="flex flex-col gap-1.5">
                         {optVoters.map(v => (
                           <div key={v.user_id} className="flex items-center gap-2.5">
-                            <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${getAvatarColor(v.name)}`}>
+                            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: "var(--plum)" }}>
                               {v.avatar_url
                                 ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
-                                : <span className="text-white font-bold" style={{ fontSize: 10 }}>{v.name.charAt(0).toUpperCase()}</span>
+                                : <span className="font-bold" style={{ fontSize: 10, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                               }
                             </div>
                             <span className="text-[13px] text-[#13101A]">{v.name}</span>
@@ -3671,7 +3671,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 }
 
 export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; onClick: () => void; isActive?: boolean }) {
-  const avatarBg = getAvatarColor(group.name) === "bg-[#3E1540]" ? "#3E1540" : "#13101A"
   const firstInitial = group.name.charAt(0)
 
   return (
@@ -3679,8 +3678,8 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
       {/* Mobile style */}
       <div className="md:hidden bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
-          <Avatar className="w-12 h-12 flex-shrink-0" style={{ background: avatarBg, borderRadius: "16px" }}>
-            <AvatarFallback className="text-[#F6F4EF] bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}>
+          <Avatar className="w-12 h-12 flex-shrink-0" style={{ background: "var(--plum)", borderRadius: "16px" }}>
+            <AvatarFallback className="bg-transparent" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--cream)" }}>
               {firstInitial}
             </AvatarFallback>
           </Avatar>
@@ -3715,7 +3714,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
       >
         <div style={{
           width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-          background: avatarBg, color: "var(--cream)",
+          background: "var(--plum)", color: "var(--cream)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "var(--serif)", fontSize: "14px",
         }}>

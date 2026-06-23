@@ -2,7 +2,7 @@ import { ReactNode, CSSProperties } from "react"
 
 interface PageTitleProps {
   eyebrow: string
-  title: string
+  title: ReactNode
   titleSize?: number
   children?: ReactNode
   style?: CSSProperties

@@ -172,7 +172,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/giving-tab.tsx` | Finance tab — giving info, reimbursements, budget, fund allocation |
 | `app/home/tabs/profile-tab.tsx` | Profile tab — spiritual profile fields, journal (devotionals/prayers/verses sub-tabs), sign out |
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
-| `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, responses |
+| `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, form fill overlay (FormFillView), admin responses view (FormResponsesView) |
 | `app/home/tabs/congregation-tab.tsx` | Congregation tab — pastor-only; congregation polling and pulse questions |
 | `app/home/components/command-palette.tsx` | ⌘K command palette — quick nav, person/chat/announcement search |
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
