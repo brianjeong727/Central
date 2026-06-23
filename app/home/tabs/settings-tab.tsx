@@ -209,6 +209,9 @@ export function SettingsTab({
   const [newLimitAmount, setNewLimitAmount] = useState("")
   const [savingLimit, setSavingLimit] = useState(false)
   const [limitError, setLimitError] = useState<string | null>(null)
+  const [editingLimitId, setEditingLimitId] = useState<string | null>(null)
+  const [editingLimitAmount, setEditingLimitAmount] = useState("")
+  const [savingLimitEdit, setSavingLimitEdit] = useState(false)
 
   // Daily verse rotation
   const [homeVerses, setHomeVerses] = useState<HomeVerse[]>([])
@@ -507,6 +510,20 @@ export function SettingsTab({
   async function handleDeleteLimit(id: string) {
     const { error } = await deleteReceiptLimit(id)
     if (!error) setReceiptLimits(prev => prev.filter(l => l.id !== id))
+  }
+
+  async function handleSaveLimitEdit(limitId: string, category: string, fund: string) {
+    const amount = parseFloat(editingLimitAmount)
+    if (isNaN(amount) || amount <= 0 || amount > 1_000_000) return
+    setSavingLimitEdit(true)
+    const { error } = await upsertReceiptLimit({ ministryId, category, fund, maxAmount: amount })
+    if (!error) {
+      const { data: fresh } = await getReceiptLimits(ministryId)
+      setReceiptLimits(fresh)
+      setEditingLimitId(null)
+      setEditingLimitAmount("")
+    }
+    setSavingLimitEdit(false)
   }
 
   // ── Verse handlers ──────────────────────────────────────────────────────────
@@ -1193,9 +1210,35 @@ export function SettingsTab({
                             <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{catLabel}</div>
                             <div style={{ marginTop: 2, fontSize: 13, color: "#8A8497" }}>{fundLabel} fund</div>
                           </div>
-                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
-                          <button style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "default" }}>Edit</button>
-                          <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
+                          {editingLimitId === l.id ? (
+                            <>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                autoFocus
+                                value={editingLimitAmount}
+                                onChange={e => setEditingLimitAmount(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") handleSaveLimitEdit(l.id, l.category, l.fund); if (e.key === "Escape") { setEditingLimitId(null); setEditingLimitAmount("") } }}
+                                style={{ padding: "6px 10px", border: "1.5px solid #3E1540", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none", width: "100%" }}
+                              />
+                              <button
+                                onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
+                                disabled={savingLimitEdit || !editingLimitAmount}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                              >{savingLimitEdit ? "…" : "Save"}</button>
+                              <button
+                                onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
+                              >Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
+                              <button onClick={() => { setEditingLimitId(l.id); setEditingLimitAmount(String(Math.round(l.max_amount))) }} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>Edit</button>
+                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
+                            </>
+                          )}
                         </div>
                       )
                     })}

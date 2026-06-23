@@ -131,6 +131,19 @@ export async function upsertReceiptLimit(params: {
   maxAmount: number
 }): Promise<{ error: string | null }> {
   const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can manage receipt limits." }
+  if (profile.ministry_id !== params.ministryId) return { error: "Ministry mismatch." }
+
   const { error } = await supabase
     .from("receipt_limits")
     .upsert(
@@ -142,6 +155,23 @@ export async function upsertReceiptLimit(params: {
 
 export async function deleteReceiptLimit(id: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
-  const { error } = await supabase.from("receipt_limits").delete().eq("id", id)
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { error: "Not authenticated." }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!profile?.ministry_id) return { error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can manage receipt limits." }
+
+  const { error } = await supabase
+    .from("receipt_limits")
+    .delete()
+    .eq("id", id)
+    .eq("ministry_id", profile.ministry_id)
+
   return { error: error?.message ?? null }
 }
