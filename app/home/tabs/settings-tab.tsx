@@ -615,9 +615,9 @@ export function SettingsTab({
       </TabPageHeader>
 
       {/* Scrollable content: tab strip + tab panels */}
-      <div className="px-5 md:px-14 md:flex-1 md:overflow-y-auto">
+      <div className="md:flex-1 md:overflow-y-auto md:pb-10">
         {/* ── Tab strip — edge-to-edge per §4.2 ── */}
-        <div className="-mx-5 md:-mx-14" style={{ marginTop: 28 }}>
+        <div style={{ marginTop: 28 }}>
           <PlanSubTabStrip
             tabs={TABS}
             active={activeSettingsTab}
@@ -626,13 +626,13 @@ export function SettingsTab({
         </div>
 
         {loading ? (
-          <div style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
+          <div className="px-5 md:px-14" style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
           <>
 
           {/* ══════════════════ GENERAL TAB ══════════════════ */}
           {activeSettingsTab === "general" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Ministry Profile */}
               <section>
@@ -825,7 +825,7 @@ export function SettingsTab({
 
           {/* ══════════════════ PEOPLE TAB ══════════════════ */}
           {activeSettingsTab === "people" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
                 <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
@@ -963,7 +963,7 @@ export function SettingsTab({
 
           {/* ══════════════════ AUTOMATIONS TAB ══════════════════ */}
           {activeSettingsTab === "automations" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
                 <SectionHeader eyebrow="Automations" title="Chat & membership rules" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
@@ -1086,7 +1086,7 @@ export function SettingsTab({
 
           {/* ══════════════════ WORKSPACE TAB ══════════════════ */}
           {activeSettingsTab === "workspace" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 48, marginTop: 40 }}>
 
               {/* Join codes */}
               <section>
@@ -1247,7 +1247,7 @@ export function SettingsTab({
           )}
 
           {activeSettingsTab === "audit" && isAdmin && (
-            <div style={{ marginTop: 40 }}>
+            <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
                 <SectionHeader eyebrow="Audit Log" title="Admin activity" />
                 <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
