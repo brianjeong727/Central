@@ -2603,27 +2603,28 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             )}
                             {editingId === msg.id ? (
                               <div
-                                className={`flex flex-col gap-1.5 ${msg.reply_to_id ? "px-3 pb-2.5 pt-1.5" : ""}`}
+                                className={msg.reply_to_id ? "px-3 pb-2.5 pt-1.5" : ""}
                                 onPointerDown={(e) => e.stopPropagation()}
                               >
-                                <textarea
-                                  autoFocus
-                                  rows={1}
-                                  value={editText}
-                                  onChange={(e) => {
-                                    setEditText(e.target.value)
-                                    e.target.style.height = "auto"
-                                    e.target.style.height = e.target.scrollHeight + "px"
-                                  }}
-                                  onFocus={(e) => {
-                                    e.target.style.height = "auto"
-                                    e.target.style.height = e.target.scrollHeight + "px"
-                                  }}
-                                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditMessage() } else if (e.key === "Escape") { setEditingId(null) } }}
-                                  className="w-full resize-none bg-transparent text-inherit text-[14px] leading-[1.4] outline-none"
-                                  style={{ fontFamily: "inherit", border: "none", overflow: "hidden", padding: 0 }}
-                                />
-                                <div className="flex gap-2 justify-end">
+                                {/* Ghost text maintains bubble's natural width/height; textarea overlays it */}
+                                <div className="relative">
+                                  <div
+                                    aria-hidden
+                                    className="text-[14px] leading-[1.4] invisible select-none whitespace-pre-wrap break-words"
+                                    style={{ fontFamily: "inherit", wordBreak: "break-word" }}
+                                  >
+                                    {editText || " "}
+                                  </div>
+                                  <textarea
+                                    autoFocus
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditMessage() } else if (e.key === "Escape") { setEditingId(null) } }}
+                                    className="absolute inset-0 w-full h-full resize-none bg-transparent text-inherit text-[14px] leading-[1.4] outline-none"
+                                    style={{ fontFamily: "inherit", border: "none", padding: 0, margin: 0 }}
+                                  />
+                                </div>
+                                <div className="flex gap-2 justify-end mt-1.5">
                                   <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[#8A8497] hover:text-[#5A5466]"}`}>Cancel</button>
                                   <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[#3E1540]"}`}>Save</button>
                                 </div>
