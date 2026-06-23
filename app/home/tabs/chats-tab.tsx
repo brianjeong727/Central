@@ -1063,6 +1063,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [gifLoading, setGifLoading] = useState(false)
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevMsgCountRef = useRef(0)
+  const suppressScrollRef = useRef(false)
   // Departed members — show "left" indicator on their messages
   const [departedIds, setDepartedIds] = useState<Set<string>>(new Set())
   // Link previews
@@ -1252,6 +1253,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setEditText("")
     setEditOriginalText("")
     if (trimmed === editOriginalText.trim()) return
+    suppressScrollRef.current = true
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, content: trimmed, is_edited: true } : m))
     await supabase.from("messages").update({ content: trimmed, is_edited: true, edited_at: new Date().toISOString() }).eq("id", id).eq("sender_id", userId)
   }
@@ -1821,7 +1823,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   // Auto-scroll only when messages are added, not on deletions/edits
   useEffect(() => {
-    if (!searchMode && messages.length > prevMsgCountRef.current) scrollToBottom()
+    if (!searchMode && !suppressScrollRef.current && messages.length > prevMsgCountRef.current) scrollToBottom()
+    suppressScrollRef.current = false
     prevMsgCountRef.current = messages.length
   }, [messages, scrollToBottom, searchMode])
 
