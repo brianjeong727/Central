@@ -98,37 +98,28 @@ function ToggleRow({ title, desc, on, onClick }: {
   )
 }
 
-// ─── Team row ────────────────────────────────────────────────────
-interface Team { id: string; icon: string; name: string; desc: string }
-
-const DEFAULT_TEAMS: Team[] = [
-  { id: "praise",      icon: "🎵", name: "Praise Team",          desc: "Worship & set planning"          },
-  { id: "smallgroups", icon: "📖", name: "Small Group Leaders",  desc: "Bible study & discipleship"      },
-  { id: "outreach",    icon: "🤝", name: "Outreach & Welcome",   desc: "First-time visitors & events"    },
+// ─── Fixed beta teams ────────────────────────────────────────────
+const BETA_TEAMS = [
+  { icon: "📖", name: "Small Group Leaders",  desc: "Bible study & discipleship"   },
+  { icon: "🏛️", name: "Student Org Board",    desc: "Campus ministry leadership"   },
 ]
 
-function TeamRowItem({ team, onRemove }: { team: Team; onRemove: () => void }) {
+function BetaTeamRow({ icon, name, desc }: { icon: string; name: string; desc: string }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
       border: "1px solid #E8E2D2", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
     }}>
       <span style={{
-        width: 38, height: 38, borderRadius: 10, background: "#F6F2E8",
+        width: 38, height: 38, borderRadius: 999, background: "#F6F2E8",
         display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0,
       }}>
-        {team.icon}
+        {icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, color: "#13101A" }}>{team.name}</div>
-        <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>{team.desc}</div>
+        <div style={{ fontSize: 15, color: "#13101A" }}>{name}</div>
+        <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>{desc}</div>
       </div>
-      <button type="button" onClick={onRemove} aria-label="Remove team" style={{
-        marginLeft: "auto", color: "#8A8497", background: "transparent", border: "none",
-        cursor: "pointer", display: "grid", placeItems: "center", padding: 4, flexShrink: 0,
-      }}>
-        <Icon d="M18 6L6 18M6 6l12 12" size={18}/>
-      </button>
     </div>
   )
 }
@@ -242,7 +233,7 @@ export default function OnboardingPage() {
   const [requireApproval, setRequireApproval] = useState(false)
 
   // Step 3
-  const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS)
+  const [includeTeams, setIncludeTeams] = useState(true)
 
   // Submit
   const [submitting, setSubmitting] = useState(false)
@@ -255,10 +246,6 @@ export default function OnboardingPage() {
     if (!val || universities.includes(val)) { setUniInput(""); return }
     setUniversities(prev => [...prev, val])
     setUniInput("")
-  }
-
-  function addTeam() {
-    setTeams(prev => [...prev, { id: `c-${prev.length}`, icon: "✦", name: "New team", desc: "Tap to edit" }])
   }
 
   function next() {
@@ -280,7 +267,7 @@ export default function OnboardingPage() {
       university: universities[0] ?? "",
       universities,
       location, size,
-      teams: teams.map(t => ({ name: t.name, icon: t.icon })),
+      teams: includeTeams ? BETA_TEAMS.map(t => ({ name: t.name, icon: t.icon })) : [],
       isPublic,
     })
     if (err) { setError(err); setSubmitting(false); return }
@@ -496,26 +483,65 @@ export default function OnboardingPage() {
             <>
               <StepHeader
                 eyebrow="Step 3 of 4 · Teams"
-                title="Start with a few teams."
-                sub="Teams organize your ministry's work — worship, outreach, hospitality. Add a starter set now; you can build out roles later."
+                title="Starter teams."
+                sub="These are the teams available during beta. You can configure roles and members after your ministry is approved."
               />
 
-              <div style={mono}>Starting teams</div>
+              <div style={mono}>Available teams</div>
               <div style={{ marginTop: 12 }}>
-                {teams.map(t => (
-                  <TeamRowItem
-                    key={t.id} team={t}
-                    onRemove={() => setTeams(prev => prev.filter(x => x.id !== t.id))}
-                  />
+                {BETA_TEAMS.map(t => (
+                  <BetaTeamRow key={t.name} icon={t.icon} name={t.name} desc={t.desc} />
                 ))}
-                <button type="button" onClick={addTeam} style={{
-                  width: "100%", padding: 13, border: "1px dashed #C4C0B0", borderRadius: 10,
-                  background: "transparent", color: "#5A5466",
-                  fontFamily: SANS, fontSize: 14, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                }}>
-                  <Icon d="M12 5v14M5 12h14"/> Add a team
-                </button>
+              </div>
+
+              {/* Beta notice */}
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4, marginBottom: 24,
+                background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10,
+                padding: "13px 15px", fontSize: 13, color: "#5A5466", lineHeight: 1.5,
+              }}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#A09A8C" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0, marginTop: 1 }}>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                In beta, Small Group Leaders and Student Org Board are the only supported teams. More team types are coming soon.
+              </div>
+
+              {/* Accept / skip choice */}
+              <div style={mono}>Would you like to include these teams?</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                {[
+                  { value: true,  label: "Yes, add these teams",    sub: "Start with Small Group Leaders and Student Org Board." },
+                  { value: false, label: "Skip for now",            sub: "You can add teams later from your ministry settings." },
+                ].map(opt => (
+                  <button
+                    key={String(opt.value)}
+                    type="button"
+                    onClick={() => setIncludeTeams(opt.value)}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: 14, padding: 16,
+                      border: `1.5px solid ${includeTeams === opt.value ? "#3E1540" : "#E2DDCF"}`,
+                      borderRadius: 12,
+                      background: includeTeams === opt.value ? "#F4EFF8" : "#FDFCF8",
+                      cursor: "pointer", textAlign: "left", fontFamily: SANS,
+                      transition: "border-color .12s ease, background .12s ease",
+                    }}
+                  >
+                    <span style={{
+                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                      border: `2px solid ${includeTeams === opt.value ? "#3E1540" : "#C4C0B0"}`,
+                      background: includeTeams === opt.value ? "#3E1540" : "transparent",
+                      display: "grid", placeItems: "center",
+                    }}>
+                      {includeTeams === opt.value && (
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#FDFCF8" }}/>
+                      )}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{opt.label}</div>
+                      <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>{opt.sub}</div>
+                    </div>
+                  </button>
+                ))}
               </div>
 
               <NavRow onBack={back} onNext={next} nextLabel="Continue"/>
@@ -548,7 +574,7 @@ export default function OnboardingPage() {
                 <ReviewRow label="Location"  value={location || "—"}/>
                 <ReviewRow label="Size"       value={sizeLabel}/>
                 <ReviewRow label="Discovery"  value={discoveryLabel}/>
-                <ReviewRow label="Teams"      value={teams.map(t => t.name).join(", ") || "None"} last/>
+                <ReviewRow label="Teams"      value={includeTeams ? BETA_TEAMS.map(t => t.name).join(", ") : "None"} last/>
               </div>
 
               {/* Approval notice */}
