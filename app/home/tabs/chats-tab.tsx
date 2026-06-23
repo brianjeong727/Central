@@ -1237,14 +1237,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   async function handleDeletePoll(msgId: string, pollId: string) {
     setPollMenuFor(null)
     setMessages(prev => prev.filter(m => m.id !== msgId))
-    console.log("[DeletePoll] start", { msgId, pollId })
     // Delete message before poll — messages.poll_id FK prevents deleting poll while message exists
-    const { error: e1 } = await supabase.from("poll_votes").delete().eq("poll_id", pollId)
-    console.log("[DeletePoll] poll_votes", e1 ?? "ok")
-    const { error: e2 } = await supabase.from("messages").delete().eq("id", msgId)
-    console.log("[DeletePoll] messages", e2 ?? "ok")
-    const { error: e3 } = await supabase.from("polls").delete().eq("id", pollId)
-    console.log("[DeletePoll] polls", e3 ?? "ok")
+    await supabase.from("poll_votes").delete().eq("poll_id", pollId)
+    await supabase.from("messages").delete().eq("id", msgId)
+    await supabase.from("polls").delete().eq("id", pollId)
   }
 
   async function handleEditMessage() {
@@ -2320,7 +2316,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                     <MoreHorizontal className="w-3.5 h-3.5 text-[#8A8497]" />
                                   </button>
                                   {pollMenuFor === msg.id && (
-                                    <div className="absolute right-0 top-8 z-10 bg-white rounded-xl border border-[#E8E2D2] shadow-lg overflow-hidden min-w-[130px]">
+                                    <div className="absolute right-0 top-8 z-[160] bg-white rounded-xl border border-[#E8E2D2] shadow-lg overflow-hidden min-w-[130px]">
                                       <button
                                         onClick={() => handleDeletePoll(msg.id, msg.poll_id!)}
                                         className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
@@ -2813,42 +2809,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         </div>
       )}
 
-      {/* ── Attachment preview bar ── */}
-      {pendingAttachment && (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center gap-3">
-          {pendingAttachment.file.type.startsWith("image/") ? (
-            <>
-              <div className="relative flex-shrink-0">
-                <img
-                  src={pendingAttachment.previewUrl}
-                  alt="Preview"
-                  className="w-16 h-16 rounded-xl object-cover border border-[#E8E2D2]"
-                />
-                <button
-                  onClick={clearPendingAttachment}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#13101A] flex items-center justify-center"
-                >
-                  <X className="w-2.5 h-2.5 text-white" />
-                </button>
-              </div>
-              <p className="text-[12px] text-[#8A8497] flex-1">Add a caption or press send</p>
-            </>
-          ) : (
-            <>
-              <div className="w-10 h-10 rounded-xl bg-[#F4F1E8] border border-[#E8E2D2] flex items-center justify-center flex-shrink-0">
-                <FileDown className="w-4 h-4 text-[#5A5466]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-[#13101A] truncate">{pendingAttachment.file.name}</p>
-                <p className="text-[11px] text-[#8A8497]">{formatFileSize(pendingAttachment.file.size)}</p>
-              </div>
-              <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      )}
 
       {/* ── GIF Picker panel ── */}
       {showGifPicker && !groupArchived && (
@@ -2950,6 +2910,39 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             </button>
             {/* Textarea bubble — its own bordered component */}
             <div className="flex-1 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
+              {/* Attachment preview — inside the bubble, above the textarea */}
+              {pendingAttachment && (
+                <div className="mb-2">
+                  {pendingAttachment.file.type.startsWith("image/") ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={pendingAttachment.previewUrl}
+                        alt="Preview"
+                        className="w-16 h-16 rounded-xl object-cover border border-[#E8E2D2]"
+                      />
+                      <button
+                        onClick={clearPendingAttachment}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#13101A] flex items-center justify-center"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-[#EDE9DF] rounded-xl px-2.5 py-2">
+                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[#E8E2D2] flex items-center justify-center flex-shrink-0">
+                        <FileDown className="w-3.5 h-3.5 text-[#5A5466]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-medium text-[#13101A] truncate">{pendingAttachment.file.name}</p>
+                        <p className="text-[10px] text-[#8A8497]">{formatFileSize(pendingAttachment.file.size)}</p>
+                      </div>
+                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 value={inputText}
