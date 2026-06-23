@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -852,31 +853,32 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   ]
 
   return (
-    <div className="pb-28 md:pb-0">
+    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <RingCrossLogo size={26} color="#3E1540" />
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          <RingCrossLogo size={26} color="var(--plum)" />
+          <span style={{ fontFamily: "var(--serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </a>
       </div>
       <div className="flex items-end justify-between px-5 mb-6 md:hidden">
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Announcements</h1>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Announcements</h1>
         {isLeaderOrAdmin && (
-          <button onClick={() => setShowCreate(true)} className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors">
-            <Plus className="w-4 h-4 text-[#F6F4EF]" />
+          <button onClick={() => setShowCreate(true)} className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
+            <Plus className="w-4 h-4 text-[var(--cream)]" />
           </button>
         )}
       </div>
 
       {/* Desktop Editorial Header */}
-      <div className="hidden md:flex items-end justify-between px-14 pt-11 pb-8 border-b border-[#E5E0D2]" style={{ gap: "24px" }}>
-        <div>
-          <p style={MONO_STYLE}>{announcements.length} total · {announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread</p>
-          <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "52px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "#13101A" }}>Announcements</h1>
-          <p style={{ marginTop: "12px", color: "#5A5466", fontSize: "14px", maxWidth: "560px" }}>What the ministry is planning, praying for, and showing up to.</p>
-        </div>
-        <div className="flex items-center gap-2 pb-1.5">
+      <TabPageHeader>
+        <PageTitle
+          eyebrow={`${announcements.length} total · ${announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread`}
+          title="Announcements"
+        >
+          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>What the ministry is planning, praying for, and showing up to.</p>
+        </PageTitle>
+        <div className="flex items-center gap-2 pb-1.5 ml-auto">
           {isLeaderOrAdmin && (
             <button
               onClick={() => setShowCreate(true)}
@@ -888,13 +890,14 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               <Plus className="w-3.5 h-3.5" />New announcement
             </button>
           )}
-          <div className="flex border border-[#E5E0D2] rounded-lg overflow-hidden">
-            <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "#EFEAE0" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
-            <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "#EFEAE0" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
+          <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
+            <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
+            <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
           </div>
         </div>
-      </div>
+      </TabPageHeader>
 
+      <div className="md:flex-1 md:overflow-y-auto">
       {loading ? (
         <div className="px-5 md:px-14"><Spinner /></div>
       ) : announcements.length === 0 ? (
@@ -930,46 +933,46 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             {/* Filter chips */}
             <div className="flex gap-2 mb-6">
               {FILTERS.map((f) => (
-                <button key={f.id} onClick={() => setFilter(f.id)} style={{ padding: "7px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 500, border: filter === f.id ? "1px solid #13101A" : "1px solid #E5E0D2", background: filter === f.id ? "#13101A" : "transparent", color: filter === f.id ? "#F6F4EF" : "#13101A", cursor: "pointer" }}>{f.label}</button>
+                <button key={f.id} onClick={() => setFilter(f.id)} style={{ padding: "7px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 500, border: filter === f.id ? "1px solid var(--ink)" : "1px solid var(--line)", background: filter === f.id ? "var(--ink)" : "transparent", color: filter === f.id ? "var(--cream)" : "var(--ink)", cursor: "pointer" }}>{f.label}</button>
               ))}
             </div>
 
-            {/* Pinned hero strip — matches Up Next card footprint (padding 40px 40px) */}
+            {/* Pinned hero strip — UpNextCard emphasis treatment */}
             {pinnedAnn && filter === "all" && (
-              <div className="rounded-xl overflow-hidden mb-6 relative" style={{ background: "#3E1540", color: "#F6F4EF", padding: "40px 40px" }}>
-                <div className="absolute rounded-full pointer-events-none" style={{ top: -80, right: 80, width: 280, height: 280, background: "radial-gradient(circle, rgba(246,244,239,0.14), transparent 60%)" }} />
-                <div className="relative">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "40px", alignItems: "center" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      <p style={{ fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", opacity: 0.6, margin: 0 }}>📌 Pinned</p>
-                      <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em" }}>{pinnedAnn.title}</h2>
-                      <p style={{ margin: 0, fontSize: "13px", opacity: 0.78, lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
-                      {/* Actions row — mirrors Up Next card button row */}
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "#F6F4EF", color: "#13101A", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
-                          {pinnedAnn.is_event ? "See details" : "See announcement"}
+              <div className="mb-6" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "40px 40px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "40px", alignItems: "center" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <p style={{ display: "flex", alignItems: "center", gap: 6, margin: 0 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--plum)" }}>Pinned</span>
+                    </p>
+                    <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "var(--ink)" }}>{pinnedAnn.title}</h2>
+                    <p style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
+                    {/* Actions row */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "var(--plum)", color: "var(--cream)", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                        {pinnedAnn.is_event ? "See details" : "See announcement"}
+                      </button>
+                      {pinnedAnn.is_event && (
+                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--line)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                          {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
                         </button>
-                        {pinnedAnn.is_event && (
-                          <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.08)", color: "#F6F4EF", border: "1px solid rgba(255,255,255,0.25)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
-                            {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
-                          </button>
-                        )}
-                        {pinnedAnn.rsvp_count > 0 && (
-                          <span style={{ fontSize: 12, opacity: 0.6 }}>{pinnedAnn.rsvp_count} going</span>
-                        )}
-                      </div>
+                      )}
+                      {pinnedAnn.rsvp_count > 0 && (
+                        <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{pinnedAnn.rsvp_count} going</span>
+                      )}
                     </div>
-                    {isLeaderOrAdmin && (
-                      <div className="flex gap-2 items-center self-start">
-                        <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
-                          <Edit3 className="w-3.5 h-3.5 text-[#F6F4EF]" />
-                        </button>
-                        <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                          <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                        </button>
-                      </div>
-                    )}
                   </div>
+                  {isLeaderOrAdmin && (
+                    <div className="flex gap-2 items-center self-start">
+                      <button onClick={() => setEditingAnnouncement(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
+                        <Edit3 className="w-3.5 h-3.5" style={{ color: "var(--body)" }} />
+                      </button>
+                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -978,15 +981,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               <EmptyState icon={<Bell className="w-7 h-7" />} title="No results" subtitle="Try a different filter" />
             ) : compact ? (
               /* Compact table */
-              <div className="rounded-xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden">
-                <div className="grid px-5 py-2.5 border-b border-[#E5E0D2]" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden">
+                <div className="grid px-5 py-2.5 border-b border-[var(--line)]" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
                   {["Type", "Title", "When", "Action"].map(h => <span key={h} style={MONO_STYLE}>{h}</span>)}
                 </div>
                 {filteredDesktop.map((ann, i) => (
-                  <div key={ann.id} style={{ borderTop: i ? "1px solid #EFEAE0" : undefined }}>
+                  <div key={ann.id} style={{ borderTop: i ? "1px solid var(--line-3)" : undefined }}>
                     <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#F4F1E8", border: "1px solid #E5E0D2", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
+                        <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "var(--ivory)", border: "1px solid var(--line)", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
                         {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
                       </div>
                       <div
@@ -994,26 +997,26 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         style={{ cursor: "pointer" }}
                         title="See announcement"
                       >
-                        <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "17px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ann.title}</div>
-                        <div style={{ fontSize: "12px", color: "#8A8497", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{previewBody(ann.body)}</div>
+                        <div style={{ fontFamily: "var(--serif)", fontSize: "17px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ann.title}</div>
+                        <div style={{ fontSize: "12px", color: "var(--muted-text)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{previewBody(ann.body)}</div>
                       </div>
-                      <div style={{ fontSize: "12px", color: "#5A5466" }}>{formatDate(ann.created_at)}</div>
+                      <div style={{ fontSize: "12px", color: "var(--body)" }}>{formatDate(ann.created_at)}</div>
                       <div className="flex justify-end items-center gap-1.5">
-                        <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[#3E1540] transition-colors">See →</button>
+                        <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[var(--plum)] transition-colors">See →</button>
                         {ann.is_event && (
-                          <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid #E5E0D2", cursor: "pointer", background: ann.user_has_rsvped ? "#EFEAE0" : "transparent" }}>
+                          <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid var(--line)", cursor: "pointer", background: ann.user_has_rsvped ? "var(--line-3)" : "transparent" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
                           </button>
                         )}
                         {isLeaderOrAdmin && (
                           <>
-                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
-                              {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
+                              {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--body)]" />}
                             </button>
-                            <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${ann.is_sub_pinned ? "bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "hover:bg-[#EFEAE0]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
-                              <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[#3E1540]" : "text-[#A09A8C]"}`} style={{ transform: "rotate(-45deg)" }} />
+                            <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${ann.is_sub_pinned ? "bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "hover:bg-[var(--line-3)]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
+                              <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                             </button>
-                            <button onClick={() => setEditingAnnouncement(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
+                            <button onClick={() => setEditingAnnouncement(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
                             <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                           </>
                         )}
@@ -1026,44 +1029,44 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               /* Editorial 2-col cards */
               <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 {filteredDesktop.map((ann) => (
-                  <article key={ann.id} className="rounded-2xl border border-[#E5E0D2] bg-[#FBF8F2] overflow-hidden hover:shadow-[0_2px_8px_rgba(19,16,26,0.06)] transition-shadow duration-200">
+                  <article key={ann.id} className="rounded-2xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden hover:shadow-[0_2px_8px_rgba(19,16,26,0.06)] transition-shadow duration-200">
                     <div style={{ padding: "26px 28px 22px" }}>
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
                         <div style={{ display: "flex", gap: 4 }}>
                           {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309" }}>Draft</span>}
-                          {ann.is_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#3E1540", textTransform: "uppercase", fontWeight: 500, color: "#F6F4EF" }}>📌 Pinned</span>}
-                          {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#F1ECFF", border: "1px solid #D8CAFF", textTransform: "uppercase", fontWeight: 500, color: "#3E1540" }}>For You</span>}
-                          <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#13101A" }}>{ann.is_event ? "Event" : "Post"}</span>
+                          {ann.is_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--plum)", textTransform: "uppercase", fontWeight: 500, color: "var(--cream)" }}>📌 Pinned</span>}
+                          {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#F1ECFF", border: "1px solid #D8CAFF", textTransform: "uppercase", fontWeight: 500, color: "var(--plum)" }}>For You</span>}
+                          <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--line-3)", textTransform: "uppercase", fontWeight: 500, color: "var(--ink)" }}>{ann.is_event ? "Event" : "Post"}</span>
                         </div>
                       </div>
-                      <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--font-instrument-serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A" }}>{ann.title}</h3>
-                      <p style={{ marginTop: "14px", fontSize: "14px", color: "#5A5466", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
-                      <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginTop: 10, fontFamily: "var(--font-inter)", textAlign: "left" }} className="hover:text-[#3E1540] transition-colors">See announcement →</button>
-                      <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid #EFEAE0" }}>
+                      <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "var(--ink)" }}>{ann.title}</h3>
+                      <p style={{ marginTop: "14px", fontSize: "14px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
+                      <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "var(--muted-text)", marginTop: 10, textAlign: "left" }} className="hover:text-[var(--plum)] transition-colors">See announcement →</button>
+                      <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--line-3)" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", color: "#8A8497" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
+                          <span style={{ fontSize: "12px", color: "var(--muted-text)" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             {ann.has_form && (
                               ann.user_has_responded
                                 ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
-                                : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
+                                : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
                             )}
                             {ann.is_event && (
-                              <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "#EFEAE0" : "transparent", color: "#13101A", border: "1px solid #13101A", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
+                              <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--ink)", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
                                 {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
                               </button>
                             )}
                             {isLeaderOrAdmin && (
                               <>
-                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
-                                  {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#5A5466]" />}
+                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
+                                  {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--body)]" />}
                                 </button>
-                                <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${ann.is_sub_pinned ? "border-[#D8CAFF] bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "border-[#E5E0D2] hover:bg-[#EFEAE0]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
-                                  <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[#3E1540]" : "text-[#A09A8C]"}`} style={{ transform: "rotate(-45deg)" }} />
+                                <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${ann.is_sub_pinned ? "border-[#D8CAFF] bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "border-[var(--line)] hover:bg-[var(--line-3)]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
+                                  <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                                 </button>
-                                <button onClick={() => setEditingAnnouncement(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[#5A5466]" /></button>
-                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                                <button onClick={() => setEditingAnnouncement(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
+                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                               </>
                             )}
                           </div>
@@ -1072,10 +1075,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                           <div style={{ marginTop: 12 }}>
                             <div className="flex flex-wrap gap-1.5">
                               {ann.rsvp_attendees.slice(0, 10).map(a => (
-                                <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                                <span key={a.user_id} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
                               ))}
                               {ann.rsvp_attendees.length > 10 && (
-                                <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
+                                <span style={{ fontSize: "11px", color: "var(--muted-text)", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
                               )}
                             </div>
                           </div>
@@ -1089,15 +1092,16 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           </div>
         </>
       )}
+      </div>
 
       {isLeaderOrAdmin && (
         <button
           onClick={() => setShowCreate(true)}
           style={{ position: "fixed", bottom: "6.5rem", right: "max(calc(50% - 195px + 16px), 16px)" }}
-          className="md:hidden w-12 h-12 bg-[#3E1540] rounded-2xl flex items-center justify-center z-40 hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
+          className="md:hidden w-12 h-12 bg-[var(--plum)] rounded-2xl flex items-center justify-center z-40 hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150"
           aria-label="New announcement"
         >
-          <Plus className="w-6 h-6 text-[#F6F4EF]" />
+          <Plus className="w-6 h-6 text-[var(--cream)]" />
         </button>
       )}
 
@@ -1261,7 +1265,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
   // ── Ivory card ──
   return (
     <>
-      <div className="relative rounded-[22px] bg-white border border-[#E5E0D2] overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
+      <div className="relative rounded-[22px] bg-[var(--cream)] border border-[var(--line)] overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
         {announcement.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={announcement.image_url} alt={announcement.title} className="w-full h-36 object-cover" />
@@ -1272,22 +1276,22 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             <div className="flex items-center gap-2 flex-wrap">
               <span style={MONO_STYLE}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
               {announcement.audience && announcement.audience !== "all" && (
-                <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", color: "#5A5466", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+                <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
               )}
             </div>
             {isAdminOrLeader && (
               <div className="relative">
                 {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[#F4F1E8] transition-colors">
-                  <MoreHorizontal className="w-4 h-4 text-[#8A8497]" />
+                <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--ivory)] transition-colors">
+                  <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
                 {showMenu && (
-                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
-                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
-                      {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#3E1540]" />}
+                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
+                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream)] transition-colors text-left">
+                      {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                       {announcement.is_pinned ? "Unpin" : "Pin"}
                     </button>
-                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
+                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
                     <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                   </div>
                 )}
@@ -1295,47 +1299,47 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             )}
           </div>
 
-          <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "#13101A", margin: "0 0 6px" }}>{announcement.title}</h3>
-          <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "#5A5466" }}>{previewBody(announcement.body)}</p>
-          <button onClick={() => onOpenDetail(announcement.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "#8A8497", marginBottom: "16px", fontFamily: "var(--font-inter)" }} className="hover:text-[#3E1540] transition-colors text-left">See announcement →</button>
+          <h3 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: "22px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>{announcement.title}</h3>
+          <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "var(--body)" }}>{previewBody(announcement.body)}</p>
+          <button onClick={() => onOpenDetail(announcement.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "var(--muted-text)", marginBottom: "16px" }} className="hover:text-[var(--plum)] transition-colors text-left">See announcement →</button>
 
           {announcement.is_event && (
-            <div className="pt-3 border-t border-[#EFEAE0]">
+            <div className="pt-3 border-t border-[var(--line-3)]">
               <div className="flex items-center gap-3">
-                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[#EFEAE0] text-[#5A5466] hover:bg-[#E5E0D2] active:scale-[0.97]" : "bg-[#3E1540] text-[#F6F4EF] hover:bg-[#2D0F2E] active:scale-[0.97]"}`}>
+                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                   {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
                 </button>
-                {announcement.rsvp_count > 0 && <span className="text-[12px] text-[#8A8497] font-medium">{announcement.rsvp_count} going</span>}
+                {announcement.rsvp_count > 0 && <span className="text-[12px] text-[var(--muted-text)] font-medium">{announcement.rsvp_count} going</span>}
               </div>
               {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {announcement.rsvp_attendees.slice(0, 8).map(a => (
-                    <span key={a.user_id} style={{ fontSize: "11px", color: "#5A5466", background: "#F4F1E8", border: "1px solid #E5E0D2", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                    <span key={a.user_id} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
                   ))}
                   {announcement.rsvp_attendees.length > 8 && (
-                    <span style={{ fontSize: "11px", color: "#8A8497", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
+                    <span style={{ fontSize: "11px", color: "var(--muted-text)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
                   )}
                 </div>
               )}
             </div>
           )}
           {announcement.has_form && (
-            <div className={`${!announcement.is_event ? "pt-3 border-t border-[#EFEAE0]" : "mt-2"}`}>
+            <div className={`${!announcement.is_event ? "pt-3 border-t border-[var(--line-3)]" : "mt-2"}`}>
               {announcement.user_has_responded
                 ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
               }
             </div>
           )}
         </div>
 
         {showDeleteConfirm && (
-          <div className="absolute inset-0 z-[20] bg-white/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
+          <div className="absolute inset-0 z-[20] bg-[var(--cream)]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
             <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-            <p className="text-[15px] font-bold text-[#13101A] text-center">Delete this announcement?</p>
-            <p className="text-[12px] text-[#8A8497] text-center -mt-1">This can&apos;t be undone.</p>
+            <p className="text-[15px] font-bold text-[var(--ink)] text-center">Delete this announcement?</p>
+            <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[#E5E0D2] text-[13px] font-semibold text-[#5A5466] hover:bg-[#F4F1E8] transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
@@ -1348,14 +1352,14 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
 
 // ── Announcement Detail View (in-shell overlay) ──────────────────────────────
 
-const DETAIL_SERIF = "var(--font-instrument-serif)"
+const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
 const DETAIL_MONO: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
   fontSize: 11,
   letterSpacing: "1.4px",
   textTransform: "uppercase" as const,
-  color: "#8A8497",
+  color: "var(--muted-text)",
 }
 
 interface DetailAnnouncement {
@@ -1470,7 +1474,7 @@ export function AnnouncementDetailView({
 
   const monoStyle: React.CSSProperties = {
     fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497",
+    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   function DetailContent() {
