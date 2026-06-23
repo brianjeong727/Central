@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo, PlanLineIcon } from "@/app/home/components/shared"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -100,22 +100,17 @@ function ToggleRow({ title, desc, on, onClick }: {
 
 // ─── Fixed beta teams ────────────────────────────────────────────
 const BETA_TEAMS = [
-  { icon: "📖", name: "Small Group Leaders",  desc: "Bible study & discipleship"   },
-  { icon: "🏛️", name: "Student Org Board",    desc: "Campus ministry leadership"   },
+  { iconKey: "book",  name: "Small Group Leaders",  desc: "Bible study & discipleship"  },
+  { iconKey: "users", name: "Student Org Board",    desc: "Campus ministry leadership"  },
 ]
 
-function BetaTeamRow({ icon, name, desc }: { icon: string; name: string; desc: string }) {
+function BetaTeamRow({ iconKey, name, desc }: { iconKey: string; name: string; desc: string }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
       border: "1px solid #E8E2D2", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
     }}>
-      <span style={{
-        width: 38, height: 38, borderRadius: 999, background: "#F6F2E8",
-        display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0,
-      }}>
-        {icon}
-      </span>
+      <PlanLineIcon iconKey={iconKey} size={38} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, color: "#13101A" }}>{name}</div>
         <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>{desc}</div>
@@ -267,7 +262,7 @@ export default function OnboardingPage() {
       university: universities[0] ?? "",
       universities,
       location, size,
-      teams: includeTeams ? BETA_TEAMS.map(t => ({ name: t.name, icon: t.icon })) : [],
+      teams: includeTeams ? BETA_TEAMS.map(t => ({ name: t.name, icon: t.iconKey })) : [],
       isPublic,
     })
     if (err) { setError(err); setSubmitting(false); return }
@@ -490,7 +485,7 @@ export default function OnboardingPage() {
               <div style={mono}>Available teams</div>
               <div style={{ marginTop: 12 }}>
                 {BETA_TEAMS.map(t => (
-                  <BetaTeamRow key={t.name} icon={t.icon} name={t.name} desc={t.desc} />
+                  <BetaTeamRow key={t.name} iconKey={t.iconKey} name={t.name} desc={t.desc} />
                 ))}
               </div>
 
