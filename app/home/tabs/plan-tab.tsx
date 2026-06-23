@@ -39,7 +39,6 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -9622,14 +9621,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                     transition: "background 0.12s",
                   }}
                 >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                    background: i % 2 === 0 ? "#3E1540" : "#13101A",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#FBF8F2", fontSize: 13, fontWeight: 600,
-                  }}>
-                    {getInitials(member.name)}
-                  </div>
+                  <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-semibold" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
                     {selected && roles.length > 1 ? (
@@ -9686,7 +9678,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         <div className="flex items-center gap-2">
           {!showAddMember && (confirmDelete
             ? <span className="text-[18px]">⚠️</span>
-            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="#3E1540" fg="#FBF8F2" radius={6} />
+            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="#3E1540" fg="#FBF8F2" />
           )}
           <span className="text-[14px] font-semibold text-[#13101A]">
             {showAddMember ? "Add Member" : confirmDelete ? "Delete team?" : team.name}
@@ -9860,9 +9852,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
                             onClick={() => { if ((isAdmin || isPresident) && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
-                            <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
-                              {getInitials(m.name)}
-                            </div>
+                            <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
                             <div className="flex-1 min-w-0">
                               <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
                               {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
@@ -9912,7 +9902,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               <>
                 {/* Hero strip */}
                 <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="#3E1540" fg="#F6F4EF" radius={20} />
+                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="#3E1540" fg="#F6F4EF" />
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
                     {editingTeamName ? (
@@ -10136,9 +10126,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                           transition: "background 0.1s",
                         }}
                       >
-                        <div style={{ width: 32, height: 32, borderRadius: 9, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", color: "#FBF8F2", fontSize: 12, fontWeight: 600 }}>
-                          {getInitials(m.name)}
-                        </div>
+                        <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
                         <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
                         {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
                           <select
@@ -10476,7 +10464,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
             <>
               {/* Live preview tile */}
               <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#F6F2E8", marginBottom: 28 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" radius={12} />
+                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" />
                 <div>
                   <div style={WIZARD_MONO}>PREVIEW</div>
                   <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginTop: 4, letterSpacing: "-0.2px", fontWeight: 400, lineHeight: 1.1 }}>
@@ -10535,7 +10523,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
             <>
               {/* Identity summary */}
               <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", marginBottom: 24 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" radius={12} />
+                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: "-0.2px", fontWeight: 400 }}>{name}</div>
                   <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>

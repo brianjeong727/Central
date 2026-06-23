@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { MonogramChip } from "@/components/central"
 
 export interface ChatPreview {
   id: string
@@ -59,14 +59,11 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
       className="w-full bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
     >
       <div className="flex items-center gap-3.5">
-        <Avatar className="w-12 h-12 rounded-2xl flex-shrink-0" style={{ background: "var(--plum)", borderRadius: "16px" }}>
-          <AvatarFallback
-            className="bg-transparent"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--cream)" }}
-          >
-            {firstInitial}
-          </AvatarFallback>
-        </Avatar>
+        <MonogramChip
+          initials={firstInitial}
+          className="w-12 h-12 flex-shrink-0"
+          style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
+        />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">

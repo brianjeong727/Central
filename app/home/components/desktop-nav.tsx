@@ -152,7 +152,6 @@ export function DesktopSidebar({
                     bg={isActive ? PLUM : "var(--line)"}
                     fg={isActive ? "var(--cream)" : INK}
                     size={30}
-                    radius={8}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>

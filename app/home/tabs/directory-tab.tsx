@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip } from "@/components/central"
 import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
 
@@ -101,19 +100,12 @@ export function DirectoryMemberListPanel({
                 onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--cream-3)" }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "" }}
               >
-                <div
-                  style={{
-                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                    background: "var(--plum)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  {member.avatar_url
-                    ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <span style={{ fontFamily: "var(--serif)", fontSize: 12, color: "var(--cream)", fontWeight: 400 }}>{getInitials(member.name)}</span>
-                  }
-                </div>
+                <MonogramChip
+                  initials={getInitials(member.name)}
+                  avatarUrl={member.avatar_url}
+                  className="w-8 h-8"
+                  style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 400 }}
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate leading-tight" style={{ color: "var(--ink)" }}>
                     {member.name}
@@ -272,10 +264,7 @@ export function DirectoryTab({
                 }}
               >
                 <div className="flex items-center gap-3.5">
-                  <Avatar className="w-11 h-11" style={{ background: "var(--plum)" }}>
-                    {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-                    <AvatarFallback className="font-bold text-[11px] bg-transparent tracking-wide" style={{ color: "var(--cream)" }}>{getInitials(member.name)}</AvatarFallback>
-                  </Avatar>
+                  <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-11 h-11 font-bold text-[11px] tracking-wide" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-[14px] tracking-tight" style={{ color: "var(--ink)" }}>{member.name}</h3>
@@ -381,19 +370,12 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
   return (
     <div className="flex flex-col items-center px-16 py-16">
       {/* Avatar */}
-      <div
-        style={{
-          width: 120, height: 120, borderRadius: "50%",
-          background: "var(--plum)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginBottom: 28, overflow: "hidden", flexShrink: 0,
-        }}
-      >
-        {member.avatar_url
-          ? <img src={member.avatar_url} alt={member.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--cream)", fontWeight: 400 }}>{getInitials(member.name)}</span>
-        }
-      </div>
+      <MonogramChip
+        initials={getInitials(member.name)}
+        avatarUrl={member.avatar_url}
+        className="flex-shrink-0"
+        style={{ width: 120, height: 120, marginBottom: 28, fontFamily: "var(--serif)", fontSize: 40, fontWeight: 400 }}
+      />
 
       {/* Member name — prominent heading in the detail body */}
       <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1, textAlign: "center" }}>
@@ -550,12 +532,7 @@ export function MemberSheet({
           >
             <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
           </button>
-          <Avatar className="w-9 h-9 flex-shrink-0 rounded-full" style={{ background: "var(--plum)" }}>
-            {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-            <AvatarFallback className="font-bold text-[13px] bg-transparent" style={{ color: "var(--cream)" }}>
-              {getInitials(member.name)}
-            </AvatarFallback>
-          </Avatar>
+          <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[13px]" />
           <h2 className="flex-1 min-w-0 text-[15px] font-bold text-[#13101A] tracking-tight truncate">
             {member.name}
           </h2>
@@ -564,12 +541,7 @@ export function MemberSheet({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-6">
           <div className="flex flex-col items-center mb-7">
-            <Avatar className="w-20 h-20 mb-4" style={{ background: "var(--plum)" }}>
-              {member.avatar_url && <img src={member.avatar_url} alt={member.name} className="w-full h-full object-cover rounded-full" />}
-              <AvatarFallback className="font-bold text-2xl bg-transparent" style={{ color: "var(--cream)" }}>
-                {getInitials(member.name)}
-              </AvatarFallback>
-            </Avatar>
+            <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-bold text-2xl mb-4" />
             <h1 className="text-[22px] font-bold text-[#13101A] tracking-tight mb-2">{member.name}</h1>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (

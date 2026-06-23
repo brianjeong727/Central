@@ -23,6 +23,7 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { getInitials } from "../utils"
+import { MonogramChip } from "@/components/central"
 
 interface MemberRow {
   id: string
@@ -624,9 +625,11 @@ export function SettingsTab({
                   <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
                 </div>
                 <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 14, background: "#3E1540", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, color: "#FBF8F2" }}>{(ministryInfo?.name ?? ministryName)[0]}</span>
-                  </div>
+                  <MonogramChip
+                    initials={(ministryInfo?.name ?? ministryName)[0]}
+                    className="flex-shrink-0"
+                    style={{ width: 64, height: 64, fontFamily: "var(--font-instrument-serif)", fontSize: 30 }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {editingName ? (
                       <input autoFocus value={nameDraft} onChange={e => setNameDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }} onBlur={() => saveMinistryField("name", nameDraft)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }} />
@@ -879,7 +882,7 @@ export function SettingsTab({
                   const menuOpen = peopleRoleMenuOpen === m.id
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid #EFE9DA" : "none", position: "relative" }}>
-                      <span style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: "var(--plum)", color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600 }}>{getInitials(m.name)}</span>
+                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-semibold" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{m.name}</span>
@@ -940,7 +943,7 @@ export function SettingsTab({
                   <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                     {bannedMembers.map((b, i) => (
                       <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
-                        <span style={{ width: 36, height: 36, borderRadius: 9, background: "#7A1010", color: "#FBF8F2", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{getInitials(b.name ?? "?")}</span>
+                        <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-semibold" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{b.name ?? "Unknown"}</div>
                           <div style={{ fontSize: 12, color: "#8A8497", marginTop: 1 }}>{b.email ?? ""}</div>
@@ -1409,9 +1412,7 @@ function MembersFullOverlay({ members, userId, isAdmin, initialFilter, onClose, 
             const menuOpen = roleMenuOpen === m.id
             return (
               <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderTop: i ? "1px solid #EFE9DA" : undefined, position: "relative" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: i % 2 === 0 ? "#3E1540" : "#13101A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#FBF8F2" }}>{getInitials(m.name)}</span>
-                </div>
+                <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", margin: 0 }}>{m.name}</p>
