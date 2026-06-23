@@ -104,7 +104,7 @@ export function DirectoryMemberListPanel({
                 <div
                   style={{
                     width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                    background: "var(--ink)",
+                    background: "var(--plum)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     overflow: "hidden",
                   }}
