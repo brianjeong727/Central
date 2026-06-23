@@ -129,7 +129,7 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
 
   if (done) {
     return (
-      <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[296px]">
+      <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[var(--shell-offset)]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
           <Check className="w-8 h-8 text-[#3E1540]" />
         </div>
@@ -142,7 +142,7 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
   }
 
   return (
-    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       <div className="flex-shrink-0 border-b border-[#E8E2D2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
           <div>
@@ -350,7 +350,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
   })
 
   return (
-    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       <div className="flex-shrink-0 border-b border-[#E8E2D2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-5 md:px-10">
           <div>

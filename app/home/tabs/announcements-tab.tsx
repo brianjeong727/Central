@@ -172,7 +172,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
   if (success) {
     return (
-      <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[296px]">
+      <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[var(--shell-offset)]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
           <CheckCircle2 className="w-8 h-8 text-[#3E1540]" />
         </div>
@@ -190,7 +190,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   }
 
   return (
-    <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
@@ -1602,7 +1602,7 @@ export function AnnouncementDetailView({
   return (
     <>
       {/* Exact same shell as CreateAnnouncementModal */}
-      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
         {/* Header — mirrors CreateAnnouncementModal: mono label left, close right, border-b */}
         <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
           <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">

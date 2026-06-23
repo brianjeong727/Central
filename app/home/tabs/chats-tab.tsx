@@ -456,7 +456,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   if (showAddMembers) {
     return (
-      <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+      <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
         <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-white border-b border-[#ECE8DE]">
@@ -557,7 +557,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[296px]">
+    <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
       {/* ── Mobile header (hidden on desktop) ── */}
@@ -2104,7 +2104,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   return (
     <>
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[296px]"}>
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
@@ -3009,7 +3009,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* Overlay to dismiss emoji / context menu / GIF picker */}
       {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker || pollMenuFor) && (
         <div
-          className="fixed inset-0 z-[155] md:left-[296px]"
+          className="fixed inset-0 z-[155] md:left-[var(--shell-offset)]"
           onClick={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
         />
       )}

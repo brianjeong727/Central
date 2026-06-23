@@ -44,6 +44,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from 
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
+import { MonogramChip } from "@/components/central"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -6102,7 +6103,7 @@ export function EventPlanWorkspace({
         ? {}
         : { position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }
       }
-      className={inline ? "" : "md:left-[296px]"}
+      className={inline ? "" : "md:left-[var(--shell-offset)]"}
     >
       {/* Plum hero header — hidden when the parent already renders a calm header (hideHero) */}
       {!hideHero && <div style={{ padding: inline ? "18px 0 0" : "0 24px", paddingTop: 18 }}>
@@ -8827,7 +8828,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
   return (
-    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
+    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
         <button
@@ -9672,7 +9673,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   )
 
   return (
-    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[296px] md:max-w-none">
+    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">

@@ -153,6 +153,12 @@
   --sidebar-accent-foreground: #2D0F2E;
   --sidebar-border:           #E8E2D2;
   --sidebar-ring:             #3E1540;
+
+  /* ── Shell layout — single source of truth ──────────────────────────────── */
+  /* To widen the sidebar: change --sidebar-width only. --shell-offset derives. */
+  --rail-width:    72px;
+  --sidebar-width: 264px;
+  --shell-offset:  calc(var(--rail-width) + var(--sidebar-width) + 4px);
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
