@@ -99,11 +99,12 @@ function StripCard({ chat, index, onOpen }: {
       <div style={{
         width: 36,
         height: 36,
-        borderRadius: 9,
+        borderRadius: 999,
         flexShrink: 0,
         background: "var(--plum)",
         display: "grid",
         placeItems: "center",
+        overflow: "hidden",
         fontSize: 16,
         fontWeight: 400,
         fontFamily: "var(--serif)",
