@@ -7,7 +7,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, StatCard, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader } from "@/components/central"
 import type { HomeTabProps, Announcement } from "../types"
 
 export { HomeTabProps }
@@ -77,7 +77,6 @@ export function HomeTab({
 
   const [forYouItems, setForYouItems] = useState<Announcement[]>([])
   const [rsvpedAnnIds, setRsvpedAnnIds] = useState<Set<string>>(new Set())
-  const [memberCount, setMemberCount] = useState<number | null>(null)
   const [eventCount, setEventCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
@@ -123,15 +122,10 @@ export function HomeTab({
 
   useEffect(() => {
     async function load() {
-      const memberCountQuery = isLeaderOrAdmin
-        ? supabase.from("profiles").select("*", { count: "exact", head: true }).eq("ministry_id", ministryId)
-        : Promise.resolve({ count: null as number | null, data: null, error: null })
-
       const [
         { data: anns },
         { data: prayerProfile },
         { data: verses },
-        { count: memberCountRaw },
       ] = await Promise.all([
         supabase
           .from("announcements")
@@ -153,7 +147,6 @@ export function HomeTab({
           .select("reference, text")
           .eq("ministry_id", ministryId)
           .order("order_index", { ascending: true }),
-        memberCountQuery,
       ])
 
       // suppress unused variable warning for prayerProfile (state was removed but fetch kept)
@@ -167,8 +160,6 @@ export function HomeTab({
         const v = verses[dayOfYear % verses.length] as { reference: string; text: string }
         setHomeVerse(v)
       }
-      setMemberCount(memberCountRaw ?? null)
-
       const list = anns ?? []
       const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
       setHeroAnn(hero)
@@ -348,14 +339,6 @@ export function HomeTab({
               </span>
             </PageTitle>
 
-            {/* Stat cards row — centered against the greeting text block */}
-            <div className="flex gap-4">
-              <StatCard eyebrow="Events" value={eventCount} sub="upcoming" valueSize={32} />
-              <StatCard eyebrow="Unread" value={totalUnread} sub="messages" valueSize={32} />
-              {isLeaderOrAdmin && memberCount !== null && (
-                <StatCard eyebrow="Members" value={memberCount} sub="in ministry" valueSize={32} />
-              )}
-            </div>
           </TabPageHeader>
 
           {/* Desktop: main content */}
