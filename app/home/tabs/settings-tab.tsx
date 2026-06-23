@@ -617,7 +617,7 @@ export function SettingsTab({
       {/* Scrollable content: tab strip + tab panels */}
       <div className="md:flex-1 md:overflow-y-auto md:pb-10">
         {/* ── Tab strip — edge-to-edge per §4.2 ── */}
-        <div style={{ marginTop: 28 }}>
+        <div>
           <PlanSubTabStrip
             tabs={TABS}
             active={activeSettingsTab}
