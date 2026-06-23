@@ -309,6 +309,27 @@ export async function registerMinistry(data: {
 
   if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create ministry." }
 
+  // Preserve existing ministry in user_ministries before overwriting profiles.ministry_id
+  // so the pending-status check in middleware can find and redirect back to the active ministry
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (existingProfile?.ministry_id) {
+    await admin.from("user_ministries").upsert(
+      { user_id: user.id, ministry_id: existingProfile.ministry_id, role: existingProfile.role ?? "member" },
+      { onConflict: "user_id,ministry_id" }
+    )
+  }
+
+  // Track the new pending ministry in user_ministries as well
+  await admin.from("user_ministries").upsert(
+    { user_id: user.id, ministry_id: ministry.id, role: "admin" },
+    { onConflict: "user_id,ministry_id" }
+  )
+
   const { data: updatedRows, error: profileErr } = await admin
     .from("profiles")
     .update({ ministry_id: ministry.id, role: "admin" })

@@ -112,6 +112,35 @@ export async function proxy(request: NextRequest) {
   const status = ministry?.status ?? 'active'
 
   if (status === 'pending') {
+    // Check whether the user belongs to any other active ministry — if so, let
+    // them switch rather than hard-locking them to the pending-status page.
+    const { data: otherMemberships } = await supabase
+      .from('user_ministries')
+      .select('ministry_id')
+      .eq('user_id', user.id)
+      .neq('ministry_id', profile.ministry_id)
+
+    let hasActiveMinistry = false
+    if (otherMemberships && otherMemberships.length > 0) {
+      const otherIds = otherMemberships.map((m: { ministry_id: string }) => m.ministry_id)
+      const { data: active } = await supabase
+        .from('ministries')
+        .select('id')
+        .in('id', otherIds)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle()
+      hasActiveMinistry = !!active
+    }
+
+    if (hasActiveMinistry) {
+      // Route to pick-ministry so they can switch back to their active church
+      if (pathname.startsWith('/pick-ministry') || pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname === '/') {
+        return supabaseResponse
+      }
+      return NextResponse.redirect(new URL('/pick-ministry', request.url))
+    }
+
     if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && pathname !== '/') {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
