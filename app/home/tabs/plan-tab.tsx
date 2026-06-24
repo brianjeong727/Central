@@ -1289,29 +1289,28 @@ export function StudentOrgTeamHome({
       const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()
       const evCfg = getEventConfig(planningEvent)
       return (
-        <div style={{ padding: "26px 56px 60px" }}>
-          <div style={{ marginBottom: 28 }}>
-            <p style={{ ...mono, color: "#8A8497" }}>{evCfg.label.toUpperCase()} · {evDateStr}</p>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
-              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1, margin: 0 }}>
-                {planningEvent.title}
-              </h1>
-              {canEdit && onEditEvent && (
-                <button
-                  onClick={onEditEvent}
-                  style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid #E5E0D2", background: "var(--cream)", cursor: "pointer", flexShrink: 0 }}
-                  title="Edit event"
-                >
-                  <Pencil style={{ width: 14, height: 14, color: "#5A5466" }} />
-                </button>
+        <div>
+          <TabPageHeader>
+            <PageTitle
+              eyebrow={`${evCfg.label.toUpperCase()} · ${evDateStr}`}
+              title={planningEvent.title}
+            >
+              {(planningEvent.description || planningEvent.location) && (
+                <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-text)" }}>
+                  {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
+                </p>
               )}
-            </div>
-            {(planningEvent.description || planningEvent.location) && (
-              <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466" }}>
-                {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
-              </p>
+            </PageTitle>
+            {canEdit && onEditEvent && (
+              <button
+                onClick={onEditEvent}
+                style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid var(--line)", background: "var(--cream)", cursor: "pointer", flexShrink: 0, marginLeft: "auto", alignSelf: "flex-start", marginTop: 4 }}
+                title="Edit event"
+              >
+                <Pencil style={{ width: 14, height: 14, color: "var(--muted-text)" }} />
+              </button>
             )}
-          </div>
+          </TabPageHeader>
           <EventPlanWorkspace
             inline
             hideHero
@@ -6436,7 +6435,7 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Content */}
-      <div style={{ padding: "24px 40px 80px" }}>
+      <div className="md:px-14" style={{ padding: "24px 20px 80px" }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
         ) : (
