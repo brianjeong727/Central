@@ -1209,6 +1209,7 @@ export function StudentOrgTeamHome({
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
 
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
@@ -1353,7 +1354,7 @@ export function StudentOrgTeamHome({
               { key: "Rotations", label: "Rotations" },
             ]}
             active={teamTab}
-            onChange={t => setTeamTabAndUrl(t as "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations")}
+            onChange={t => setTeamTabAndUrl(t as "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
           />
         </div>
       )}
@@ -1363,7 +1364,7 @@ export function StudentOrgTeamHome({
         const sectionMeta: Record<string, { eyebrow: string; title: string }> = {
           General:   { eyebrow: `GENERAL · ${teamName.toUpperCase()}`, title: "General" },
           Notes:     { eyebrow: "MEETING NOTES", title: "Notes" },
-          Plan:      { eyebrow: "EVENTS & PLANNING", title: "Event Plans" },
+          Events:    { eyebrow: "EVENTS & PLANNING", title: "Events" },
           Resources: { eyebrow: "TEAM RESOURCES", title: "Resources" },
           Groups:    { eyebrow: "SMALL GROUPS", title: "Groups" },
           Rotations: { eyebrow: "ROTATIONS", title: "Rotations" },
@@ -1372,7 +1373,7 @@ export function StudentOrgTeamHome({
         return (
           <TabPageHeader>
             <PageTitle eyebrow={meta.eyebrow} title={meta.title} />
-            {displaySection === "Plan" && canEdit && (
+            {displaySection === "Events" && canEdit && (
               <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
             )}
             {displaySection === "Resources" && userRosterRole && (
@@ -1439,14 +1440,14 @@ export function StudentOrgTeamHome({
         )}
 
         {/* PLAN — events list with Plan → links */}
-        {displaySection === "Plan" && (
+        {displaySection === "Events" && (
           <div>
             {/* Mobile header + New Event (desktop header is TabPageHeader above) */}
             {!isDesktopView && (
               <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
                 <div>
                   <p style={mono}>Events & planning</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Events</h2>
                 </div>
                 {canEdit && (
                   <button
@@ -1468,61 +1469,61 @@ export function StudentOrgTeamHome({
                   const isPlanned = plannedIds.has(ev.id)
                   const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
                   const isConfirmDelete = deleteConfirmId === ev.id
+                  const isHovered = hoveredEventId === ev.id
                   return (
                     <div
                       key={ev.id}
+                      onClick={() => !isConfirmDelete && onPlanningEventChange(ev)}
+                      onMouseEnter={() => !isConfirmDelete && setHoveredEventId(ev.id)}
+                      onMouseLeave={() => setHoveredEventId(null)}
                       style={{
-                        display: "flex", alignItems: "center", gap: 18,
-                        padding: "18px 20px", borderRadius: 14,
-                        border: `1px solid ${isConfirmDelete ? "#F0C8C8" : "#E8E2D2"}`,
-                        background: isConfirmDelete ? "#FEF7F7" : "#FBF8F2",
-                        transition: "border-color 0.15s, background 0.15s",
+                        display: "flex", alignItems: "center", gap: 16,
+                        padding: "16px 20px", borderRadius: 12,
+                        border: `1px solid ${isConfirmDelete ? "#F0C8C8" : "var(--line)"}`,
+                        background: isConfirmDelete ? "#FEF7F7" : isHovered ? "var(--ivory)" : "var(--body-bg)",
+                        cursor: isConfirmDelete ? "default" : "pointer",
+                        transition: "background 120ms ease, border-color 120ms ease",
                       }}
                     >
-                      <span style={{ width: 8, height: 8, borderRadius: 99, background: isConfirmDelete ? "#C0392B" : getEventConfig(ev).dot, flexShrink: 0, transition: "background 0.15s" }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: isConfirmDelete ? "#9F3030" : "#13101A", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
-                        <p style={{ fontSize: 13, color: isConfirmDelete ? "#C08080" : "#8A8497", margin: "3px 0 0" }}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: isConfirmDelete ? "#9F3030" : "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                        <p style={{ fontSize: 12, color: isConfirmDelete ? "#C08080" : "var(--muted-text)", margin: "3px 0 0", fontFamily: "var(--sans)" }}>
                           {isConfirmDelete ? "Delete this event and all its planning data?" : `${dateStr}${ev.location ? ` · ${ev.location}` : ""}`}
                         </p>
                       </div>
                       {isConfirmDelete ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                           <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            style={{ padding: "8px 16px", borderRadius: 9, border: "1px solid #E8E2D2", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "#5A5466" }}
+                            onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }}
+                            style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}
                           >
                             Cancel
                           </button>
                           <button
-                            onClick={() => handleDeleteEvent(ev.id)}
+                            onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id) }}
                             disabled={deleting}
-                            style={{ padding: "8px 16px", borderRadius: 9, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}
+                            style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}
                           >
                             {deleting ? "Deleting…" : "Delete"}
                           </button>
                         </div>
                       ) : (
-                        <>
-                          <span style={{ fontSize: 11, fontWeight: 500, color: isPlanned ? "#14532D" : "#92400E", background: isPlanned ? "#DCFCE7" : "#FEF3C7", borderRadius: 9999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                            {isPlanned ? "Planned ✓" : "Needs planning"}
-                          </span>
-                          <button
-                            onClick={() => onPlanningEventChange(ev)}
-                            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-                          >
-                            {isPlanned ? "View plan →" : "Plan →"}
-                          </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          {isPlanned && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
                           {canEdit && (
                             <button
-                              onClick={() => setDeleteConfirmId(ev.id)}
-                              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "#C4BEBC", flexShrink: 0, display: "flex", alignItems: "center" }}
+                              onClick={e => { e.stopPropagation(); setDeleteConfirmId(ev.id) }}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--muted-text)", flexShrink: 0, display: "flex", alignItems: "center", opacity: isHovered ? 1 : 0, transition: "opacity 120ms" }}
                               title="Delete event"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           )}
-                        </>
+                        </div>
                       )}
                     </div>
                   )
@@ -2105,7 +2106,7 @@ export function PlanTab({
               refreshSignal={studentOrgRefreshSignal}
               onOpenChat={onOpenChat}
               isDesktopView
-              desktopSection={studentOrgSection ?? "Plan"}
+              desktopSection={studentOrgSection ?? "Events"}
               onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
               onEditEvent={() => setShowEditEvent(true)}
             />
@@ -2346,9 +2347,9 @@ export function StudentOrgSectionNav({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
-  const SECTIONS = ["General", "Notes", "Plan", "Resources", "Groups", "Rotations"] as const
+  const SECTIONS = ["General", "Notes", "Events", "Resources", "Groups", "Rotations"] as const
 
-  const isPlanExpanded = activeSection === "Plan" || planningEvent !== null
+  const isPlanExpanded = activeSection === "Events" || planningEvent !== null
   const PLUM = "#3E1540"
   const FAINT = "var(--faint)"
   const LINE = "var(--line)"
@@ -2358,14 +2359,14 @@ export function StudentOrgSectionNav({
       {/* Section nav */}
       <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
         {SECTIONS.map(section => {
-          const isPlan = section === "Plan"
+          const isPlan = section === "Events"
           const isActive = isPlan ? isPlanExpanded : activeSection === section
           return (
             <div key={section}>
               <button
                 onClick={() => {
                   onSectionChange(section)
-                  if (section !== "Plan") onPlanningEventChange(null)
+                  if (section !== "Events") onPlanningEventChange(null)
                 }}
                 style={{ ...sidebarItemStyle(isActive), marginBottom: 1 }}
               >
@@ -2388,7 +2389,7 @@ export function StudentOrgSectionNav({
                       return (
                         <button
                           key={ev.id}
-                          onClick={() => { onPlanningEventChange(ev); onSectionChange("Plan") }}
+                          onClick={() => { onPlanningEventChange(ev); onSectionChange("Events") }}
                           style={{ ...sidebarItemStyle(isEvActive), borderRadius: "var(--r-pill)" }}
                         >
                           <span style={{ width: 6, height: 6, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0, marginRight: 3 }} />
