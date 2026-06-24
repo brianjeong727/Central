@@ -7719,18 +7719,6 @@ function GroupsTab({
 
   return (
     <div>
-      {canEdit && sessions.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-          <button
-            onClick={() => setShowWizard(true)}
-            style={{ padding: "10px 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}
-          >
-            <Plus style={{ width: 15, height: 15 }} />
-            Generate groups
-          </button>
-        </div>
-      )}
-
       {loading ? (
         <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
           <Loader2 style={{ width: 24, height: 24, color: "#8A8497" }} className="animate-spin" />
@@ -7817,6 +7805,18 @@ function GroupsTab({
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {canEdit && sessions.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24 }}>
+          <button
+            onClick={() => setShowWizard(true)}
+            style={{ padding: "10px 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}
+          >
+            <Plus style={{ width: 15, height: 15 }} />
+            Generate groups
+          </button>
         </div>
       )}
 
