@@ -1184,12 +1184,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations"
+    return (["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations") {
+  function setTeamTabAndUrl(tab: "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1347,14 +1347,14 @@ export function StudentOrgTeamHome({
           <PlanSubTabStrip
             tabs={[
               { key: "General", label: "General" },
-              { key: "Notes", label: "Notes" },
+              { key: "Meeting Notes", label: "Meeting Notes" },
               { key: "Events", label: "Events" },
               { key: "Resources", label: "Resources" },
               { key: "Groups", label: "Groups" },
               { key: "Rotations", label: "Rotations" },
             ]}
             active={teamTab}
-            onChange={t => setTeamTabAndUrl(t as "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
+            onChange={t => setTeamTabAndUrl(t as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
           />
         </div>
       )}
@@ -1362,7 +1362,7 @@ export function StudentOrgTeamHome({
       {/* Desktop section header — shared TabPageHeader + PageTitle */}
       {isDesktopView && (() => {
         const sectionMeta: Record<string, string> = {
-          General: "General", Notes: "Notes", Events: "Events",
+          General: "General", "Meeting Notes": "Meeting Notes", Events: "Events",
           Resources: "Resources", Groups: "Groups", Rotations: "Rotations",
         }
         const sectionTitle = sectionMeta[displaySection] ?? displaySection
@@ -1377,7 +1377,7 @@ export function StudentOrgTeamHome({
                 {userRosterRole}
               </span>
             )}
-            {displaySection === "Notes" && canEdit && (
+            {displaySection === "Meeting Notes" && canEdit && (
               <HeaderActionButton label="Start new" onClick={() => setNotesTrigger(t => t + 1)} />
             )}
             {displaySection === "Groups" && canEdit && (
@@ -1423,12 +1423,12 @@ export function StudentOrgTeamHome({
         )}
 
         {/* NOTES — meeting notes timeline */}
-        {displaySection === "Notes" && (
+        {displaySection === "Meeting Notes" && (
           <div>
             {!isDesktopView && (
               <div style={{ marginBottom: 28 }}>
                 <p style={mono}>Meeting Notes</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Notes</h2>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Meeting Notes</h2>
               </div>
             )}
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} />
@@ -1758,6 +1758,7 @@ export function PlanTab({
   onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat,
   onTeamSelect,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
+  sglSection, onSglSectionChange,
 }: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
@@ -2114,6 +2115,8 @@ export function PlanTab({
               isPresident={isDGLPresident}
               isPastor={isPastor}
               onOpenChat={onOpenChat}
+              isDesktopView
+              desktopSection={sglSection ?? "bible_study"}
               praiseTeamId={
                 allTeams.find(t =>
                   /\b(praise|worship)\b/i.test(t.name) ||
@@ -2343,7 +2346,7 @@ export function StudentOrgSectionNav({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
-  const SECTIONS = ["General", "Notes", "Events", "Resources", "Groups", "Rotations"] as const
+  const SECTIONS = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
   // Independent — only toggled by the chevron button, never by section navigation
   const [isPlanOpen, setIsPlanOpen] = useState(
     () => activeSection === "Events" || planningEvent !== null
@@ -2433,6 +2436,34 @@ export function StudentOrgSectionNav({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ── SmallGroupSectionNav ──────────────────────────────────────────────────────
+
+export function SmallGroupSectionNav({
+  activeSection,
+  onSectionChange,
+}: {
+  activeSection: string
+  onSectionChange: (s: string) => void
+}) {
+  const sections = [
+    { key: "bible_study", label: "Bible Study" },
+    { key: "schedule", label: "Schedule" },
+  ]
+  return (
+    <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
+      {sections.map(s => (
+        <button
+          key={s.key}
+          style={{ ...sidebarItemStyle(activeSection === s.key), marginBottom: 1 }}
+          onClick={() => onSectionChange(s.key)}
+        >
+          <span style={{ flex: 1 }}>{s.label}</span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -10964,6 +10995,8 @@ function SmallGroupLeadersTab({
   isPastor,
   praiseTeamId,
   onOpenChat,
+  isDesktopView,
+  desktopSection,
 }: {
   teamId: string
   ministryId: string
@@ -10972,6 +11005,8 @@ function SmallGroupLeadersTab({
   isPastor: boolean
   praiseTeamId?: string | null
   onOpenChat?: (id: string, name: string) => void
+  isDesktopView?: boolean
+  desktopSection?: string
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -11501,6 +11536,9 @@ function SmallGroupLeadersTab({
       .eq("semester", semester)
   }
 
+  // On desktop: section is driven by sidebar prop; on mobile: by internal activeSubTab state
+  const effectiveSection = (isDesktopView && desktopSection) ? desktopSection : activeSubTab
+
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner /></div>
 
   const weekDateStrings = semesterWeeks.map(d => d.toISOString().split("T")[0])
@@ -11509,22 +11547,31 @@ function SmallGroupLeadersTab({
   const flaggedKeys = new Set(flagged.map(f => `${f.week_date}::${f.slot}`))
 
   return (
-    <div>
-      {/* Sub-tab switcher */}
-      <div style={{ marginBottom: 24 }}>
-        <PlanSubTabStrip
-          tabs={validTabs.map(k => ({
-            key: k,
-            label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
-          }))}
-          active={activeSubTab}
-          onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
-        />
-      </div>
+    <div className={isDesktopView ? "pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" : ""}>
+      {/* Desktop header */}
+      {isDesktopView && (
+        <TabPageHeader>
+          <PageTitle title={effectiveSection === "bible_study" ? "Bible Study" : "Schedule"} compact />
+        </TabPageHeader>
+      )}
 
-      <div className="md:px-14">
+      {/* Mobile sub-tab switcher */}
+      {!isDesktopView && (
+        <div style={{ marginBottom: 24 }}>
+          <PlanSubTabStrip
+            tabs={validTabs.map(k => ({
+              key: k,
+              label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+            }))}
+            active={activeSubTab}
+            onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
+          />
+        </div>
+      )}
+
+      <div className={isDesktopView ? "flex-1 overflow-y-auto px-14 py-6 pb-20" : "md:px-14"}>
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
-      {activeSubTab === "bible_study" && (
+      {effectiveSection === "bible_study" && (
         <BibleStudySubTab
           teamId={teamId}
           ministryId={ministryId}
@@ -11536,7 +11583,7 @@ function SmallGroupLeadersTab({
       )}
 
       {/* ── Home Tab ──────────────────────────────────────────────────────── */}
-      {activeSubTab === "home" && !isPastor && (
+      {effectiveSection === "home" && !isPastor && !isDesktopView && (
         <div className="grid grid-cols-1 md:grid-cols-[1.45fr_1fr] gap-6 md:gap-9 items-start">
 
           {/* LEFT COLUMN — renewal banner + My Assignments */}
@@ -11883,7 +11930,7 @@ function SmallGroupLeadersTab({
       )}
 
       {/* ── Schedule Tab ──────────────────────────────────────────────────── */}
-      {activeSubTab === "schedule" && (
+      {effectiveSection === "schedule" && (
         <div className="flex flex-col gap-6">
 
           {/* Semester selector — president/admin only */}

@@ -493,6 +493,9 @@ export interface PlanTabProps {
   studentOrgPlanningEvent?: CalendarEvent | null
   onStudentOrgPlanningEventChange?: (ev: CalendarEvent | null) => void
   onStudentOrgCalEventsChange?: (events: CalendarEvent[]) => void
+  // Lifted small group leaders state (for sidebar)
+  sglSection?: string
+  onSglSectionChange?: (s: string) => void
 }
 
 export interface WorshipWeek {

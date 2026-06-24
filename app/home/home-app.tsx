@@ -19,7 +19,7 @@ import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 import { HomeTab } from "./tabs/home-tab"
 import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
-import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav } from "./tabs/plan-tab"
+import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionNav } from "./tabs/plan-tab"
 import type { CalendarEvent } from "./types"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
@@ -170,17 +170,29 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }
 
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
-  const validSOSections = ["General", "Plan", "Resources", "Groups", "Rotations"] as const
+  const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
   const initialSOSection = searchParams.get("sotab")
   const [studentOrgSection, setStudentOrgSection] = useState<string>(
-    initialSOSection && (validSOSections as readonly string[]).includes(initialSOSection) ? initialSOSection : "Plan"
+    initialSOSection && (validSOSections as readonly string[]).includes(initialSOSection) ? initialSOSection : "Events"
   )
   const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
   const [studentOrgCalEvents, setStudentOrgCalEvents] = useState<CalendarEvent[]>([])
 
   function handleStudentOrgSectionChange(s: string) {
     setStudentOrgSection(s)
-    replaceParam("sotab", s === "Plan" ? null : s)
+    replaceParam("sotab", s === "Events" ? null : s)
+  }
+
+  // Small Group Leaders section state — lifted here for sidebar
+  const validSGLSections = ["bible_study", "schedule"] as const
+  const initialSGLSection = searchParams.get("sgltab")
+  const [sglSection, setSglSection] = useState<string>(
+    initialSGLSection && (validSGLSections as readonly string[]).includes(initialSGLSection) ? initialSGLSection : "bible_study"
+  )
+
+  function handleSglSectionChange(s: string) {
+    setSglSection(s)
+    replaceParam("sgltab", s === "bible_study" ? null : s)
   }
 
   // Congregation sub-view — lifted so shell can build accurate crumbs
@@ -194,21 +206,27 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
     activeTeamPermsForPlan.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
   )
+  const isDGLActive = activeTab === "plan" && isDesktop && !isStudentOrgActive && (
+    /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabelForPlan) ||
+    activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
+  )
 
-  // Plan context sidebar — replaces the flat team list when student org is active
+  // Plan context sidebar — replaces the flat team list when student org or DGL is active
   const planContextContent = isStudentOrgActive && activeUserTeamForPlan ? (
     <StudentOrgSectionNav
-      teamName={activeUserTeamForPlan.teamName}
-      teamRole={activeUserTeamForPlan.roleName ?? ""}
-      teamIcon={activeUserTeamForPlan.teamIcon ?? "🏛️"}
       activeSection={studentOrgSection}
       onSectionChange={handleStudentOrgSectionChange}
       calEvents={studentOrgCalEvents}
       planningEvent={studentOrgPlanningEvent}
       onPlanningEventChange={(ev) => {
-        if (ev) handleStudentOrgSectionChange("Plan")
+        if (ev) handleStudentOrgSectionChange("Events")
         setStudentOrgPlanningEvent(ev)
       }}
+    />
+  ) : isDGLActive && activeUserTeamForPlan ? (
+    <SmallGroupSectionNav
+      activeSection={sglSection}
+      onSectionChange={handleSglSectionChange}
     />
   ) : undefined
 
@@ -542,14 +560,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           <DesktopTopbar
             crumbs={getShellCrumbs()}
             right={isStudentOrgActive && activeTeamId ? (
-              <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                  style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                >
-                  ← All teams
-                </button>
-              </div>
+              <button
+                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ← All teams
+              </button>
             ) : undefined}
           />
         )}
@@ -654,8 +670,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
                 studentOrgPlanningEvent={studentOrgPlanningEvent}
-                onStudentOrgPlanningEventChange={setStudentOrgPlanningEvent}
+                onStudentOrgPlanningEventChange={(ev) => {
+                  if (ev) {
+                    handleStudentOrgSectionChange("Events")
+                  } else {
+                    replaceParam("evtab", null)
+                  }
+                  setStudentOrgPlanningEvent(ev)
+                }}
                 onStudentOrgCalEventsChange={setStudentOrgCalEvents}
+                sglSection={sglSection}
+                onSglSectionChange={handleSglSectionChange}
               />
             </div>
           )}
