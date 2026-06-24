@@ -981,9 +981,16 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
       {/* Desktop header */}
       <TabPageHeader>
-        <PageTitle eyebrow="Finance · 2 Corinthians 9:7" title={sectionLabel}>
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>{sectionSubtitle}</p>
-        </PageTitle>
+        <PageTitle eyebrow="Finance · 2 Corinthians 9:7" title={sectionLabel} compact />
+        {visibleSections.length > 1 && (
+          <div className="hidden md:flex items-center gap-1.5 ml-auto">
+            {visibleSections.map(s => (
+              <button key={s.id} onClick={() => onSectionChange(s.id)} style={{ padding: "6px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 500, border: activeSection === s.id ? "none" : "1px solid var(--line)", background: activeSection === s.id ? "var(--plum)" : "transparent", color: activeSection === s.id ? "var(--cream)" : "var(--body)", cursor: "pointer" }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
       </TabPageHeader>
 
       <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
