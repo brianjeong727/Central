@@ -1943,8 +1943,8 @@ export function PlanTab({
 
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-        {/* Page header — hidden for student org board and for the no-team picker screen */}
-        {activeTeamId && !isStudentOrgBoard && (
+        {/* Page header — hidden for student org board, DGL team (both use section-level headers), and the no-team picker screen */}
+        {activeTeamId && !isStudentOrgBoard && !isDGLTeam && (
           <TabPageHeader>
             <PageTitle
               eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
