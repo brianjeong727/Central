@@ -981,7 +981,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
       {/* Desktop header */}
       <TabPageHeader>
-        <PageTitle eyebrow="Finance · 2 Corinthians 9:7" title={sectionLabel} compact />
+        <PageTitle title={sectionLabel} compact />
         {visibleSections.length > 1 && (
           <div className="hidden md:flex items-center gap-1.5 ml-auto">
             {visibleSections.map(s => (
