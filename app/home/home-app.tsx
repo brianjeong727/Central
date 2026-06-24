@@ -19,7 +19,8 @@ import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 import { HomeTab } from "./tabs/home-tab"
 import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
-import { PlanTab, QuickCreateTeamModal } from "./tabs/plan-tab"
+import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav } from "./tabs/plan-tab"
+import type { CalendarEvent } from "./types"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
 import { GivingTab } from "./tabs/giving-tab"
@@ -158,8 +159,52 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("finance", s === "give" ? null : s)
   }
 
+  // Student Org Board planning state — lifted here for breadcrumb + sidebar
+  const validSOSections = ["General", "Plan", "Resources", "Groups", "Rotations"] as const
+  const initialSOSection = searchParams.get("sotab")
+  const [studentOrgSection, setStudentOrgSection] = useState<string>(
+    initialSOSection && (validSOSections as readonly string[]).includes(initialSOSection) ? initialSOSection : "Plan"
+  )
+  const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
+  const [studentOrgCalEvents, setStudentOrgCalEvents] = useState<CalendarEvent[]>([])
+
+  function handleStudentOrgSectionChange(s: string) {
+    setStudentOrgSection(s)
+    replaceParam("sotab", s === "Plan" ? null : s)
+  }
+
   // Congregation sub-view — lifted so shell can build accurate crumbs
   const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
+
+  // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb)
+  const activeUserTeamForPlan = userTeams.find(t => t.teamId === activeTeamId)
+  const activeTeamLabelForPlan = (activeUserTeamForPlan?.teamName ?? "").toLowerCase()
+  const activeTeamPermsForPlan = activeUserTeamForPlan?.permissions ?? []
+  const isStudentOrgActive = activeTab === "plan" && isDesktop && (
+    /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
+    activeTeamPermsForPlan.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
+  )
+
+  // Plan context sidebar — replaces the flat team list when student org is active
+  const planContextContent = isStudentOrgActive && activeUserTeamForPlan ? (
+    <StudentOrgSectionNav
+      teamName={activeUserTeamForPlan.teamName}
+      teamRole={activeUserTeamForPlan.roleName ?? ""}
+      teamIcon={activeUserTeamForPlan.teamIcon ?? "🏛️"}
+      activeSection={studentOrgSection}
+      onSectionChange={handleStudentOrgSectionChange}
+      calEvents={studentOrgCalEvents}
+      planningEvent={studentOrgPlanningEvent}
+      onPlanningEventChange={(ev) => {
+        if (ev) handleStudentOrgSectionChange("Plan")
+        setStudentOrgPlanningEvent(ev)
+      }}
+      onBack={() => {
+        setActiveTeamId(null)
+        replaceParam("team", null)
+      }}
+    />
+  ) : undefined
 
   // Shell breadcrumb computation — derived from shell-known state, no tab props needed
   function getShellCrumbs(): string[] {
@@ -177,7 +222,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                               : ["Central", "Finance"]
       case "plan": {
         const team = userTeams.find(t => t.teamId === activeTeamId)
-        return team ? ["Central", "Planning", team.teamName] : ["Central", "Planning"]
+        if (!team) return ["Central", "Planning"]
+        if (isStudentOrgActive && studentOrgPlanningEvent) {
+          return ["Central", "Planning", team.teamName, studentOrgPlanningEvent.title]
+        }
+        return ["Central", "Planning", team.teamName]
       }
       case "directory":     return ["Central", "Directory"]
       case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
@@ -475,6 +524,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             userRole={initialProfile.role}
           />
         }
+        planContextContent={planContextContent}
+        hideSidePanel={activeTab === "plan" && !activeTeamId}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -579,6 +630,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 activeTeamId={activeTeamId}
                 onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
                 onOpenChat={(id, name) => { setActiveTab("chats"); handleOpenChat(id, name) }}
+                onTeamSelect={handleTeamChange}
+                studentOrgSection={studentOrgSection}
+                onStudentOrgSectionChange={handleStudentOrgSectionChange}
+                studentOrgPlanningEvent={studentOrgPlanningEvent}
+                onStudentOrgPlanningEventChange={setStudentOrgPlanningEvent}
+                onStudentOrgCalEventsChange={setStudentOrgCalEvents}
               />
             </div>
           )}

@@ -485,6 +485,14 @@ export interface PlanTabProps {
   activeTeamId: string | null
   onTeamCreated: (teamId: string) => void
   onOpenChat?: (id: string, name: string) => void
+  // Called when user clicks a team card in the picker (no-team-selected state)
+  onTeamSelect?: (teamId: string) => void
+  // Lifted student-org planning state (for breadcrumb + sidebar)
+  studentOrgSection?: string
+  onStudentOrgSectionChange?: (s: string) => void
+  studentOrgPlanningEvent?: CalendarEvent | null
+  onStudentOrgPlanningEventChange?: (ev: CalendarEvent | null) => void
+  onStudentOrgCalEventsChange?: (events: CalendarEvent[]) => void
 }
 
 export interface WorshipWeek {
@@ -610,6 +618,10 @@ export interface DesktopSidebarProps {
   onDirectoryMemberSelect?: (member: DirectoryMember) => void
   // Chat panel
   chatPanelContent?: ReactNode
+  // Plan panel override — renders in place of team list when student org is active
+  planContextContent?: ReactNode
+  // When true, hides the cream context panel entirely (icon rail stays); used for full-width picker
+  hideSidePanel?: boolean
 }
 
 export interface HomeAppProps {

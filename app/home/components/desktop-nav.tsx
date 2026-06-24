@@ -62,6 +62,8 @@ export function DesktopSidebar({
   directoryMinistryId, directoryCurrentUserId,
   directorySelectedMemberId, directoryInitialMemberId, onDirectoryMemberSelect,
   chatPanelContent,
+  planContextContent,
+  hideSidePanel,
 }: DesktopSidebarProps) {
   const supabase = createClient()
 
@@ -116,8 +118,9 @@ export function DesktopSidebar({
       )
     }
 
-    // ── Plan: team list ──────────────────────────────────────────────────────
+    // ── Plan: team sections sidebar OR team list ─────────────────────────────
     if (activeTab === "plan") {
+      if (planContextContent) return <>{planContextContent}</>
       return (
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 8px 6px" }}>
@@ -370,22 +373,24 @@ export function DesktopSidebar({
         </div>
       </div>
 
-      {/* ── Context Panel ─────────────────────────────────────────────────── */}
-      <div
+      {/* ── Context Panel — hidden on picker (no team selected) so main content goes full-width ── */}
+      {!hideSidePanel && <div
         className="hidden md:flex flex-col w-[var(--sidebar-width)] flex-shrink-0 h-screen"
         style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
-        {/* Section header */}
-        <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
-          <p style={MONO}>Section</p>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
-            {getSectionName()}
-          </p>
-        </div>
+        {/* Section header — hidden when planContextContent provides its own header */}
+        {!(activeTab === "plan" && planContextContent) && (
+          <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
+            <p style={MONO}>Section</p>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
+              {getSectionName()}
+            </p>
+          </div>
+        )}
 
         {renderPanelBody()}
 
-      </div>
+      </div>}
     </>
   )
 }

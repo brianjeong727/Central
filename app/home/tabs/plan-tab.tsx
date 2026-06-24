@@ -1173,6 +1173,7 @@ export function MeetingNotesSection({
 export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, canEditBudget, onTeamSettings,
   planningEvent, onPlanningEventChange, refreshSignal, onOpenChat,
+  desktopSection, isDesktopView, onCalEventsChange, onEditEvent,
 }: {
   teamId: string | null
   teamName: string
@@ -1189,6 +1190,10 @@ export function StudentOrgTeamHome({
   onPlanningEventChange: (ev: CalendarEvent | null) => void
   refreshSignal?: number
   onOpenChat?: (id: string, name: string) => void
+  desktopSection?: string
+  isDesktopView?: boolean
+  onCalEventsChange?: (events: CalendarEvent[]) => void
+  onEditEvent?: () => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1203,6 +1208,9 @@ export function StudentOrgTeamHome({
     sp.set("sotab", tab)
     router.replace(`?${sp.toString()}`, { scroll: false })
   }
+
+  // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
+  const displaySection = desktopSection ?? teamTab
 
   // Calendar
   const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
@@ -1228,7 +1236,7 @@ export function StudentOrgTeamHome({
       .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
       .eq("ministry_id", ministryId).is("parent_event_id", null).order("start_date")
     const run = teamId ? q.or(`team_id.eq.${teamId},team_id.is.null`) : q
-    run.then(({ data }) => { setCalEvents((data ?? []) as CalendarEvent[]); setCalLoading(false) })
+    run.then(({ data }) => { const evs = (data ?? []) as CalendarEvent[]; setCalEvents(evs); setCalLoading(false); onCalEventsChange?.(evs) })
     supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
       .then(({ data }) => setPlannedIds(new Set((data ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1276,6 +1284,55 @@ export function StudentOrgTeamHome({
   }
 
   if (planningEvent) {
+    if (isDesktopView) {
+      const evStart = new Date(planningEvent.start_date)
+      const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()
+      const evCfg = getEventConfig(planningEvent)
+      return (
+        <div style={{ padding: "26px 56px 60px" }}>
+          <button
+            onClick={() => onPlanningEventChange(null)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "8px 15px", border: "1px solid #E5E0D2", borderRadius: 9999, fontSize: 13, color: "#5A5466", background: "var(--cream)", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+          >
+            <ArrowLeft style={{ width: 14, height: 14 }} /> Back to events
+          </button>
+          <div style={{ marginTop: 22, marginBottom: 28 }}>
+            <p style={{ ...mono, color: "#8A8497" }}>{evCfg.label.toUpperCase()} · {evDateStr}</p>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
+              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1, margin: 0 }}>
+                {planningEvent.title}
+              </h1>
+              {canEdit && onEditEvent && (
+                <button
+                  onClick={onEditEvent}
+                  style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid #E5E0D2", background: "var(--cream)", cursor: "pointer", flexShrink: 0 }}
+                  title="Edit event"
+                >
+                  <Pencil style={{ width: 14, height: 14, color: "#5A5466" }} />
+                </button>
+              )}
+            </div>
+            {(planningEvent.description || planningEvent.location) && (
+              <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466" }}>
+                {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <EventPlanWorkspace
+            inline
+            hideHero
+            calendarEvent={planningEvent}
+            ministryId={ministryId}
+            userId={userId}
+            canEdit={canEdit}
+            canEditBudget={canEditBudget}
+            teamId={teamId}
+            onClose={() => onPlanningEventChange(null)}
+            onOpenChat={onOpenChat}
+          />
+        </div>
+      )
+    }
     return (
       <EventPlanWorkspace
         inline
@@ -1295,26 +1352,28 @@ export function StudentOrgTeamHome({
   return (
     <>
     <div>
-      {/* ── Underline tabs: General / Plan / Roster / Resources ── */}
-      <div style={{ marginBottom: 24 }}>
-        <PlanSubTabStrip
-          tabs={[
-            { key: "General", label: "General" },
-            { key: "Plan", label: "Plan" },
-            { key: "Resources", label: "Resources" },
-            { key: "Groups", label: "Groups" },
-            { key: "Rotations", label: "Rotations" },
-          ]}
-          active={teamTab}
-          onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Resources" | "Groups" | "Rotations")}
-        />
-      </div>
+      {/* ── Underline tabs: General / Plan / Roster / Resources ── mobile only (desktop uses sidebar nav) ── */}
+      {!isDesktopView && (
+        <div style={{ marginBottom: 24 }}>
+          <PlanSubTabStrip
+            tabs={[
+              { key: "General", label: "General" },
+              { key: "Plan", label: "Plan" },
+              { key: "Resources", label: "Resources" },
+              { key: "Groups", label: "Groups" },
+              { key: "Rotations", label: "Rotations" },
+            ]}
+            active={teamTab}
+            onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Resources" | "Groups" | "Rotations")}
+          />
+        </div>
+      )}
 
       {/* ── Tab content ── */}
       <div className="md:px-14" style={{ paddingTop: 30, paddingBottom: 60 }}>
 
         {/* GENERAL — calendar + sidebar + meeting notes */}
-        {teamTab === "General" && (
+        {displaySection === "General" && (
           <div>
             <section style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 32 }}>
               {/* Left: month calendar */}
@@ -1405,12 +1464,15 @@ export function StudentOrgTeamHome({
         )}
 
         {/* PLAN — events list with Plan → links */}
-        {teamTab === "Plan" && (
+        {displaySection === "Plan" && (
           <div>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
               <div>
                 <p style={mono}>Events & planning</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+                {isDesktopView
+                  ? <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h1>
+                  : <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+                }
               </div>
               {canEdit && (
                 <button
@@ -1496,7 +1558,7 @@ export function StudentOrgTeamHome({
         )}
 
         {/* RESOURCES — role links/docs */}
-        {teamTab === "Resources" && (() => {
+        {displaySection === "Resources" && (() => {
           const userRosterRole = roster.find(m => m.user_id === userId)?.role ?? null
           const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
           const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
@@ -1545,7 +1607,7 @@ export function StudentOrgTeamHome({
         })()}
 
         {/* GROUPS — group generator */}
-        {teamTab === "Groups" && (
+        {displaySection === "Groups" && (
           <GroupsTab
             teamId={teamId}
             ministryId={ministryId}
@@ -1554,7 +1616,7 @@ export function StudentOrgTeamHome({
           />
         )}
 
-        {teamTab === "Rotations" && teamId && (
+        {displaySection === "Rotations" && teamId && (
           <RotationsTab
             teamId={teamId}
             ministryId={ministryId}
@@ -1574,6 +1636,7 @@ export function StudentOrgTeamHome({
         onSaved={(newEv) => {
           const sorted = [...calEvents, newEv].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
           setCalEvents(sorted)
+          onCalEventsChange?.(sorted)
           setPlannedIds(prev => new Set([...prev, newEv.id]))
           setShowAddModal(false)
           onPlanningEventChange(newEv)
@@ -1725,14 +1788,53 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   )
 }
 
-export function PlanTab({ userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, isPastor, onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat }: PlanTabProps) {
+export function PlanTab({
+  userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, isPastor,
+  onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat,
+  onTeamSelect,
+  studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
+}: PlanTabProps) {
   const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const router = useRouter()
+  const supabase = createClient()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
-  const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
+  const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
+
+  // Fetch upcoming event counts per team — only runs when the picker is visible (no team selected)
+  useEffect(() => {
+    if (activeTeamId || userTeams.length === 0) return
+    const teamIds = userTeams.map(t => t.teamId)
+    const now = new Date().toISOString()
+    supabase
+      .from("calendar_events")
+      .select("team_id")
+      .eq("ministry_id", ministryId)
+      .in("team_id", teamIds)
+      .gte("start_date", now)
+      .then(({ data }) => {
+        const counts: Record<string, number> = {}
+        for (const ev of (data ?? []) as { team_id: string }[]) {
+          counts[ev.team_id] = (counts[ev.team_id] ?? 0) + 1
+        }
+        setTeamEventCounts(counts)
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTeamId, userTeams.length, ministryId])
+
+  function getPickerSectionCount(team: UserTeam): number {
+    const name = team.teamName.toLowerCase()
+    const perms = team.permissions
+    if (/\b(student org|board|leadership|officer)\b/.test(name) ||
+        perms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))) return 5
+    if (/\b(praise|worship)\b/.test(name) ||
+        perms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p))) return 3
+    if (/\b(dgl|small group|discipleship|sg)\b/.test(name) ||
+        perms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))) return 3
+    return 3
+  }
 
   function replaceParam(key: string, value: string | null) {
     const params = new URLSearchParams(window.location.search)
@@ -1777,7 +1879,7 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
   useEffect(() => {
     if (!teamSwitchRef.current) { teamSwitchRef.current = true; return }
     setOpenTeam(null)
-    setStudentOrgPlanningEvent(null)
+    onStudentOrgPlanningEventChange?.(null)
     // Atomic clear: remove all team-specific sub-page params in one replace call
     const params = new URLSearchParams(window.location.search)
     params.delete("view")
@@ -1862,12 +1964,12 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
           existing={studentOrgPlanningEvent}
           onClose={() => setShowEditEvent(false)}
           onSaved={(updated) => {
-            setStudentOrgPlanningEvent(updated)
+            onStudentOrgPlanningEventChange?.(updated)
             setShowEditEvent(false)
           }}
           onDelete={() => {
             setShowEditEvent(false)
-            setStudentOrgPlanningEvent(null)
+            onStudentOrgPlanningEventChange?.(null)
             setStudentOrgRefreshSignal(s => s + 1)
           }}
         />
@@ -1875,64 +1977,92 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
 
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-        {/* Shared page header */}
-        <TabPageHeader>
-          <PageTitle
-            eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
-            title={activeTeamName}
-          />
-          {activeTeamFull && canOpenTeamSettings && (
-            <button
-              onClick={() => openSettings(activeTeamFull)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-              title="Team settings"
-            >
-              <Settings className="w-4 h-4 text-[#5A5466]" />
-            </button>
-          )}
-        </TabPageHeader>
-
-        {/* Cream event header — replaces the old bespoke header swap (Option B: no plum gradient) */}
-        {isStudentOrgBoard && studentOrgPlanningEvent && (() => {
-          const ev = studentOrgPlanningEvent
-          const evStart = new Date(ev.start_date)
-          const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-          const evCfg = getEventConfig(ev)
-          const evDesc = [ev.description, ev.location].filter(Boolean).join(" · ")
-          return (
-            <div style={{ padding: "16px 56px 14px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+        {/* Page header — hidden for student org board and for the no-team picker screen */}
+        {activeTeamId && !isStudentOrgBoard && (
+          <TabPageHeader>
+            <PageTitle
+              eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
+              title={activeTeamName}
+            />
+            {activeTeamFull && canOpenTeamSettings && (
               <button
-                onClick={() => setStudentOrgPlanningEvent(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] text-[#5A5466] text-[13px] hover:bg-[#ECE8DE] hover:text-[#3E1540] transition-colors"
-                style={{ cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                onClick={() => openSettings(activeTeamFull)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+                title="Team settings"
               >
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to calendar
+                <Settings className="w-4 h-4 text-[#5A5466]" />
               </button>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 }}>
-                <div>
-                  <p style={{ ...monoStyle, marginTop: 0 }}>{evCfg.label.toUpperCase()} · {evDateStr.toUpperCase()}</p>
-                  <h2 style={{ margin: "8px 0 0", fontFamily: "var(--serif)", fontWeight: 600, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)" }}>
-                    {ev.title}
-                  </h2>
-                  {evDesc && <p style={{ marginTop: 6, color: "var(--body)", fontSize: 14 }}>{evDesc}</p>}
-                </div>
-                {canEditStudentOrg && (
-                  <button
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-                    title="Edit event"
-                    onClick={() => setShowEditEvent(true)}
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-[#5A5466]" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })()}
+            )}
+          </TabPageHeader>
+        )}
 
         {/* Scrollable team content */}
         <div className="flex-1 overflow-y-auto">
-        {isDgPraiseTeam && activeTeamId ? (
+        {!activeTeamId && userTeams.length > 0 ? (
+          /* ── Team picker — full-width (cream sidebar hidden via hideSidePanel in home-app) ── */
+          <div style={{ padding: "52px 80px 80px" }}>
+            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 14 }}>
+              PLANNING · {ministryName.toUpperCase()}
+            </p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 48, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 14px" }}>
+              Which team are you planning for?
+            </h1>
+            <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 40px", lineHeight: 1.6 }}>
+              You coordinate across {userTeams.length} team{userTeams.length !== 1 ? "s" : ""}. Pick one to open its planning workspace.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+              {userTeams.map(t => {
+                const evCount = teamEventCounts[t.teamId] ?? 0
+                const secCount = getPickerSectionCount(t)
+                return (
+                  <button
+                    key={t.teamId}
+                    onClick={() => onTeamSelect?.(t.teamId)}
+                    className="text-left transition-all hover:border-[var(--plum)]"
+                    style={{
+                      background: "var(--ivory)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 16,
+                      padding: "28px 28px 24px",
+                      cursor: "pointer",
+                      display: "block",
+                      width: "100%",
+                    }}
+                  >
+                    <div style={{
+                      width: 52, height: 52,
+                      background: "var(--cream-2)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 12,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 22,
+                      marginBottom: 22,
+                    }}>
+                      {t.teamIcon ?? "👥"}
+                    </div>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                      {t.roleName}
+                    </p>
+                    <p style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.1, margin: "0 0 18px" }}>
+                      {t.teamName}
+                    </p>
+                    <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
+                      {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setShowCreateTeam(true)}
+                style={{ marginTop: 24, display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+              >
+                <Plus style={{ width: 13, height: 13 }} /> New team
+              </button>
+            )}
+          </div>
+        ) : isDgPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
               teamId={activeTeamId}
@@ -1975,10 +2105,14 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
               canEdit={canEditStudentOrg}
               canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
               onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-              planningEvent={studentOrgPlanningEvent}
-              onPlanningEventChange={setStudentOrgPlanningEvent}
+              planningEvent={studentOrgPlanningEvent ?? null}
+              onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
               refreshSignal={studentOrgRefreshSignal}
               onOpenChat={onOpenChat}
+              isDesktopView
+              desktopSection={studentOrgSection ?? "Plan"}
+              onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
+              onEditEvent={() => setShowEditEvent(true)}
             />
         ) : isDGLTeam && activeTeamId ? (
           <SmallGroupLeadersTab
@@ -2079,8 +2213,8 @@ export function PlanTab({ userId, userName, ministryId, ministryName, userTeams,
             canEdit={canEditStudentOrg}
             canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-            planningEvent={studentOrgPlanningEvent}
-            onPlanningEventChange={setStudentOrgPlanningEvent}
+            planningEvent={studentOrgPlanningEvent ?? null}
+            onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
           />
         ) : isDGLTeam && activeTeamId ? (
@@ -2224,6 +2358,141 @@ export function PlanSubTabStrip({
       </div>
       {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
       <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
+    </div>
+  )
+}
+
+// ── StudentOrgSectionNav ──────────────────────────────────────────────────────
+// Vertical sidebar nav for the Student Org Board workspace on desktop.
+// Renders in place of the flat team list in DesktopSidebar when SOB is active.
+export function StudentOrgSectionNav({
+  teamName, teamRole, teamIcon,
+  activeSection, onSectionChange,
+  calEvents, planningEvent, onPlanningEventChange,
+  onBack,
+}: {
+  teamName: string
+  teamRole: string
+  teamIcon: string
+  activeSection: string
+  onSectionChange: (s: string) => void
+  calEvents: CalendarEvent[]
+  planningEvent: CalendarEvent | null
+  onPlanningEventChange: (ev: CalendarEvent | null) => void
+  onBack: () => void
+}) {
+  const SECTIONS = ["General", "Plan", "Resources", "Groups", "Rotations"] as const
+  const SECTION_ICONS: Record<string, React.ReactNode> = {
+    General:   <Grid3x3 style={{ width: 16, height: 16 }} />,
+    Plan:      <ClipboardList style={{ width: 16, height: 16 }} />,
+    Resources: <FileText style={{ width: 16, height: 16 }} />,
+    Groups:    <Users style={{ width: 16, height: 16 }} />,
+    Rotations: <Shuffle style={{ width: 16, height: 16 }} />,
+  }
+
+  const isPlanExpanded = activeSection === "Plan" || planningEvent !== null
+  const PLUM = "#3E1540"
+  const PLUM2 = "#2D0F2E"
+  const IVORY = "var(--ivory)"
+  const INK = "var(--ink)"
+  const BODY = "var(--body)"
+  const MUTED = "var(--muted-text)"
+  const FAINT = "var(--faint)"
+  const LINE = "var(--line)"
+  const MONO: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.2px", textTransform: "uppercase" as const }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Team switcher header */}
+      <div style={{ padding: "16px 14px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 6px" }}>
+          <div style={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", background: PLUM, color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 16 }}>
+            {teamIcon}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: INK, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{teamName}</div>
+            <div style={{ fontSize: 11, color: MUTED }}>{teamRole}</div>
+          </div>
+        </div>
+        <button
+          onClick={onBack}
+          style={{ ...MONO, color: PLUM2, background: "none", border: "none", cursor: "pointer", padding: "4px 8px 14px", display: "block", letterSpacing: "1px" }}
+        >
+          ↤ All teams
+        </button>
+      </div>
+
+      {/* Section nav */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 12px" }}>
+        <p style={{ ...MONO, color: FAINT, padding: "0 10px", marginBottom: 6 }}>Team Sections</p>
+        {SECTIONS.map(section => {
+          const isPlan = section === "Plan"
+          const isActive = isPlan ? isPlanExpanded : activeSection === section
+          return (
+            <div key={section}>
+              <button
+                onClick={() => {
+                  onSectionChange(section)
+                  if (section !== "Plan") onPlanningEventChange(null)
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 10px", borderRadius: "var(--r-chip)",
+                  width: "100%", textAlign: "left" as const,
+                  background: isActive ? IVORY : "transparent",
+                  color: isActive ? PLUM2 : BODY,
+                  fontWeight: isActive ? 500 : 400, fontSize: 14,
+                  border: "none", borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
+                  cursor: "pointer", fontFamily: "var(--sans)",
+                  transition: "background 100ms ease",
+                  marginBottom: 1,
+                }}
+              >
+                <span style={{ width: 18, flexShrink: 0, display: "grid", placeItems: "center", color: "inherit" }}>
+                  {SECTION_ICONS[section]}
+                </span>
+                <span style={{ flex: 1 }}>{section}</span>
+                {isPlan && (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: isPlanExpanded ? "rotate(90deg)" : undefined, transition: "transform 160ms", color: FAINT, flexShrink: 0 }}>
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                )}
+              </button>
+
+              {isPlan && isPlanExpanded && (
+                <div style={{ marginLeft: 28, marginBottom: 4 }}>
+                  {calEvents.length === 0 ? (
+                    <p style={{ fontSize: 12, color: FAINT, padding: "5px 10px", fontFamily: "var(--sans)" }}>No events yet</p>
+                  ) : (
+                    calEvents.map(ev => {
+                      const isEvActive = planningEvent?.id === ev.id
+                      return (
+                        <button
+                          key={ev.id}
+                          onClick={() => { onPlanningEventChange(ev); onSectionChange("Plan") }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 9,
+                            padding: "7px 10px", borderRadius: "var(--r-pill)",
+                            fontSize: 13, color: isEvActive ? PLUM2 : BODY,
+                            fontWeight: isEvActive ? 500 : 400,
+                            background: "none", border: "none", cursor: "pointer",
+                            textAlign: "left" as const, width: "100%",
+                            fontFamily: "var(--sans)",
+                          }}
+                        >
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0 }} />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{ev.title}</span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
