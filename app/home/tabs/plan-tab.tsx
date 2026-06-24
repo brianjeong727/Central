@@ -1361,18 +1361,14 @@ export function StudentOrgTeamHome({
 
       {/* Desktop section header — shared TabPageHeader + PageTitle */}
       {isDesktopView && (() => {
-        const sectionMeta: Record<string, { eyebrow: string; title: string }> = {
-          General:   { eyebrow: `GENERAL · ${teamName.toUpperCase()}`, title: "General" },
-          Notes:     { eyebrow: "MEETING NOTES", title: "Notes" },
-          Events:    { eyebrow: "EVENTS & PLANNING", title: "Events" },
-          Resources: { eyebrow: "TEAM RESOURCES", title: "Resources" },
-          Groups:    { eyebrow: "SMALL GROUPS", title: "Groups" },
-          Rotations: { eyebrow: "ROTATIONS", title: "Rotations" },
+        const sectionMeta: Record<string, string> = {
+          General: "General", Notes: "Notes", Events: "Events",
+          Resources: "Resources", Groups: "Groups", Rotations: "Rotations",
         }
-        const meta = sectionMeta[displaySection] ?? { eyebrow: "PLANNING", title: displaySection }
+        const sectionTitle = sectionMeta[displaySection] ?? displaySection
         return (
           <TabPageHeader>
-            <PageTitle eyebrow={meta.eyebrow} title={meta.title} />
+            <PageTitle title={sectionTitle} compact />
             {displaySection === "Events" && canEdit && (
               <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
             )}

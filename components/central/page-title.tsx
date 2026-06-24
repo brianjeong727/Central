@@ -1,36 +1,45 @@
 import { ReactNode, CSSProperties } from "react"
 
 interface PageTitleProps {
-  eyebrow: string
+  // Omit to suppress the eyebrow entirely — title top-spacing tightens automatically.
+  eyebrow?: string
   title: ReactNode
+  // Explicit size override; defaults to 36 (identity) or 25 (compact).
   titleSize?: number
+  // Planning/work pages: no eyebrow + 25px title. Independent from eyebrow.
+  compact?: boolean
   children?: ReactNode
   style?: CSSProperties
 }
 
-export function PageTitle({ eyebrow, title, titleSize = 36, children, style }: PageTitleProps) {
+export function PageTitle({ eyebrow, title, titleSize, compact = false, children, style }: PageTitleProps) {
+  const resolvedSize = titleSize ?? (compact ? 25 : 36)
+  const showEyebrow = !!eyebrow
+
   return (
     <div style={style}>
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 11,
-          letterSpacing: "1.4px",
-          color: "var(--muted-text)",
-          textTransform: "uppercase",
-        }}
-      >
-        {eyebrow}
-      </div>
+      {showEyebrow && (
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            letterSpacing: "1.4px",
+            color: "var(--muted-text)",
+            textTransform: "uppercase",
+          }}
+        >
+          {eyebrow}
+        </div>
+      )}
       <h1
         style={{
           fontFamily: "var(--serif)",
-          fontSize: titleSize,
+          fontSize: resolvedSize,
           fontWeight: 600,
           letterSpacing: "-0.02em",
           color: "var(--ink)",
           lineHeight: 1.05,
-          margin: "12px 0 0",
+          margin: showEyebrow ? "12px 0 0" : 0,
         }}
       >
         {title}
