@@ -103,15 +103,6 @@ export interface FormField {
   order_index: number
 }
 
-export interface FormResponse {
-  id: string
-  form_id: string
-  announcement_id: string
-  ministry_id: string
-  user_id: string
-  submitted_at: string
-}
-
 export interface FormAnswer {
   id: string
   response_id: string

@@ -40,9 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# design-sync build output
+# design-sync tool (abandoned)
+/.design-sync/
+/.ds-sync/
 /ds-bundle/
-/.ds-sync/node_modules/
-/.design-sync/.cache/
-/.design-sync/learnings/
-/.design-sync/node_modules
+/ds-entry.ts
+/.ds-entry.tsx

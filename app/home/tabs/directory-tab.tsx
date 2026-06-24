@@ -185,7 +185,7 @@ export function DirectoryTab({
 
         {/* Page header — matches Finance/Profile exactly */}
         <TabPageHeader>
-          <PageTitle eyebrow={`PEOPLE · ${ministryName.toUpperCase()}`} title="Directory" />
+          <PageTitle title="Directory" compact />
         </TabPageHeader>
 
         {/* Detail area */}

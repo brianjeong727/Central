@@ -1,8 +1,0 @@
-export { Avatar, AvatarImage, AvatarFallback } from "./components/ui/avatar"
-export { BottomNav } from "./components/ui/bottom-nav"
-export { Button, buttonVariants } from "./components/ui/button"
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "./components/ui/card"
-export { ChatsSection } from "./components/ui/chats-section"
-export type { ChatPreview } from "./components/ui/chats-section"
-export { Input } from "./components/ui/input"
-export { Label } from "./components/ui/label"
