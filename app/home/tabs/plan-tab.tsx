@@ -2052,10 +2052,12 @@ export function PlanTab({
                 {isAdmin && (
                   <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
-                      onClick={() => setShowCreateTeam(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                      disabled
+                      title="Custom team creation coming soon"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "not-allowed", opacity: 0.45 }}
                     >
                       <Plus style={{ width: 13, height: 13 }} /> New team
+                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, background: "#ECE8DE", color: "#8A8497", letterSpacing: "0.5px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
                     </button>
                   </div>
                 )}
