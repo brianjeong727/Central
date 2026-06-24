@@ -6435,7 +6435,7 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Content */}
-      <div className="md:px-14" style={{ padding: "24px 20px 80px" }}>
+      <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 80 }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
         ) : (
