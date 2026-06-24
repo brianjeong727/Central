@@ -1998,66 +1998,95 @@ export function PlanTab({
 
         {/* Scrollable team content */}
         <div className="flex-1 overflow-y-auto">
-        {!activeTeamId && userTeams.length > 0 ? (
-          /* ── Team picker — full-width, centered, no sidebar ── */
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "72px 48px 80px" }}>
-            <div style={{ width: "100%", maxWidth: 860 }}>
-              <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 14, textAlign: "center" }}>
-                PLANNING · {ministryName.toUpperCase()}
-              </p>
-              <h1 style={{ fontFamily: "var(--sans)", fontSize: 46, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 14px", textAlign: "center" }}>
-                Which team are you planning for?
-              </h1>
-              <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 48px", lineHeight: 1.6, textAlign: "center" }}>
-                You coordinate across {userTeams.length} team{userTeams.length !== 1 ? "s" : ""}. Pick one to open its planning workspace.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-                {userTeams.map(t => {
-                  const evCount = teamEventCounts[t.teamId] ?? 0
-                  const secCount = getPickerSectionCount(t)
-                  return (
+        {!activeTeamId ? (
+          /* ── Three-way branch: 0 teams → empty state | 2+ teams → picker
+             (1-team case auto-entered in home-app before this renders) ── */
+          userTeams.length >= 2 ? (
+            /* PICKER — full-width, no sidebar */
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "72px 48px 80px" }}>
+              <div style={{ width: "100%", maxWidth: 860 }}>
+                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 14, textAlign: "center" }}>
+                  PLANNING · {ministryName.toUpperCase()}
+                </p>
+                <h1 style={{ fontFamily: "var(--sans)", fontSize: 46, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 14px", textAlign: "center" }}>
+                  Which team are you planning for?
+                </h1>
+                <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 48px", lineHeight: 1.6, textAlign: "center" }}>
+                  You coordinate across {userTeams.length} teams. Pick one to open its planning workspace.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                  {userTeams.map(t => {
+                    const evCount = teamEventCounts[t.teamId] ?? 0
+                    const secCount = getPickerSectionCount(t)
+                    return (
+                      <button
+                        key={t.teamId}
+                        onClick={() => onTeamSelect?.(t.teamId)}
+                        className="text-left transition-all hover:border-[var(--plum)]"
+                        style={{
+                          background: "var(--ivory)",
+                          border: "1px solid var(--line)",
+                          borderRadius: 16,
+                          padding: "28px 28px 24px",
+                          cursor: "pointer",
+                          display: "block",
+                          width: "100%",
+                        }}
+                      >
+                        <div style={{ marginBottom: 22 }}>
+                          <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
+                        </div>
+                        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                          {t.roleName}
+                        </p>
+                        <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
+                          {t.teamName}
+                        </p>
+                        <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
+                          {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+                {isAdmin && (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
-                      key={t.teamId}
-                      onClick={() => onTeamSelect?.(t.teamId)}
-                      className="text-left transition-all hover:border-[var(--plum)]"
-                      style={{
-                        background: "var(--ivory)",
-                        border: "1px solid var(--line)",
-                        borderRadius: 16,
-                        padding: "28px 28px 24px",
-                        cursor: "pointer",
-                        display: "block",
-                        width: "100%",
-                      }}
+                      onClick={() => setShowCreateTeam(true)}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                     >
-                      <div style={{ marginBottom: 22 }}>
-                        <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
-                      </div>
-                      <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
-                        {t.roleName}
-                      </p>
-                      <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
-                        {t.teamName}
-                      </p>
-                      <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
-                        {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
-                      </p>
+                      <Plus style={{ width: 13, height: 13 }} /> New team
                     </button>
-                  )
-                })}
+                  </div>
+                )}
               </div>
-              {isAdmin && (
-                <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
+            </div>
+          ) : (
+            /* EMPTY STATE — strictly 0 teams */
+            <div className="px-14 py-7">
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "#8A8497", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                  {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
+                </div>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                  {isAdmin ? "Create your first team." : "You're not on a team yet."}
+                </h2>
+                <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
+                  {isAdmin
+                    ? "Teams keep your ministry organized — Praise, Small Groups, Student Org Board, and more."
+                    : "Ask a leader to add you to a team."}
+                </p>
+                {isAdmin && (
                   <button
                     onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                   >
-                    <Plus style={{ width: 13, height: 13 }} /> New team
+                    <Plus style={{ width: 14, height: 14 }} /> Create a team
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )
         ) : isDgPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
@@ -2127,46 +2156,22 @@ export function PlanTab({
                 )?.id ?? null
               }
             />
-        ) : (
-          <div className="px-14 py-7">
-            {!activeTeamId ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "#8A8497", textTransform: "uppercase" as const, marginBottom: 12 }}>
-                  {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
-                </div>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                  {isAdmin ? "Create your first team." : "You're not on a team yet."}
-                </h2>
-                <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
-                  {isAdmin
-                    ? "Teams keep your ministry organized — Praise, Small Groups, Student Org Board, and more."
-                    : "Ask a leader to add you to a team."}
-                </p>
-                {isAdmin && (
-                  <button
-                    onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                  >
-                    <Plus style={{ width: 14, height: 14 }} /> Create a team
-                  </button>
-                )}
-              </div>
-            ) : (() => {
-              const perms = activeUserTeam?.permissions ?? []
-              const showCalendar = isAdmin || perms.includes("can_plan_events")
-              if (!showCalendar) return null
-              return (
-                <MinistryCalendar
-                  ministryId={ministryId}
-                  teamId={activeTeamId}
-                  userId={userId}
-                  canEdit={isAdmin || perms.includes("can_plan_events")}
-                  onOpenChat={onOpenChat}
-                />
-              )
-            })()}
-          </div>
-        )}
+        ) : (() => {
+          /* Fallback: team selected but not a recognized special type → ministry calendar */
+          const perms = activeUserTeam?.permissions ?? []
+          if (!isAdmin && !perms.includes("can_plan_events")) return null
+          return (
+            <div className="px-14 py-7">
+              <MinistryCalendar
+                ministryId={ministryId}
+                teamId={activeTeamId}
+                userId={userId}
+                canEdit={isAdmin || perms.includes("can_plan_events")}
+                onOpenChat={onOpenChat}
+              />
+            </div>
+          )
+        })()}
       </div>
       </div>
 

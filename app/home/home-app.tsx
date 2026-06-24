@@ -72,7 +72,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
     const urlTeam = searchParams.get("team")
     if (urlTeam) return urlTeam
-    return initialUserTeams?.[0]?.teamId ?? null
+    // 0 teams → null (empty state); 1 team → auto-enter; 2+ teams → null (picker)
+    return (initialUserTeams?.length ?? 0) === 1 ? initialUserTeams![0].teamId : null
   })
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
   const [selectedDirectoryMember, setSelectedDirectoryMember] = useState<DirectoryMember | null>(null)
@@ -107,6 +108,15 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Graduation prompt — show once per session if user's graduation year has passed
   const [showGradPrompt, setShowGradPrompt] = useState(false)
   const [gradPromptLoading, setGradPromptLoading] = useState(false)
+  // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
+  // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
+  useEffect(() => {
+    if (activeTab === "plan" && userTeams.length === 1 && !activeTeamId) {
+      handleTeamChange(userTeams[0].teamId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, userTeams.length, activeTeamId])
+
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
     if (!gradYear) return
@@ -295,9 +305,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
-      // Keep URL-initialized or user-selected team if still valid; otherwise fall back to first
+      // Keep a valid existing selection; otherwise apply three-way routing
       if (prev && teams.some((t) => t.teamId === prev)) return prev
-      return teams[0]?.teamId ?? null
+      return teams.length === 1 ? teams[0].teamId : null
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
