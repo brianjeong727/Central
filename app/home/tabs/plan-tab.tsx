@@ -2407,8 +2407,18 @@ export function StudentOrgSectionNav({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Team switcher header */}
-      <div style={{ padding: "16px 14px 0", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 6px" }}>
+      <div style={{ padding: "10px 14px 0", flexShrink: 0 }}>
+        {/* Back link — top right */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+          <button
+            onClick={onBack}
+            style={{ ...MONO, color: PLUM2, background: "none", border: "none", cursor: "pointer", padding: 0, letterSpacing: "1px" }}
+          >
+            ↤ All teams
+          </button>
+        </div>
+        {/* Team identity row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 12px" }}>
           <div style={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", background: PLUM, color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 16 }}>
             {teamIcon}
           </div>
@@ -2417,12 +2427,6 @@ export function StudentOrgSectionNav({
             <div style={{ fontSize: 11, color: MUTED }}>{teamRole}</div>
           </div>
         </div>
-        <button
-          onClick={onBack}
-          style={{ ...MONO, color: PLUM2, background: "none", border: "none", cursor: "pointer", padding: "4px 8px 14px", display: "block", letterSpacing: "1px" }}
-        >
-          ↤ All teams
-        </button>
       </div>
 
       {/* Section nav */}
