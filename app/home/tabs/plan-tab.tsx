@@ -1342,10 +1342,14 @@ export function StudentOrgTeamHome({
     )
   }
 
+  const userRosterRole = roster.find(m => m.user_id === userId)?.role ?? null
+  const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
+  const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
+
   return (
     <>
     <div>
-      {/* ── Underline tabs: General / Plan / Roster / Resources ── mobile only (desktop uses sidebar nav) ── */}
+      {/* Mobile tab strip — desktop uses sidebar nav */}
       {!isDesktopView && (
         <div style={{ marginBottom: 24 }}>
           <PlanSubTabStrip
@@ -1362,93 +1366,83 @@ export function StudentOrgTeamHome({
         </div>
       )}
 
-      {/* ── Tab content ── */}
-      <div className="md:px-14" style={{ paddingTop: 30, paddingBottom: 60 }}>
+      {/* Desktop section header — shared TabPageHeader + PageTitle */}
+      {isDesktopView && (() => {
+        const sectionMeta: Record<string, { eyebrow: string; title: string }> = {
+          General:   { eyebrow: `GENERAL · ${teamName.toUpperCase()}`, title: "General" },
+          Plan:      { eyebrow: "EVENTS & PLANNING", title: "Event Plans" },
+          Resources: { eyebrow: "TEAM RESOURCES", title: "Resources" },
+          Groups:    { eyebrow: "SMALL GROUPS", title: "Groups" },
+          Rotations: { eyebrow: "ROTATIONS", title: "Rotations" },
+        }
+        const meta = sectionMeta[displaySection] ?? { eyebrow: "PLANNING", title: displaySection }
+        return (
+          <TabPageHeader>
+            <PageTitle eyebrow={meta.eyebrow} title={meta.title} />
+            {displaySection === "Plan" && canEdit && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginLeft: "auto" }}
+              >
+                <Plus className="w-3.5 h-3.5" /> New Event
+              </button>
+            )}
+            {displaySection === "Resources" && userRosterRole && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
+                {userRosterRole}
+              </span>
+            )}
+          </TabPageHeader>
+        )
+      })()}
 
-        {/* GENERAL — calendar + sidebar + meeting notes */}
+      {/* Desktop Resources role sub-strip (replaces pill buttons) */}
+      {isDesktopView && displaySection === "Resources" && (
+        <PlanSubTabStrip
+          tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
+          active={activeResourcesRole}
+          onChange={setResourcesRole}
+        />
+      )}
+
+      {/* ── Tab content ── */}
+      <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
+
+        {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
           <div>
-            <section style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 32 }}>
-              {/* Left: month calendar */}
-              <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18 }}>
-                  <div>
-                    <p style={mono}>Upcoming</p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>
-                      {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                    </h2>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#8A8497" }}>
-                    {[{ label: "Ministry", color: "#3E1540" }, { label: "Social", color: "#9D7B4F" }, { label: "Outreach", color: "#5B7A6C" }].map(({ label, color }) => (
-                      <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 99, background: color }} />{label}
-                      </span>
-                    ))}
-                  </div>
+            <section>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18 }}>
+                <div>
+                  <p style={mono}>Upcoming</p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>
+                    {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </h2>
                 </div>
-
-                {calLoading ? (
-                  <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
-                ) : (
-                  <MonthGrid
-                    events={calEvents}
-                    currentMonth={currentMonth}
-                    onMonthChange={setCurrentMonth}
-                    onSelectEvent={(ev) => onPlanningEventChange(ev)}
-                  />
-                )}
-
-                <p style={{ marginTop: 10, fontSize: 12, color: "#8A8497", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "#3E1540" }} />
-                  Click any event to open its plan — no modal in between.
-                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#8A8497" }}>
+                  {[{ label: "Ministry", color: "#3E1540" }, { label: "Social", color: "#9D7B4F" }, { label: "Outreach", color: "#5B7A6C" }].map(({ label, color }) => (
+                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 99, background: color }} />{label}
+                    </span>
+                  ))}
+                </div>
               </div>
 
-              {/* Right: UP NEXT + QUICK ADD */}
-              <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                <p style={mono}>Up next</p>
+              {calLoading ? (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+              ) : (
+                <MonthGrid
+                  events={calEvents}
+                  currentMonth={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  onSelectEvent={(ev) => onPlanningEventChange(ev)}
+                />
+              )}
 
-                {upNext ? (
-                  <button
-                    onClick={() => onPlanningEventChange(upNext)}
-                    style={{ width: "100%", textAlign: "left", border: "1px solid #E5E0D2", padding: 0, cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "var(--cream)", color: "var(--ink)" }}
-                  >
-                    <div style={{ padding: "18px 20px 16px" }}>
-                      <p style={{ ...mono, color: "var(--muted-text)" }}>
-                        {new Date(upNext.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()} · {upNext.category.toUpperCase()}
-                      </p>
-                      <p style={{ fontFamily: "var(--serif)", fontSize: 26, marginTop: 6, letterSpacing: "-0.01em", color: "var(--ink)" }}>{upNext.title}</p>
-                      {upNext.location && <p style={{ fontSize: 13, color: "var(--body)", marginTop: 4 }}>{upNext.location}</p>}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
-                        <span style={{ padding: "3px 9px", borderRadius: 999, background: "#EDE8DC", fontSize: 11, color: "#5A5466" }}>
-                          {plannedIds.has(upNext.id) ? "Plan exists" : "Needs planning"}
-                        </span>
-                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>
-                          {Math.max(0, Math.ceil((new Date(upNext.start_date).getTime() - now.getTime()) / 86400000))} days out
-                        </span>
-                      </div>
-                      <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "#3E1540", color: "#FDFCF8", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        Open plan <ChevronRight className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </button>
-                ) : (
-                  <div style={{ padding: 20, border: "1px dashed #E8E2D2", borderRadius: 16, textAlign: "center" }}>
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", margin: 0 }}>No upcoming events</p>
-                  </div>
-                )}
-
-                {canEdit && (
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    style={{ width: "100%", padding: "16px 18px", borderRadius: 14, border: "1.5px dashed #D4CECD", background: "transparent", color: "#5A5466", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "var(--font-inter)", transition: "border-color 150ms, background 150ms" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#3E1540"; (e.currentTarget as HTMLButtonElement).style.color = "#3E1540" }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#D4CECD"; (e.currentTarget as HTMLButtonElement).style.color = "#5A5466" }}
-                  >
-                    <Plus className="w-4 h-4" /> New Event
-                  </button>
-                )}
-              </aside>
+              <p style={{ marginTop: 10, fontSize: 12, color: "#8A8497", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "#3E1540" }} />
+                Click any event to open its plan — no modal in between.
+              </p>
             </section>
 
             {/* Meeting notes timeline */}
@@ -1459,23 +1453,23 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Plan" && (
           <div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
-              <div>
-                <p style={mono}>Events & planning</p>
-                {isDesktopView
-                  ? <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 38, fontWeight: 400, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h1>
-                  : <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
-                }
+            {/* Mobile header + New Event (desktop header is TabPageHeader above) */}
+            {!isDesktopView && (
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
+                <div>
+                  <p style={mono}>Events & planning</p>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Event Plans</h2>
+                </div>
+                {canEdit && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Event
+                  </button>
+                )}
               </div>
-              {canEdit && (
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> New Event
-                </button>
-              )}
-            </div>
+            )}
             {calEvents.length === 0 ? (
               <div style={{ borderLeft: "2px solid #E8E2D2", paddingLeft: 20 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Click &ldquo;New Event&rdquo; to get started.</p>
@@ -1551,53 +1545,45 @@ export function StudentOrgTeamHome({
         )}
 
         {/* RESOURCES — role links/docs */}
-        {displaySection === "Resources" && (() => {
-          const userRosterRole = roster.find(m => m.user_id === userId)?.role ?? null
-          const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
-          const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
-          return (
-            <div>
-              <div style={{ marginBottom: 20 }}>
-                <p style={mono}>Team resources</p>
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
-                  {userRosterRole && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
-                      {userRosterRole}
-                    </span>
-                  )}
+        {displaySection === "Resources" && (
+          <div>
+            {/* Mobile header + role pills (desktop gets TabPageHeader + PlanSubTabStrip above) */}
+            {!isDesktopView && (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <p style={mono}>Team resources</p>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
+                    {userRosterRole && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                        {userRosterRole}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              {/* Role selector */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-                {resourcesRoles.map(role => (
-                  <button
-                    key={role}
-                    onClick={() => setResourcesRole(role)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 9999,
-                      border: "1.5px solid",
-                      borderColor: activeResourcesRole === role ? "#3E1540" : "#E8E2D2",
-                      background: activeResourcesRole === role ? "#3E1540" : "transparent",
-                      color: activeResourcesRole === role ? "#F6F4EF" : "#5A5466",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      fontFamily: "var(--font-inter)",
-                      transition: "border-color 150ms, background-color 150ms, color 150ms",
-                    }}
-                  >
-                    {role}
-                  </button>
-                ))}
-              </div>
-
-              <StudentOrgRoleTabContent teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canEdit} />
-            </div>
-          )
-        })()}
+                <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+                  {resourcesRoles.map(role => (
+                    <button
+                      key={role}
+                      onClick={() => setResourcesRole(role)}
+                      style={{
+                        padding: "6px 14px", borderRadius: 9999, border: "1.5px solid",
+                        borderColor: activeResourcesRole === role ? "#3E1540" : "#E8E2D2",
+                        background: activeResourcesRole === role ? "#3E1540" : "transparent",
+                        color: activeResourcesRole === role ? "#F6F4EF" : "#5A5466",
+                        fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)",
+                        transition: "border-color 150ms, background-color 150ms, color 150ms",
+                      }}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <StudentOrgRoleTabContent teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canEdit} />
+          </div>
+        )}
 
         {/* GROUPS — group generator */}
         {displaySection === "Groups" && (
