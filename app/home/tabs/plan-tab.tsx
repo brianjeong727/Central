@@ -2445,25 +2445,45 @@ export function StudentOrgSectionNav({
 export function SmallGroupSectionNav({
   activeSection,
   onSectionChange,
+  onBack,
 }: {
   activeSection: string
   onSectionChange: (s: string) => void
+  onBack?: () => void
 }) {
   const sections = [
     { key: "bible_study", label: "Bible Study" },
     { key: "schedule", label: "Schedule" },
   ]
   return (
-    <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
-      {sections.map(s => (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+      {onBack && (
         <button
-          key={s.key}
-          style={{ ...sidebarItemStyle(activeSection === s.key), marginBottom: 1 }}
-          onClick={() => onSectionChange(s.key)}
+          onClick={onBack}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 10px", margin: "6px 8px 2px",
+            background: "transparent", border: "none", cursor: "pointer",
+            color: "var(--muted-text)", fontSize: 11, fontFamily: "var(--mono)",
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            borderRadius: "var(--r-chip)",
+          }}
         >
-          <span style={{ flex: 1 }}>{s.label}</span>
+          <ChevronLeft style={{ width: 12, height: 12 }} />
+          All teams
         </button>
-      ))}
+      )}
+      <div className="flex-1 overflow-y-auto px-2 pt-1 pb-3">
+        {sections.map(s => (
+          <button
+            key={s.key}
+            style={{ ...sidebarItemStyle(activeSection === s.key), marginBottom: 1 }}
+            onClick={() => onSectionChange(s.key)}
+          >
+            <span style={{ flex: 1 }}>{s.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

@@ -227,6 +227,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     <SmallGroupSectionNav
       activeSection={sglSection}
       onSectionChange={handleSglSectionChange}
+      onBack={userTeams.length > 1 ? () => { setActiveTeamId(null); replaceParam("team", null) } : undefined}
     />
   ) : undefined
 
