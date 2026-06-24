@@ -209,10 +209,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         if (ev) handleStudentOrgSectionChange("Plan")
         setStudentOrgPlanningEvent(ev)
       }}
-      onBack={() => {
-        setActiveTeamId(null)
-        replaceParam("team", null)
-      }}
     />
   ) : undefined
 
@@ -542,7 +538,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
         {/* Shell topbar — suppressed on chats and on planning team picker (picker has its own full-width header) */}
-        {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && <DesktopTopbar crumbs={getShellCrumbs()} />}
+        {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
+          <DesktopTopbar
+            crumbs={getShellCrumbs()}
+            right={isStudentOrgActive && activeTeamId ? (
+              <button
+                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" as const, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ↤ All teams
+              </button>
+            ) : undefined}
+          />
+        )}
 
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
