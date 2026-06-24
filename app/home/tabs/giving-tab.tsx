@@ -983,9 +983,33 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
       {/* Desktop header */}
       <TabPageHeader>
         <PageTitle title={sectionLabel} compact />
+        {activeSection === "budget" && canAccessBudget && (
+          <div className="hidden md:flex" style={{ marginLeft: "auto", gap: 8 }}>
+            <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--ivory)", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: budgetExporting ? "default" : "pointer", fontFamily: "var(--sans)", opacity: budgetExporting ? 0.5 : 1 }}>
+              <Download style={{ width: 13, height: 13 }} />{budgetExporting ? "…" : "Export"}
+            </button>
+            <button onClick={() => setShowAddEntry(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "none", background: showAddEntry ? "var(--ivory)" : "var(--plum)", color: showAddEntry ? "var(--ink)" : "var(--cream)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
+              <Plus style={{ width: 14, height: 14 }} />Add entry
+            </button>
+          </div>
+        )}
       </TabPageHeader>
 
-      <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
+      {/* Budget / Allocation sub-tab strip — desktop only, outside padded content div */}
+      {(activeSection === "budget" || activeSection === "allocation") && canAccessBudget && (
+        <div className="hidden md:block">
+          <PlanSubTabStrip
+            tabs={[
+              { key: "budget", label: "Expenses" },
+              { key: "allocation", label: "Allocation" },
+            ]}
+            active={activeSection}
+            onChange={k => onSectionChange(k as "budget" | "allocation")}
+          />
+        </div>
+      )}
+
+      <div className="px-5 md:px-14 pt-6 md:pt-5 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
 
         {/* Mobile section tab strip */}
         {visibleSections.length > 1 && (
@@ -1187,9 +1211,9 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
               </div>
             )}
 
-            {/* ── Budget / Allocation sub-tabs ── */}
+            {/* Budget / Allocation sub-tab strip — mobile only */}
             {(activeSection === "budget" || activeSection === "allocation") && canAccessBudget && (
-              <div style={{ marginBottom: 24 }}>
+              <div className="md:hidden" style={{ marginBottom: 16 }}>
                 <PlanSubTabStrip
                   tabs={[
                     { key: "budget", label: "Expenses" },
@@ -1217,17 +1241,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
             {/* ── Budget ── */}
             {activeSection === "budget" && canAccessBudget && (
               <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 10 }}>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Expense ledger</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--cream)", color: "var(--body)", fontSize: 13, cursor: "pointer" }}>
-                      <Download size={13} />{budgetExporting ? "…" : "Export"}
-                    </button>
-                    <button onClick={() => setShowAddEntry(v => !v)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", background: showAddEntry ? "var(--ivory)" : "var(--plum)", color: showAddEntry ? "var(--ink)" : "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      <Plus size={14} />Add entry
-                    </button>
-                  </div>
-                </div>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", marginBottom: 16 }}>Expense ledger</p>
 
                 {showAddEntry && (
                   <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, padding: "16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>

@@ -62,6 +62,14 @@ Use the inline confirm pattern — first click reveals "Delete / Cancel" inline;
 
 **Common mistake to avoid:** Using `window.confirm()` or a modal for small items in lists/tables. The inline pattern is always preferred — it keeps focus in place and feels native to the UI.
 
+## PlanSubTabStrip placement — always outside the padded content wrapper
+
+`PlanSubTabStrip` manages its own horizontal alignment internally: its label row uses `md:pl-14` (56px) and its hairline uses `md:mx-14`. It must be placed **outside** any `px-5 md:px-14` content wrapper. If placed inside, the outer and inner paddings stack → tabs appear ~112px from the left on desktop (double-padded = wrong).
+
+**Rule:** Place the strip as a sibling to `TabPageHeader` at the component root, NOT inside the scrollable body div. Desktop-only instance: `<div className="hidden md:block"><PlanSubTabStrip .../></div>`. Mobile-only instance (if needed): `<div className="md:hidden"><PlanSubTabStrip .../></div>` inside the content wrapper (mobile has no `px-14` applied by the strip, so it reads the outer `px-5` correctly).
+
+**Check before adding any strip:** Find the content div with `px-5 md:px-14` and make sure the strip is **not** inside it.
+
 ## Tab strip / hairline mounting — proven structure, do not re-derive
 Date: 2026-06-21
 
