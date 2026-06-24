@@ -1290,13 +1290,7 @@ export function StudentOrgTeamHome({
       const evCfg = getEventConfig(planningEvent)
       return (
         <div style={{ padding: "26px 56px 60px" }}>
-          <button
-            onClick={() => onPlanningEventChange(null)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "8px 15px", border: "1px solid #E5E0D2", borderRadius: 9999, fontSize: 13, color: "#5A5466", background: "var(--cream)", cursor: "pointer", fontFamily: "var(--font-inter)" }}
-          >
-            <ArrowLeft style={{ width: 14, height: 14 }} /> Back to events
-          </button>
-          <div style={{ marginTop: 22, marginBottom: 28 }}>
+          <div style={{ marginBottom: 28 }}>
             <p style={{ ...mono, color: "#8A8497" }}>{evCfg.label.toUpperCase()} · {evDateStr}</p>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
               <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1, margin: 0 }}>
@@ -2407,9 +2401,7 @@ export function StudentOrgSectionNav({
       {/* Team identity header */}
       <div style={{ padding: "16px 14px 0", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 12px" }}>
-          <div style={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", background: PLUM, color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 16 }}>
-            {teamIcon}
-          </div>
+          <PlanLineIcon iconKey={teamIcon} bg={PLUM} fg="var(--cream)" size={36} radius={999} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: INK, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{teamName}</div>
             <div style={{ fontSize: 11, color: MUTED }}>{teamRole}</div>

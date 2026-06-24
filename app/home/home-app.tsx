@@ -544,9 +544,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             right={isStudentOrgActive && activeTeamId ? (
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase" as const, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                style={{ marginLeft: "auto", fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
-                ↤ All teams
+                ← All teams
               </button>
             ) : undefined}
           />
