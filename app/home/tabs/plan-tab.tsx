@@ -1197,12 +1197,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Plan" | "Resources" | "Groups" | "Rotations">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Plan", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Plan" | "Resources" | "Groups" | "Rotations"
+    return (["General", "Notes", "Plan", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Plan" | "Resources" | "Groups" | "Rotations") {
+  function setTeamTabAndUrl(tab: "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1357,13 +1357,14 @@ export function StudentOrgTeamHome({
           <PlanSubTabStrip
             tabs={[
               { key: "General", label: "General" },
+              { key: "Notes", label: "Notes" },
               { key: "Plan", label: "Plan" },
               { key: "Resources", label: "Resources" },
               { key: "Groups", label: "Groups" },
               { key: "Rotations", label: "Rotations" },
             ]}
             active={teamTab}
-            onChange={t => setTeamTabAndUrl(t as "General" | "Plan" | "Resources" | "Groups" | "Rotations")}
+            onChange={t => setTeamTabAndUrl(t as "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations")}
           />
         </div>
       )}
@@ -1372,6 +1373,7 @@ export function StudentOrgTeamHome({
       {isDesktopView && (() => {
         const sectionMeta: Record<string, { eyebrow: string; title: string }> = {
           General:   { eyebrow: `GENERAL · ${teamName.toUpperCase()}`, title: "General" },
+          Notes:     { eyebrow: "MEETING NOTES", title: "Notes" },
           Plan:      { eyebrow: "EVENTS & PLANNING", title: "Event Plans" },
           Resources: { eyebrow: "TEAM RESOURCES", title: "Resources" },
           Groups:    { eyebrow: "SMALL GROUPS", title: "Groups" },
@@ -1422,10 +1424,6 @@ export function StudentOrgTeamHome({
         {displaySection === "General" && (
           <div>
             <section>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "0 0 18px", letterSpacing: "-0.01em", color: "#13101A" }}>
-                Calendar
-              </h2>
-
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
               ) : (
@@ -1442,8 +1440,18 @@ export function StudentOrgTeamHome({
                 Click any event to open its plan — no modal in between.
               </p>
             </section>
+          </div>
+        )}
 
-            {/* Meeting notes timeline */}
+        {/* NOTES — meeting notes timeline */}
+        {displaySection === "Notes" && (
+          <div>
+            {!isDesktopView && (
+              <div style={{ marginBottom: 28 }}>
+                <p style={mono}>Meeting Notes</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Notes</h2>
+              </div>
+            )}
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} />
           </div>
         )}
@@ -2356,7 +2364,7 @@ export function StudentOrgSectionNav({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
-  const SECTIONS = ["General", "Plan", "Resources", "Groups", "Rotations"] as const
+  const SECTIONS = ["General", "Notes", "Plan", "Resources", "Groups", "Rotations"] as const
 
   const isPlanExpanded = activeSection === "Plan" || planningEvent !== null
   const PLUM = "#3E1540"
