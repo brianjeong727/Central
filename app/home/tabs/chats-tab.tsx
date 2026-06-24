@@ -3961,9 +3961,11 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
           </p>
         ) : (
           <>
-            {active.map((group) => (
-              <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
-            ))}
+            <div className="flex flex-col gap-2 pt-1">
+              {active.map((group) => (
+                <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
+              ))}
+            </div>
             {subTab === "church" && archivedChurchChats.length > 0 && (
               <div>
                 <button
@@ -3975,11 +3977,15 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 text-[var(--faint)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
                 </button>
-                {showArchived && archivedChurchChats.map((group) => (
-                  <div key={group.id} className="opacity-50">
-                    <ChatGroupCard group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} />
+                {showArchived && (
+                  <div className="flex flex-col gap-2">
+                    {archivedChurchChats.map((group) => (
+                      <div key={group.id} className="opacity-50">
+                        <ChatGroupCard group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </>
