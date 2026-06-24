@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { Spinner } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
+import { PlanSubTabStrip } from "./plan-tab"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
@@ -982,15 +983,6 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
       {/* Desktop header */}
       <TabPageHeader>
         <PageTitle title={sectionLabel} compact />
-        {visibleSections.length > 1 && (
-          <div className="hidden md:flex items-center gap-1.5 ml-auto">
-            {visibleSections.map(s => (
-              <button key={s.id} onClick={() => onSectionChange(s.id)} style={{ padding: "6px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 500, border: activeSection === s.id ? "none" : "1px solid var(--line)", background: activeSection === s.id ? "var(--plum)" : "transparent", color: activeSection === s.id ? "var(--cream)" : "var(--body)", cursor: "pointer" }}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
       </TabPageHeader>
 
       <div className="px-5 md:px-14 pt-6 md:pt-8 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
@@ -1197,12 +1189,15 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
             {/* ── Budget / Allocation sub-tabs ── */}
             {(activeSection === "budget" || activeSection === "allocation") && canAccessBudget && (
-              <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
-                {[{ id: "budget" as const, label: "Expenses" }, { id: "allocation" as const, label: "Allocation" }].map(t => (
-                  <button key={t.id} onClick={() => onSectionChange(t.id)} style={{ padding: "6px 16px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: activeSection === t.id ? "none" : "1px solid var(--line)", background: activeSection === t.id ? "var(--plum)" : "var(--cream)", color: activeSection === t.id ? "var(--cream)" : "var(--body)", cursor: "pointer" }}>
-                    {t.label}
-                  </button>
-                ))}
+              <div style={{ marginBottom: 24 }}>
+                <PlanSubTabStrip
+                  tabs={[
+                    { key: "budget", label: "Expenses" },
+                    { key: "allocation", label: "Allocation" },
+                  ]}
+                  active={activeSection}
+                  onChange={k => onSectionChange(k as "budget" | "allocation")}
+                />
               </div>
             )}
 
