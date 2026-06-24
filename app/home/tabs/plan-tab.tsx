@@ -7719,12 +7719,8 @@ function GroupsTab({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={mono}>Group generator</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Groups</h2>
-        </div>
-        {canEdit && sessions.length > 0 && (
+      {canEdit && sessions.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
           <button
             onClick={() => setShowWizard(true)}
             style={{ padding: "10px 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}
@@ -7732,8 +7728,8 @@ function GroupsTab({
             <Plus style={{ width: 15, height: 15 }} />
             Generate groups
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
