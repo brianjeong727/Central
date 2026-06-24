@@ -2348,41 +2348,64 @@ export function StudentOrgSectionNav({
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
   const SECTIONS = ["General", "Notes", "Events", "Resources", "Groups", "Rotations"] as const
-
-  const isPlanExpanded = activeSection === "Events" || planningEvent !== null
+  // Independent — only toggled by the chevron button, never by section navigation
+  const [isPlanOpen, setIsPlanOpen] = useState(
+    () => activeSection === "Events" || planningEvent !== null
+  )
   const PLUM = "#3E1540"
   const FAINT = "var(--faint)"
   const LINE = "var(--line)"
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      {/* Section nav */}
       <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
         {SECTIONS.map(section => {
-          const isPlan = section === "Events"
-          const isActive = isPlan ? isPlanExpanded : activeSection === section
+          const isEvents = section === "Events"
+          const isActive = isEvents
+            ? activeSection === "Events" || planningEvent !== null
+            : activeSection === section
           return (
             <div key={section}>
-              <button
-                onClick={() => {
-                  onSectionChange(section)
-                  if (section !== "Events") onPlanningEventChange(null)
-                }}
-                style={{ ...sidebarItemStyle(isActive), marginBottom: 1 }}
-              >
-                <span style={{ flex: 1 }}>{section}</span>
-                {isPlan && (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    style={{ transform: isPlanExpanded ? "rotate(90deg)" : undefined, transition: "transform 160ms", color: FAINT, flexShrink: 0 }}>
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                )}
-              </button>
+              {isEvents ? (
+                /* Events row: text click navigates, chevron click toggles — never nested buttons */
+                <div
+                  style={{ ...sidebarItemStyle(isActive), marginBottom: 1, display: "flex", alignItems: "center", cursor: "pointer" }}
+                  onClick={() => { onSectionChange("Events"); onPlanningEventChange(null) }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => e.key === "Enter" && onSectionChange("Events")}
+                >
+                  <span style={{ flex: 1 }}>Events</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={e => { e.stopPropagation(); setIsPlanOpen(p => !p) }}
+                    onKeyDown={e => e.key === "Enter" && (e.stopPropagation(), setIsPlanOpen(p => !p))}
+                    style={{ display: "flex", alignItems: "center", padding: "2px 4px", borderRadius: 4, cursor: "pointer" }}
+                    title={isPlanOpen ? "Collapse" : "Expand"}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      style={{ transform: isPlanOpen ? "rotate(90deg)" : undefined, transition: "transform 160ms", color: FAINT }}>
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    onSectionChange(section)
+                    onPlanningEventChange(null)
+                  }}
+                  style={{ ...sidebarItemStyle(isActive), marginBottom: 1 }}
+                >
+                  <span style={{ flex: 1 }}>{section}</span>
+                </button>
+              )}
 
-              {isPlan && isPlanExpanded && (
-                <div style={{ marginLeft: 28, marginBottom: 4 }}>
+              {isEvents && isPlanOpen && (
+                <div style={{ marginLeft: 16, marginBottom: 4 }}>
                   {calEvents.length === 0 ? (
-                    <p style={{ fontSize: 12, color: FAINT, padding: "5px 10px", fontFamily: "var(--sans)" }}>No events yet</p>
+                    <p style={{ fontSize: 11, color: FAINT, padding: "4px 10px", fontFamily: "var(--sans)" }}>No events yet</p>
                   ) : (
                     calEvents.map(ev => {
                       const isEvActive = planningEvent?.id === ev.id
@@ -2390,9 +2413,19 @@ export function StudentOrgSectionNav({
                         <button
                           key={ev.id}
                           onClick={() => { onPlanningEventChange(ev); onSectionChange("Events") }}
-                          style={{ ...sidebarItemStyle(isEvActive), borderRadius: "var(--r-pill)" }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 7,
+                            width: "100%", padding: "5px 10px",
+                            background: isEvActive ? "var(--ivory)" : "none",
+                            border: "none", borderRadius: "var(--r-chip)",
+                            cursor: "pointer", textAlign: "left" as const,
+                            fontFamily: "var(--sans)", fontSize: 12,
+                            color: isEvActive ? "var(--ink)" : "var(--muted-text)",
+                            fontWeight: isEvActive ? 500 : 400,
+                            transition: "background 100ms ease",
+                          }}
                         >
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0, marginRight: 3 }} />
+                          <span style={{ width: 4, height: 4, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0 }} />
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{ev.title}</span>
                         </button>
                       )
