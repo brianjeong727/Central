@@ -227,7 +227,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     <SmallGroupSectionNav
       activeSection={sglSection}
       onSectionChange={handleSglSectionChange}
-      onBack={userTeams.length > 1 ? () => { setActiveTeamId(null); replaceParam("team", null) } : undefined}
     />
   ) : undefined
 
@@ -560,7 +559,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={isStudentOrgActive && activeTeamId ? (
+            right={(isStudentOrgActive || isDGLActive) && activeTeamId && userTeams.length > 1 ? (
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
                 style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
