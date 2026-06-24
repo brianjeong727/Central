@@ -1373,12 +1373,7 @@ export function StudentOrgTeamHome({
           <TabPageHeader>
             <PageTitle eyebrow={meta.eyebrow} title={meta.title} />
             {displaySection === "Plan" && canEdit && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginLeft: "auto" }}
-              >
-                <Plus className="w-3.5 h-3.5" /> New Event
-              </button>
+              <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
             )}
             {displaySection === "Resources" && userRosterRole && (
               <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
