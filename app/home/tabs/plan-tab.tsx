@@ -1257,7 +1257,6 @@ export function StudentOrgTeamHome({
   }, [teamId])
 
   const now = new Date()
-  const upNext = calEvents.find(ev => new Date(ev.start_date) >= now)
 
   async function handleDeleteEvent(evId: string) {
     setDeleting(true)
