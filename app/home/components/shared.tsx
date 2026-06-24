@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Plus } from "lucide-react"
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
@@ -150,6 +151,37 @@ export function PlanLineIcon({ iconKey, bg = "#3E1540", fg = "#F6F4EF", size = 4
         {paths}
       </svg>
     </div>
+  )
+}
+
+// Canonical header-right CTA button for section pages (e.g. "Start new", "Generate groups").
+// Always lives in the TabPageHeader right slot — never inline in content.
+export function HeaderActionButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "7px 14px", borderRadius: 9,
+        border: "1px solid var(--line)", background: "var(--ivory)",
+        color: "var(--ink)", fontSize: 13, fontWeight: 500,
+        cursor: disabled ? "default" : "pointer",
+        flexShrink: 0, marginLeft: "auto",
+        fontFamily: "var(--sans)", opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Plus style={{ width: 14, height: 14 }} />
+      {label}
+    </button>
   )
 }
 

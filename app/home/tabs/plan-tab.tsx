@@ -39,7 +39,7 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton } from "../components/shared"
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
@@ -1044,11 +1044,13 @@ export function MeetingNotesSection({
   userId,
   userName,
   canWrite,
+  startNewTrigger,
 }: {
   teamId: string | null
   userId: string
   userName: string
   canWrite: boolean
+  startNewTrigger?: number
 }) {
   const supabase = createClient()
   const [notes, setNotes] = useState<MeetingNote[]>([])
@@ -1074,6 +1076,11 @@ export function MeetingNotesSection({
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId])
+
+  useEffect(() => {
+    if (startNewTrigger) createNote()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startNewTrigger])
 
   async function createNote() {
     if (!teamId || creating) return
@@ -1117,18 +1124,6 @@ export function MeetingNotesSection({
 
   return (
     <div>
-      {canWrite && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-          <button
-            onClick={createNote}
-            disabled={creating}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--ivory)", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: creating ? "default" : "pointer", fontFamily: "var(--sans)", opacity: creating ? 0.5 : 1 }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {creating ? "Creating…" : "Start new"}
-          </button>
-        </div>
-      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
@@ -1223,6 +1218,8 @@ export function StudentOrgTeamHome({
 
   // Groups tab — trigger wizard from header button
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
+  // Notes tab — trigger createNote from header button
+  const [notesTrigger, setNotesTrigger] = useState(0)
 
   useEffect(() => {
     if (!ministryId) return
@@ -1388,13 +1385,11 @@ export function StudentOrgTeamHome({
                 {userRosterRole}
               </span>
             )}
+            {displaySection === "Notes" && canEdit && (
+              <HeaderActionButton label="Start new" onClick={() => setNotesTrigger(t => t + 1)} />
+            )}
             {displaySection === "Groups" && canEdit && (
-              <button
-                onClick={() => setGroupGenerateTrigger(t => t + 1)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "var(--ivory)", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginLeft: "auto", fontFamily: "var(--sans)" }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Generate groups
-              </button>
+              <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
             )}
           </TabPageHeader>
         )
@@ -1444,7 +1439,7 @@ export function StudentOrgTeamHome({
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Notes</h2>
               </div>
             )}
-            <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} />
+            <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} />
           </div>
         )}
 
