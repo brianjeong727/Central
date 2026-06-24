@@ -1229,6 +1229,9 @@ export function StudentOrgTeamHome({
   // Resources tab — which role's content to display
   const [resourcesRole, setResourcesRole] = useState<string | null>(null)
 
+  // Groups tab — trigger wizard from header button
+  const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
+
   useEffect(() => {
     if (!ministryId) return
     setCalLoading(true)
@@ -1391,6 +1394,14 @@ export function StudentOrgTeamHome({
                 {userRosterRole}
               </span>
             )}
+            {displaySection === "Groups" && canEdit && (
+              <button
+                onClick={() => setGroupGenerateTrigger(t => t + 1)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "var(--ivory)", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginLeft: "auto", fontFamily: "var(--sans)" }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Generate groups
+              </button>
+            )}
           </TabPageHeader>
         )
       })()}
@@ -1411,21 +1422,9 @@ export function StudentOrgTeamHome({
         {displaySection === "General" && (
           <div>
             <section>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18 }}>
-                <div>
-                  <p style={mono}>Upcoming</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "4px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>
-                    {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                  </h2>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "#8A8497" }}>
-                  {[{ label: "Ministry", color: "#3E1540" }, { label: "Social", color: "#9D7B4F" }, { label: "Outreach", color: "#5B7A6C" }].map(({ label, color }) => (
-                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 99, background: color }} />{label}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, margin: "0 0 18px", letterSpacing: "-0.01em", color: "#13101A" }}>
+                Calendar
+              </h2>
 
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
@@ -1591,6 +1590,7 @@ export function StudentOrgTeamHome({
             ministryId={ministryId}
             userId={userId}
             canEdit={canEdit}
+            generateTrigger={groupGenerateTrigger}
           />
         )}
 
@@ -2347,13 +2347,9 @@ export function PlanSubTabStrip({
 // Vertical sidebar nav for the Student Org Board workspace on desktop.
 // Renders in place of the flat team list in DesktopSidebar when SOB is active.
 export function StudentOrgSectionNav({
-  teamName, teamRole, teamIcon,
   activeSection, onSectionChange,
   calEvents, planningEvent, onPlanningEventChange,
 }: {
-  teamName: string
-  teamRole: string
-  teamIcon: string
   activeSection: string
   onSectionChange: (s: string) => void
   calEvents: CalendarEvent[]
@@ -2361,41 +2357,19 @@ export function StudentOrgSectionNav({
   onPlanningEventChange: (ev: CalendarEvent | null) => void
 }) {
   const SECTIONS = ["General", "Plan", "Resources", "Groups", "Rotations"] as const
-  const SECTION_ICONS: Record<string, React.ReactNode> = {
-    General:   <Grid3x3 style={{ width: 16, height: 16 }} />,
-    Plan:      <ClipboardList style={{ width: 16, height: 16 }} />,
-    Resources: <FileText style={{ width: 16, height: 16 }} />,
-    Groups:    <Users style={{ width: 16, height: 16 }} />,
-    Rotations: <Shuffle style={{ width: 16, height: 16 }} />,
-  }
 
   const isPlanExpanded = activeSection === "Plan" || planningEvent !== null
   const PLUM = "#3E1540"
   const PLUM2 = "#2D0F2E"
   const IVORY = "var(--ivory)"
-  const INK = "var(--ink)"
   const BODY = "var(--body)"
-  const MUTED = "var(--muted-text)"
   const FAINT = "var(--faint)"
   const LINE = "var(--line)"
-  const MONO: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.2px", textTransform: "uppercase" as const }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {/* Team identity header */}
-      <div style={{ padding: "16px 14px 0", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 12px" }}>
-          <PlanLineIcon iconKey={teamIcon} bg={PLUM} fg="var(--cream)" size={36} radius={999} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: INK, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{teamName}</div>
-            <div style={{ fontSize: 11, color: MUTED }}>{teamRole}</div>
-          </div>
-        </div>
-      </div>
-
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
       {/* Section nav */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 12px" }}>
-        <p style={{ ...MONO, color: FAINT, padding: "0 10px", marginBottom: 6 }}>Team Sections</p>
         {SECTIONS.map(section => {
           const isPlan = section === "Plan"
           const isActive = isPlan ? isPlanExpanded : activeSection === section
@@ -2408,20 +2382,17 @@ export function StudentOrgSectionNav({
                 }}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 10px", borderRadius: "var(--r-chip)",
+                  padding: "7px 10px", borderRadius: "var(--r-chip)",
                   width: "100%", textAlign: "left" as const,
                   background: isActive ? IVORY : "transparent",
                   color: isActive ? PLUM2 : BODY,
-                  fontWeight: isActive ? 500 : 400, fontSize: 14,
+                  fontWeight: isActive ? 500 : 400, fontSize: 13,
                   border: "none", borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
                   cursor: "pointer", fontFamily: "var(--sans)",
                   transition: "background 100ms ease",
                   marginBottom: 1,
                 }}
               >
-                <span style={{ width: 18, flexShrink: 0, display: "grid", placeItems: "center", color: "inherit" }}>
-                  {SECTION_ICONS[section]}
-                </span>
                 <span style={{ flex: 1 }}>{section}</span>
                 {isPlan && (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -7628,12 +7599,13 @@ type GroupSessionRecord = {
 }
 
 function GroupsTab({
-  teamId, ministryId, userId, canEdit,
+  teamId, ministryId, userId, canEdit, generateTrigger,
 }: {
   teamId: string | null
   ministryId: string
   userId: string
   canEdit: boolean
+  generateTrigger?: number
 }) {
   const supabase = createClient()
   const [sessions, setSessions] = useState<GroupSessionRecord[]>([])
@@ -7642,6 +7614,8 @@ function GroupsTab({
   const [viewSession, setViewSession] = useState<GroupSessionRecord | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => { if (generateTrigger) setShowWizard(true) }, [generateTrigger])
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
@@ -7805,18 +7779,6 @@ function GroupsTab({
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {canEdit && sessions.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24 }}>
-          <button
-            onClick={() => setShowWizard(true)}
-            style={{ padding: "10px 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}
-          >
-            <Plus style={{ width: 15, height: 15 }} />
-            Generate groups
-          </button>
         </div>
       )}
 
