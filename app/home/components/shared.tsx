@@ -154,6 +154,30 @@ export function PlanLineIcon({ iconKey, bg = "#3E1540", fg = "#F6F4EF", size = 4
   )
 }
 
+// Canonical sidebar nav item style — used by DesktopSidebar and all plan sub-navs.
+// Keeps active/inactive/danger states consistent across every context panel.
+export function sidebarItemStyle(active?: boolean, danger?: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    padding: "7px 10px",
+    borderRadius: "var(--r-chip)",
+    cursor: "pointer",
+    background: active ? "var(--ivory)" : "transparent",
+    color: danger ? "var(--danger)" : active ? "var(--ink)" : "var(--body)",
+    fontSize: 13,
+    fontWeight: active ? 500 : 400,
+    border: "none",
+    width: "100%",
+    textAlign: "left" as const,
+    fontFamily: "var(--sans)",
+    borderLeftWidth: 2,
+    borderLeftStyle: "solid" as const,
+    borderLeftColor: active ? "var(--plum)" : "transparent",
+    transition: "background 100ms ease",
+  }
+}
+
 // Canonical header-right CTA button for section pages (e.g. "Start new", "Generate groups").
 // Always lives in the TabPageHeader right slot — never inline in content.
 export function HeaderActionButton({

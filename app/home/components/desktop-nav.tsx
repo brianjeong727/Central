@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { PlanLineIcon } from "./shared"
+import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { getInitials } from "../utils"
 import { DirectoryMemberListPanel } from "../tabs/directory-tab"
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
@@ -32,7 +32,7 @@ const MONO: React.CSSProperties = {
 export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   return (
     <div
-      className="hidden md:flex h-12 px-14 items-center gap-4 flex-shrink-0"
+      className="hidden md:flex h-12 px-14 items-center justify-between gap-4 flex-shrink-0"
       style={{ background: "transparent" }}
     >
       <div className="flex items-center gap-1.5 text-[12px]">
@@ -76,30 +76,15 @@ export function DesktopSidebar({
     { id: "profile",   label: "You",       icon: User },
   ]
 
-  const subItemStyle = (active?: boolean, danger?: boolean): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    padding: "7px 10px",
-    borderRadius: "var(--r-chip)",
-    cursor: "pointer",
-    background: active ? IVORY : "transparent",
-    color: danger ? "var(--danger)" : active ? INK : "var(--body)",
-    fontSize: 13,
-    fontWeight: active ? 500 : 400,
-    border: "none",
-    width: "100%",
-    textAlign: "left",
-    fontFamily: "var(--sans)",
-    borderLeftWidth: 2,
-    borderLeftStyle: "solid",
-    borderLeftColor: active ? PLUM : "transparent",
-    transition: "background 100ms ease",
-  })
+  const subItemStyle = sidebarItemStyle
 
   function getSectionName(): string {
     switch (activeTab) {
       case "chats":        return "Messages"
-      case "plan":         return "Planning"
+      case "plan": {
+        const activeTeam = userTeams.find(t => t.teamId === activeTeamId)
+        return activeTeam?.teamName ?? "Planning"
+      }
       case "directory":    return "People"
       case "giving":       return "Finance"
       case "congregation": return "Congregation"
@@ -141,27 +126,8 @@ export function DesktopSidebar({
             userTeams.map((t) => {
               const isActive = t.teamId === activeTeamId
               return (
-                <button key={t.teamId} onClick={() => onActiveTeamChange(t.teamId)} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 8px", borderRadius: "var(--r-chip)", cursor: "pointer",
-                  background: isActive ? IVORY : "transparent",
-                  border: "none",
-                  borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
-                  width: "100%", textAlign: "left",
-                  transition: "background 100ms ease",
-                }}>
-                  <PlanLineIcon
-                    iconKey={t.teamIcon ?? "users"}
-                    bg={isActive ? PLUM : "var(--line)"}
-                    fg={isActive ? "var(--cream)" : INK}
-                    size={30}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "var(--sans)", color: INK }}>
-                      {t.teamName}
-                    </div>
-                    <div style={{ fontSize: 10, color: MUTED, letterSpacing: "0.4px", fontFamily: "var(--sans)" }}>{t.roleName}</div>
-                  </div>
+                <button key={t.teamId} onClick={() => onActiveTeamChange(t.teamId)} style={subItemStyle(isActive)}>
+                  <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.teamName}</span>
                 </button>
               )
             })
@@ -378,15 +344,13 @@ export function DesktopSidebar({
         className="hidden md:flex flex-col w-[var(--sidebar-width)] flex-shrink-0 h-screen"
         style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
-        {/* Section header — hidden when planContextContent provides its own header */}
-        {!(activeTab === "plan" && planContextContent) && (
-          <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
-            <p style={MONO}>Section</p>
-            <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
-              {getSectionName()}
-            </p>
-          </div>
-        )}
+        {/* Section header */}
+        <div style={{ padding: "18px 16px 14px", flexShrink: 0 }}>
+          <p style={MONO}>Section</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 20, lineHeight: 1.1, color: INK, marginTop: 4 }}>
+            {getSectionName()}
+          </p>
+        </div>
 
         {renderPanelBody()}
 

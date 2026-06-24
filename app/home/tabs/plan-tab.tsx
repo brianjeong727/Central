@@ -39,7 +39,7 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle } from "../components/shared"
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
@@ -1184,12 +1184,12 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const router = useRouter()
-  const [teamTab, setTeamTab] = useState<"General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations">(() => {
+  const [teamTab, setTeamTab] = useState<"General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Notes", "Plan", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations"
+    return (["General", "Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations"
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Notes" | "Plan" | "Resources" | "Groups" | "Rotations") {
+  function setTeamTabAndUrl(tab: "General" | "Notes" | "Events" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
     const sp = new URLSearchParams(window.location.search)
     sp.set("sotab", tab)
@@ -1347,7 +1347,7 @@ export function StudentOrgTeamHome({
             tabs={[
               { key: "General", label: "General" },
               { key: "Notes", label: "Notes" },
-              { key: "Plan", label: "Plan" },
+              { key: "Events", label: "Events" },
               { key: "Resources", label: "Resources" },
               { key: "Groups", label: "Groups" },
               { key: "Rotations", label: "Rotations" },
@@ -2350,16 +2350,13 @@ export function StudentOrgSectionNav({
 
   const isPlanExpanded = activeSection === "Plan" || planningEvent !== null
   const PLUM = "#3E1540"
-  const PLUM2 = "#2D0F2E"
-  const IVORY = "var(--ivory)"
-  const BODY = "var(--body)"
   const FAINT = "var(--faint)"
   const LINE = "var(--line)"
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
       {/* Section nav */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 12px" }}>
+      <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
         {SECTIONS.map(section => {
           const isPlan = section === "Plan"
           const isActive = isPlan ? isPlanExpanded : activeSection === section
@@ -2370,18 +2367,7 @@ export function StudentOrgSectionNav({
                   onSectionChange(section)
                   if (section !== "Plan") onPlanningEventChange(null)
                 }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "7px 10px", borderRadius: "var(--r-chip)",
-                  width: "100%", textAlign: "left" as const,
-                  background: isActive ? IVORY : "transparent",
-                  color: isActive ? PLUM2 : BODY,
-                  fontWeight: isActive ? 500 : 400, fontSize: 13,
-                  border: "none", borderLeft: isActive ? `2px solid ${PLUM}` : "2px solid transparent",
-                  cursor: "pointer", fontFamily: "var(--sans)",
-                  transition: "background 100ms ease",
-                  marginBottom: 1,
-                }}
+                style={{ ...sidebarItemStyle(isActive), marginBottom: 1 }}
               >
                 <span style={{ flex: 1 }}>{section}</span>
                 {isPlan && (
@@ -2403,17 +2389,9 @@ export function StudentOrgSectionNav({
                         <button
                           key={ev.id}
                           onClick={() => { onPlanningEventChange(ev); onSectionChange("Plan") }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 9,
-                            padding: "7px 10px", borderRadius: "var(--r-pill)",
-                            fontSize: 13, color: isEvActive ? PLUM2 : BODY,
-                            fontWeight: isEvActive ? 500 : 400,
-                            background: "none", border: "none", cursor: "pointer",
-                            textAlign: "left" as const, width: "100%",
-                            fontFamily: "var(--sans)",
-                          }}
+                          style={{ ...sidebarItemStyle(isEvActive), borderRadius: "var(--r-pill)" }}
                         >
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0 }} />
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0, marginRight: 3 }} />
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{ev.title}</span>
                         </button>
                       )
