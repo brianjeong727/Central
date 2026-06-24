@@ -542,12 +542,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           <DesktopTopbar
             crumbs={getShellCrumbs()}
             right={isStudentOrgActive && activeTeamId ? (
-              <button
-                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                style={{ marginLeft: "auto", fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-              >
-                ← All teams
-              </button>
+              <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                  style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                >
+                  ← All teams
+                </button>
+              </div>
             ) : undefined}
           />
         )}
