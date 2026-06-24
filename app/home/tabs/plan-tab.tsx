@@ -1116,34 +1116,26 @@ export function MeetingNotesSection({
   }
 
   return (
-    <div className="mt-14">
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
-            Meeting Notes · Weekly
-          </p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>
-            What we&apos;ve discussed
-          </h2>
-        </div>
-        {canWrite && (
+    <div>
+      {canWrite && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
           <button
             onClick={createNote}
             disabled={creating}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontSize: 13, fontWeight: 500, cursor: creating ? "default" : "pointer", fontFamily: "var(--font-inter)", opacity: creating ? 0.5 : 1 }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--ivory)", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: creating ? "default" : "pointer", fontFamily: "var(--sans)", opacity: creating ? 0.5 : 1 }}
           >
             <Plus className="w-3.5 h-3.5" />
             {creating ? "Creating…" : "Start new"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
       ) : notes.length === 0 ? (
         <div style={{ borderLeft: "1px solid #E8E2D2", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", margin: 0 }}>
-            {canWrite ? "No notes yet — start a new one above." : "No notes have been created yet."}
+            {canWrite ? "No notes yet — start a new one." : "No notes have been created yet."}
           </p>
         </div>
       ) : (
