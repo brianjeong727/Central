@@ -573,6 +573,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
 
+          {/* Shared on-load entrance — keyed by activeTab so this single element
+              remounts and replays the fade+rise on every top-level tab switch
+              (one mount point, not one per tab). md:h-full + md:overflow-hidden
+              pass the shell's height/scroll context through to each tab's own
+              wrapper, which resolves md:h-full against this element. */}
+          <div key={activeTab} className="content-enter md:h-full md:overflow-hidden">
+
           {activeTab === "home" && (
             <div className="md:h-full md:overflow-y-auto">
               <HomeTab
@@ -768,6 +775,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
               />
             </div>
           )}
+
+          </div>
 
         </div>
 

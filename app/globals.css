@@ -278,6 +278,22 @@
   .fade-in-up { animation: none; opacity: 1; transform: none; }
 }
 
+/* Shared main-content-column entrance — fires on every top-level tab switch
+   (the wrapper in home-app.tsx is keyed by activeTab, so it remounts).
+   Gentler/shorter than the overlay entrance because it's high-frequency.
+   Ends at `transform: none` (not translateY(0)) so no lingering transform
+   lingers to trap position:fixed descendants (plan/forms render full-screen
+   overlays inside this column). Tune feel: duration = the 300ms below;
+   rise distance = the 8px translateY in the keyframe below. */
+@keyframes content-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.content-enter { animation: content-enter 300ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .content-enter { animation: none; opacity: 1; transform: none; }
+}
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
