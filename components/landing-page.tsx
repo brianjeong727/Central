@@ -290,21 +290,21 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section className="cl-hero-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "84px 56px 92px" }}>
-        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.04fr 0.96fr", gap: 56, alignItems: "center" }}>
+        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.04fr 0.96fr", gap: 56, alignItems: "center", ["--fade-step" as string]: "80ms" }}>
 
           {/* Left — type + verse */}
           <div>
-            <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
+            <p className="fade-in-up" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0, ["--fade-index" as string]: 0 }}>
               For college ministries
             </p>
-            <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 58, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "18px 0 0", color: INK }}>
+            <h1 className="cl-hero-title fade-in-up" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 58, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "18px 0 0", color: INK, ["--fade-index" as string]: 1 }}>
               One calm place,<br/>
               <em style={{ fontStyle: "italic", color: PLUM2 }}>between Sundays.</em>
             </h1>
-            <p className="cl-hero-sub" style={{ fontSize: 17, lineHeight: 1.6, color: BODY, marginTop: 22, maxWidth: 420 }}>
+            <p className="cl-hero-sub fade-in-up" style={{ fontSize: 17, lineHeight: 1.6, color: BODY, marginTop: 22, maxWidth: 420, ["--fade-index" as string]: 2 }}>
               Central replaces scattered chats, announcement threads, RSVP lists, and planning docs with a single weekly workspace your whole ministry lives in.
             </p>
-            <div className="cl-hero-ctas" style={{ display: "flex", gap: 18, marginTop: 34, alignItems: "center", flexWrap: "wrap" }}>
+            <div className="cl-hero-ctas fade-in-up" style={{ display: "flex", gap: 18, marginTop: 34, alignItems: "center", flexWrap: "wrap", ["--fade-index" as string]: 3 }}>
               {authChecked && authUser ? (
                 <>
                   <button onClick={handleOpenApp} className="cl-btn-primary" style={{ height: 54, padding: "0 30px", borderRadius: 999, fontSize: 15, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
@@ -327,7 +327,7 @@ export default function LandingPage() {
             </div>
 
             {/* Verse — in text column, below CTAs */}
-            <div style={{ marginTop: 38, paddingTop: 24, borderTop: `1px solid ${LINE}`, maxWidth: 430 }}>
+            <div className="fade-in-up" style={{ marginTop: 38, paddingTop: 24, borderTop: `1px solid ${LINE}`, maxWidth: 430, ["--fade-index" as string]: 4 }}>
               <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: BODY, margin: 0 }}>
                 &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
               </p>
@@ -338,10 +338,11 @@ export default function LandingPage() {
           </div>
 
           {/* Right — rotating image stage */}
-          <div className="cl-hero-stage" style={{
+          <div className="cl-hero-stage fade-in-up" style={{
             position: "relative", width: "100%", aspectRatio: "1 / 1",
             borderRadius: 18, overflow: "hidden",
             border: `1px solid ${LINE2}`, background: CREAM,
+            ["--fade-index" as string]: 1,
           }}>
             {HERO_IMAGES.map((img, k) => (
               <div key={img.src} style={{
