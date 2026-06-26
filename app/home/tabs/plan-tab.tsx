@@ -669,14 +669,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
 }
 
 // ── Collab presence colors ────────────────────────────────────────────────────
-const COLLAB_COLORS = ["#7C3AED", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#EC4899"]
-function hashUserId(id: string) {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return h
-}
-
-interface CollabUser { userId: string; userName: string; color: string }
+interface CollabUser { userId: string; userName: string }
 
 // ── Live collab hook ──────────────────────────────────────────────────────────
 function useNoteCollab(noteId: string, userId: string, userName: string) {
@@ -687,7 +680,6 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
   const initDoneRef = useRef(false)
   const isApplyingRemote = useRef(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const color = COLLAB_COLORS[hashUserId(userId) % COLLAB_COLORS.length]
 
   useEffect(() => {
     receivedStateRef.current = false
@@ -746,7 +738,7 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
 
     channel.subscribe(async (status: string) => {
       if (status !== "SUBSCRIBED") return
-      await channel.track({ userId, userName, color })
+      await channel.track({ userId, userName })
       // Ask existing clients for their current state
       channel.send({ type: "broadcast", event: "request-state", payload: { forUserId: userId } })
     })
@@ -770,7 +762,7 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId, userId, userName])
 
-  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, color, isApplyingRemote }
+  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, isApplyingRemote }
 }
 
 export function MeetingNoteEditor({
@@ -871,13 +863,12 @@ export function MeetingNoteEditor({
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "#FDFBF7" }}>
           <div style={{ display: "flex" }}>
             {activeUsers.slice(0, 4).map((u, i) => (
-              <div
+              <MonogramChip
                 key={u.userId}
                 title={u.userName}
-                style={{ width: 22, height: 22, borderRadius: "50%", background: u.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "white", border: "2px solid white", marginLeft: i === 0 ? 0 : -6, flexShrink: 0 }}
-              >
-                {getInitials(u.userName)}
-              </div>
+                initials={getInitials(u.userName)}
+                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 700, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
+              />
             ))}
           </div>
           <span style={{ fontSize: 12, color: "#8A8497" }}>
@@ -1305,7 +1296,6 @@ export function StudentOrgTeamHome({
           </TabPageHeader>
           <EventPlanWorkspace
             inline
-            hideHero
             calendarEvent={planningEvent}
             ministryId={ministryId}
             userId={userId}
@@ -1321,7 +1311,6 @@ export function StudentOrgTeamHome({
     return (
       <EventPlanWorkspace
         inline
-        hideHero
         calendarEvent={planningEvent}
         ministryId={ministryId}
         userId={userId}
@@ -2131,15 +2120,13 @@ export function PlanTab({
           const perms = activeUserTeam?.permissions ?? []
           if (!isAdmin && !perms.includes("can_plan_events")) return null
           return (
-            <div className="px-14 py-7">
-              <MinistryCalendar
-                ministryId={ministryId}
-                teamId={activeTeamId}
-                userId={userId}
-                canEdit={isAdmin || perms.includes("can_plan_events")}
-                onOpenChat={onOpenChat}
-              />
-            </div>
+            <MinistryCalendar
+              ministryId={ministryId}
+              teamId={activeTeamId}
+              userId={userId}
+              canEdit={isAdmin || perms.includes("can_plan_events")}
+              onOpenChat={onOpenChat}
+            />
           )
         })()}
       </div>
@@ -5685,20 +5672,67 @@ export function MinistryCalendar({
     await supabase.from("calendar_events").delete().eq("id", id)
   }
 
+  // Event planning view — replaces the calendar while an event is open.
+  // Cream TabPageHeader + PageTitle supply the event header; EventPlanWorkspace
+  // renders the body (status selector + section tabs + content). Back button
+  // returns to the calendar. Rendered un-wrapped so TabPageHeader /
+  // EventPlanWorkspace apply their own px-14 inset (matching StudentOrgTeamHome).
+  if (planningEvent) {
+    const evStart = new Date(planningEvent.start_date)
+    const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()
+    const evCfg = getEventConfig(planningEvent)
+    return (
+      <div>
+        <div className="px-14" style={{ paddingTop: 24 }}>
+          <button
+            onClick={() => setPlanningEvent(null)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#5A5466", fontSize: 13, padding: "0 0 16px" }}
+          >
+            ← Back to calendar
+          </button>
+        </div>
+        <TabPageHeader>
+          <PageTitle
+            eyebrow={`${evCfg.label.toUpperCase()} · ${evDateStr}`}
+            title={planningEvent.title}
+          >
+            {(planningEvent.description || planningEvent.location) && (
+              <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-text)" }}>
+                {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </PageTitle>
+        </TabPageHeader>
+        <EventPlanWorkspace
+          inline
+          calendarEvent={planningEvent}
+          ministryId={ministryId}
+          userId={userId}
+          canEdit={canEdit}
+          teamId={teamId}
+          onClose={() => setPlanningEvent(null)}
+          onOpenChat={onOpenChat}
+        />
+      </div>
+    )
+  }
+
   if (!tableReady) {
     return (
-      <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
+      <div className="px-14 py-7">
+        <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", marginBottom: 8 }}>Ministry Calendar</p>
         <div style={{ background: "#FBF8F2", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
           <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 4 }}>Calendar database table not set up yet.</p>
           <p style={{ fontSize: 12, color: "#8A8497" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
+        </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ marginBottom: 32 }}>
+    <div className="px-14 py-7" style={{ marginBottom: 32 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
@@ -5849,19 +5883,6 @@ export function MinistryCalendar({
           }}
         />
       )}
-
-      {planningEvent && (
-        <EventPlanWorkspace
-          inline
-          calendarEvent={planningEvent}
-          ministryId={ministryId}
-          userId={userId}
-          canEdit={canEdit}
-          teamId={teamId}
-          onClose={() => setPlanningEvent(null)}
-          onOpenChat={onOpenChat}
-        />
-      )}
     </div>
   )
 }
@@ -5876,7 +5897,6 @@ export function EventPlanWorkspace({
   canEditBudget = false,
   onClose,
   inline = false,
-  hideHero = false,
   teamId,
   onOpenChat,
 }: {
@@ -5887,7 +5907,6 @@ export function EventPlanWorkspace({
   canEditBudget?: boolean
   onClose: () => void
   inline?: boolean
-  hideHero?: boolean
   teamId?: string | null
   onOpenChat?: (id: string, name: string) => void
 }) {
@@ -6343,75 +6362,32 @@ export function EventPlanWorkspace({
       }
       className={inline ? "" : "md:left-[var(--shell-offset)]"}
     >
-      {/* Plum hero header — hidden when the parent already renders a calm header (hideHero) */}
-      {!hideHero && <div style={{ padding: inline ? "18px 0 0" : "0 24px", paddingTop: 18 }}>
-        <div style={{
-          position: "relative",
-          borderRadius: 18,
-          overflow: "hidden",
-          background: "radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)",
-          color: "#FBF8F2",
-          padding: "30px 36px 32px",
-        }}>
-          {/* Dot texture */}
-          <div style={{ position: "absolute", inset: 0, opacity: 0.18, background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px", pointerEvents: "none" }} />
-          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
-            {/* Initial chip */}
-            <span style={{ width: 92, height: 92, borderRadius: 18, background: "rgba(251,248,242,0.08)", border: "1px solid rgba(251,248,242,0.18)", display: "grid", placeItems: "center", fontFamily: "var(--font-instrument-serif)", fontSize: 46, color: "#FBF8F2", flexShrink: 0 }}>
-              {calendarEvent.title.charAt(0).toUpperCase()}
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 18 }}>{typeCfg.icon}</span>
-                <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(251,248,242,0.65)" }}>
-                  {typeCfg.label.toUpperCase()} · {dateStr}
-                </span>
-              </div>
-              <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,4vw,56px)", lineHeight: 1, margin: "0 0 0", letterSpacing: -0.6, color: "#FBF8F2", fontWeight: 400 }}>
-                {calendarEvent.title}
-              </h1>
-              {(calendarEvent.description || calendarEvent.location) && (
-                <div style={{ fontSize: 15, color: "rgba(251,248,242,0.78)", marginTop: 10 }}>
-                  {[calendarEvent.description, calendarEvent.location].filter(Boolean).join(" · ")}
-                </div>
-              )}
-              {/* Status selector */}
-              <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
-                {(['planning', 'active', 'complete'] as const).map(s => {
-                  const sc = statusColors[s]
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => handleStatusChange(s)}
-                      disabled={savingStatus}
-                      style={{
-                        padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                        background: eventStatus === s ? sc.bg : "rgba(251,248,242,0.08)",
-                        color: eventStatus === s ? sc.text : "rgba(251,248,242,0.55)",
-                        border: eventStatus === s ? `1px solid ${sc.border}` : "1px solid transparent",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
-              <button
-                onClick={onClose}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(251,248,242,0.55)", fontSize: 13, fontFamily: "var(--font-inter)", padding: 0 }}
-              >
-                ← Back to calendar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>}
+      {/* Event status selector — cream surface (planning / active / complete) */}
+      <div className="px-5 md:px-14" style={{ paddingTop: 18, display: "flex", gap: 6 }}>
+        {(['planning', 'active', 'complete'] as const).map(s => {
+          const sc = statusColors[s]
+          const on = eventStatus === s
+          return (
+            <button
+              key={s}
+              onClick={() => handleStatusChange(s)}
+              disabled={savingStatus}
+              style={{
+                padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                background: on ? sc.bg : "#FBF8F2",
+                color: on ? sc.text : "#5A5466",
+                border: on ? `1px solid ${sc.border}` : "1px solid #E2DDCF",
+                transition: "all 0.15s",
+              }}
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          )
+        })}
+      </div>
 
       {/* Underline section tabs */}
-      <div style={{ marginTop: hideHero ? 0 : 22, marginBottom: 24 }}>
+      <div style={{ marginTop: 0, marginBottom: 24 }}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
@@ -7000,7 +6976,6 @@ function SubEventsTab({
         </button>
         <EventPlanWorkspace
           inline
-          hideHero
           calendarEvent={planningChild}
           ministryId={ministryId}
           userId={userId}

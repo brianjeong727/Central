@@ -163,9 +163,15 @@ For pages without a hero banner:
 ## 4. Component library
 
 ### 4.1 Plum hero banner
+
+> **Canonical source:** The hero gradient is **retired from all app-shell surfaces** — shell headers, team homes, section/event/tab headers, and identity cards are cream (see the **Status** note at the end of this section). The gradient spec and the JSX samples in §4.1, §11.4, and §13 are preserved **only as historical reference** — do **not** treat them as current, copy-pasteable canonical code.
+
 The highest-weight identity statement in the app. Reserved for **at most one** genuine identity moment per page — the surface that needs to own the room. This is not a default treatment for any entity type; it is an earned moment. Team home, profile, giving page, and event detail may each carry one hero; the "Up Next" home card uses a cream card with plum accent rather than the full gradient.
 
+> **⛔ RETIRED — DO NOT USE — preserved for reference only.** Hero gradient retired from all app-shell surfaces (see Status note below). The block below is historical reference, not canonical code.
+
 ```
+/* ⛔ RETIRED — DO NOT USE — reference only. Hero gradient retired from all app-shell surfaces. */
 border-radius: 18
 overflow: hidden
 background: radial-gradient(120% 100% at 0% 0%, #4A1B4D 0%, #2D0F2E 55%, #1B0A1E 100%)
@@ -173,7 +179,7 @@ color: #FDFCF8
 padding: 30px 36px 32px
 ```
 - **Dot texture overlay** (required): absolute inset, opacity 0.18, `radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px`.
-- **Layout:** flex row, gap 24. Square monogram (84–92px, radius 16–18, `rgba(251,248,242,0.08)` bg, `rgba(251,248,242,0.18)` border, serif initial 46px) + identity column (mono eyebrow `rgba(251,248,242,0.65)` + serif title 48–56 + meta 15px `rgba(251,248,242,0.78)`) + actions column right-aligned.
+- **Layout:** flex row, gap 24. **⛔ RETIRED — DO NOT USE (reference only):** ~~Square monogram (84–92px, radius 16–18, `rgba(251,248,242,0.08)` bg, `rgba(251,248,242,0.18)` border, serif initial 46px)~~ — superseded by the unified `MonogramChip` (circle / plum `#3E1540` / cream initials); no square monograms, no non-plum backgrounds — + identity column (mono eyebrow `rgba(251,248,242,0.65)` + serif title 48–56 + meta 15px `rgba(251,248,242,0.78)`) + actions column right-aligned.
 - **Action buttons inside hero:** primary uses cream bg / plum-2 text; secondary uses `rgba(251,248,242,0.08)` bg with cream text and 1px `rgba(251,248,242,0.25)` border. Radius 10.
 
 **Do not:** use the hero as a default card treatment or a repeated pattern within a view. Do not place it on list pages, settings pages, or secondary surfaces. Do not use it more than once in the same view — two full-bleed plum moments cancel each other. Do not change the gradient stops or direction when it appears.
@@ -241,7 +247,10 @@ background: #FDFCF8
 - **Soft pill** (assigned-to chip): radius 999, padding 5×12, `#F1ECDE` bg, 1px `#E8E2D2`, plum-2 text 12–13px. Avatar circle 24px on the left when used for people.
 
 ### 4.8 Avatars
-- **Square monogram (default):** 32–44px, radius 8–11. `#3E1540` plum bg + cream initial for plum-emphasized; `#F1ECDE` bg + plum text for muted; `#13101A` for user/dark.
+
+> **Canonical source:** Avatars/monograms are unified into the live **`MonogramChip`** component (`components/central/MonogramChip.tsx`) — every monogram is a **circle** (border-radius 999), **plum `#3E1540`** background, **cream** initials. That component is the single source of truth; the legacy bullet below (square monograms, ivory/dark/non-plum backgrounds) is retired.
+
+- **⛔ RETIRED — DO NOT USE (reference only):** ~~**Square monogram (default):** 32–44px, radius 8–11. `#3E1540` plum bg + cream initial for plum-emphasized; `#F1ECDE` bg + plum text for muted; `#13101A` for user/dark.~~ Superseded by `MonogramChip` (circle / plum `#3E1540` / cream initials). No square monograms, no non-plum avatar backgrounds.
 - **Round avatar** only in chat avatar stack (16px overlapping circles).
 - Initial style: sans weight 600, size ~36% of avatar.
 
@@ -519,7 +528,11 @@ const mono = {
 ```
 
 ### 11.4 Plum hero banner
+
+> **⛔ RETIRED — DO NOT USE — preserved for reference only.** The plum hero gradient is retired from all app-shell surfaces (see §4.1 Status note). The square monogram chip inside this sample also contradicts the unified avatar spec — use the circular `MonogramChip` (§4.8). Do not copy this block as canonical code.
+
 ```jsx
+{/* ⛔ RETIRED — DO NOT USE — reference only. Hero gradient retired from app-shell surfaces; the monogram below is square/non-canonical — use MonogramChip (circle / plum / cream). */}
 <div style={{
   position: "relative", marginTop: 18,
   borderRadius: 18, overflow: "hidden",
@@ -532,6 +545,7 @@ const mono = {
     background: "radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
   }}/>
   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
+    {/* ⛔ RETIRED square monogram — contradicts the unified avatar spec. Use circular MonogramChip (border-radius 999, plum #3E1540 bg, cream initials). */}
     <span style={{
       width: 92, height: 92, borderRadius: 18,
       background: "rgba(253,252,248,0.08)",
@@ -748,7 +762,7 @@ When in doubt, open these files and copy the *exact* pattern. Do not interpret �
 
 ## 13. Starter page template
 
-Drop this into a new file and replace the placeholder content. It is already correct.
+Drop this into a new file and replace the placeholder content. It is already correct **except for the identity-hero block**, which uses the **⛔ RETIRED plum gradient + square monogram** (see the marker on that block below). For any app-shell page, delete that block and use a cream identity header plus the circular `MonogramChip` (§4.8) instead.
 
 ```jsx
 const MyNewPage = () => (
@@ -758,7 +772,7 @@ const MyNewPage = () => (
     activeTeam="student"
     crumbs={["Central", "Student Org Board", "MyNewPage"]}
   >
-    {/* Identity hero — delete this block if the page is NOT identity-anchored */}
+    {/* ⛔ RETIRED — DO NOT USE — reference only. This identity hero uses the retired plum gradient + square monogram (radius 16). For app-shell pages use a cream header + circular MonogramChip (§4.8). Delete this block if the page is NOT identity-anchored. */}
     <div style={{
       position: "relative", marginTop: 18,
       borderRadius: 18, overflow: "hidden",
@@ -768,6 +782,7 @@ const MyNewPage = () => (
       <div style={{ position: "absolute", inset: 0, opacity: 0.18, pointerEvents: "none",
         background: "radial-gradient(rgba(253,252,248,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px" }}/>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 24 }}>
+        {/* ⛔ RETIRED square monogram — use circular MonogramChip (border-radius 999, plum #3E1540 bg, cream initials). */}
         <span style={{ width: 84, height: 84, borderRadius: 16,
           background: "rgba(253,252,248,0.08)", border: "1px solid rgba(253,252,248,0.18)",
           display: "grid", placeItems: "center", fontFamily: "var(--serif)", fontSize: 40,
