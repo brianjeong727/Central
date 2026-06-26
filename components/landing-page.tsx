@@ -290,18 +290,18 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section className="cl-hero-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "84px 56px 92px" }}>
-        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.04fr 0.96fr", gap: 72, alignItems: "center" }}>
+        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.04fr 0.96fr", gap: 56, alignItems: "center" }}>
 
           {/* Left — type + verse */}
           <div>
             <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
               For college ministries
             </p>
-            <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 72, lineHeight: 0.97, letterSpacing: "-0.025em", margin: "22px 0 0", color: INK }}>
+            <h1 className="cl-hero-title" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 58, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "18px 0 0", color: INK }}>
               One calm place,<br/>
               <em style={{ fontStyle: "italic", color: PLUM2 }}>between Sundays.</em>
             </h1>
-            <p className="cl-hero-sub" style={{ fontSize: 19, lineHeight: 1.6, color: BODY, marginTop: 28, maxWidth: 440 }}>
+            <p className="cl-hero-sub" style={{ fontSize: 17, lineHeight: 1.6, color: BODY, marginTop: 22, maxWidth: 420 }}>
               Central replaces scattered chats, announcement threads, RSVP lists, and planning docs with a single weekly workspace your whole ministry lives in.
             </p>
             <div className="cl-hero-ctas" style={{ display: "flex", gap: 18, marginTop: 34, alignItems: "center", flexWrap: "wrap" }}>
@@ -595,8 +595,8 @@ export default function LandingPage() {
 
           .cl-hero-wrap { padding: 64px 24px 48px !important; }
           .cl-hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
-          .cl-hero-title { font-size: 46px !important; }
-          .cl-hero-sub { font-size: 17px !important; max-width: 100% !important; }
+          .cl-hero-title { font-size: 40px !important; }
+          .cl-hero-sub { font-size: 16px !important; max-width: 100% !important; }
           .cl-hero-stage { display: none !important; }
 
           .cl-features { padding: 64px 24px 40px !important; border-top-width: 1px; }
@@ -622,7 +622,7 @@ export default function LandingPage() {
         }
 
         @media (max-width: 560px) {
-          .cl-hero-title { font-size: 38px !important; }
+          .cl-hero-title { font-size: 32px !important; }
           .cl-cta-h { font-size: 32px !important; }
           .cl-feat-h { font-size: 26px !important; }
         }
