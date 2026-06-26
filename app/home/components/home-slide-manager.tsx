@@ -71,6 +71,7 @@ export function HomeSlideManager({
         .from("announcements")
         .select("id, title, is_event")
         .eq("ministry_id", ministryId)
+        .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(50),
     ])
