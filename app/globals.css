@@ -268,6 +268,16 @@
 }
 .animate-fade-up { animation: fade-up 240ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 
+/* Staggered load-in (reuses fade-up keyframe). --fade-index per element; --fade-step set once on the container. */
+.fade-in-up {
+  opacity: 0;
+  animation: fade-up 600ms var(--ease-out) both;
+  animation-delay: calc(var(--fade-index, 0) * var(--fade-step, 80ms));
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up { animation: none; opacity: 1; transform: none; }
+}
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
