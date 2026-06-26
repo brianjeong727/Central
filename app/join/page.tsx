@@ -5,6 +5,7 @@ import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
+import { MonogramChip } from "@/components/central/MonogramChip"
 
 // ─── design tokens ──────────────────────────────────────────────
 const SANS = "var(--font-inter), system-ui, sans-serif"
@@ -557,15 +558,10 @@ function JoinContent() {
                           background: isSelected ? "#F6F2E8" : "#FBF8F2",
                           transition: "all .12s ease",
                         }}>
-                          <div style={{
-                            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                            background: "#F1ECDE", color: "#3E1540",
-                            display: "grid", placeItems: "center",
-                          }}>
-                            <span style={{ fontFamily: SERIF, fontSize: 17, fontWeight: 400 }}>
-                              {getInitials(m.name)}
-                            </span>
-                          </div>
+                          <MonogramChip
+                            initials={getInitials(m.name)}
+                            style={{ width: 44, height: 44, fontFamily: SERIF, fontSize: 17, fontWeight: 400 }}
+                          />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
                             <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

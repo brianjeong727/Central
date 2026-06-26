@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
+import { MonogramChip } from "@/components/central/MonogramChip"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -25,14 +26,10 @@ type Tab = "browse" | "code"
 // ─── Avatar ──────────────────────────────────────────────────────
 function Avatar({ name }: { name: string }) {
   return (
-    <span style={{
-      width: 48, height: 48, borderRadius: 13, flexShrink: 0,
-      background: "#F1ECDE", color: "#3E1540",
-      display: "grid", placeItems: "center",
-      fontFamily: SERIF, fontSize: 22,
-    }}>
-      {name.charAt(0).toUpperCase()}
-    </span>
+    <MonogramChip
+      initials={name.charAt(0).toUpperCase()}
+      style={{ width: 48, height: 48, fontFamily: SERIF, fontSize: 22 }}
+    />
   )
 }
 
