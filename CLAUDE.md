@@ -176,7 +176,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
 | `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, form fill overlay (FormFillView), admin responses view (FormResponsesView) |
 | `app/home/tabs/congregation-tab.tsx` | Congregation tab — pastor-only; congregation polling and pulse questions |
-| `app/home/components/home-slide-manager.tsx` | Phase-1 home hero curation overlay — leaders add upcoming events / announcements as reference slides, reorder, and remove; writes to `home_slides` (ministry_id on every write) |
+| `app/home/components/home-slide-manager.tsx` | Home hero curation overlay — leaders add upcoming events / announcements (published only) as reference slides AND upload photo slides (caption + eyebrow; dark `panel_color` computed once at upload via client canvas), reorder, and remove; writes to `home_slides` (ministry_id on every write). Photo uploads reuse the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 | `app/home/components/command-palette.tsx` | ⌘K command palette — quick nav, person/chat/announcement search |
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
 | `app/home/components/shared.tsx` | Shared UI primitives used across tab files |
@@ -208,7 +208,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `components/ui/bottom-nav.tsx` | Bottom tab navigation (mobile only) |
 | `components/ui/chats-section.tsx` | Recent chats list used on Home tab |
 | `components/central/` | Shared design-system components (Button, Card, PageTitle, SectionHeader, StatCard, UpNextCard, ChatStrip, MonogramChip, etc.) |
-| `components/central/home-hero-carousel.tsx` | Curated home hero carousel — renders `HeroSlide`s (announcement / calendar_event references) through `UpNextCard`; manual prev/next only (no auto-rotation/motion/swipe) |
+| `components/central/home-hero-carousel.tsx` | Curated home hero carousel — one shared `--hero-h` frame (`HeroFrame`, radius `--r-hero`) with a constant "Featured" eyebrow (`HeroSectionLabel`) and tall flanking side-pill arrows + dot row. Renders three slide types: `photo` (image + stored `panel_color` adaptive panel + ink scrim + cream caption), event-with-photo (same + glass date/RSVP chip), and ivory reference slides (announcement / event-without-photo) via `UpNextCard`. Manual prev/next only (no auto-rotation/motion/swipe). Exports `HeroFrame`/`HeroSectionLabel` reused by the home-tab fallback. |
 | `permissions.md` | **Canonical source of truth** for role-based access — who can do what across every feature |
 
 ## Architecture
@@ -289,7 +289,7 @@ HomeApp (root — owns all global state)
 
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
-- Storage buckets: `announcement-images` (public), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
+- Storage buckets: `announcement-images` (public; also holds reimbursement `receipts/` and home hero `home-slides/{ministryId}/` photos), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
 
 ## Environment Variables (required on Vercel)
 
@@ -320,7 +320,7 @@ HomeApp (root — owns all global state)
 | `teams` | `id`, `ministry_id`, `name`, `icon`, `description`, `team_type` (`standard`/`dg_praise`/`one_time`), `created_by` |
 | `team_roles` | `id`, `team_id`, `name`, `permissions` (jsonb array of strings) |
 | `team_members` | `id`, `team_id`, `user_id`, `role_id`, `added_by` — UNIQUE(team_id, user_id) |
-| `home_slides` | `id`, `ministry_id`, `slide_type` (`announcement`/`event`), `announcement_id` FK→`announcements`, `calendar_event_id` FK→`calendar_events`, `order_index`, `is_active`, `created_by`. Curated home hero slides; CHECK enforces exactly one ref matching `slide_type`. RLS: select = ministry members; insert/update/delete via `auth_is_admin_or_leader()`. |
+| `home_slides` | `id`, `ministry_id`, `slide_type` (`announcement`/`event`/`photo`), `announcement_id` FK→`announcements`, `calendar_event_id` FK→`calendar_events`, `image_url`, `caption`, `eyebrow`, `panel_color` (stored clamped dark hex, computed once at upload), `order_index`, `is_active`, `created_by`. Curated home hero slides. CHECK: `announcement` → announcement_id set, image_url null; `event` → calendar_event_id set (image_url optional, its own uploaded photo); `photo` → image_url set, no refs. RLS: select = ministry members; insert/update/delete via `auth_is_admin_or_leader()`. Photo images live in the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 
 ### Feature-area index (names only — query MCP for columns)
 

@@ -186,6 +186,25 @@ padding: 30px 36px 32px
 
 **Status (June 2026):** The plum gradient hero has been retired from all app shell surfaces — team home headers, section headers, event sub-headers, tab headers, and identity cards inside the shell are now cream. Plum remains a surgical accent (CTA button fills, active tab underlines, icon chip backgrounds) but is never a card background, section header, or surface gradient anywhere in the shell. The §4.1 gradient spec is preserved only for rare standalone full-identity moments where the surface genuinely needs to own the room (e.g., a dedicated profile identity card or give-page hero) — never as a default treatment for a section or team.
 
+### 4.1b Home hero carousel (Phase 2)
+
+The home "Up Next" slot is a manually-advanced carousel of curated slides sharing **one frame identity**. Constant frame elements are always system tokens (never image-derived):
+- **Height:** `--hero-h` (500px) — single source of truth; every slide type reads it, never hardcode per-slide.
+- **Radius:** `--r-hero` (18px). **Border:** `1px var(--line-2)`. No drop shadows.
+- **Section eyebrow:** "Featured" + plum dot, `--muted-text`, above the frame (constant).
+- **Chrome:** tall flanking side-pill arrows (54px wide, full frame height, radius `--r-pill-lg`, `--cream-2`/`--line-2`, hover `--ivory`/`--plum-2`, `--dur-fast` transition) + an elongated-dot row below (`--dashed` inactive, `--plum-2` active). Manual advance only — no auto-rotation/motion/swipe. Arrows/dots appear only when >1 slide.
+
+**Three slide types, one frame** (only the interior differs):
+- **Photo:** full-height image with an adaptive dark panel on the left. The panel is filled with a **stored clamped dark color** (`home_slides.panel_color`, computed once at upload — NOT a per-render blur), feathered into the image with a mask, plus a neutral **ink-based legibility scrim** (`rgba(19,16,26,…)` — never plum/colored, never decorative). Cream caption + cream eyebrow dot.
+- **Event:** real `calendar_events` date/location; if the slide has its own photo → photo treatment + a glass date/RSVP chip; otherwise the ivory reference layout with real detail. RSVP via the linked announcement when present.
+- **Announcement:** ivory editorial reference layout (`UpNextCard`).
+
+**Retired here:**
+- The hollow **"No date, time, or location set yet" placeholder is retired** from the hero. Non-event references fill the frame editorially; events show only the fields that exist (omit unset fields) — never a "nothing set" box.
+- **Cream over photo:** use `--cream` (opacity for hierarchy); do not introduce a separate over-dark cream value. **Eyebrow dot over photos is `--cream`, never `--gold`** (gold stays avatar-accent-only, §1.2).
+
+**New material:** `backdrop-filter: blur` is allowed **only** on the event glass chip as a contained, surgical material — do not let it proliferate to other surfaces.
+
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
 - Tab: `padding: 12px 0 14px; font-size: 15;`

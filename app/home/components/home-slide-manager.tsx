@@ -1,21 +1,55 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone } from "lucide-react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone, Image as ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "./shared"
 
-// Phase-1 curation overlay for the home hero carousel. Reference slides only:
-// add upcoming events or announcements, reorder, remove. Writes go straight to
-// home_slides (ministry_id on every write; RLS mirrors the canCurateHome gate).
+// Curation overlay for the home hero carousel. Reference slides (upcoming events
+// / announcements) plus uploaded photo slides; add, reorder, remove. Writes go
+// straight to home_slides (ministry_id on every write; RLS mirrors canCurateHome).
 
 interface SlideRow {
   id: string
-  slide_type: "announcement" | "event"
+  slide_type: "announcement" | "event" | "photo"
   announcement_id: string | null
   calendar_event_id: string | null
   order_index: number
   title: string
+}
+
+// Compute a dark, contrast-safe panel color from the chosen photo, ONCE at
+// upload (from the local file blob — no CORS). Stored in home_slides.panel_color
+// and used as the slide's adaptive panel fill (replaces any per-render blur).
+function clampDark(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const img = new window.Image()
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas")
+        const w = (c.width = 24)
+        const h = (c.height = 24)
+        const ctx = c.getContext("2d")
+        if (!ctx) { resolve("#1B0A1E"); return }
+        ctx.drawImage(img, 0, 0, w, h)
+        const { data } = ctx.getImageData(0, 0, w, h)
+        let r = 0, g = 0, b = 0, n = 0
+        for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++ }
+        r /= n; g /= n; b /= n
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b
+        const f = lum > 0 ? Math.min(1, 46 / lum) : 1 // clamp toward ~46 luminance (dark)
+        const hex = (x: number) => Math.round(Math.max(0, Math.min(255, x * f))).toString(16).padStart(2, "0")
+        resolve(`#${hex(r)}${hex(g)}${hex(b)}`)
+      } catch {
+        resolve("#1B0A1E")
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve("#1B0A1E") }
+    img.src = url
+  })
 }
 
 interface EventOpt {
@@ -52,13 +86,17 @@ export function HomeSlideManager({
   const [events, setEvents] = useState<EventOpt[]>([])
   const [anns, setAnns] = useState<AnnOpt[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [caption, setCaption] = useState("")
+  const [eyebrow, setEyebrow] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
     const nowIso = new Date().toISOString()
     const [{ data: slideRows }, { data: evRows }, { data: annRows }] = await Promise.all([
       supabase
         .from("home_slides")
-        .select("id, slide_type, announcement_id, calendar_event_id, order_index")
+        .select("id, slide_type, announcement_id, calendar_event_id, order_index, caption")
         .eq("ministry_id", ministryId)
         .order("order_index", { ascending: true }),
       supabase
@@ -88,7 +126,9 @@ export function HomeSlideManager({
       title:
         r.slide_type === "event"
           ? evMap.get(r.calendar_event_id ?? "")?.title ?? "Event"
-          : annMap.get(r.announcement_id ?? "")?.title ?? "Announcement",
+          : r.slide_type === "photo"
+            ? r.caption || "Photo"
+            : annMap.get(r.announcement_id ?? "")?.title ?? "Announcement",
     }))
 
     setSlides(resolved)
@@ -120,6 +160,39 @@ export function HomeSlideManager({
     })
     await refresh()
     setBusy(false)
+  }
+
+  async function addPhotoSlide(file: File) {
+    setBusy(true)
+    setUploading(true)
+    try {
+      // compute clamped panel color from the local file (no CORS), then upload
+      const panel = await clampDark(file)
+      const ext = file.name.split(".").pop() || "jpg"
+      // reuse the announcement-images bucket via a home-slides/ path prefix
+      const path = `home-slides/${ministryId}/${Date.now()}.${ext}`
+      const { data: up, error } = await supabase.storage.from("announcement-images").upload(path, file, { upsert: false })
+      if (error || !up) return
+      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(up.path)
+      const nextOrder = slides.length ? Math.max(...slides.map((s) => s.order_index)) + 1 : 0
+      await supabase.from("home_slides").insert({
+        ministry_id: ministryId,
+        slide_type: "photo",
+        image_url: publicUrl,
+        caption: caption.trim() || null,
+        eyebrow: eyebrow.trim() || null,
+        panel_color: panel,
+        order_index: nextOrder,
+        created_by: userId,
+      })
+      setCaption("")
+      setEyebrow("")
+      if (fileRef.current) fileRef.current.value = ""
+      await refresh()
+    } finally {
+      setUploading(false)
+      setBusy(false)
+    }
   }
 
   async function removeSlide(id: string) {
@@ -231,8 +304,8 @@ export function HomeSlideManager({
               <div style={{ ...MONO, marginBottom: 12 }}>Current slides · {slides.length}</div>
               {slides.length === 0 ? (
                 <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>
-                  No slides yet — add an event or announcement below. The home hero falls back to the latest pinned
-                  announcement until you add one.
+                  No slides yet — add a photo, event, or announcement below. The home hero falls back to the latest
+                  pinned announcement until you add one.
                 </p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -251,6 +324,8 @@ export function HomeSlideManager({
                     >
                       {s.slide_type === "event" ? (
                         <CalendarDays style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
+                      ) : s.slide_type === "photo" ? (
+                        <ImageIcon style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
                       ) : (
                         <Megaphone style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
                       )}
@@ -300,6 +375,61 @@ export function HomeSlideManager({
               )}
             </section>
 
+            {/* Add a photo */}
+            <section>
+              <div style={{ ...MONO, marginBottom: 12 }}>Add a photo</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <input
+                  value={eyebrow}
+                  onChange={(e) => setEyebrow(e.target.value)}
+                  placeholder="Eyebrow (e.g. Fellowship night)"
+                  maxLength={48}
+                  style={fieldStyle}
+                />
+                <input
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Caption (e.g. Sixty of us packed the hall)"
+                  maxLength={120}
+                  style={fieldStyle}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) addPhotoSlide(f)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={busy}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: "12px 14px",
+                    borderRadius: "var(--r-card)",
+                    border: "1px solid var(--plum)",
+                    background: "transparent",
+                    color: "var(--plum)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: busy ? "default" : "pointer",
+                    opacity: busy ? 0.5 : 1,
+                    fontFamily: "var(--sans)",
+                  }}
+                >
+                  <ImageIcon style={{ width: 16, height: 16 }} />
+                  {uploading ? "Uploading…" : "Choose photo & add slide"}
+                </button>
+              </div>
+            </section>
+
             {/* Add upcoming events */}
             <section>
               <div style={{ ...MONO, marginBottom: 12 }}>Add an upcoming event</div>
@@ -346,6 +476,19 @@ export function HomeSlideManager({
       </div>
     </div>
   )
+}
+
+const fieldStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: "var(--r-input)",
+  border: "1px solid var(--line-2)",
+  background: "var(--cream)",
+  color: "var(--ink)",
+  fontSize: 14,
+  fontFamily: "var(--sans)",
+  outline: "none",
+  boxSizing: "border-box",
 }
 
 function iconBtn(disabled: boolean): React.CSSProperties {

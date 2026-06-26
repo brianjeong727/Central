@@ -7,7 +7,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { Spinner, RingCrossLogo, HeaderActionButton } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 import { HomeSlideManager } from "../components/home-slide-manager"
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
@@ -212,7 +212,7 @@ export function HomeTab({
       // ── Curated hero slides: resolve each home_slides row to LIVE referenced data ──
       const { data: slideRows } = await supabase
         .from("home_slides")
-        .select("id, slide_type, announcement_id, calendar_event_id, order_index")
+        .select("id, slide_type, announcement_id, calendar_event_id, order_index, image_url, caption, eyebrow, panel_color, created_at")
         .eq("ministry_id", ministryId)
         .eq("is_active", true)
         .order("order_index", { ascending: true })
@@ -242,7 +242,20 @@ export function HomeTab({
 
         const built: HeroSlide[] = []
         for (const r of rows) {
-          if (r.slide_type === "announcement") {
+          if (r.slide_type === "photo") {
+            if (!r.image_url) continue
+            built.push({
+              kind: "photo",
+              key: r.id,
+              imageUrl: r.image_url,
+              caption: r.caption ?? "",
+              eyebrow: r.eyebrow ?? "Featured",
+              panelColor: r.panel_color,
+              meta: r.created_at
+                ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : null,
+            })
+          } else if (r.slide_type === "announcement") {
             const a = annMap.get(r.announcement_id ?? "")
             if (!a) continue
             built.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
@@ -257,6 +270,8 @@ export function HomeTab({
               title: e.title,
               body: e.description,
               eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
+              imageUrl: r.image_url,
+              panelColor: r.panel_color,
             })
           }
         }
@@ -379,8 +394,8 @@ export function HomeTab({
 
   function handleSlideDetails(slide: HeroSlide) {
     if (slide.kind === "announcement") onOpenAnnouncement(slide.announcementId)
-    else if (slide.linkedAnnouncementId) onOpenAnnouncement(slide.linkedAnnouncementId)
-    // event slide with no linked announcement: no detail target this phase
+    else if (slide.kind === "event" && slide.linkedAnnouncementId) onOpenAnnouncement(slide.linkedAnnouncementId)
+    // photo slides and link-less event slides have no detail target
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -464,7 +479,9 @@ export function HomeTab({
             style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
           >
 
-            {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement */}
+            {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement.
+                "Featured" section eyebrow is the constant frame element above every state. */}
+            <HeroSectionLabel offsetForArrows={slides.length > 1} />
             {slides.length > 0 ? (
               <HomeHeroCarousel
                 slides={slides}
@@ -478,41 +495,46 @@ export function HomeTab({
                 onDetails={handleSlideDetails}
               />
             ) : heroAnn ? (
-              <UpNextCard
-                label="Up next"
-                labelAccent
-                title={heroAnn.title}
-                body={heroAnn.body}
-                isEvent={heroAnn.is_event}
-                userHasRsvped={userHasRsvped}
-                rsvping={rsvping}
-                rsvpCount={rsvpCount}
-                attendees={rsvpAttendees}
-                showAttendees={showAttendeeList}
-                onRsvp={handleHomeRsvp}
-                onDetails={() => onOpenAnnouncement(heroAnn.id)}
-              />
+              <HeroFrame>
+                <UpNextCard
+                  fill
+                  label="Up next"
+                  labelAccent
+                  title={heroAnn.title}
+                  body={heroAnn.body}
+                  isEvent={heroAnn.is_event}
+                  userHasRsvped={userHasRsvped}
+                  rsvping={rsvping}
+                  rsvpCount={rsvpCount}
+                  attendees={rsvpAttendees}
+                  showAttendees={showAttendeeList}
+                  onRsvp={handleHomeRsvp}
+                  onDetails={() => onOpenAnnouncement(heroAnn.id)}
+                />
+              </HeroFrame>
             ) : latestAnn ? (
-              <UpNextCard
-                label="Latest"
-                labelAccent={false}
-                title={latestAnn.title}
-                body={latestAnn.body}
-                isEvent={false}
-                onDetails={() => onOpenAnnouncement(latestAnn.id)}
-              />
+              <HeroFrame>
+                <UpNextCard
+                  fill
+                  label="Latest"
+                  labelAccent={false}
+                  title={latestAnn.title}
+                  body={latestAnn.body}
+                  isEvent={false}
+                  onDetails={() => onOpenAnnouncement(latestAnn.id)}
+                />
+              </HeroFrame>
             ) : (
-              <CentralCard
+              <HeroFrame
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 12,
-                  minHeight: 220,
                   textAlign: "center",
+                  background: "var(--ivory)",
                 }}
-                padding="40px 32px"
               >
                 <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
                 <div>
@@ -524,7 +546,7 @@ export function HomeTab({
                 <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
                   See announcements
                 </CentralButton>
-              </CentralCard>
+              </HeroFrame>
             )}
 
             {/* Your chats — horizontal strip below hero */}

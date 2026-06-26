@@ -159,6 +159,10 @@
   --rail-width:    72px;
   --sidebar-width: 264px;
   --shell-offset:  calc(var(--rail-width) + var(--sidebar-width) + 4px);
+
+  /* ── Home hero carousel — single source of truth for the shared frame height.
+     Every slide type (photo / event / announcement) reads this; never hardcode. */
+  --hero-h: 500px;
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
@@ -238,6 +242,9 @@
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* ── Motion durations (seed token set — Central had inline ms before) ── */
+  --dur-fast: 120ms;
 }
 
 /* Modal entrance — slide up + fade */

@@ -20,47 +20,10 @@ const MUTED_EYEBROW: CSSProperties = {
   textTransform: "uppercase",
 }
 
-// B · Emphasis: solid cream inset (not dashed) — DS §4.18 reserves dashed for
-// ACTIONABLE empty states with a +; this passive "not set yet" reads calmer solid.
-function EventDetailPlaceholder() {
-  return (
-    <div
-      style={{
-        background: "var(--cream)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-input)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        padding: "28px 20px",
-      }}
-    >
-      <CalendarDays style={{ width: 26, height: 26, color: "var(--faint)", marginBottom: 14 }} />
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          letterSpacing: "1.2px",
-          color: "var(--muted-text)",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        Event Details
-      </div>
-      <div style={{ fontSize: 14, color: "var(--faint)", lineHeight: 1.5 }}>
-        No date, time, or
-        <br />
-        location set yet
-      </div>
-    </div>
-  )
-}
-
 // Live event-detail data, pulled from a referenced calendar_events row.
-// When provided, replaces the "no date set yet" placeholder with real details.
+// When provided, the reference slide shows a real two-column detail panel; when
+// absent the slide fills editorially (single column) — there is NO hollow
+// "nothing set yet" placeholder anymore (retired in the hero carousel, Phase 2).
 export interface UpNextEventDetail {
   startDate: string
   endDate: string
@@ -152,6 +115,9 @@ interface UpNextCardProps {
   // Used by event slides whose calendar_events row has no detail target.
   onDetails?: () => void
   mobile?: boolean
+  // Carousel slide mode: fill the shared --hero-h frame (no own border/radius —
+  // the HeroFrame owns the border, radius, and clipping).
+  fill?: boolean
   style?: CSSProperties
 }
 
@@ -170,19 +136,22 @@ export function UpNextCard({
   onRsvp,
   onDetails,
   mobile = false,
+  fill = false,
   style,
 }: UpNextCardProps) {
   const maxAttendees = mobile ? 6 : 8
   const bodyText = body ? body.replace(/\n+/g, " ") : null
 
-  // B · Emphasis: --ivory as the single emphasized surface; --line-2 border to
-  // complement the warmer/slightly-darker card bg (DS soft-callout pattern).
-  const cardBase: CSSProperties = {
-    background: "var(--ivory)",
-    border: "1px solid var(--line-2)",
-    borderRadius: "var(--r-callout)",
-    ...style,
-  }
+  // fill mode (carousel slide): ivory surface fills the HeroFrame, which owns the
+  // border/radius/clip. Standalone mode keeps its own soft-callout chrome.
+  const cardBase: CSSProperties = fill
+    ? { background: "var(--ivory)", height: "100%", boxSizing: "border-box", ...style }
+    : {
+        background: "var(--ivory)",
+        border: "1px solid var(--line-2)",
+        borderRadius: "var(--r-callout)",
+        ...style,
+      }
 
   const eyebrow = (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -281,54 +250,83 @@ export function UpNextCard({
     )
   }
 
-  // ── Desktop: B · Emphasis — two-column grid 1.95fr 1fr ──────────────────────
-  // Title at 36px steps clearly below the greeting H1 (52px) so both serif
-  // moments are distinct and neither competes for dominance.
+  // ── Desktop ─────────────────────────────────────────────────────────────────
+  // Title bumped to 46px for the taller --hero-h frame. Two layouts share the
+  // same frame: a two-column split when there is REAL event detail, and a calm
+  // single editorial column otherwise (no hollow placeholder — retired).
+  const titleEl = (
+    <h2
+      style={{
+        fontFamily: "var(--serif)",
+        fontSize: 46,
+        fontWeight: 400,
+        letterSpacing: "-0.02em",
+        lineHeight: 1.02,
+        color: "var(--ink)",
+        margin: 0,
+      }}
+    >
+      {title}
+    </h2>
+  )
+
+  // Two-column: real event detail present → editorial left + detail card right.
+  if (eventDetail) {
+    return (
+      <div
+        style={{
+          ...cardBase,
+          padding: "var(--space-10) var(--space-11)",
+          display: "grid",
+          gridTemplateColumns: "1.95fr 1fr",
+          gap: "var(--space-11)",
+          alignItems: "stretch",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {eyebrow}
+          <div style={{ marginTop: "var(--space-7)" }}>
+            {titleEl}
+            {bodyText && (
+              <p
+                className="line-clamp-2"
+                style={{ fontSize: 15, color: "var(--body)", marginTop: "var(--space-5)", lineHeight: 1.6 }}
+              >
+                {bodyText}
+              </p>
+            )}
+          </div>
+          <div style={{ marginTop: "auto", paddingTop: "var(--space-9)" }}>{actions}</div>
+        </div>
+        <EventDetailCard detail={eventDetail} />
+      </div>
+    )
+  }
+
+  // Single editorial column: announcements (and events without detail) fill the
+  // frame; CTA pinned to the bottom so the tall frame never reads empty.
   return (
     <div
       style={{
         ...cardBase,
-        padding: "36px 40px",
-        display: "grid",
-        gridTemplateColumns: "1.95fr 1fr",
-        gap: "40px",
-        alignItems: "stretch",
+        padding: "var(--space-10) var(--space-11)",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      {/* Left content column */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {eyebrow}
-        <div style={{ marginTop: 18 }}>
-          <h2
-            style={{
-              fontFamily: "var(--serif)",
-              fontSize: 36,
-              fontWeight: 400,
-              letterSpacing: "-0.01em",
-              lineHeight: 1.04,
-              color: "var(--ink)",
-              margin: 0,
-            }}
+      {eyebrow}
+      <div style={{ marginTop: "var(--space-7)", maxWidth: 620 }}>
+        {titleEl}
+        {bodyText && (
+          <p
+            className="line-clamp-3"
+            style={{ fontSize: 16, color: "var(--body)", marginTop: "var(--space-6)", lineHeight: 1.6 }}
           >
-            {title}
-          </h2>
-          {bodyText && (
-            <p
-              className="line-clamp-2"
-              style={{ fontSize: 15, color: "var(--body)", marginTop: 12, lineHeight: 1.6 }}
-            >
-              {bodyText}
-            </p>
-          )}
-        </div>
-        <div style={{ marginTop: "auto", paddingTop: 28 }}>
-          {actions}
-        </div>
+            {bodyText}
+          </p>
+        )}
       </div>
-
-      {/* Right: event detail slot — cream bg so it reads lighter than the ivory card.
-          Real details when a referenced event provides them; placeholder otherwise. */}
-      {eventDetail ? <EventDetailCard detail={eventDetail} /> : <EventDetailPlaceholder />}
+      <div style={{ marginTop: "auto", paddingTop: "var(--space-9)" }}>{actions}</div>
     </div>
   )
 }
