@@ -4,11 +4,13 @@ import { useState, useEffect } from "react"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { Spinner, RingCrossLogo } from "../components/shared"
+import { Spinner, RingCrossLogo, HeaderActionButton } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader } from "@/components/central"
-import type { HomeTabProps, Announcement } from "../types"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel } from "@/components/central"
+import type { HeroSlide } from "@/components/central"
+import { HomeSlideManager } from "../components/home-slide-manager"
+import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 
 export { HomeTabProps }
 
@@ -68,6 +70,17 @@ export function HomeTab({
   const [forYouItems, setForYouItems] = useState<Announcement[]>([])
   const [rsvpedAnnIds, setRsvpedAnnIds] = useState<Set<string>>(new Set())
   const [eventCount, setEventCount] = useState(0)
+
+  // ── Curated home hero carousel ──
+  const [slides, setSlides] = useState<HeroSlide[]>([])
+  const [slideRsvpedIds, setSlideRsvpedIds] = useState<Set<string>>(new Set())
+  const [slideRsvpCounts, setSlideRsvpCounts] = useState<Record<string, number>>({})
+  const [slideRsvpAttendees, setSlideRsvpAttendees] = useState<Record<string, RsvpAttendee[]>>({})
+  const [slideShowAttendeesIds, setSlideShowAttendeesIds] = useState<Set<string>>(new Set())
+  const [slideRsvping, setSlideRsvping] = useState(false)
+  const [managerOpen, setManagerOpen] = useState(false)
+  const [slidesRefreshKey, setSlidesRefreshKey] = useState(0)
+  const canCurateHome = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const [loading, setLoading] = useState(true)
   const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
@@ -196,11 +209,110 @@ export function HomeTab({
         .slice(0, 3)
       setForYouItems(forYou)
 
+      // ── Curated hero slides: resolve each home_slides row to LIVE referenced data ──
+      const { data: slideRows } = await supabase
+        .from("home_slides")
+        .select("id, slide_type, announcement_id, calendar_event_id, order_index")
+        .eq("ministry_id", ministryId)
+        .eq("is_active", true)
+        .order("order_index", { ascending: true })
+
+      const rows = slideRows ?? []
+      if (rows.length === 0) {
+        setSlides([])
+      } else {
+        const annIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
+        const evIds = rows.filter((r) => r.slide_type === "event").map((r) => r.calendar_event_id).filter(Boolean) as string[]
+
+        const [{ data: slideAnns }, { data: slideEvents }] = await Promise.all([
+          annIds.length
+            ? supabase.from("announcements").select("id, title, body, is_event").in("id", annIds).eq("ministry_id", ministryId)
+            : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
+          evIds.length
+            ? supabase
+                .from("calendar_events")
+                .select("id, title, description, location, start_date, end_date, all_day, linked_announcement_id")
+                .in("id", evIds)
+                .eq("ministry_id", ministryId)
+            : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
+        ])
+
+        const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
+        const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
+
+        const built: HeroSlide[] = []
+        for (const r of rows) {
+          if (r.slide_type === "announcement") {
+            const a = annMap.get(r.announcement_id ?? "")
+            if (!a) continue
+            built.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
+          } else {
+            const e = evMap.get(r.calendar_event_id ?? "")
+            if (!e) continue
+            built.push({
+              kind: "event",
+              key: r.id,
+              calendarEventId: e.id,
+              linkedAnnouncementId: e.linked_announcement_id,
+              title: e.title,
+              body: e.description,
+              eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
+            })
+          }
+        }
+        setSlides(built)
+
+        // RSVP wiring keyed on announcement_id (event slides reuse their linked announcement).
+        const rsvpAnnIds = new Set<string>()
+        for (const s of built) {
+          if (s.kind === "announcement" && s.isEvent) rsvpAnnIds.add(s.announcementId)
+          else if (s.kind === "event" && s.linkedAnnouncementId) rsvpAnnIds.add(s.linkedAnnouncementId)
+        }
+        const rsvpIdArr = [...rsvpAnnIds]
+
+        if (rsvpIdArr.length === 0) {
+          setSlideRsvpedIds(new Set())
+          setSlideRsvpCounts({})
+          setSlideRsvpAttendees({})
+          setSlideShowAttendeesIds(new Set())
+        } else {
+          const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
+            supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
+            supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
+            supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
+          ])
+
+          const counts: Record<string, number> = {}
+          const byAnnUserIds: Record<string, string[]> = {}
+          for (const row of allR ?? []) {
+            counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
+            ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
+          }
+
+          const allUserIds = [...new Set((allR ?? []).map((r) => r.user_id))]
+          let nameById = new Map<string, string>()
+          if (allUserIds.length) {
+            const { data: profs } = await supabase.from("profiles").select("id, name").in("id", allUserIds).eq("ministry_id", ministryId)
+            nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
+          }
+
+          const attendeesMap: Record<string, RsvpAttendee[]> = {}
+          for (const [annId, uids] of Object.entries(byAnnUserIds)) {
+            attendeesMap[annId] = uids.map((uid) => ({ user_id: uid, name: nameById.get(uid) ?? "" }))
+          }
+
+          setSlideRsvpedIds(new Set((myR ?? []).map((r) => r.announcement_id)))
+          setSlideRsvpCounts(counts)
+          setSlideRsvpAttendees(attendeesMap)
+          setSlideShowAttendeesIds(new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id)))
+        }
+      }
+
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id])
+  }, [profile.id, slidesRefreshKey])
 
   async function handleHomeRsvp() {
     if (!heroAnn || rsvping) return
@@ -237,6 +349,38 @@ export function HomeTab({
         { onConflict: "announcement_id,user_id" }
       )
     }
+  }
+
+  async function handleSlideRsvp(annId: string) {
+    if (slideRsvping) return
+    setSlideRsvping(true)
+    const has = slideRsvpedIds.has(annId)
+    setSlideRsvpedIds((prev) => {
+      const s = new Set(prev)
+      if (has) s.delete(annId)
+      else s.add(annId)
+      return s
+    })
+    setSlideRsvpCounts((prev) => ({ ...prev, [annId]: Math.max(0, (prev[annId] ?? 0) + (has ? -1 : 1)) }))
+    setSlideRsvpAttendees((prev) => {
+      const cur = prev[annId] ?? []
+      const next = has
+        ? cur.filter((a) => a.user_id !== profile.id)
+        : [...cur, { user_id: profile.id, name: profile.name }]
+      return { ...prev, [annId]: next }
+    })
+    if (has) {
+      await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
+    } else {
+      await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id" })
+    }
+    setSlideRsvping(false)
+  }
+
+  function handleSlideDetails(slide: HeroSlide) {
+    if (slide.kind === "announcement") onOpenAnnouncement(slide.announcementId)
+    else if (slide.linkedAnnouncementId) onOpenAnnouncement(slide.linkedAnnouncementId)
+    // event slide with no linked announcement: no detail target this phase
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -311,7 +455,7 @@ export function HomeTab({
           {/* Desktop: hero header */}
           <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
             <PageTitle eyebrow={dateLabel} title={greetingNode} style={{ maxWidth: 640 }} />
-
+            {canCurateHome && <HeaderActionButton label="Curate hero" onClick={() => setManagerOpen(true)} />}
           </TabPageHeader>
 
           {/* Desktop: main content */}
@@ -320,8 +464,20 @@ export function HomeTab({
             style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
           >
 
-            {/* Up Next — full-width hero */}
-            {heroAnn ? (
+            {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement */}
+            {slides.length > 0 ? (
+              <HomeHeroCarousel
+                slides={slides}
+                rsvpedIds={slideRsvpedIds}
+                rsvpCounts={slideRsvpCounts}
+                rsvpAttendees={slideRsvpAttendees}
+                showAttendeesIds={slideShowAttendeesIds}
+                isLeaderOrAdmin={isLeaderOrAdmin}
+                rsvping={slideRsvping}
+                onRsvp={handleSlideRsvp}
+                onDetails={handleSlideDetails}
+              />
+            ) : heroAnn ? (
               <UpNextCard
                 label="Up next"
                 labelAccent
@@ -670,7 +826,20 @@ export function HomeTab({
                   </button>
                 </div>
 
-                {heroAnn ? (
+                {slides.length > 0 ? (
+                  <HomeHeroCarousel
+                    slides={slides}
+                    mobile
+                    rsvpedIds={slideRsvpedIds}
+                    rsvpCounts={slideRsvpCounts}
+                    rsvpAttendees={slideRsvpAttendees}
+                    showAttendeesIds={slideShowAttendeesIds}
+                    isLeaderOrAdmin={isLeaderOrAdmin}
+                    rsvping={slideRsvping}
+                    onRsvp={handleSlideRsvp}
+                    onDetails={handleSlideDetails}
+                  />
+                ) : heroAnn ? (
                   <UpNextCard
                     label="Up next"
                     labelAccent
@@ -921,6 +1090,16 @@ export function HomeTab({
             </div>
           </div>
         </>
+      )}
+
+      {managerOpen && (
+        <HomeSlideManager
+          ministryId={ministryId}
+          onClose={() => {
+            setManagerOpen(false)
+            setSlidesRefreshKey((k) => k + 1)
+          }}
+        />
       )}
     </div>
   )

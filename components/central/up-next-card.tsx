@@ -1,7 +1,7 @@
 "use client"
 
 import { CSSProperties } from "react"
-import { CalendarDays } from "lucide-react"
+import { CalendarDays, MapPin } from "lucide-react"
 import { CentralButton } from "./button"
 
 const PLUM_EYEBROW: CSSProperties = {
@@ -59,19 +59,98 @@ function EventDetailPlaceholder() {
   )
 }
 
+// Live event-detail data, pulled from a referenced calendar_events row.
+// When provided, replaces the "no date set yet" placeholder with real details.
+export interface UpNextEventDetail {
+  startDate: string
+  endDate: string
+  allDay: boolean
+  location: string | null
+}
+
+function formatEventWhen(detail: UpNextEventDetail): string {
+  const start = new Date(detail.startDate)
+  const dateStr = start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  if (detail.allDay) return `${dateStr} · All day`
+  const timeStr = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  return `${dateStr} · ${timeStr}`
+}
+
+// Desktop right-column real event details — same cream frame as the placeholder
+// so the hero reads as one coherent frame regardless of slide type.
+function EventDetailCard({ detail }: { detail: UpNextEventDetail }) {
+  return (
+    <div
+      style={{
+        background: "var(--cream)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-input)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: 14,
+        padding: "28px 24px",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "1.2px",
+          color: "var(--muted-text)",
+          textTransform: "uppercase",
+        }}
+      >
+        Event Details
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <CalendarDays style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
+        <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{formatEventWhen(detail)}</span>
+      </div>
+      {detail.location && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <MapPin style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
+          <span style={{ fontSize: 14, color: "var(--body)" }}>{detail.location}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Mobile inline event details — compact stacked rows (mobile card is single-column).
+function EventDetailInline({ detail }: { detail: UpNextEventDetail }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <CalendarDays style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>{formatEventWhen(detail)}</span>
+      </div>
+      {detail.location && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MapPin style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--body)" }}>{detail.location}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface UpNextCardProps {
   label: string
   labelAccent?: boolean
   title: string
   body?: string | null
   isEvent?: boolean
+  eventDetail?: UpNextEventDetail
   userHasRsvped?: boolean
   rsvping?: boolean
   rsvpCount?: number
   attendees?: { user_id: string; name: string }[]
   showAttendees?: boolean
   onRsvp?: () => void
-  onDetails: () => void
+  // Optional: when omitted, the primary "See details" button is not rendered.
+  // Used by event slides whose calendar_events row has no detail target.
+  onDetails?: () => void
   mobile?: boolean
   style?: CSSProperties
 }
@@ -82,6 +161,7 @@ export function UpNextCard({
   title,
   body,
   isEvent,
+  eventDetail,
   userHasRsvped,
   rsvping,
   rsvpCount = 0,
@@ -124,9 +204,11 @@ export function UpNextCard({
   const actions = (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <CentralButton variant="primary" onClick={onDetails}>
-          {isEvent ? "See details" : "See announcement"}
-        </CentralButton>
+        {onDetails && (
+          <CentralButton variant="primary" onClick={onDetails}>
+            {isEvent ? "See details" : "See announcement"}
+          </CentralButton>
+        )}
         {isEvent && onRsvp && (
           <CentralButton onClick={onRsvp} disabled={rsvping} variant="secondary">
             {userHasRsvped ? "Going ✓" : "RSVP"}
@@ -193,6 +275,7 @@ export function UpNextCard({
             </p>
           )}
         </div>
+        {eventDetail && <EventDetailInline detail={eventDetail} />}
         {actions}
       </div>
     )
@@ -243,8 +326,9 @@ export function UpNextCard({
         </div>
       </div>
 
-      {/* Right: event detail slot — cream bg so it reads lighter than the ivory card */}
-      <EventDetailPlaceholder />
+      {/* Right: event detail slot — cream bg so it reads lighter than the ivory card.
+          Real details when a referenced event provides them; placeholder otherwise. */}
+      {eventDetail ? <EventDetailCard detail={eventDetail} /> : <EventDetailPlaceholder />}
     </div>
   )
 }
