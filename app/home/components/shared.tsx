@@ -194,8 +194,16 @@ export function HeaderActionButton({
       onClick={onClick}
       disabled={disabled}
       style={{
+        // Height pinned to the compact PageTitle line box (25 × 1.05 ≈ 26.25px,
+        // see components/central/page-title.tsx) so the button can never exceed
+        // the title and grow TabPageHeader's content-driven row. box-sizing
+        // includes the 1px borders; align-items:center vertically centers the
+        // 14px icon + 13px text within the 24px inner box. Floored to 26 so the
+        // title (26.25px) stays the height-governing child. (Follow-up: lift this
+        // and the compact title size into one shared CSS token consumed by both.)
+        boxSizing: "border-box", height: 28,
         display: "flex", alignItems: "center", gap: 6,
-        padding: "7px 14px", borderRadius: 9,
+        padding: "0 14px", borderRadius: 9,
         border: "1px solid var(--line)", background: "var(--ivory)",
         color: "var(--ink)", fontSize: 13, fontWeight: 500,
         cursor: disabled ? "default" : "pointer",
