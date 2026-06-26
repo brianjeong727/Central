@@ -130,3 +130,10 @@ Date: 2026-06-22
 When `app/(auth)/shared.tsx` was rewritten to be the canonical shared file, the old exports (`GoogleIcon`, `PasswordToggle`) were removed. `update-password/page.tsx` still imported `PasswordToggle` — the build failed. The new canonical export is `EyeButton` (same props interface: `show`, `onToggle`).
 
 **Rule:** After replacing or renaming exports in a shared file, grep for all import sites before marking the task done: `grep -r "from.*/(auth)/shared"`. This catches pages like `update-password` that were not part of the immediate refactor.
+
+## Dev server — never run two `next dev`, never `build` against a live dev cache
+Date: 2026-06-26
+
+The `dev` script is `rm -rf .next && next dev`. If a second `npm run dev` starts (or `npm run build`, which also `rm -rf .next`, runs while `next dev` is live), the two processes delete and rewrite each other's Turbopack cache mid-flight. Symptoms: `Failed to restore task data (corrupted database or bug)`, `Unable to open static sorted file …sst`, `Another write batch or compaction is already active`, surfaced in the browser as **Internal Server Error** or an infinite "Compiling…". It is NOT a code bug — `curl` may hit the healthy instance while the browser hits the broken one, which is the tell.
+
+**Rule:** Keep exactly one `next dev` running. Don't run `npm run build` while it's up. Recovery: `pkill -9 -f next-server; pkill -9 -f "next dev"; lsof -ti:3000 | xargs kill -9; rm -rf .next node_modules/.cache; npm run dev`. Verify one logical server before testing.

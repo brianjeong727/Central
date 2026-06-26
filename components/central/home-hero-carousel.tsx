@@ -40,8 +40,22 @@ export type HeroSlide =
 
 // Fallback panel color when a stored clamped color is missing (darkest brand token).
 const PANEL_FALLBACK = "var(--plum-deep)"
+// --plum-deep components, for the gradient when no stored clamped color exists.
+const PANEL_FALLBACK_RGB = "27, 10, 30"
 // Tall side-pill arrow width — component constant (no spacing token for chrome width).
 const ARROW_W = 54
+
+// "#rrggbb" → "r, g, b" for building the clamped-color gradient stops.
+function rgbFromHex(hex?: string | null): string {
+  if (!hex) return PANEL_FALLBACK_RGB
+  const m = hex.replace("#", "")
+  if (m.length < 6) return PANEL_FALLBACK_RGB
+  const r = parseInt(m.slice(0, 2), 16)
+  const g = parseInt(m.slice(2, 4), 16)
+  const b = parseInt(m.slice(4, 6), 16)
+  if ([r, g, b].some(Number.isNaN)) return PANEL_FALLBACK_RGB
+  return `${r}, ${g}, ${b}`
+}
 
 // ── Shared frame: single source of truth for height/radius/border/clip ───────
 // Owns the border, radius (--r-hero), and overflow so every slide interior fills
@@ -184,38 +198,37 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
     )
   }
 
-  // Desktop: image right ~60%, adaptive panel left ~44% (feathered into the image).
+  // Desktop: full-bleed photo; the clamped panel_color fades to transparent
+  // across the seam (Option B) over a left-anchored ink legibility scrim, so the
+  // image emerges out of the color with no hard slab edge. The solid-vs-clear
+  // ratio is the single --hero-panel-fade knob. Pure static CSS — SSR-safe, no blur.
+  const c = rgbFromHex(panelColor)
   return (
     <div style={{ position: "relative", height: "100%", width: "100%", background: panel }}>
       <img
         src={imageUrl}
         alt=""
-        style={{ position: "absolute", right: 0, top: 0, height: "100%", width: "60%", objectFit: "cover", display: "block" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "75% center", display: "block" }}
       />
-      {/* adaptive panel: stored clamped color + feather mask + ink scrim */}
+      {/* ink legibility scrim — left-anchored, --ink-token based (the hard floor) */}
       <div
         style={{
           position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "44%",
-          overflow: "hidden",
-          WebkitMaskImage: "linear-gradient(90deg, #000 86%, transparent 100%)",
-          maskImage: "linear-gradient(90deg, #000 86%, transparent 100%)",
+          inset: 0,
+          background:
+            "linear-gradient(90deg, color-mix(in srgb, var(--ink) 72%, transparent) 0%, color-mix(in srgb, var(--ink) 50%, transparent) 34%, transparent 60%)",
         }}
-      >
-        <div style={{ position: "absolute", inset: 0, background: panel }} />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(180deg, rgba(19,16,26,0.30) 0%, rgba(19,16,26,0.56) 100%)",
-          }}
-        />
-      </div>
+      />
+      {/* clamped panel_color → transparent across the seam (Option B) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `linear-gradient(90deg, rgba(${c}, 0.96) 0%, rgba(${c}, 0.88) var(--hero-panel-fade), rgba(${c}, 0) 100%)`,
+        }}
+      />
       {/* content */}
-      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-10)", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-10)", display: "flex", flexDirection: "column", zIndex: 1 }}>
         <Eyebrow text={eyebrow} />
         <div
           style={{
@@ -226,12 +239,13 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
             lineHeight: event ? 1.02 : 1.1,
             color: "var(--cream)",
             marginTop: "var(--space-7)",
+            maxWidth: "92%",
           }}
         >
           {title}
         </div>
         {body && (
-          <p className="line-clamp-2" style={{ fontSize: 15, color: "var(--cream)", opacity: 0.72, marginTop: "var(--space-5)", lineHeight: 1.5 }}>
+          <p className="line-clamp-2" style={{ fontSize: 15, color: "var(--cream)", opacity: 0.72, marginTop: "var(--space-5)", lineHeight: 1.5, maxWidth: "92%" }}>
             {body}
           </p>
         )}
@@ -246,6 +260,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
             position: "absolute",
             right: "var(--space-8)",
             bottom: "var(--space-8)",
+            zIndex: 2,
             background: "rgba(253,252,248,0.16)",
             backdropFilter: "blur(16px)",
             WebkitBackdropFilter: "blur(16px)",

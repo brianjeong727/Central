@@ -163,6 +163,10 @@
   /* ── Home hero carousel — single source of truth for the shared frame height.
      Every slide type (photo / event / announcement) reads this; never hardcode. */
   --hero-h: 500px;
+  /* Photo-slide panel: the one knob for the solid-vs-clear ratio. The clamped
+     panel_color stays fully opaque up to this stop, then fades to transparent
+     toward the photo (Option B — clamped → transparent across the seam). */
+  --hero-panel-fade: 42%;
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */

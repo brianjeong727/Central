@@ -18,36 +18,82 @@ interface SlideRow {
   title: string
 }
 
+function hslToHex(h: number, s: number, l: number): string {
+  // h in [0,360), s & l in [0,1]
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const hp = h / 60
+  const x = c * (1 - Math.abs((hp % 2) - 1))
+  let r = 0, g = 0, b = 0
+  if (hp < 1) { r = c; g = x }
+  else if (hp < 2) { r = x; g = c }
+  else if (hp < 3) { g = c; b = x }
+  else if (hp < 4) { g = x; b = c }
+  else if (hp < 5) { r = x; b = c }
+  else { r = c; b = x }
+  const m = l - c / 2
+  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0")
+  return `#${to(r)}${to(g)}${to(b)}`
+}
+
 // Compute a dark, contrast-safe panel color from the chosen photo, ONCE at
 // upload (from the local file blob — no CORS). Stored in home_slides.panel_color
 // and used as the slide's adaptive panel fill (replaces any per-render blur).
+//
+// Hue-preserving: a chroma-weighted circular mean recovers the photo's dominant
+// hue (ignoring near-white/near-black/neutral pixels that would otherwise wash a
+// bright, diverse image toward grey), then the color is rebuilt at a fixed dark
+// lightness with saturation clamped to a floor/cap so the hue stays visible but
+// on-brand. Falls back to --plum-deep only when the image has no usable color.
 function clampDark(file: File): Promise<string> {
+  const FALLBACK = "#1B0A1E" // --plum-deep
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file)
     const img = new window.Image()
     img.onload = () => {
       try {
         const c = document.createElement("canvas")
-        const w = (c.width = 24)
-        const h = (c.height = 24)
+        const w = (c.width = 32)
+        const h = (c.height = 32)
         const ctx = c.getContext("2d")
-        if (!ctx) { resolve("#1B0A1E"); return }
+        if (!ctx) { resolve(FALLBACK); return }
         ctx.drawImage(img, 0, 0, w, h)
         const { data } = ctx.getImageData(0, 0, w, h)
-        let r = 0, g = 0, b = 0, n = 0
-        for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++ }
-        r /= n; g /= n; b /= n
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b
-        const f = lum > 0 ? Math.min(1, 46 / lum) : 1 // clamp toward ~46 luminance (dark)
-        const hex = (x: number) => Math.round(Math.max(0, Math.min(255, x * f))).toString(16).padStart(2, "0")
-        resolve(`#${hex(r)}${hex(g)}${hex(b)}`)
+
+        let sx = 0, sy = 0, satSum = 0, wsum = 0
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
+          const max = Math.max(r, g, b), min = Math.min(r, g, b)
+          const l = (max + min) / 2
+          if (l > 0.92 || l < 0.08) continue // skip near-white / near-black
+          const chroma = max - min
+          if (chroma < 0.01) continue // skip neutral pixels (no usable hue)
+          const s = chroma / (1 - Math.abs(2 * l - 1)) // HSL saturation
+          let hue: number // degrees
+          if (max === r) hue = (((g - b) / chroma) % 6) * 60
+          else if (max === g) hue = ((b - r) / chroma + 2) * 60
+          else hue = ((r - g) / chroma + 4) * 60
+          const rad = (hue * Math.PI) / 180
+          const wgt = chroma // weight by colorfulness so washed pixels don't dilute hue
+          sx += Math.cos(rad) * wgt
+          sy += Math.sin(rad) * wgt
+          satSum += s * wgt
+          wsum += wgt
+        }
+
+        if (wsum < 1e-4) { resolve(FALLBACK); return } // genuinely colorless image
+
+        let H = (Math.atan2(sy, sx) * 180) / Math.PI
+        if (H < 0) H += 360
+        const S = Math.min(0.5, Math.max(0.28, satSum / wsum)) // floor so hue shows, cap so on-brand
+        const L = 0.13 // fixed dark lightness (≈ --plum-deep range)
+        resolve(hslToHex(H, S, L))
       } catch {
-        resolve("#1B0A1E")
+        resolve(FALLBACK)
       } finally {
         URL.revokeObjectURL(url)
       }
     }
-    img.onerror = () => { URL.revokeObjectURL(url); resolve("#1B0A1E") }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(FALLBACK) }
     img.src = url
   })
 }
@@ -89,6 +135,7 @@ export function HomeSlideManager({
   const [caption, setCaption] = useState("")
   const [eyebrow, setEyebrow] = useState("")
   const [uploading, setUploading] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
@@ -165,6 +212,7 @@ export function HomeSlideManager({
   async function addPhotoSlide(file: File) {
     setBusy(true)
     setUploading(true)
+    setPhotoError(null)
     try {
       // compute clamped panel color from the local file (no CORS), then upload
       const panel = await clampDark(file)
@@ -172,10 +220,13 @@ export function HomeSlideManager({
       // reuse the announcement-images bucket via a home-slides/ path prefix
       const path = `home-slides/${ministryId}/${Date.now()}.${ext}`
       const { data: up, error } = await supabase.storage.from("announcement-images").upload(path, file, { upsert: false })
-      if (error || !up) return
+      if (error || !up) {
+        setPhotoError(error?.message || "Upload failed. Please try again.")
+        return
+      }
       const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(up.path)
       const nextOrder = slides.length ? Math.max(...slides.map((s) => s.order_index)) + 1 : 0
-      await supabase.from("home_slides").insert({
+      const { error: insErr } = await supabase.from("home_slides").insert({
         ministry_id: ministryId,
         slide_type: "photo",
         image_url: publicUrl,
@@ -185,10 +236,16 @@ export function HomeSlideManager({
         order_index: nextOrder,
         created_by: userId,
       })
+      if (insErr) {
+        setPhotoError(insErr.message || "Could not save the slide.")
+        return
+      }
       setCaption("")
       setEyebrow("")
       if (fileRef.current) fileRef.current.value = ""
       await refresh()
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Something went wrong uploading the photo.")
     } finally {
       setUploading(false)
       setBusy(false)
@@ -427,6 +484,20 @@ export function HomeSlideManager({
                   <ImageIcon style={{ width: 16, height: 16 }} />
                   {uploading ? "Uploading…" : "Choose photo & add slide"}
                 </button>
+                {photoError && (
+                  <div
+                    style={{
+                      borderRadius: "var(--r-input)",
+                      background: "rgba(159,48,48,0.08)",
+                      border: "1px solid rgba(159,48,48,0.18)",
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      color: "var(--danger)",
+                    }}
+                  >
+                    {photoError}
+                  </div>
+                )}
               </div>
             </section>
 

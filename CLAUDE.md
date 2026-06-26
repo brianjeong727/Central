@@ -208,7 +208,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `components/ui/bottom-nav.tsx` | Bottom tab navigation (mobile only) |
 | `components/ui/chats-section.tsx` | Recent chats list used on Home tab |
 | `components/central/` | Shared design-system components (Button, Card, PageTitle, SectionHeader, StatCard, UpNextCard, ChatStrip, MonogramChip, etc.) |
-| `components/central/home-hero-carousel.tsx` | Curated home hero carousel — one shared `--hero-h` frame (`HeroFrame`, radius `--r-hero`) with a constant "Featured" eyebrow (`HeroSectionLabel`) and tall flanking side-pill arrows + dot row. Renders three slide types: `photo` (image + stored `panel_color` adaptive panel + ink scrim + cream caption), event-with-photo (same + glass date/RSVP chip), and ivory reference slides (announcement / event-without-photo) via `UpNextCard`. Manual prev/next only (no auto-rotation/motion/swipe). Exports `HeroFrame`/`HeroSectionLabel` reused by the home-tab fallback. |
+| `components/central/home-hero-carousel.tsx` | Curated home hero carousel — one shared `--hero-h` frame (`HeroFrame`, radius `--r-hero`) with a constant "Featured" eyebrow (`HeroSectionLabel`) and tall flanking side-pill arrows + dot row. Renders three slide types: `photo` (full-bleed image; stored `panel_color` fades solid→transparent across the seam via `--hero-panel-fade`, over a left-anchored `--ink` legibility scrim; cream caption), event-with-photo (same + glass date/RSVP chip), and ivory reference slides (announcement / event-without-photo) via `UpNextCard`. Static CSS panel — no live blur, SSR-safe. Manual prev/next only (no auto-rotation/motion/swipe). Exports `HeroFrame`/`HeroSectionLabel` reused by the home-tab fallback. |
 | `permissions.md` | **Canonical source of truth** for role-based access — who can do what across every feature |
 
 ## Architecture
@@ -290,6 +290,7 @@ HomeApp (root — owns all global state)
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
 - Storage buckets: `announcement-images` (public; also holds reimbursement `receipts/` and home hero `home-slides/{ministryId}/` photos), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
+- Storage RLS: `storage.objects` policy `home_slides_photo_insert` (INSERT, `authenticated`) permits uploads to `announcement-images` only under `home-slides/<auth_ministry_id()>/` — ministry-scoped, mirroring Convention #8 (verified: own-ministry path allowed, cross-ministry denied). ⚠️ Known gap: `announcement-images` has **no** INSERT policy for the announcement-image or `receipts/` paths, so those uploads are silently RLS-denied (separate unfixed issue); `chat-attachments`/`worship-charts` carry unscoped bucket-wide authenticated INSERT.
 
 ## Environment Variables (required on Vercel)
 
