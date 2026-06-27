@@ -36,10 +36,13 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient()
 
+    // Only ACTIVE ministries count toward the picker — a pending registration
+    // application is in user_ministries but isn't openable (mirrors getUserMinistries).
     const { data: memberships, error: umErr } = await admin
       .from("user_ministries")
-      .select("ministry_id")
+      .select("ministry_id, ministries!inner(status)")
       .eq("user_id", data.user.id)
+      .eq("ministries.status", "active")
 
     if (umErr) console.warn("[auth/callback] user_ministries query error:", umErr.message)
 
