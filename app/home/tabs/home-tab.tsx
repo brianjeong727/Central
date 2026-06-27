@@ -107,7 +107,7 @@ export function HomeTab({
     onResponded?.()
   }
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
   const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
