@@ -43,6 +43,7 @@ function setTabAndUrl(t: TabType) {
 - `?sgltab=` — SmallGroupLeadersTab tabs (home/schedule)
 - `?section=` — Profile section (spiritual-profile/journal)
 - `?member=` — Directory member
+- `?compose=` — Announcements compose/edit page (`new` = create, `{id}` = edit a specific announcement)
 - `?view=` — Plan tab sub-page overlay (settings)
 
 **Sidebar navigation must atomically clear `view` param:** `handleSidebarTabChange` clears `view=settings` and sets `tab` in one `router.replace` call. Two separate `replaceParam` calls race on `window.location.search` — the second overwrites the first's deletion.
