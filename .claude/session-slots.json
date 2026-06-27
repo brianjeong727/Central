@@ -1,0 +1,9 @@
+{
+  "_comment": "Fixed pool of session worktree slots. Each slot is a REUSABLE git worktree directory bound to a FIXED dev port. A session claims a free slot, branches, works, and releases it on exit — the directory is reused, never recreated. Do NOT create ad-hoc worktrees per session. Managed by scripts/session.sh and the SessionStart/SessionEnd hooks.",
+  "mainPort": 3000,
+  "slots": [
+    { "slot": "s1", "dir": "central-s1", "port": 3001 },
+    { "slot": "s2", "dir": "central-s2", "port": 3002 },
+    { "slot": "s3", "dir": "central-s3", "port": 3003 }
+  ]
+}
