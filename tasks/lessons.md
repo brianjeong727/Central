@@ -176,3 +176,10 @@ Date: 2026-06-27
 - One session per **git worktree** (separate dir, separate active branch, shared `.git`): `git worktree add ../central-<name> <branch>`. Run each session's dev server on a different port (`next dev -p 3001`). Use `EnterWorktree`/`ExitWorktree` to drive a session inside a worktree.
 - **Never let verification subagents run `git stash`** to diff against HEAD — concurrent stash/pop is a prime corruption source. Compare lint output by reading it, not by stashing.
 - Symptom of corruption: `Persisting failed: Unable to write SST file`, turbopack panics, missing `build-manifest.json`, or a persistent client-side exception that survives a `.next` clear. Recovery: kill ALL `next` processes, `rm -rf .next`, restart ONE server; your committed/pushed branches are the safe source of truth.
+
+## Don't run `next build` and `next dev` in the same worktree at once
+Date: 2026-06-27
+
+`npm run build` (next build) and `npm run dev` (next dev) BOTH write to the same `.next` directory. If a dev server is live in a worktree while verification/build cycles run `npm run build` in that SAME worktree, they corrupt each other's Turbopack persistent cache — symptom: `Failed to write page endpoint`, `Failed to restore task data (corrupted database or bug)`, missing `.sst` / `build-manifest.json`, Turbopack panics, and the dev server returns 500 even though `npm run build` passes standalone. The code is fine; only the cache is poisoned.
+
+**Rule:** while actively running engineer/tester build cycles in a worktree, keep that worktree's dev server STOPPED. Start the dev server only for a testing handoff, after the build cycles are done — and don't run `npm run build` again while it's up. Recovery if it happens: kill the dev server, `rm -rf .next`, restart. (Caused by the `git worktree move` era too: a moved `.next` carries stale absolute paths — always `rm -rf .next` after moving a worktree.)
