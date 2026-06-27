@@ -317,7 +317,6 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const [members, setMembers] = useState<GroupMember[]>([])
-  const [loading, setLoading] = useState(true)
   const [displayGroupName, setDisplayGroupName] = useState(groupName)
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(groupName)
@@ -347,28 +346,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const canUnarchive = isChurch && isAdminOrLeader && groupArchived
   const canDelete = isChurch && isAdminOrLeader
 
-  useEffect(() => {
-    loadMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
-
-  async function loadMembers() {
-    setLoading(true)
-    const [{ data }, { data: prefData }] = await Promise.all([
-      supabase
-        .from("group_members")
-        .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
-        .eq("group_id", groupId),
-      supabase
-        .from("group_members")
-        .select("muted, pinned")
-        .eq("group_id", groupId)
-        .eq("user_id", userId)
-        .maybeSingle(),
-    ])
-
-    if (data) {
-      const mapped: GroupMember[] = data.map((m: {
+  // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
+  // local state is populated via the effect below so re-opening a chat paints from cache.
+  const { data: settingsData, mutate: mutateSettings } = useSWR(
+    groupId ? ["group-settings", groupId] : null,
+    async () => {
+      const [{ data }, { data: prefData }] = await Promise.all([
+        supabase
+          .from("group_members")
+          .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
+          .eq("group_id", groupId),
+        supabase
+          .from("group_members")
+          .select("muted, pinned")
+          .eq("group_id", groupId)
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ])
+      const mapped: GroupMember[] = (data ?? []).map((m: {
         user_id: string
         profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
       }) => {
@@ -381,16 +376,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           avatar_url: p?.avatar_url ?? null,
         }
       })
-      setMembers(mapped)
+      return { members: mapped, pref: (prefData as { muted: boolean | null; pinned: boolean | null } | null) ?? null }
     }
-    if (prefData) {
-      setMuted(prefData.muted ?? false)
-      setSavedMuted(prefData.muted ?? false)
-      setPinned(prefData.pinned ?? false)
-      setSavedPinned(prefData.pinned ?? false)
-    }
-    setLoading(false)
-  }
+  )
+  const loading = !settingsData
+
+  useEffect(() => {
+    if (!settingsData) return
+    // Seed locally-editable state (members can be added/removed; muted/pinned are
+    // toggles) from the SWR cache. This is a deliberate "controlled-from-server,
+    // then locally edited" seed — not derivable during render — hence the disable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMembers(settingsData.members)
+    const pref = settingsData.pref
+    setMuted(pref?.muted ?? false)
+    setSavedMuted(pref?.muted ?? false)
+    setPinned(pref?.pinned ?? false)
+    setSavedPinned(pref?.pinned ?? false)
+  }, [settingsData])
 
   async function loadAllProfiles() {
     const existingIds = new Set([...members.map((m) => m.user_id), ...pendingAddMembers.map(m => m.user_id)])
@@ -477,6 +480,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     if (addUserIds.length > 0 || removeUserIds.length > 0) {
       await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds, removeUserIds })
     }
+    // Keep the SWR settings cache consistent with the writes above.
+    mutateSettings()
     setSaving(false)
   }
 
@@ -1072,7 +1077,23 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [uploading, setUploading] = useState(false)
   const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
-  const [mentionMembers, setMentionMembers] = useState<{ id: string; name: string }[]>([])
+  // SWR-cached @mention member list — read-only lookup, pure fetcher.
+  const { data: mentionData } = useSWR(
+    groupId ? ["chat-mention-members", groupId] : null,
+    async () => {
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id, profiles!user_id(name)")
+        .eq("group_id", groupId)
+      return (data ?? [])
+        .map((m: { user_id: string; profiles: { name: string } | { name: string }[] | null }) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+          return p ? { id: m.user_id, name: p.name } : null
+        })
+        .filter((m): m is { id: string; name: string } => m !== null)
+    }
+  )
+  const mentionMembers = useMemo(() => (mentionData ?? []).filter(m => m.id !== userId), [mentionData, userId])
   const [mentionIndex, setMentionIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Polls
@@ -1096,8 +1117,33 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevMsgCountRef = useRef(0)
   const suppressScrollRef = useRef(false)
-  // Departed members — show "left" indicator on their messages
-  const [departedIds, setDepartedIds] = useState<Set<string>>(new Set())
+  // Departed members — show "left" indicator on their messages.
+  // SWR-cached ministry-scoped lookup, pure fetcher; derived to a Set below.
+  const { data: departuresData } = useSWR(
+    ministryId ? ["ministry-departures", ministryId] : null,
+    async () => {
+      const { data } = await supabase
+        .from("ministry_departures")
+        .select("user_id")
+        .eq("ministry_id", ministryId)
+      return (data ?? []).map((d: { user_id: string }) => d.user_id)
+    }
+  )
+  const departedIds = useMemo(() => new Set(departuresData ?? []), [departuresData])
+  // SWR-cached group meta — type/archived/pinned_message_id. Pure fetcher; local
+  // state (incl. the pinned-message lookup) is populated via the effect below.
+  // pinned_message_id is mutated by pin/unpin handlers, which sync this cache.
+  const { data: groupMeta, mutate: mutateGroupMeta } = useSWR(
+    groupId ? ["group-meta", groupId] : null,
+    async () => {
+      const { data } = await supabase
+        .from("groups")
+        .select("type, archived, pinned_message_id")
+        .eq("id", groupId)
+        .single()
+      return (data as { type: string; archived: boolean | null; pinned_message_id: string | null } | null) ?? null
+    }
+  )
   // Link previews
   const [linkPreviews, setLinkPreviews] = useState<Record<string, { title: string | null; description: string | null; image: string | null; hostname: string; url: string }>>({})
 
@@ -1133,26 +1179,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     )}</>
   }
 
-  // Load group members for @mention autocomplete
-  useEffect(() => {
-    async function loadGroupMembers() {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id, profiles!user_id(name)")
-        .eq("group_id", groupId)
-      if (data) {
-        const members = data
-          .map((m: { user_id: string; profiles: { name: string } | { name: string }[] | null }) => {
-            const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-            return p ? { id: m.user_id, name: p.name } : null
-          })
-          .filter((m): m is { id: string; name: string } => m !== null && m.id !== userId)
-        setMentionMembers(members)
-      }
-    }
-    loadGroupMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
+  // @mention member list is loaded via useSWR above (see mentionData/mentionMembers).
 
   // Load trending GIFs when GIF picker opens
   useEffect(() => {
@@ -1333,12 +1360,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setPinnedMessageId(msgId)
     if (msg) setPinnedMessage({ id: msg.id, content: msg.content, sender_name: msg.sender_name, attachment_url: msg.attachment_url ?? null, attachment_type: msg.attachment_type ?? null })
     await supabase.from("groups").update({ pinned_message_id: msgId }).eq("id", groupId).eq("ministry_id", ministryId)
+    // Keep the SWR group-meta cache in sync so the pinned state survives re-open.
+    mutateGroupMeta((cur) => cur ? { ...cur, pinned_message_id: msgId } : cur, { revalidate: false })
   }
 
   async function handleUnpin() {
     setPinnedMessageId(null)
     setPinnedMessage(null)
     await supabase.from("groups").update({ pinned_message_id: null }).eq("id", groupId).eq("ministry_id", ministryId)
+    // Keep the SWR group-meta cache in sync so the pinned state survives re-open.
+    mutateGroupMeta((cur) => cur ? { ...cur, pinned_message_id: null } : cur, { revalidate: false })
   }
 
   function handleMentionSelect(name: string) {
@@ -1513,46 +1544,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Load departed members for this ministry — drives the "left" indicator
-  useEffect(() => {
-    supabase
-      .from("ministry_departures")
-      .select("user_id")
-      .eq("ministry_id", ministryId)
-      .then(({ data }) => {
-        setDepartedIds(new Set((data ?? []).map((d: { user_id: string }) => d.user_id)))
-      })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
+  // Departed members are loaded via useSWR above (see departuresData/departedIds).
 
-  // Fetch group type + archived status + pinned message
+  // Populate group type + archived status + pinned message from the SWR group-meta
+  // cache. The fetcher is pure; the secondary pinned-message lookup lives here.
   useEffect(() => {
-    supabase
-      .from("groups")
-      .select("type, archived, pinned_message_id")
-      .eq("id", groupId)
-      .single()
-      .then(async ({ data }) => {
-        if (data) {
-          setGroupType(data.type)
-          setGroupArchived(data.archived ?? false)
-          if (data.pinned_message_id) {
-            setPinnedMessageId(data.pinned_message_id)
-            const { data: pmsg } = await supabase
-              .from("messages")
-              .select("id, content, attachment_url, attachment_type, profiles!sender_id(name)")
-              .eq("id", data.pinned_message_id)
-              .maybeSingle()
-            if (pmsg) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const p = Array.isArray((pmsg as any).profiles) ? (pmsg as any).profiles[0] : (pmsg as any).profiles
-              setPinnedMessage({ id: pmsg.id, content: pmsg.content, sender_name: (p as { name: string } | null)?.name ?? "Unknown", attachment_url: (pmsg as { attachment_url?: string | null }).attachment_url ?? null, attachment_type: (pmsg as { attachment_type?: string | null }).attachment_type ?? null })
-            }
+    if (!groupMeta) return
+    setGroupType(groupMeta.type)
+    setGroupArchived(groupMeta.archived ?? false)
+    if (groupMeta.pinned_message_id) {
+      setPinnedMessageId(groupMeta.pinned_message_id)
+      supabase
+        .from("messages")
+        .select("id, content, attachment_url, attachment_type, profiles!sender_id(name)")
+        .eq("id", groupMeta.pinned_message_id)
+        .maybeSingle()
+        .then(({ data: pmsg }) => {
+          if (pmsg) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const p = Array.isArray((pmsg as any).profiles) ? (pmsg as any).profiles[0] : (pmsg as any).profiles
+            setPinnedMessage({ id: pmsg.id, content: pmsg.content, sender_name: (p as { name: string } | null)?.name ?? "Unknown", attachment_url: (pmsg as { attachment_url?: string | null }).attachment_url ?? null, attachment_type: (pmsg as { attachment_type?: string | null }).attachment_type ?? null })
           }
-        }
-      })
+        })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
+  }, [groupMeta])
 
   // Load other members' last_read_at for read receipts
   useEffect(() => {
