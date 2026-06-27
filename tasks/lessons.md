@@ -156,3 +156,23 @@ When a CSS var is DEFINED as the exact hex it replaces (verify in `app/globals.c
 - Pass B (inline-style/literal): `(?<!\[)#HEX\b` → `var(--token)` — lookbehind protects bracket leftovers; `\b` protects 8-digit alpha.
 
 **Always LEAVE:** Tailwind opacity-modified arbitrary hex (`bg-[#3E1540]/95` — `/opacity` does NOT compute on a `var()` color in Tailwind v4), `rgba(...)`, 8-digit alpha hex, `<meta theme-color>` / `themeColor` (browser chrome needs a literal), and any hex NOT in the token map. Verify with a symmetric diff (equal insertions/deletions = pure 1:1 swaps) and a final grep proving zero plain target hexes remain outside the intended exceptions. Off-token hexes that have no matching token (e.g. `#ECE8DE`) need an explicit snap decision, not a silent merge.
+
+## Performance: chat-list RPC, tab code-splitting, SWR caching
+Date: 2026-06-27
+
+- **`get_chat_previews` deliberately EXCLUDES archived groups** and returns no `archived` column. Do NOT reuse it for any list with an "Archived" section (e.g. `ChatListPanel`) — archived chats vanish. The sibling RPC `get_chat_list(p_user_id, p_ministry_id)` includes archived groups + a `group_archived` boolean. Both are `STABLE SECURITY DEFINER, search_path=public`, take user id + ministry id as args. Mirror the pattern; don't invent a new one.
+- **ChatListPanel N+1** fired `1 + 2N` queries per desktop mount; replaced with one `get_chat_list` RPC. The **mobile** `ChatsTab` loader (~line 3451) still has the same `Promise.all(groups.map(...))` N+1 — reuse `get_chat_list` there too in a later pass.
+- **Tabs are code-split:** `home-app.tsx` lazy-loads the 9 non-Home tabs via `next/dynamic(..., { ssr:false })` with skeleton `loading` fallbacks; only `HomeTab` is eager. New tabs follow the same pattern. Heavy libs imported inside a tab (e.g. `@emoji-mart/data`, ~2MB) must be lazy-loaded at point-of-use, not module-level.
+- **Skeletons live in `components/central/skeletons.tsx`** (`SkeletonBlock` + per-tab skeletons). Motion is the `.skeleton-pulse` opacity pulse in `globals.css` (calm, reduced-motion aware). Use instead of bare `<Spinner/>`.
+- **SWR cache (Phase 2a):** `SWRConfig` in home-app (`revalidateOnFocus:false, keepPreviousData:true, dedupingInterval:5000`). Home/Announcements/Directory tabs fetch via `useSWR` with ministry-scoped keys, so revisiting a tab paints from cache instantly. Writes use optimistic `mutate(asyncFn, { optimisticData, rollbackOnError, revalidate:false })`. Skeleton shows only on first load (`isLoading || !data`). Chats + Plan tabs are NOT yet converted (Phase 2b).
+- **`rsvps` table has NO `ministry_id` column** — scoping is via the RLS join to `announcements`. RSVP writes must NOT add `ministry_id` (would error). Convention #8's "ministry_id on all writes" applies only to tables that carry the column.
+
+## Multi-session / git hygiene — never run two Claude sessions in one working dir
+Date: 2026-06-27
+
+**Two Claude sessions in the SAME working directory corrupt each other.** A working tree has exactly one active branch; when session B runs `git checkout`, it yanks the branch out from under session A, so A's edits land on the wrong branch. Concurrent `npm run dev` (the `dev` script does `rm -rf .next`) and concurrent `git stash`/index ops then corrupt the Turbopack cache and leave stash-pop conflict markers (`<<<<<<< Updated upstream` / `>>>>>>> Stashed changes`) in source files. This actually happened and stranded a fix on the wrong branch.
+
+**Rules:**
+- One session per **git worktree** (separate dir, separate active branch, shared `.git`): `git worktree add ../central-<name> <branch>`. Run each session's dev server on a different port (`next dev -p 3001`). Use `EnterWorktree`/`ExitWorktree` to drive a session inside a worktree.
+- **Never let verification subagents run `git stash`** to diff against HEAD — concurrent stash/pop is a prime corruption source. Compare lint output by reading it, not by stashing.
+- Symptom of corruption: `Persisting failed: Unable to write SST file`, turbopack panics, missing `build-manifest.json`, or a persistent client-side exception that survives a `.next` clear. Recovery: kill ALL `next` processes, `rm -rf .next`, restart ONE server; your committed/pushed branches are the safe source of truth.
