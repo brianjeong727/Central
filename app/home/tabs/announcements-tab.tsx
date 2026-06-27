@@ -703,31 +703,36 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       .upsert(ids.map((id) => ({ announcement_id: id, user_id: userId })), { onConflict: "announcement_id,user_id" })
       .then()
 
-    // Form data
+    // Build the cross-row lookups that the next two queries depend on, then run
+    // both in parallel — form_responses (needs formIds) and profiles (needs
+    // rsvp user ids) are independent of each other.
     const formByAnn: Record<string, string> = {}
     for (const f of formRows ?? []) formByAnn[f.announcement_id] = f.id
     const formIds = Object.values(formByAnn)
-    const respondedFormIds = new Set<string>()
-    if (formIds.length > 0) {
-      const { data: responseRows } = await supabase
-        .from("form_responses")
-        .select("form_id")
-        .in("form_id", formIds)
-        .eq("user_id", userId)
-      for (const r of responseRows ?? []) respondedFormIds.add(r.form_id)
-    }
-
-    // Fetch names for all RSVP attendees
     const allRsvpUserIds = [...new Set((rsvpRows ?? []).map((r) => r.user_id))]
+
+    const [{ data: responseRows }, { data: profileRows }] = await Promise.all([
+      formIds.length > 0
+        ? supabase
+            .from("form_responses")
+            .select("form_id")
+            .in("form_id", formIds)
+            .eq("user_id", userId)
+        : Promise.resolve({ data: null }),
+      allRsvpUserIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, name")
+            .in("id", allRsvpUserIds)
+            .eq("ministry_id", ministryId)
+        : Promise.resolve({ data: null }),
+    ])
+
+    const respondedFormIds = new Set<string>()
+    for (const r of responseRows ?? []) respondedFormIds.add(r.form_id)
+
     const profileNameMap: Record<string, string> = {}
-    if (allRsvpUserIds.length > 0) {
-      const { data: profileRows } = await supabase
-        .from("profiles")
-        .select("id, name")
-        .in("id", allRsvpUserIds)
-        .eq("ministry_id", ministryId)
-      for (const p of profileRows ?? []) profileNameMap[p.id] = p.name
-    }
+    for (const p of profileRows ?? []) profileNameMap[p.id] = p.name
 
     const viewMap: Record<string, number> = {}
     const rsvpCountMap: Record<string, number> = {}

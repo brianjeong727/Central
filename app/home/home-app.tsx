@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { SWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle } from "lucide-react"
@@ -390,17 +390,34 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId, userId])
 
-  // Initial load + reload after closing a chat
+  // Initial load + reload after closing a chat.
+  // recentChats is SSR-seeded from initialRecentChats, so skip the redundant
+  // refetch on the very first mount (chatRefreshKey === 0). After a chat closes
+  // chatRefreshKey increments (>0) and this effect still refetches — the ref is
+  // already true by then, so subsequent runs proceed normally.
+  const didInitRecentChats = useRef(false)
   useEffect(() => {
+    if (!didInitRecentChats.current) { didInitRecentChats.current = true; return }
     loadRecentChats()
   }, [loadRecentChats, chatRefreshKey])
 
+  // userTeams is SSR-seeded from initialUserTeams → skip the mount refetch.
+  // loadAllTeams is admin-only and NOT SSR-seeded → it must still fire on mount,
+  // so it lives in its own unguarded effect.
+  const didInitUserTeams = useRef(false)
   useEffect(() => {
+    if (!didInitUserTeams.current) { didInitUserTeams.current = true; return }
     loadUserTeams()
-    loadAllTeams()
-  }, [loadUserTeams, loadAllTeams])
+  }, [loadUserTeams])
 
   useEffect(() => {
+    loadAllTeams()
+  }, [loadAllTeams])
+
+  // activeQuestion/hasResponded are SSR-seeded → skip the mount refetch.
+  const didInitActiveQuestion = useRef(false)
+  useEffect(() => {
+    if (!didInitActiveQuestion.current) { didInitActiveQuestion.current = true; return }
     loadActiveQuestion()
   }, [loadActiveQuestion])
 
