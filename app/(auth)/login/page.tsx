@@ -48,10 +48,15 @@ function LoginContent() {
 
     const { data: { user: me } } = await supabase.auth.getUser()
     if (me) {
+      // Only ACTIVE ministries count toward the picker. A pending registration
+      // application lives in user_ministries too, but it isn't a ministry you can open —
+      // without this filter a single-ministry admin who registered a second (pending)
+      // ministry is wrongly offered the picker. Mirrors getUserMinistries' active filter.
       const { data: memberships } = await supabase
         .from("user_ministries")
-        .select("ministry_id")
+        .select("ministry_id, ministries!inner(status)")
         .eq("user_id", me.id)
+        .eq("ministries.status", "active")
       const uniqueMinistries = [...new Set((memberships ?? []).map((m: { ministry_id: string }) => m.ministry_id))]
       if (uniqueMinistries.length > 1) { window.location.assign("/pick-ministry"); return }
       if (uniqueMinistries.length === 1) { window.location.assign("/home"); return }
