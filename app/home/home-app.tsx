@@ -844,9 +844,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {showGradPrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>
           <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "36px 32px", maxWidth: 400, width: "100%", boxShadow: "0 24px 80px rgba(19,16,26,0.18)" }}>
-            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
-            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "#13101A", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
-            <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 28px" }}>
+            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
+            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 28px" }}>
               You&apos;ve reached your graduation year. Would you like to stay in {ministryName} or remove yourself from the ministry?
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -856,7 +856,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   sessionStorage.setItem(key, "1")
                   setShowGradPrompt(false)
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
               >
                 Stay in {ministryName}
               </button>
@@ -867,7 +867,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   await selfLeaveMinistry()
                   window.location.replace("/join")
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: gradPromptLoading ? "not-allowed" : "pointer", opacity: gradPromptLoading ? 0.6 : 1 }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid var(--line-2)", background: "transparent", color: "#9F3030", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: gradPromptLoading ? "not-allowed" : "pointer", opacity: gradPromptLoading ? 0.6 : 1 }}
               >
                 {gradPromptLoading ? "Leaving…" : "Leave ministry"}
               </button>

@@ -12,7 +12,7 @@ const SERIF = "var(--font-instrument-serif)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
 
 const SIZE_LABELS: Record<string, string> = {
@@ -38,7 +38,7 @@ function MinRow({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 16,
-      padding: "16px 18px", border: "1px solid #E8E2D2", borderRadius: 12,
+      padding: "16px 18px", border: "1px solid var(--line)", borderRadius: 12,
       background: "#FDFCF8", marginBottom: 12,
     }}>
       {children}
@@ -148,7 +148,7 @@ function MinistriesContent() {
   }
 
   return (
-    <div style={{ minHeight: "100svh", background: "#FDFCF8", fontFamily: SANS, color: "#13101A" }}>
+    <div style={{ minHeight: "100svh", background: "#FDFCF8", fontFamily: SANS, color: "var(--ink)" }}>
 
       {/* ── Top bar ── */}
       <div style={{
@@ -158,15 +158,15 @@ function MinistriesContent() {
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
           <span style={{
             width: 32, height: 32, borderRadius: 9, display: "grid", placeItems: "center",
-            background: "#2D0F2E", flexShrink: 0,
+            background: "var(--plum-2)", flexShrink: 0,
           }}>
-            <RingCrossLogo size={18} color="#F1ECDE"/>
+            <RingCrossLogo size={18} color="var(--ivory)"/>
           </span>
           <span style={{ fontFamily: SERIF, fontSize: 20, letterSpacing: "-0.01em" }}>Central</span>
         </div>
         <a href="/home" style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          fontSize: 14, color: "#8A8497", textDecoration: "none",
+          fontSize: 14, color: "var(--muted-text)", textDecoration: "none",
         }}>
           <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -182,21 +182,21 @@ function MinistriesContent() {
         <div style={mono}>Discover · Central</div>
         <h1 style={{
           fontFamily: SERIF, fontWeight: 600, fontSize: 44, letterSpacing: "-0.02em",
-          color: "#13101A", margin: "12px 0 8px", lineHeight: 1.1,
+          color: "var(--ink)", margin: "12px 0 8px", lineHeight: 1.1,
         }}>Ministries</h1>
-        <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: 0 }}>
+        <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
           Your communities, and ones you can join.
         </p>
 
         {/* Underline tabs */}
-        <div style={{ display: "flex", gap: 32, borderBottom: "1px solid #E8E2D2", marginTop: 32 }}>
+        <div style={{ display: "flex", gap: 32, borderBottom: "1px solid var(--line)", marginTop: 32 }}>
           {(["browse", "code"] as const).map(t => (
             <button key={t} type="button" onClick={() => changeTab(t)} style={{
               padding: "12px 0 14px", fontSize: 15,
-              color: tab === t ? "#2D0F2E" : "#8A8497",
+              color: tab === t ? "var(--plum-2)" : "var(--muted-text)",
               fontWeight: tab === t ? 600 : 400, fontFamily: SANS,
               background: "none", border: "none",
-              borderBottom: `2px solid ${tab === t ? "#3E1540" : "transparent"}`,
+              borderBottom: `2px solid ${tab === t ? "var(--plum)" : "transparent"}`,
               marginBottom: -1, cursor: "pointer", transition: "color .12s ease",
             }}>
               {t === "browse" ? "Browse" : "Invite code"}
@@ -211,10 +211,10 @@ function MinistriesContent() {
             {/* Search */}
             <div style={{
               display: "flex", alignItems: "center", gap: 12,
-              padding: "14px 18px", border: "1px solid #E2DDCF", borderRadius: 10,
+              padding: "14px 18px", border: "1px solid var(--line-2)", borderRadius: 10,
               background: "#FDFCF8",
             }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#8A8497" strokeWidth={1.6} strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted-text)" strokeWidth={1.6} strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
                 <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"/>
               </svg>
               <input
@@ -223,7 +223,7 @@ function MinistriesContent() {
                 autoComplete="off"
                 style={{
                   border: "none", outline: "none", background: "none",
-                  fontFamily: SANS, fontSize: 15, color: "#13101A", width: "100%",
+                  fontFamily: SANS, fontSize: 15, color: "var(--ink)", width: "100%",
                 }}
               />
             </div>
@@ -247,13 +247,13 @@ function MinistriesContent() {
                   <MinRow key={m.id}>
                     <Avatar name={m.name}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "#13101A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
-                      <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>{m.university}</div>
+                      <div style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                      <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>{m.university}</div>
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
                       <button onClick={() => handleGoToMinistry(m.id)} disabled={switchingId === m.id} style={{
-                        padding: "8px 16px", border: "1px solid #E2DDCF", borderRadius: 10,
-                        background: "transparent", color: "#5A5466",
+                        padding: "8px 16px", border: "1px solid var(--line-2)", borderRadius: 10,
+                        background: "transparent", color: "var(--body)",
                         fontFamily: SANS, fontSize: 13, cursor: switchingId === m.id ? "not-allowed" : "pointer",
                         display: "inline-flex", alignItems: "center", gap: 7,
                       }}>
@@ -282,15 +282,15 @@ function MinistriesContent() {
                   <MinRow key={m.id}>
                     <Avatar name={m.name}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "#13101A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
-                      <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>
+                      <div style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                      <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>
                         {m.university}{m.size ? ` · ${SIZE_LABELS[m.size] ?? m.size}` : ""}
                       </div>
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
                       <button onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{
                         padding: "10px 22px", border: "none", borderRadius: 10,
-                        background: joiningId === m.id ? "#E2DDCF" : "#2D0F2E",
+                        background: joiningId === m.id ? "var(--line-2)" : "var(--plum-2)",
                         color: joiningId === m.id ? "#A09A8C" : "#FDFCF8",
                         fontFamily: SANS, fontSize: 14, fontWeight: 500,
                         cursor: joiningId === m.id ? "not-allowed" : "pointer",
@@ -306,7 +306,7 @@ function MinistriesContent() {
 
             {!browsingPublic && browseable.length === 0 && !browseError && authChecked && (
               <div style={{ paddingTop: 56, textAlign: "center" }}>
-                <p style={{ fontSize: 14, color: "#8A8497", margin: 0 }}>
+                <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
                   {search
                     ? "No ministries match your search."
                     : myIds.size > 0
@@ -315,7 +315,7 @@ function MinistriesContent() {
                 </p>
                 {!search && myIds.size === 0 && (
                   <button type="button" onClick={() => changeTab("code")} style={{
-                    marginTop: 8, fontSize: 13, fontWeight: 600, color: "#2D0F2E",
+                    marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--plum-2)",
                     background: "none", border: "none", cursor: "pointer", fontFamily: SANS,
                   }}>
                     Try an invite code instead →
@@ -329,7 +329,7 @@ function MinistriesContent() {
         {/* ── Invite code panel ── */}
         {tab === "code" && (
           <div style={{ paddingTop: 26 }}>
-            <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.6, margin: "0 0 22px", maxWidth: 480 }}>
+            <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.6, margin: "0 0 22px", maxWidth: 480 }}>
               Have an invite code from a ministry leader? Enter it below to join their workspace directly.
             </p>
 
@@ -348,16 +348,16 @@ function MinistriesContent() {
                 autoComplete="off" autoCapitalize="characters" maxLength={10}
                 style={{
                   width: "100%", padding: "16px 18px",
-                  border: "1px solid #E2DDCF", borderRadius: 10, background: "#FDFCF8",
+                  border: "1px solid var(--line-2)", borderRadius: 10, background: "#FDFCF8",
                   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                   fontSize: 22, letterSpacing: "4px", textTransform: "uppercase",
-                  color: "#13101A", outline: "none", boxSizing: "border-box",
+                  color: "var(--ink)", outline: "none", boxSizing: "border-box",
                 }}
               />
               <div>
                 <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{
                   marginTop: 20, padding: "14px 28px", border: "none", borderRadius: 10,
-                  background: (joiningCode || inviteCode.trim().length < 4) ? "#E2DDCF" : "#2D0F2E",
+                  background: (joiningCode || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
                   color: (joiningCode || inviteCode.trim().length < 4) ? "#A09A8C" : "#FDFCF8",
                   fontFamily: SANS, fontSize: 15, fontWeight: 500,
                   cursor: (joiningCode || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
@@ -365,7 +365,7 @@ function MinistriesContent() {
                   {joiningCode ? "Joining…" : "Join ministry"}
                 </button>
               </div>
-              <p style={{ fontSize: 13, color: "#8A8497", marginTop: 14 }}>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 14 }}>
                 Codes are case-insensitive. Ask your ministry&apos;s admin or leader if you don&apos;t have one.
               </p>
             </form>
@@ -374,13 +374,13 @@ function MinistriesContent() {
 
         {/* ── Footer register row ── */}
         <div style={{
-          marginTop: 34, paddingTop: 26, borderTop: "1px solid #E8E2D2",
+          marginTop: 34, paddingTop: 26, borderTop: "1px solid var(--line)",
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
         }}>
-          <span style={{ fontSize: 14, color: "#5A5466" }}>Leading a ministry that isn&apos;t here yet?</span>
+          <span style={{ fontSize: 14, color: "var(--body)" }}>Leading a ministry that isn&apos;t here yet?</span>
           <button type="button" onClick={() => router.push("/register-ministry")} style={{
-            padding: "9px 18px", border: "1px solid #3E1540", borderRadius: 10,
-            background: "transparent", color: "#3E1540",
+            padding: "9px 18px", border: "1px solid var(--plum)", borderRadius: 10,
+            background: "transparent", color: "var(--plum)",
             fontFamily: SANS, fontSize: 13, fontWeight: 500, cursor: "pointer",
           }}>
             Register a ministry →

@@ -7,7 +7,7 @@ const SANS  = "var(--font-inter)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
 
 // ── AuthPhotoPanel ─────────────────────────────────────────────
@@ -30,7 +30,7 @@ export function AuthPhotoPanel() {
           width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
           background: "rgba(253,252,248,0.12)", border: "1px solid rgba(253,252,248,0.22)",
         }}>
-          <RingCrossLogo size={20} color="#F1ECDE" />
+          <RingCrossLogo size={20} color="var(--ivory)" />
         </span>
         <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#FBF8F2" }}>Central</span>
       </div>
@@ -65,7 +65,7 @@ export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; chi
         {/* Top bar */}
         <div className="px-6 md:px-12" style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6,
-          paddingTop: 26, minHeight: 64, fontSize: 14, color: "#5A5466",
+          paddingTop: 26, minHeight: 64, fontSize: 14, color: "var(--body)",
         }}>
           {topBar}
         </div>
@@ -78,11 +78,11 @@ export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; chi
           <div className="md:hidden" style={{ marginBottom: 36, alignSelf: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{
-                width: 32, height: 32, borderRadius: 8, background: "#3E1540",
+                width: 32, height: 32, borderRadius: 8, background: "var(--plum)",
                 color: "#FBF8F2", display: "grid", placeItems: "center",
                 fontFamily: SERIF, fontSize: 15, flexShrink: 0,
               }}>C</span>
-              <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#13101A" }}>Central</span>
+              <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
             </div>
           </div>
           <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
@@ -97,11 +97,11 @@ export function GoogleButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} style={{
       width: "100%", padding: "13px 18px", borderRadius: 12,
-      background: "#FBF8F2", border: "1px solid #E2DDCF", color: "#13101A",
+      background: "#FBF8F2", border: "1px solid var(--line-2)", color: "var(--ink)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS, cursor: "pointer",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
       transition: "background .15s",
-    }} className="hover:bg-[#F1ECDE]">
+    }} className="hover:bg-[var(--ivory)]">
       <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
@@ -118,9 +118,9 @@ export function GoogleButton({ onClick }: { onClick: () => void }) {
 export function OrDivider() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, color: "#A09A8C" }}>
-      <span style={{ flex: 1, height: 1, background: "#E8E2D2" }}/>
+      <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
       <span style={{ ...mono, color: "#A09A8C", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
-      <span style={{ flex: 1, height: 1, background: "#E8E2D2" }}/>
+      <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
     </div>
   )
 }
@@ -129,7 +129,7 @@ export function OrDivider() {
 export function EyeButton({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} aria-label={show ? "Hide password" : "Show password"}
-      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#8A8497", display: "grid", placeItems: "center", marginRight: -4, flexShrink: 0 }}>
+      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "var(--muted-text)", display: "grid", placeItems: "center", marginRight: -4, flexShrink: 0 }}>
       {show
         ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>
         : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>

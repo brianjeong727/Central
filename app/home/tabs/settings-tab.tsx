@@ -44,13 +44,13 @@ type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" |
 type ActiveSettingsTab = "general" | "people" | "automations" | "workspace" | "audit"
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-  admin:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Admin"   },
-  deacon:  { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Deacon"  },
-  elder:   { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Elder"   },
-  pastor:  { bg: "#2D0F2E",  color: "#FBF8F2", border: "#2D0F2E",              label: "Pastor"  },
-  leader:  { bg: "#F1ECDE",  color: "#3E1540", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
-  member:  { bg: "#F1ECDE",  color: "#8A8497", border: "#E2DDCF",              label: "Member"  },
-  visitor: { bg: "white",    color: "#8A8497", border: "#D8D3C8",              label: "Visitor" },
+  admin:   { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Admin"   },
+  deacon:  { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Deacon"  },
+  elder:   { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Elder"   },
+  pastor:  { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Pastor"  },
+  leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
+  member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
+  visitor: { bg: "white",    color: "var(--muted-text)", border: "#D8D3C8",              label: "Visitor" },
 }
 
 function roleBadge(role: string) {
@@ -66,7 +66,7 @@ function roleBadge(role: string) {
 const SECTION_LABEL: React.CSSProperties = { ...EYEBROW_STYLE, fontWeight: 400 }
 
 const CARD: React.CSSProperties = {
-  background: "#FBF8F2", borderRadius: "14px", border: "1px solid #E8E2D2",
+  background: "#FBF8F2", borderRadius: "14px", border: "1px solid var(--line)",
 }
 
 export function SettingsTab({
@@ -623,7 +623,7 @@ export function SettingsTab({
         </div>
 
         {loading ? (
-          <div className="px-5 md:px-14" style={{ color: "#8A8497", fontSize: "14px", marginTop: 40 }}>Loading…</div>
+          <div className="px-5 md:px-14" style={{ color: "var(--muted-text)", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
           <>
 
@@ -635,7 +635,7 @@ export function SettingsTab({
               <section>
                 <div style={{ marginBottom: 20 }}>
                   <SectionHeader eyebrow="Ministry Identity" title="Profile" titleSize={20} />
-                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
                 </div>
                 <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
                   <MonogramChip
@@ -645,19 +645,19 @@ export function SettingsTab({
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {editingName ? (
-                      <input autoFocus value={nameDraft} onChange={e => setNameDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }} onBlur={() => saveMinistryField("name", nameDraft)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }} />
+                      <input autoFocus value={nameDraft} onChange={e => setNameDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }} onBlur={() => saveMinistryField("name", nameDraft)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }} />
                     ) : (
                       <div className="group flex items-center gap-2" style={{ cursor: isAdmin ? "text" : "default" }} onClick={isAdmin ? () => { setNameDraft(ministryInfo?.name ?? ministryName); setEditingName(true) } : undefined}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "#13101A", lineHeight: 1.1 }}>{ministryInfo?.name ?? ministryName}</p>
-                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0 }} />}
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "var(--ink)", lineHeight: 1.1 }}>{ministryInfo?.name ?? ministryName}</p>
+                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                       </div>
                     )}
                     {editingUniversity ? (
-                      <input autoFocus value={universityDraft} onChange={e => setUniversityDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }} onBlur={() => saveMinistryField("university", universityDraft)} style={{ fontSize: "14px", color: "#5A5466", marginTop: 4, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }} />
+                      <input autoFocus value={universityDraft} onChange={e => setUniversityDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }} onBlur={() => saveMinistryField("university", universityDraft)} style={{ fontSize: "14px", color: "var(--body)", marginTop: 4, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }} />
                     ) : (
                       <div className="group flex items-center gap-1" style={{ cursor: isAdmin ? "text" : "default", marginTop: 4 }} onClick={isAdmin ? () => { setUniversityDraft(ministryInfo?.university ?? ""); setEditingUniversity(true) } : undefined}>
-                        <p style={{ fontSize: "14px", color: "#5A5466" }}>{ministryInfo?.university ?? "—"}</p>
-                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />}
+                        <p style={{ fontSize: "14px", color: "var(--body)" }}>{ministryInfo?.university ?? "—"}</p>
+                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} />}
                       </div>
                     )}
                     {infoError && <p style={{ fontSize: "12px", color: "#DC2626", marginTop: 4 }}>{infoError}</p>}
@@ -674,12 +674,12 @@ export function SettingsTab({
                       <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} />
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Public discovery</div>
-                        <div style={{ marginTop: 4, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>{isPublic ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
+                        <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{isPublic ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
                       </div>
                     </div>
                   </div>
@@ -687,17 +687,17 @@ export function SettingsTab({
                   {/* Schools */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>) : undefined} />
+                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>) : undefined} />
                     </div>
                     <div style={{ ...CARD, overflow: "hidden" }}>
-                      {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No schools added yet.</p></div>}
+                      {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No schools added yet.</p></div>}
                       {schools.length > 0 && (
                         <div style={{ padding: "16px 18px", display: "flex", flexWrap: "wrap", gap: 8 }}>
                           {schools.map(s => (
-                            <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "#F1ECDE", color: "#2D0F2E", border: "1px solid #E2DDCF", fontSize: 13 }}>
+                            <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "var(--ivory)", color: "var(--plum-2)", border: "1px solid var(--line-2)", fontSize: 13 }}>
                               <span style={{ fontWeight: 500 }}>{s.name}</span>
-                              <span style={{ color: "#8A8497", fontSize: 12 }}>({s.abbreviation})</span>
-                              {isAdmin && <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", padding: 0, color: "#8A8497", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
+                              <span style={{ color: "var(--muted-text)", fontSize: 12 }}>({s.abbreviation})</span>
+                              {isAdmin && <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", padding: 0, color: "var(--muted-text)", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
                             </span>
                           ))}
                         </div>
@@ -706,12 +706,12 @@ export function SettingsTab({
                         <div style={{ padding: "16px 18px", borderTop: schools.length > 0 ? "1px solid #EFE9DA" : undefined }}>
                           {schoolError && <p style={{ fontSize: 12, color: "#E53E3E", marginBottom: 8 }}>{schoolError}</p>}
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-                            <input autoFocus type="text" placeholder="School name (e.g. University of Pittsburgh)" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-                            <input type="text" placeholder="Abbreviation (e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                            <input autoFocus type="text" placeholder="School name (e.g. University of Pittsburgh)" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                            <input type="text" placeholder="Abbreviation (e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                            <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
                           </div>
                         </div>
                       )}
@@ -724,12 +724,12 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
-                    <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
+                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
-                  <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                     {homeVerses.length === 0 && !addingVerse && (
-                      <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No verses yet. Add one to start the daily rotation.</p></div>
+                      <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No verses yet. Add one to start the daily rotation.</p></div>
                     )}
                     {homeVerses.map((v, idx) => {
                       const isToday = v.id === todayVerseId
@@ -737,18 +737,18 @@ export function SettingsTab({
                         <div key={v.id} style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : isToday ? "#F6F2E8" : undefined, borderBottom: "1px solid #EFE9DA", transition: "background 100ms" }} draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id} onDragStart={e => handleVerseDragStart(e, idx)} onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }} onDragLeave={() => setDragOverVerseIdx(null)} onDrop={e => handleVerseDrop(e, idx)}>
                           {editingVerseId === v.id ? (
                             <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
-                              <input autoFocus value={verseRefDraft} onChange={e => setVerseRefDraft(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-                              <textarea value={verseTextDraft} onChange={e => setVerseTextDraft(e.target.value)} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+                              <input autoFocus value={verseRefDraft} onChange={e => setVerseRefDraft(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                              <textarea value={verseTextDraft} onChange={e => setVerseTextDraft(e.target.value)} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
+                                <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
+                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
                               </div>
                             </div>
                           ) : confirmDeleteVerseId === v.id ? (
                             <div style={{ padding: "16px 22px" }}>
-                              <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
+                              <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
+                                <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
                                 <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "#9D2D2D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
                               </div>
                             </div>
@@ -757,14 +757,14 @@ export function SettingsTab({
                               <span style={{ color: "#A09A8C", cursor: "grab", fontSize: 16, marginTop: 2, userSelect: "none", fontFamily: "ui-monospace, Menlo, monospace", flexShrink: 0 }}>⋮⋮</span>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                  <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{v.reference}</span>
-                                  {isToday && <span style={{ padding: "2px 8px", borderRadius: 999, background: "#3E1540", color: "#FBF8F2", fontSize: 10, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 500 }}>Today</span>}
+                                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{v.reference}</span>
+                                  {isToday && <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", fontSize: 10, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 500 }}>Today</span>}
                                 </div>
-                                <div style={{ marginTop: 4, fontSize: 13, color: "#8A8497", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.text}</div>
+                                <div style={{ marginTop: 4, fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.text}</div>
                               </div>
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                                <button onClick={() => { setEditingVerseId(v.id); setVerseRefDraft(v.reference); setVerseTextDraft(v.text) }} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><Pencil style={{ width: 13, height: 13, color: "#8A8497" }} /></button>
-                                <button onClick={() => setConfirmDeleteVerseId(v.id)} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><X style={{ width: 13, height: 13, color: "#8A8497" }} /></button>
+                                <button onClick={() => { setEditingVerseId(v.id); setVerseRefDraft(v.reference); setVerseTextDraft(v.text) }} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><Pencil style={{ width: 13, height: 13, color: "var(--muted-text)" }} /></button>
+                                <button onClick={() => setConfirmDeleteVerseId(v.id)} style={{ padding: 6, background: "none", border: "none", cursor: "pointer", borderRadius: 6 }}><X style={{ width: 13, height: 13, color: "var(--muted-text)" }} /></button>
                               </div>
                             </div>
                           )}
@@ -773,16 +773,16 @@ export function SettingsTab({
                     })}
                     {addingVerse ? (
                       <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8, borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
-                        <input autoFocus value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-                        <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid #E2DDCF", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+                        <input autoFocus value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                        <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
+                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
+                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
                         </div>
                       </div>
                     ) : (
                       <div style={{ padding: "14px 22px", borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
-                        <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#3E1540", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
+                        <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--plum)", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
                       </div>
                     )}
                   </div>
@@ -793,23 +793,23 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 22 }}>
-                    <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+                    <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "#9F3030", whiteSpace: "nowrap" }}>Danger Zone</p>
-                    <div style={{ flex: 1, height: 1, background: "#E8E2D2" }} />
+                    <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
                   </div>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", marginBottom: 6 }}>Archive ministry</p>
-                      <p style={{ fontSize: "13px", color: "#5A5466", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", marginBottom: 6 }}>Archive ministry</p>
+                      <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
                     </div>
                     {!showArchiveConfirm ? (
                       <button onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 10, border: "1px solid #9F3030", color: "#9F3030", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Archive</button>
                     ) : (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-                        <p style={{ fontSize: "12px", color: "#8A8497", textAlign: "right" }}>Type <strong style={{ color: "#13101A" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
-                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "#13101A", outline: "none", background: "#FBF8F2", width: 192, fontFamily: "inherit" }} />
+                        <p style={{ fontSize: "12px", color: "var(--muted-text)", textAlign: "right" }}>Type <strong style={{ color: "var(--ink)" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
+                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "var(--ink)", outline: "none", background: "#FBF8F2", width: 192, fontFamily: "inherit" }} />
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                          <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
                           <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #9F3030", fontSize: 12, fontWeight: 600, color: "#9F3030", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
                         </div>
                       </div>
@@ -825,7 +825,7 @@ export function SettingsTab({
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
                 <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" titleSize={20} />
-                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
+                <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
               </div>
 
               {/* Stat tiles */}
@@ -837,22 +837,22 @@ export function SettingsTab({
                   { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" as RoleFilter },
                   { label: "Visitors", value: totalVisitors,                                             filter: "visitor" as RoleFilter },
                 ] as { label: string; value: number; filter: RoleFilter }[]).map(({ value, label, filter }) => (
-                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", borderColor: peopleFilter === filter ? "#3E1540" : "#E8E2D2" }}>
+                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>{label}</p>
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "#13101A", fontWeight: 400, lineHeight: 1 }}>{value}</p>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "var(--ink)", fontWeight: 400, lineHeight: 1 }}>{value}</p>
                   </button>
                 ))}
               </div>
 
               {/* Search + filter */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2" }}>
-                  <Search style={{ width: 15, height: 15, color: "#8A8497", flexShrink: 0 }} />
-                  <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#13101A", fontFamily: "var(--font-inter)" }} />
+                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2" }}>
+                  <Search style={{ width: 15, height: 15, color: "var(--muted-text)", flexShrink: 0 }} />
+                  <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)" }} />
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
-                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "#3E1540" : "#E2DDCF"}`, background: peopleFilter === f ? "#2D0F2E" : "#FBF8F2", color: peopleFilter === f ? "#FBF8F2" : "#5A5466", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "var(--plum)" : "var(--line-2)"}`, background: peopleFilter === f ? "var(--plum-2)" : "#FBF8F2", color: peopleFilter === f ? "#FBF8F2" : "var(--body)", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
                       {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
@@ -865,8 +865,8 @@ export function SettingsTab({
                 return (
                   <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
-                    <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>Remove <strong style={{ color: "#13101A" }}>{target?.name}</strong> from this ministry?</p>
-                    <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+                    <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>Remove <strong style={{ color: "var(--ink)" }}>{target?.name}</strong> from this ministry?</p>
+                    <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
                     <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "#9F3030", border: "1px solid #9F3030", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
                       {peopleRemoving ? "Removing…" : "Remove"}
                     </button>
@@ -875,9 +875,9 @@ export function SettingsTab({
               })()}
 
               {/* Member list */}
-              <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+              <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                 {peopleFiltered.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#8A8497", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
                 ) : peopleFiltered.map((m, i) => {
                   const isMe = m.id === userId
                   const menuOpen = peopleRoleMenuOpen === m.id
@@ -886,12 +886,12 @@ export function SettingsTab({
                       <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-semibold" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{m.name}</span>
-                          {isMe && <span style={{ fontSize: 12, color: "#8A8497" }}>you</span>}
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</span>
+                          {isMe && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>you</span>}
                         </div>
-                        <div style={{ marginTop: 2, fontSize: 13, color: "#8A8497", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
+                        <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                       </div>
-                      {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "#8A8497" }}>Saving…</span> : roleBadge(m.role)}
+                      {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Saving…</span> : roleBadge(m.role)}
                       {isAdmin && !isMe && (
                         <div style={{ position: "relative" }}>
                           {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setPeopleRoleMenuOpen(null)} />}
@@ -899,12 +899,12 @@ export function SettingsTab({
                             <MoreHorizontal style={{ width: 16, height: 16, color: "#A09A8C" }} />
                           </button>
                           {menuOpen && (
-                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid #E8E2D2", padding: "6px 0", minWidth: 160 }}>
-                              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "#8A8497", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
+                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
+                              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
-                                <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "#3E1540" : "#13101A", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
+                                <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                                   {r.charAt(0).toUpperCase() + r.slice(1)}
-                                  {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
+                                  {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                                 </button>
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid #EFE9DA" }} />
@@ -926,10 +926,10 @@ export function SettingsTab({
                   <div style={{ borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <AlertTriangle style={{ width: 16, height: 16, color: "#9F3030", flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "#13101A" }}>{target?.name}</strong>?</p>
+                      <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "var(--ink)" }}>{target?.name}</strong>?</p>
                       <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
-                    <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
+                    <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
                     <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "#FBF8F2", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
                       {excomming ? "Banning…" : "Excommunicate"}
                     </button>
@@ -946,8 +946,8 @@ export function SettingsTab({
                       <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
                         <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-semibold" />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{b.name ?? "Unknown"}</div>
-                          <div style={{ fontSize: 12, color: "#8A8497", marginTop: 1 }}>{b.email ?? ""}</div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{b.name ?? "Unknown"}</div>
+                          <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{b.email ?? ""}</div>
                         </div>
                         <span style={{ fontSize: 11, color: "#9F3030", fontFamily: "ui-monospace, Menlo, monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>Banned</span>
                       </div>
@@ -963,7 +963,7 @@ export function SettingsTab({
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
                 <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} />
-                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
+                <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
               </div>
 
               {/* Active toggles */}
@@ -977,13 +977,13 @@ export function SettingsTab({
                   const on = isToggleOn(key, pendingAutomationSettings)
                   const changed = isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
                   return (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid #3E1540" : "none", outlineOffset: -2 }}>
-                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "#3E1540" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
+                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{label}</div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>{sub}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}</div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>{sub}</div>
                       </div>
                     </div>
                   )
@@ -1003,11 +1003,11 @@ export function SettingsTab({
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, left: 2 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A", display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
                           {label}
-                          <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "#8A8497" }}>Soon</span>
+                          <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Soon</span>
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>{sub}</div>
+                        <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>{sub}</div>
                       </div>
                     </div>
                   ))}
@@ -1020,12 +1020,12 @@ export function SettingsTab({
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <AlertTriangle style={{ width: 18, height: 18, color: "#DC2626", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 6 }}>This will archive chats</div>
-                      <div style={{ fontSize: 13, color: "#5A5466", lineHeight: 1.55, marginBottom: 14 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
+                      <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginBottom: 14 }}>
                         Turning these off will archive: <strong>{pendingArchiveLabels.join(", ")}</strong>. Members will lose access from their active list.
                       </div>
                       <div style={{ display: "flex", gap: 10 }}>
-                        <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
+                        <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
                         <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#DC2626", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                           {savingAutomations ? "Saving…" : "Archive & Save"}
                         </button>
@@ -1038,15 +1038,15 @@ export function SettingsTab({
               {/* Save / discard bar */}
               {hasAutomationChanges && !showArchiveWarning && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
-                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                  <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
+                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                     {savingAutomations ? "Saving…" : "Save changes"}
                   </button>
                 </div>
               )}
 
               {automationSaveMsg && (
-                <div style={{ padding: "10px 16px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontSize: 13, color: "#5A5466" }}>
+                <div style={{ padding: "10px 16px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontSize: 13, color: "var(--body)" }}>
                   {automationSaveMsg}
                 </div>
               )}
@@ -1055,11 +1055,11 @@ export function SettingsTab({
               {isAdmin && (
                 <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Run annual class maintenance</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Run annual class maintenance</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
                     {maintenanceResult && <div style={{ marginTop: 8, fontSize: 12, color: maintenanceResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{maintenanceResult}</div>}
                   </div>
-                  <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: maintenanceRunning ? "#E2DDCF" : "#FBF8F2", color: maintenanceRunning ? "#8A8497" : "#13101A", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
+                  <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: maintenanceRunning ? "var(--line-2)" : "#FBF8F2", color: maintenanceRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {maintenanceRunning ? "Running…" : "Run now"}
                   </button>
                 </div>
@@ -1069,11 +1069,11 @@ export function SettingsTab({
               {isAdmin && (
                 <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Departed member cleanup</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as "Former Member."</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Departed member cleanup</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as "Former Member."</div>
                     {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{cleanupResult}</div>}
                   </div>
-                  <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2DDCF", background: cleanupRunning ? "#E2DDCF" : "#FBF8F2", color: cleanupRunning ? "#8A8497" : "#13101A", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
+                  <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "#FBF8F2", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {cleanupRunning ? "Running…" : "Run now"}
                   </button>
                 </div>
@@ -1089,30 +1089,30 @@ export function SettingsTab({
               <section>
                 <div style={{ marginBottom: 20 }}>
                   <SectionHeader eyebrow="Join Codes" title="How people get in" titleSize={20} />
-                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Share these codes to let people join {ministryInfo?.name ?? ministryName}. Staff codes assign admin-tier roles automatically.</p>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Share these codes to let people join {ministryInfo?.name ?? ministryName}. Staff codes assign admin-tier roles automatically.</p>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: isAdmin && staffCode ? "1fr 1fr" : "1fr", gap: 18, maxWidth: isAdmin && staffCode ? undefined : 480 }}>
                   {/* Invite code */}
                   <div style={{ ...CARD, padding: 22 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Invite code</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
                     <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "#13101A", fontWeight: 600, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
-                      <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                        {copied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
+                      <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                        {copied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                         {copied ? "Copied" : "Copy"}
                       </button>
                     </div>
                     {isAdmin && (showRegenerateConfirm ? (
-                      <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid #E8E2D2", background: "#F7F4EF", padding: "12px 14px" }}>
-                        <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>The old code will stop working immediately.</p>
+                      <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--line)", background: "#F7F4EF", padding: "12px 14px" }}>
+                        <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "#2D0F2E", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
                         </div>
                       </div>
                     ) : (
-                      <button onClick={() => setShowRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "#8A8497", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <button onClick={() => setShowRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                         <RefreshCw style={{ width: 12, height: 12 }} /> Regenerate code
                       </button>
                     ))}
@@ -1121,25 +1121,25 @@ export function SettingsTab({
                   {/* Staff code — admin only */}
                   {isAdmin && staffCode && (
                     <div style={{ ...CARD, padding: 22 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>Staff code</div>
-                      <div style={{ marginTop: 6, fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Staff code</div>
+                      <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
                       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "#13101A", fontWeight: 600, textAlign: "center", display: "block" }}>{staffCode}</span>
-                        <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                          {staffCopied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{staffCode}</span>
+                        <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                          {staffCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                           {staffCopied ? "Copied" : "Copy"}
                         </button>
                       </div>
                       {showStaffRegenerateConfirm ? (
-                        <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid #E8E2D2", background: "#F7F4EF", padding: "12px 14px" }}>
-                          <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
+                        <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--line)", background: "#F7F4EF", padding: "12px 14px" }}>
+                          <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #E2DDCF", fontSize: 12, color: "#5A5466", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "#2D0F2E", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => setShowStaffRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "#8A8497", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <button onClick={() => setShowStaffRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <RefreshCw style={{ width: 12, height: 12 }} /> Regenerate staff code
                         </button>
                       )}
@@ -1152,20 +1152,20 @@ export function SettingsTab({
               <section>
                 <div style={{ marginBottom: 20 }}>
                   <SectionHeader eyebrow="Calendar Integration" title="Sync events to your calendar" titleSize={20} />
-                  <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
                 </div>
                 <div style={{ ...CARD, padding: 22 }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "#F1ECDE", border: "1px solid #E2DDCF", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, color: "#5A5466", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{calFeedUrl}</div>
-                    <button onClick={copyCalUrl} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                      {calCopied ? <Check style={{ width: 13, height: 13, color: "#3E1540" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                    <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, color: "var(--body)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{calFeedUrl}</div>
+                    <button onClick={copyCalUrl} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      {calCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                       {calCopied ? "Copied" : "Copy"}
                     </button>
-                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "#2D0F2E", border: "none", color: "#FBF8F2", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
+                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "var(--plum-2)", border: "none", color: "#FBF8F2", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
                       <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
                     </button>
                   </div>
-                  <p style={{ marginTop: 14, fontSize: 12, color: "#8A8497", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
+                  <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
                 </div>
               </section>
 
@@ -1173,19 +1173,19 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
-                    <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
+                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
-                  <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
-                    {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "#8A8497" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                    {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
                     {receiptLimits.map((l, i) => {
                       const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
                       const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
                       return (
                         <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < receiptLimits.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                           <div>
-                            <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{catLabel}</div>
-                            <div style={{ marginTop: 2, fontSize: 13, color: "#8A8497" }}>{fundLabel} fund</div>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{catLabel}</div>
+                            <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)" }}>{fundLabel} fund</div>
                           </div>
                           {editingLimitId === l.id ? (
                             <>
@@ -1197,23 +1197,23 @@ export function SettingsTab({
                                 value={editingLimitAmount}
                                 onChange={e => setEditingLimitAmount(e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") handleSaveLimitEdit(l.id, l.category, l.fund); if (e.key === "Escape") { setEditingLimitId(null); setEditingLimitAmount("") } }}
-                                style={{ padding: "6px 10px", border: "1.5px solid #3E1540", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none", width: "100%" }}
+                                style={{ padding: "6px 10px", border: "1.5px solid var(--plum)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none", width: "100%" }}
                               />
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
                                 disabled={savingLimitEdit || !editingLimitAmount}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "#F6F4EF", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
                               >{savingLimitEdit ? "…" : "Save"}</button>
                               <button
                                 onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}
                               >Cancel</button>
                             </>
                           ) : (
                             <>
-                              <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
-                              <button onClick={() => { setEditingLimitId(l.id); setEditingLimitAmount(String(Math.round(l.max_amount))) }} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>Edit</button>
-                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
+                              <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
+                              <button onClick={() => { setEditingLimitId(l.id); setEditingLimitAmount(String(Math.round(l.max_amount))) }} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>Edit</button>
+                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
                             </>
                           )}
                         </div>
@@ -1222,18 +1222,18 @@ export function SettingsTab({
                     {addingLimit && (
                       <div style={{ padding: "16px 22px", borderTop: receiptLimits.length > 0 ? "1px solid #EFE9DA" : undefined }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 10 }}>
-                          <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                          <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
                             {[["dg_dinner","DG Dinner"],["welcoming_week","Welcoming Week"],["coffeehouse","Coffeehouse"],["turkeybowl","Turkey Bowl"],["supplies","Supplies"],["other","Other"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
-                          <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                          <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
                             {[["church","Church"],["cmu","CMU"],["pitt","Pitt"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
-                          <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
+                          <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
                         </div>
                         {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", marginBottom: 8 }}>{limitError}</p>}
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid #E2DDCF", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#5A5466" }}>Cancel</button>
-                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "#3E1540", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
+                          <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
+                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>
                     )}
@@ -1247,16 +1247,16 @@ export function SettingsTab({
             <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
                 <SectionHeader eyebrow="Audit Log" title="Admin activity" titleSize={20} />
-                <p style={{ marginTop: 8, fontSize: 14, color: "#5A5466", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
+                <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
               </div>
               {auditLoading ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
               ) : auditLogs.length === 0 ? (
                 <div style={{ border: "1px dashed #C4C0B0", borderRadius: 14, background: "transparent", padding: "28px 22px", textAlign: "center" }}>
-                  <p style={{ fontSize: 13, color: "#8A8497" }}>No admin actions have been recorded yet.</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No admin actions have been recorded yet.</p>
                 </div>
               ) : (
-                <div style={{ border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
                   {auditLogs.map((log, i) => {
                     const actionLabel: Record<string, string> = {
                       "announcement.create": "Created announcement",
@@ -1281,8 +1281,8 @@ export function SettingsTab({
                     return (
                       <div key={log.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < auditLogs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
-                          <div style={{ marginTop: 2, fontSize: 12, color: "#8A8497" }}>by {log.actor_name}</div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
+                          <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
                         </div>
                         <div style={{ fontSize: 12, color: "#A09A8C", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
                       </div>

@@ -9,7 +9,7 @@ const SERIF = "var(--font-instrument-serif)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
 
 // ─── Rail stepper ────────────────────────────────────────────────
@@ -29,9 +29,9 @@ function RailStep({ i, label, sub, status }: {
         <span style={{
           width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center",
           fontSize: 12, flexShrink: 0, transition: "all .14s ease",
-          border: status === "pending" ? "1px solid #E2DDCF" : "none",
-          background: status === "active" ? "#2D0F2E" : status === "done" ? "#F1ECDE" : "#FDFCF8",
-          color:      status === "active" ? "#FDFCF8"  : status === "done" ? "#3E1540" : "#8A8497",
+          border: status === "pending" ? "1px solid var(--line-2)" : "none",
+          background: status === "active" ? "var(--plum-2)" : status === "done" ? "var(--ivory)" : "#FDFCF8",
+          color:      status === "active" ? "#FDFCF8"  : status === "done" ? "var(--plum)" : "var(--muted-text)",
         }}>
           {status === "done"
             ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5L20 7"/></svg>
@@ -40,14 +40,14 @@ function RailStep({ i, label, sub, status }: {
         <span style={{ paddingTop: 4 }}>
           <span style={{
             display: "block", fontSize: 14, transition: "color .14s ease",
-            color: status === "active" ? "#13101A" : "#8A8497",
+            color: status === "active" ? "var(--ink)" : "var(--muted-text)",
             fontWeight: status === "active" ? 500 : 400,
           }}>{label}</span>
           <span style={{ display: "block", fontSize: 12, color: "#A09A8C", marginTop: 1 }}>{sub}</span>
         </span>
       </div>
       {i < STEPS.length - 1 && (
-        <div style={{ width: 1, height: 14, background: "#E2DDCF", marginLeft: 16 }} />
+        <div style={{ width: 1, height: 14, background: "var(--line-2)", marginLeft: 16 }} />
       )}
     </>
   )
@@ -69,7 +69,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     <button type="button" onClick={onClick} style={{
       width: 36, height: 22, borderRadius: 999, border: "none", padding: 0,
       cursor: "pointer", position: "relative", flexShrink: 0,
-      background: on ? "#3E1540" : "#D6D0C0", transition: "background .14s ease",
+      background: on ? "var(--plum)" : "#D6D0C0", transition: "background .14s ease",
       marginTop: 1,
     }}>
       <span style={{
@@ -87,12 +87,12 @@ function ToggleRow({ title, desc, on, onClick }: {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 14, padding: 18,
-      border: "1px solid #E8E2D2", borderRadius: 12, background: "#FDFCF8", marginTop: 12,
+      border: "1px solid var(--line)", borderRadius: 12, background: "#FDFCF8", marginTop: 12,
     }}>
       <Toggle on={on} onClick={onClick}/>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{title}</div>
-        <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{title}</div>
+        <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
       </div>
     </div>
   )
@@ -108,12 +108,12 @@ function BetaTeamRow({ iconKey, name, desc }: { iconKey: string; name: string; d
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
-      border: "1px solid #E8E2D2", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
+      border: "1px solid var(--line)", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
     }}>
       <PlanLineIcon iconKey={iconKey} size={38} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, color: "#13101A" }}>{name}</div>
-        <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>{desc}</div>
+        <div style={{ fontSize: 15, color: "var(--ink)" }}>{name}</div>
+        <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
       </div>
     </div>
   )
@@ -134,10 +134,10 @@ function Field({ label, value, onChange, placeholder, readOnly, mono: monoFont, 
         placeholder={placeholder}
         style={{
           width: "100%", padding: "13px 15px",
-          border: `1px solid ${error ? "#E53E3E" : "#E2DDCF"}`,
+          border: `1px solid ${error ? "#E53E3E" : "var(--line-2)"}`,
           borderRadius: 10, background: "#FDFCF8",
           fontFamily: monoFont ? "ui-monospace, SFMono-Regular, Menlo, monospace" : SANS,
-          fontSize: 15, color: "#13101A", outline: "none",
+          fontSize: 15, color: "var(--ink)", outline: "none",
           letterSpacing: monoFont ? "2px" : undefined,
           boxSizing: "border-box",
         }}
@@ -155,7 +155,7 @@ function ReviewRow({ label, value, last }: { label: string; value: string; last?
       borderBottom: last ? "none" : "1px solid #EFE9DA",
     }}>
       <span style={{ ...mono }}>{label}</span>
-      <span style={{ fontSize: 15, color: "#13101A", textAlign: "right" }}>{value}</span>
+      <span style={{ fontSize: 15, color: "var(--ink)", textAlign: "right" }}>{value}</span>
     </div>
   )
 }
@@ -167,9 +167,9 @@ function StepHeader({ eyebrow, title, sub }: { eyebrow: string; title: string; s
       <div style={mono}>{eyebrow}</div>
       <h1 style={{
         fontFamily: SERIF, fontWeight: 600, fontSize: 38, letterSpacing: "-0.02em",
-        color: "#13101A", margin: "12px 0 8px", lineHeight: 1.1,
+        color: "var(--ink)", margin: "12px 0 8px", lineHeight: 1.1,
       }}>{title}</h1>
-      <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.6, margin: 0 }}>{sub}</p>
+      <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>{sub}</p>
     </div>
   )
 }
@@ -183,7 +183,7 @@ function NavRow({ onBack, onNext, nextLabel, disabled }: {
       {onBack ? (
         <button type="button" onClick={onBack} style={{
           background: "none", border: "none", fontFamily: SANS, fontSize: 14,
-          color: "#8A8497", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
+          color: "var(--muted-text)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
           padding: 0,
         }}>
           <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
@@ -191,7 +191,7 @@ function NavRow({ onBack, onNext, nextLabel, disabled }: {
       ) : <span/>}
       <button type="button" onClick={onNext} disabled={disabled} style={{
         padding: "14px 32px", border: "none", borderRadius: 10,
-        background: disabled ? "#E2DDCF" : "#2D0F2E",
+        background: disabled ? "var(--line-2)" : "var(--plum-2)",
         color: disabled ? "#A09A8C" : "#FDFCF8",
         fontFamily: SANS, fontSize: 15, fontWeight: 500,
         cursor: disabled ? "not-allowed" : "pointer",
@@ -275,12 +275,12 @@ export default function OnboardingPage() {
     : "Private"
 
   return (
-    <div style={{ display: "flex", height: "100svh", overflow: "hidden", fontFamily: SANS, color: "#13101A" }}>
+    <div style={{ display: "flex", height: "100svh", overflow: "hidden", fontFamily: SANS, color: "var(--ink)" }}>
 
       {/* ── Left cream rail ── */}
       <div style={{
         width: 320, flexShrink: 0,
-        background: "#F4F1E8", borderRight: "1px solid #E8E2D2",
+        background: "#F4F1E8", borderRight: "1px solid var(--line)",
         display: "flex", flexDirection: "column",
       }}>
         {/* Brand */}
@@ -288,11 +288,11 @@ export default function OnboardingPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
             <span style={{
               width: 34, height: 34, borderRadius: 9, display: "grid", placeItems: "center",
-              background: "#2D0F2E", flexShrink: 0,
+              background: "var(--plum-2)", flexShrink: 0,
             }}>
-              <RingCrossLogo size={20} color="#F1ECDE"/>
+              <RingCrossLogo size={20} color="var(--ivory)"/>
             </span>
-            <span style={{ fontFamily: SERIF, fontSize: 21, letterSpacing: "-0.01em", color: "#13101A" }}>Central</span>
+            <span style={{ fontFamily: SERIF, fontSize: 21, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
           </div>
         </div>
 
@@ -312,11 +312,11 @@ export default function OnboardingPage() {
         {/* Verse callout (pushed to bottom) */}
         <div style={{
           margin: "auto 18px 18px",
-          background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 14, padding: 18,
+          background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 14, padding: 18,
         }}>
-          <div style={{ ...mono, color: "#8A8497", marginBottom: 10 }}>Verse · Psalm 127:1</div>
+          <div style={{ ...mono, color: "var(--muted-text)", marginBottom: 10 }}>Verse · Psalm 127:1</div>
           <div style={{
-            fontFamily: SERIF, fontStyle: "italic", fontSize: 16, lineHeight: 1.45, color: "#2D0F2E",
+            fontFamily: SERIF, fontStyle: "italic", fontSize: 16, lineHeight: 1.45, color: "var(--plum-2)",
           }}>
             Unless the Lord builds the house, those who build it labor in vain.
           </div>
@@ -356,15 +356,15 @@ export default function OnboardingPage() {
                       placeholder="e.g. University of Pittsburgh"
                       style={{
                         flex: 1, padding: "13px 15px",
-                        border: `1px solid ${step1Touched && universities.length === 0 ? "#E53E3E" : "#E2DDCF"}`,
+                        border: `1px solid ${step1Touched && universities.length === 0 ? "#E53E3E" : "var(--line-2)"}`,
                         borderRadius: 10, background: "#FDFCF8",
-                        fontFamily: SANS, fontSize: 15, color: "#13101A", outline: "none",
+                        fontFamily: SANS, fontSize: 15, color: "var(--ink)", outline: "none",
                         boxSizing: "border-box",
                       }}
                     />
                     <button type="button" onClick={addUniversity} style={{
-                      padding: "0 20px", border: "1px solid #E2DDCF", borderRadius: 10,
-                      background: "#F1ECDE", color: "#2D0F2E",
+                      padding: "0 20px", border: "1px solid var(--line-2)", borderRadius: 10,
+                      background: "var(--ivory)", color: "var(--plum-2)",
                       fontFamily: SANS, fontSize: 14, fontWeight: 500, cursor: "pointer",
                       whiteSpace: "nowrap",
                     }}>Add</button>
@@ -375,8 +375,8 @@ export default function OnboardingPage() {
                         <span key={u} style={{
                           display: "inline-flex", alignItems: "center", gap: 8,
                           padding: "7px 8px 7px 14px", borderRadius: 999,
-                          background: "#F6F2E8", border: "1px solid #E8E2D2",
-                          fontSize: 13, color: "#13101A",
+                          background: "#F6F2E8", border: "1px solid var(--line)",
+                          fontSize: 13, color: "var(--ink)",
                         }}>
                           {u}
                           <span
@@ -384,7 +384,7 @@ export default function OnboardingPage() {
                             style={{
                               width: 18, height: 18, borderRadius: "50%",
                               display: "grid", placeItems: "center",
-                              cursor: "pointer", color: "#8A8497",
+                              cursor: "pointer", color: "var(--muted-text)",
                             }}
                           >×</span>
                         </span>
@@ -410,15 +410,15 @@ export default function OnboardingPage() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                     {SIZE_OPTIONS.map(opt => (
                       <button key={opt.value} type="button" onClick={() => setSize(opt.value)} style={{
-                        border: `1px solid ${size === opt.value ? "#2D0F2E" : "#E2DDCF"}`,
-                        borderRadius: 10, background: size === opt.value ? "#2D0F2E" : "#FDFCF8",
+                        border: `1px solid ${size === opt.value ? "var(--plum-2)" : "var(--line-2)"}`,
+                        borderRadius: 10, background: size === opt.value ? "var(--plum-2)" : "#FDFCF8",
                         padding: 18, cursor: "pointer", textAlign: "left",
                         transition: "all .12s ease",
                       }}>
                         <div style={{
-                          fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "#FDFCF8" : "#13101A",
+                          fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "#FDFCF8" : "var(--ink)",
                         }}>{opt.label}</div>
-                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "#5A5466" }}>{opt.sub}</div>
+                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "var(--body)" }}>{opt.sub}</div>
                       </button>
                     ))}
                   </div>
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
                   readOnly
                   mono
                 />
-                <div style={{ fontSize: 12.5, color: "#8A8497", marginTop: 8 }}>
+                <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 8 }}>
                   Auto-generated — edit it to something memorable for your campus.
                 </div>
               </div>
@@ -492,8 +492,8 @@ export default function OnboardingPage() {
               {/* Beta notice */}
               <div style={{
                 display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4, marginBottom: 24,
-                background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10,
-                padding: "13px 15px", fontSize: 13, color: "#5A5466", lineHeight: 1.5,
+                background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10,
+                padding: "13px 15px", fontSize: 13, color: "var(--body)", lineHeight: 1.5,
               }}>
                 <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#A09A8C" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0, marginTop: 1 }}>
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -514,7 +514,7 @@ export default function OnboardingPage() {
                     onClick={() => setIncludeTeams(opt.value)}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 14, padding: 16,
-                      border: `1.5px solid ${includeTeams === opt.value ? "#3E1540" : "#E2DDCF"}`,
+                      border: `1.5px solid ${includeTeams === opt.value ? "var(--plum)" : "var(--line-2)"}`,
                       borderRadius: 12,
                       background: includeTeams === opt.value ? "#F4EFF8" : "#FDFCF8",
                       cursor: "pointer", textAlign: "left", fontFamily: SANS,
@@ -523,8 +523,8 @@ export default function OnboardingPage() {
                   >
                     <span style={{
                       width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
-                      border: `2px solid ${includeTeams === opt.value ? "#3E1540" : "#C4C0B0"}`,
-                      background: includeTeams === opt.value ? "#3E1540" : "transparent",
+                      border: `2px solid ${includeTeams === opt.value ? "var(--plum)" : "#C4C0B0"}`,
+                      background: includeTeams === opt.value ? "var(--plum)" : "transparent",
                       display: "grid", placeItems: "center",
                     }}>
                       {includeTeams === opt.value && (
@@ -532,8 +532,8 @@ export default function OnboardingPage() {
                       )}
                     </span>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{opt.label}</div>
-                      <div style={{ fontSize: 13, color: "#8A8497", marginTop: 3 }}>{opt.sub}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{opt.label}</div>
+                      <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>{opt.sub}</div>
                     </div>
                   </button>
                 ))}
@@ -561,7 +561,7 @@ export default function OnboardingPage() {
 
               {/* Review card */}
               <div style={{
-                border: "1px solid #E8E2D2", borderRadius: 12, background: "#FDFCF8",
+                border: "1px solid var(--line)", borderRadius: 12, background: "#FDFCF8",
                 padding: "6px 20px", marginTop: 14,
               }}>
                 <ReviewRow label="Ministry"  value={name || "—"}/>
@@ -575,8 +575,8 @@ export default function OnboardingPage() {
               {/* Approval notice */}
               <div style={{
                 display: "flex", alignItems: "center", gap: 10,
-                marginTop: 22, fontSize: 13.5, color: "#5A5466",
-                background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10, padding: "14px 16px",
+                marginTop: 22, fontSize: 13.5, color: "var(--body)",
+                background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10, padding: "14px 16px",
               }}>
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#7FA67F" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>

@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
 
       {/* ── Left brand panel (desktop only) ── */}
       <div className="hidden md:flex" style={{
-        width: "42%", flexShrink: 0, background: "#3E1540",
+        width: "42%", flexShrink: 0, background: "var(--plum)",
         flexDirection: "column", justifyContent: "space-between",
         padding: "52px 56px", position: "relative", overflow: "hidden",
       }}>
@@ -67,26 +67,26 @@ export default function ForgotPasswordPage() {
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <RingCrossLogo size={28} color="#3E1540" />
-            <span style={{ fontFamily: SERIF, fontSize: 32, color: "#13101A", letterSpacing: "-0.01em" }}>Central</span>
+            <RingCrossLogo size={28} color="var(--plum)" />
+            <span style={{ fontFamily: SERIF, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.01em" }}>Central</span>
           </div>
-          <p style={{ fontSize: 13, color: "#8A8497" }}>College ministry community</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)" }}>College ministry community</p>
         </div>
 
         <div style={{ width: "100%", maxWidth: 400 }}>
 
           <div className="hidden md:block" style={{ marginBottom: 32 }}>
-            <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 6px" }}>
+            <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 6px" }}>
               Reset your password
             </h1>
-            <p style={{ fontSize: 14, color: "#8A8497" }}>We&apos;ll send a reset link to your email.</p>
+            <p style={{ fontSize: 14, color: "var(--muted-text)" }}>We&apos;ll send a reset link to your email.</p>
           </div>
 
-          <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #E8E2D2", padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(19,16,26,0.07)" }}>
+          <div style={{ background: "#fff", borderRadius: 20, border: "1px solid var(--line)", padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(19,16,26,0.07)" }}>
 
             <div className="md:hidden" style={{ marginBottom: 20 }}>
-              <h2 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: "#13101A", margin: "0 0 3px" }}>Reset your password</h2>
-              <p style={{ fontSize: 13, color: "#8A8497" }}>We&apos;ll send a reset link to your email.</p>
+              <h2 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: "var(--ink)", margin: "0 0 3px" }}>Reset your password</h2>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>We&apos;ll send a reset link to your email.</p>
             </div>
 
             {sent ? (
@@ -94,9 +94,9 @@ export default function ForgotPasswordPage() {
                 <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <CheckCircle2 size={22} color="#16a34a" />
                 </div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>Check your inbox</p>
-                <p style={{ fontSize: 13, color: "#8A8497", lineHeight: 1.5, margin: 0 }}>
-                  We sent a password reset link to <strong style={{ color: "#13101A" }}>{email}</strong>. Check your spam folder if it doesn&apos;t arrive within a minute.
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: 0 }}>Check your inbox</p>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: 0 }}>
+                  We sent a password reset link to <strong style={{ color: "var(--ink)" }}>{email}</strong>. Check your spam folder if it doesn&apos;t arrive within a minute.
                 </p>
               </div>
             ) : (
@@ -109,7 +109,7 @@ export default function ForgotPasswordPage() {
                 )}
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Email</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", letterSpacing: "0.02em" }}>Email</label>
                   <input
                     type="email"
                     value={email}
@@ -117,14 +117,14 @@ export default function ForgotPasswordPage() {
                     placeholder="you@example.com"
                     required
                     autoComplete="email"
-                    className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
+                  className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
                   style={{ marginTop: 4 }}
                 >
                   {loading ? "Sending…" : "Send reset link"}
@@ -133,9 +133,9 @@ export default function ForgotPasswordPage() {
             )}
           </div>
 
-          <p style={{ textAlign: "center", fontSize: 13, color: "#8A8497", marginTop: 20 }}>
+          <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", marginTop: 20 }}>
             Remember your password?{" "}
-            <Link href="/login" style={{ fontWeight: 600, color: "#3E1540", textDecoration: "none" }} className="hover:underline underline-offset-2">
+            <Link href="/login" style={{ fontWeight: 600, color: "var(--plum)", textDecoration: "none" }} className="hover:underline underline-offset-2">
               Sign in
             </Link>
           </p>
