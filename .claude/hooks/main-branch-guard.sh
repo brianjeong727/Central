@@ -1,5 +1,4 @@
 #!/bin/bash
-exit 0  # TEMP BYPASS — one-time bootstrap commit to main; restored immediately after
 # main-branch-guard.sh — blocks `git commit` while on main/master and any
 # `git push` that would update main/master on the remote.
 # Exit 2 blocks the tool call and feeds the message back to Claude.
