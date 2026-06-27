@@ -12,9 +12,9 @@ const SANS  = "var(--font-inter)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
-const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "#13101A", margin: 0 }
+const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -75,7 +75,7 @@ function LoginContent() {
     <SplitShell topBar={<>
       <Link href="/" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
-        color: "#5A5466", textDecoration: "none", marginRight: "auto", fontSize: 14,
+        color: "var(--body)", textDecoration: "none", marginRight: "auto", fontSize: 14,
       }}>
         <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -84,7 +84,7 @@ function LoginContent() {
       </Link>
       <span>
         New to Central?{" "}
-        <Link href={signupHref} style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+        <Link href={signupHref} style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
           Create an account
         </Link>
       </span>
@@ -93,7 +93,7 @@ function LoginContent() {
       <h1 style={{ ...serif, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         Welcome back.
       </h1>
-      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 0" }}>
+      <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 0" }}>
         Sign in to continue to your ministry workspace.
       </p>
 
@@ -119,11 +119,11 @@ function LoginContent() {
       <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
         <label style={{ display: "block" }}>
           <div style={{ ...mono, marginBottom: 8 }}>Email</div>
-          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 10, padding: "0 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@university.edu" required autoComplete="email"
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A" }}
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "var(--ink)" }}
             />
           </div>
         </label>
@@ -131,15 +131,15 @@ function LoginContent() {
         <label style={{ display: "block" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
             <span style={mono}>Password</span>
-            <Link href="/forgot-password" style={{ fontSize: 13, color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+            <Link href="/forgot-password" style={{ fontSize: 13, color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
               Forgot password?
             </Link>
           </div>
-          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 10, padding: "0 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
               type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••••" required autoComplete="current-password"
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "#13101A" }}
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "var(--ink)" }}
             />
             <EyeButton show={showPw} onToggle={() => setShowPw(v => !v)} />
           </div>
@@ -149,7 +149,7 @@ function LoginContent() {
           type="submit" disabled={loading}
           style={{
             width: "100%", padding: "15px", border: "none", borderRadius: 10,
-            background: "#2D0F2E", color: "#FBF8F2",
+            background: "var(--plum-2)", color: "#FBF8F2",
             fontFamily: SANS, fontSize: 15, fontWeight: 500,
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.75 : 1,

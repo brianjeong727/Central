@@ -11,7 +11,7 @@ export default function NotAdminPage() {
 
       {/* ── Left brand panel (desktop only) ── */}
       <div className="hidden md:flex" style={{
-        width: "42%", flexShrink: 0, background: "#3E1540",
+        width: "42%", flexShrink: 0, background: "var(--plum)",
         flexDirection: "column", justifyContent: "space-between",
         padding: "52px 56px", position: "relative", overflow: "hidden",
       }}>
@@ -42,8 +42,8 @@ export default function NotAdminPage() {
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <RingCrossLogo size={28} color="#3E1540" />
-            <span style={{ fontFamily: SERIF, fontSize: 32, color: "#13101A", letterSpacing: "-0.01em" }}>Central</span>
+            <RingCrossLogo size={28} color="var(--plum)" />
+            <span style={{ fontFamily: SERIF, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.01em" }}>Central</span>
           </div>
         </div>
 
@@ -53,7 +53,7 @@ export default function NotAdminPage() {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
             <div style={{
               width: 72, height: 72, borderRadius: "50%",
-              background: "#3E1540",
+              background: "var(--plum)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F6F4EF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -64,10 +64,10 @@ export default function NotAdminPage() {
           </div>
 
           {/* Heading */}
-          <h1 style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 14px", textAlign: "center" }}>
+          <h1 style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 14px", textAlign: "center" }}>
             Church leaders only.
           </h1>
-          <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.65, textAlign: "center", margin: "0 0 32px" }}>
+          <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.65, textAlign: "center", margin: "0 0 32px" }}>
             Registering a church on Central requires a pastoral role — pastor, deacon, or elder. If you&apos;re a student or ministry member, join an existing ministry instead.
           </p>
 
@@ -78,11 +78,11 @@ export default function NotAdminPage() {
               style={{
                 display: "block", textAlign: "center",
                 padding: "14px 0", borderRadius: 12,
-                background: "#3E1540", color: "#F6F4EF",
+                background: "var(--plum)", color: "#F6F4EF",
                 fontSize: 15, fontWeight: 600, textDecoration: "none",
                 transition: "background 0.15s",
               }}
-              className="hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150"
+              className="hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150"
             >
               Browse ministries
             </Link>
@@ -91,8 +91,8 @@ export default function NotAdminPage() {
               style={{
                 display: "block", textAlign: "center",
                 padding: "13px 0", borderRadius: 12,
-                border: "1px solid #E2DDCF", background: "transparent",
-                color: "#5A5466", fontSize: 14, fontWeight: 500,
+                border: "1px solid var(--line-2)", background: "transparent",
+                color: "var(--body)", fontSize: 14, fontWeight: 500,
                 textDecoration: "none",
               }}
               className="hover:bg-[#F4F1E8] active:scale-[0.97] transition-[transform,background-color] duration-150"

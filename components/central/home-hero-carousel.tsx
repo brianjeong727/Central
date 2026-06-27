@@ -182,7 +182,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
                     borderRadius: "var(--r-chip)",
                     padding: "var(--space-2) var(--space-5)",
                     fontSize: 12,
-                    fontWeight: 600,
+                    fontWeight: 500,
                     cursor: "pointer",
                     fontFamily: "var(--sans)",
                   }}
@@ -289,7 +289,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
                 borderRadius: "var(--r-chip)",
                 padding: "var(--space-3) var(--space-6)",
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 500,
                 cursor: "pointer",
                 fontFamily: "var(--sans)",
               }}

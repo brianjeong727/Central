@@ -6,16 +6,26 @@ import { Plus } from "lucide-react"
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
 export const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+  fontFamily: "var(--mono)",
   fontSize: "10px",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
-  color: "#8A8497",
+  color: "var(--muted-text)",
+}
+
+// Canonical "eyebrow" micro-label: 11px / 1.4px tracking / uppercase mono.
+// Distinct from MONO_STYLE (10px / 0.06em) — do not flatten the two together.
+export const EYEBROW_STYLE: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: "11px",
+  letterSpacing: "1.4px",
+  textTransform: "uppercase",
+  color: "var(--muted-text)",
 }
 
 // ── Shared brand mark ─────────────────────────────────────────────────────────
 
-export function RingCrossLogo({ size = 32, color = "#3E1540" }: { size?: number; color?: string }) {
+export function RingCrossLogo({ size = 32, color = "var(--plum)" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden>
       <path d="M70 28 A32 32 0 1 0 70 72" stroke={color} strokeWidth="8" strokeLinecap="round" />
@@ -28,14 +38,14 @@ export function RingCrossLogo({ size = 32, color = "#3E1540" }: { size?: number;
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#8A8497]">{children}</span>
+    <span className="text-[11px] font-normal tracking-[0.15em] uppercase text-[var(--muted-text)]">{children}</span>
   )
 }
 
 export function Spinner() {
   return (
     <div className="flex items-center justify-center py-12">
-      <div className="w-6 h-6 rounded-full border-2 border-[#3E1540]/20 border-t-[#3E1540] animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-[#3E1540]/20 border-t-[var(--plum)] animate-spin" />
     </div>
   )
 }
@@ -106,7 +116,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-fade-up">
-      <div className="w-14 h-14 rounded-2xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center text-[#8A8497]">
+      <div className="w-14 h-14 rounded-2xl bg-[#FBF8F2] border border-[var(--line)] flex items-center justify-center text-[var(--muted-text)]">
         {icon}
       </div>
       <div>
@@ -143,7 +153,7 @@ const ICON_SVG: Record<string, React.ReactNode> = {
   "dollar":    <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
 }
 
-export function PlanLineIcon({ iconKey, bg = "#3E1540", fg = "#F6F4EF", size = 40, radius = 999 }: { iconKey: string; bg?: string; fg?: string; size?: number; radius?: number }) {
+export function PlanLineIcon({ iconKey, bg = "var(--plum)", fg = "#F6F4EF", size = 40, radius = 999 }: { iconKey: string; bg?: string; fg?: string; size?: number; radius?: number }) {
   const paths = ICON_SVG[iconKey] ?? ICON_SVG["clipboard"]
   return (
     <div style={{ width: size, height: size, borderRadius: radius, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -220,10 +230,10 @@ export function HeaderActionButton({
 export function PlanSectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 mb-3">
-      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
         {children}
       </span>
-      <div className="flex-1 h-px bg-[#ECE8DE]" />
+      <div className="flex-1 h-px bg-[var(--line)]" />
     </div>
   )
 }

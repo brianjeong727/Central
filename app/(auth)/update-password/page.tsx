@@ -8,7 +8,7 @@ import { EyeButton } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 
-const inputClass = "w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+const inputClass = "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("")
@@ -45,7 +45,7 @@ export default function UpdatePasswordPage() {
 
       {/* ── Left brand panel (desktop only) ── */}
       <div className="hidden md:flex" style={{
-        width: "42%", flexShrink: 0, background: "#3E1540",
+        width: "42%", flexShrink: 0, background: "var(--plum)",
         flexDirection: "column", justifyContent: "space-between",
         padding: "52px 56px", position: "relative", overflow: "hidden",
       }}>
@@ -76,26 +76,26 @@ export default function UpdatePasswordPage() {
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <RingCrossLogo size={28} color="#3E1540" />
-            <span style={{ fontFamily: SERIF, fontSize: 32, color: "#13101A", letterSpacing: "-0.01em" }}>Central</span>
+            <RingCrossLogo size={28} color="var(--plum)" />
+            <span style={{ fontFamily: SERIF, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.01em" }}>Central</span>
           </div>
-          <p style={{ fontSize: 13, color: "#8A8497" }}>College ministry community</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)" }}>College ministry community</p>
         </div>
 
         <div style={{ width: "100%", maxWidth: 400 }}>
 
           <div className="hidden md:block" style={{ marginBottom: 32 }}>
-            <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 6px" }}>
+            <h1 style={{ fontFamily: SERIF, fontSize: 36, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, margin: "0 0 6px" }}>
               Set a new password
             </h1>
-            <p style={{ fontSize: 14, color: "#8A8497" }}>Choose something you&apos;ll remember.</p>
+            <p style={{ fontSize: 14, color: "var(--muted-text)" }}>Choose something you&apos;ll remember.</p>
           </div>
 
-          <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #E8E2D2", padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(19,16,26,0.07)" }}>
+          <div style={{ background: "#fff", borderRadius: 20, border: "1px solid var(--line)", padding: "28px 28px 24px", boxShadow: "0 2px 12px rgba(19,16,26,0.07)" }}>
 
             <div className="md:hidden" style={{ marginBottom: 20 }}>
-              <h2 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: "#13101A", margin: "0 0 3px" }}>Set a new password</h2>
-              <p style={{ fontSize: 13, color: "#8A8497" }}>Choose something you&apos;ll remember.</p>
+              <h2 style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: "var(--ink)", margin: "0 0 3px" }}>Set a new password</h2>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Choose something you&apos;ll remember.</p>
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -107,7 +107,7 @@ export default function UpdatePasswordPage() {
               )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>New password</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", letterSpacing: "0.02em" }}>New password</label>
                 <div style={{ position: "relative" }}>
                   <input
                     type={showPw ? "text" : "password"}
@@ -122,11 +122,11 @@ export default function UpdatePasswordPage() {
                     <EyeButton show={showPw} onToggle={() => setShowPw((v) => !v)} />
                   </div>
                 </div>
-                <p style={{ fontSize: 11, color: "#8A8497", marginTop: 2 }}>At least 6 characters</p>
+                <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2 }}>At least 6 characters</p>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5A5466", letterSpacing: "0.02em" }}>Confirm password</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", letterSpacing: "0.02em" }}>Confirm password</label>
                 <div style={{ position: "relative" }}>
                   <input
                     type={showConfirm ? "text" : "password"}
@@ -146,7 +146,7 @@ export default function UpdatePasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
+                className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px]"
                 style={{ marginTop: 4 }}
               >
                 {loading ? "Updating…" : "Update password"}

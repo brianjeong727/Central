@@ -3,22 +3,7 @@
 import { CSSProperties } from "react"
 import { CalendarDays, MapPin } from "lucide-react"
 import { CentralButton } from "./button"
-
-const PLUM_EYEBROW: CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  color: "var(--plum)",
-  textTransform: "uppercase",
-}
-
-const MUTED_EYEBROW: CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  color: "var(--muted-text)",
-  textTransform: "uppercase",
-}
+import { EYEBROW_STYLE } from "@/app/home/components/shared"
 
 // Live event-detail data, pulled from a referenced calendar_events row.
 // When provided, the reference slide shows a real two-column detail panel; when
@@ -166,7 +151,7 @@ export function UpNextCard({
           }}
         />
       )}
-      <div style={labelAccent ? PLUM_EYEBROW : MUTED_EYEBROW}>{label}</div>
+      <div style={labelAccent ? { ...EYEBROW_STYLE, color: "var(--plum)" } : EYEBROW_STYLE}>{label}</div>
     </div>
   )
 

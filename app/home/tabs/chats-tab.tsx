@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
-import { Spinner, EmptyState, AnimateIn } from "../components/shared"
+import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
@@ -99,23 +99,23 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
       <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 border-b border-[#ECE8DE]">
+        <div className="flex-shrink-0 border-b border-[var(--line)]">
           <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-white border border-[#ECE8DE] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+              className="size-9 bg-white border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
             >
-              <X className="w-4 h-4 text-[#13101A]" />
+              <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
-            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "#8A8497" }}>
+            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "var(--muted-text)" }}>
               {groupType === "church" ? "Church Chat" : "New Chat"}
             </span>
           </div>
           <div className="px-5 pb-5">
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>
+            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>
               {groupType === "church" ? "New Church Chat" : "New Chat"}
             </h1>
-            <p style={{ fontSize: "13px", color: "#8A8497", marginTop: "6px" }}>
+            <p style={{ fontSize: "13px", color: "var(--muted-text)", marginTop: "6px" }}>
               {isDM ? `Starting a conversation with ${selectedMembers[0]?.name.split(" ")[0]}.` : "Select people to start a conversation."}
             </p>
           </div>
@@ -124,7 +124,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
           {error && (
-            <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">
+            <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">
               {error}
             </div>
           )}
@@ -132,14 +132,14 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Chat name — adapts to selection state */}
           {noMembers && (
             // No members selected: show traditional name input (needed for church chats)
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-2">Chat Name</label>
+            <div className="bg-white rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+              <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
               <input
                 type="text"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-                className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                className="w-full text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
                 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
               />
             </div>
@@ -147,13 +147,13 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
           {isGroup && (
             // 2+ members: show auto-name with optional edit link
-            <div className="bg-white rounded-2xl border border-[#ECE8DE] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-white rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Chat Name</label>
+                <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
                 <button
                   type="button"
                   onClick={() => { setShowNameEdit((v) => !v); if (!showNameEdit) setCustomName("") }}
-                  className="text-[11px] font-semibold text-[#8A8497] hover:text-[#3E1540] transition-colors"
+                  className="text-[11px] font-semibold text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
                 >
                   {showNameEdit ? "Use default" : "Edit name"}
                 </button>
@@ -165,11 +165,11 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder={defaultName}
                   autoFocus
-                  className="w-full text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                  className="w-full text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
                   style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
                 />
               ) : (
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4", color: "#13101A", margin: 0 }}>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4", color: "var(--ink)", margin: 0 }}>
                   {effectiveName}
                 </p>
               )}
@@ -179,9 +179,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Member search */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <label style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", color: "#8A8497" }}>Add Members</label>
+              <label style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Add Members</label>
               {selectedMembers.length > 0 && (
-                <span className="text-[12px] text-[#3E1540] font-semibold">{selectedMembers.length} selected</span>
+                <span className="text-[12px] text-[var(--plum)] font-semibold">{selectedMembers.length} selected</span>
               )}
             </div>
             <div className="relative">
@@ -191,7 +191,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#ECE8DE] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
               />
             </div>
 
@@ -203,7 +203,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                     key={m.id}
                     type="button"
                     onClick={() => toggleMember(m.id)}
-                    className="flex items-center gap-1.5 bg-[#3E1540] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[#2D0F2E] transition-colors"
+                    className="flex items-center gap-1.5 bg-[var(--plum)] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[var(--plum-2)] transition-colors"
                   >
                     {m.name.split(" ")[0]}
                     <X className="w-3 h-3 opacity-70" />
@@ -212,7 +212,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               </div>
             )}
 
-            <div className="flex flex-col rounded-2xl border border-[#ECE8DE] bg-white overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-white overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
               {filtered.length === 0 ? (
                 <p className="text-center text-[13px] text-[#8A8497]/50 py-8">No members found</p>
               ) : (
@@ -234,13 +234,13 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                         style={{ fontFamily: "var(--font-instrument-serif)" }}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[#13101A]">{member.name}</p>
+                        <p className="text-[13px] font-semibold text-[var(--ink)]">{member.name}</p>
                         {member.graduation_year && (
-                          <p className="text-[11px] text-[#8A8497]">Class of {member.graduation_year}</p>
+                          <p className="text-[11px] text-[var(--muted-text)]">Class of {member.graduation_year}</p>
                         )}
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        isSelected ? "bg-[#3E1540] border-[#3E1540]" : "border-[#D4CFCF]"
+                        isSelected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#D4CFCF]"
                       }`}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -253,11 +253,11 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         </div>
 
         {/* Create button */}
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4">
+        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[var(--line)] px-5 py-4">
           <button
             onClick={handleCreate}
             disabled={creating || !effectiveName.trim()}
-            className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
+            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
           >
             {creating ? "Creating…" : isDM ? `Message ${selectedMembers[0]?.name.split(" ")[0]}` : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
           </button>
@@ -473,16 +473,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-[#FDFCF8] border-b border-[#E8E2D2]">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-[#FDFCF8] border-b border-[var(--line)]">
           <button
             onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-[#13101A]" />
+            <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
           </button>
-          <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Add Members</h2>
+          <h2 className="flex-1 text-[15px] font-bold text-[var(--ink)] tracking-tight">Add Members</h2>
           {selectedToAdd.length > 0 && (
-            <span className="text-[12px] font-semibold text-[#3E1540]">{selectedToAdd.length} selected</span>
+            <span className="text-[12px] font-semibold text-[var(--plum)]">{selectedToAdd.length} selected</span>
           )}
         </div>
 
@@ -495,7 +495,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               value={searchAdd}
               onChange={(e) => setSearchAdd(e.target.value)}
               autoFocus
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#E8E2D2] focus:border-[#3E1540]/30 transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all"
             />
           </div>
         </div>
@@ -518,15 +518,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
                       selected
                         ? "bg-[#3E1540]/6 border-[#3E1540]/20"
-                        : "bg-[#FDFCF8] border-[#E8E2D2]"
+                        : "bg-[#FDFCF8] border-[var(--line)]"
                     }`}
                   >
                     <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#13101A] truncate">{profile.name}</p>
+                      <p className="text-[13px] font-semibold text-[var(--ink)] truncate">{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {profile.role && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(profile.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>
+                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(profile.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[var(--plum)] border-transparent"}`}>
                             {profile.role}
                           </span>
                         )}
@@ -536,7 +536,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       </div>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      selected ? "bg-[#3E1540] border-[#3E1540]" : "border-muted-foreground/20"
+                      selected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-muted-foreground/20"
                     }`}>
                       {selected && <Check className="w-3 h-3 text-white" />}
                     </div>
@@ -547,11 +547,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
         </div>
 
-        <div className="flex-shrink-0 bg-[#FDFCF8] border-t border-[#E8E2D2] px-5 py-4">
+        <div className="flex-shrink-0 bg-[#FDFCF8] border-t border-[var(--line)] px-5 py-4">
           <button
             onClick={stageAddMembers}
             disabled={selectedToAdd.length === 0}
-            className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide"
+            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide"
           >
             {selectedToAdd.length > 0
               ? `Add ${selectedToAdd.length} Member${selectedToAdd.length !== 1 ? "s" : ""}`
@@ -570,13 +570,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
 
       {/* ── Mobile header (hidden on desktop) ── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-[#FDFCF8] border-b border-[#E8E2D2]">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-[#FDFCF8] border-b border-[var(--line)]">
         <button onClick={onBack} className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
-          <ArrowLeft className="w-4 h-4 text-[#13101A]" />
+          <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
         </button>
-        <h2 className="flex-1 text-[15px] font-bold text-[#13101A] tracking-tight">Chat Info</h2>
+        <h2 className="flex-1 text-[15px] font-bold text-[var(--ink)] tracking-tight">Chat Info</h2>
         {hasChanges && (
-          <button onClick={handleSaveChanges} disabled={saving} style={{ height: 32, padding: "0 12px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+          <button onClick={handleSaveChanges} disabled={saving} style={{ height: 32, padding: "0 12px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
             {saving ? "Saving…" : "Save"}
           </button>
         )}
@@ -595,13 +595,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         </div>
         {hasChanges ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
-            <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Discard</button>
+            <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
               {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         ) : (
-          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[#3E1540] transition-colors px-3 py-1.5 rounded-lg border border-[#E8E2D2] bg-[#FDFCF8]" style={{ color: "#8A8497" }}>
+          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[var(--plum)] transition-colors px-3 py-1.5 rounded-lg border border-[var(--line)] bg-[#FDFCF8]" style={{ color: "var(--muted-text)" }}>
             <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
           </button>
         )}
@@ -611,7 +611,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
         {/* ── Desktop: page title block (§11.3) ── */}
         <div className="hidden md:block px-10 pt-8 pb-6">
-          <p style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>
+          <p style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>
             {typeLabel.toUpperCase()}
           </p>
           {renaming ? (
@@ -621,7 +621,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
               onBlur={handleRename}
-              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0, width: "100%" }}
+              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }}
             />
           ) : (
             <div
@@ -629,11 +629,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               style={{ cursor: canManage ? "text" : "default" }}
               onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
             >
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", lineHeight: 1.05, fontWeight: 400 }}>{displayGroupName}</h2>
-              {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0, marginTop: 4 }} />}
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", lineHeight: 1.05, fontWeight: 400 }}>{displayGroupName}</h2>
+              {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 4 }} />}
             </div>
           )}
-          <p style={{ fontSize: 13, color: "#8A8497", marginTop: 6 }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
             {members.length} member{members.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -643,12 +643,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
           {/* Members */}
           <div>
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MEMBERS · {members.length + pendingAddMembers.length - pendingRemoveIds.size} PEOPLE</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Members</h3>
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MEMBERS · {members.length + pendingAddMembers.length - pendingRemoveIds.size} PEOPLE</p>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Members</h3>
             {loading ? <Spinner /> : (() => {
               const allRows = [...members, ...pendingAddMembers]
               return (
-              <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                 {allRows.map((member, i) => {
                   const isPendingRemove = pendingRemoveIds.has(member.user_id)
                   const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
@@ -668,15 +668,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p style={{ fontSize: 14, color: isPendingRemove ? "#9F3030" : "#13101A", fontWeight: 500, textDecoration: isPendingRemove ? "line-through" : "none" }}>{member.name}</p>
+                        <p style={{ fontSize: 14, color: isPendingRemove ? "#9F3030" : "var(--ink)", fontWeight: 500, textDecoration: isPendingRemove ? "line-through" : "none" }}>{member.name}</p>
                         {member.user_id === userId && (
-                          <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#FBF8F2", color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>
+                          <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#FBF8F2", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>
                         )}
                         {isPendingRemove && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
-                        {isPendingAdd && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
+                        {isPendingAdd && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
                       </div>
                       {member.graduation_year && (
-                        <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Class of {member.graduation_year}</p>
+                        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -684,7 +684,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         <span style={{
                           fontSize: 11, padding: "3px 10px", borderRadius: 999,
                           background: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : member.role.toLowerCase() === "visitor" ? "white" : "#FBF8F2",
-                          color: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "#3E1540" : "#8A8497",
+                          color: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "var(--plum)" : "var(--muted-text)",
                           border: member.role.toLowerCase() === "visitor" ? "1px solid #D8D3C8" : "none",
                           letterSpacing: "0.04em", textTransform: "uppercase" as const,
                         }}>
@@ -694,11 +694,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     </div>
                     {canManage && member.user_id !== userId && (
                       isPendingAdd ? (
-                        <button onClick={() => unstagePendingAdd(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
+                        <button onClick={() => unstagePendingAdd(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}>
                           <X style={{ width: 14, height: 14 }} />
                         </button>
                       ) : isPendingRemove ? (
-                        <button onClick={() => unstageRemoveMember(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497" }}>
+                        <button onClick={() => unstageRemoveMember(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}>
                           <X style={{ width: 14, height: 14 }} />
                         </button>
                       ) : isConfirming ? (
@@ -706,14 +706,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                           <button onClick={() => stageRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check style={{ width: 14, height: 14 }} />
                           </button>
-                          <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>
+                          <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}>
                             <X style={{ width: 14, height: 14 }} />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmRemoveMemberId(member.user_id)}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
                         >
                           <X style={{ width: 14, height: 14 }} />
                         </button>
@@ -723,7 +723,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   )
                 })}
                 {canManage && (
-                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", borderTop: "1px solid #EFE9DA", cursor: "pointer", textAlign: "left" }}>
+                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", color: "var(--plum)", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", borderTop: "1px solid #EFE9DA", cursor: "pointer", textAlign: "left" }}>
                     <Plus style={{ width: 14, height: 14 }} /> Add members from directory
                   </button>
                 )}
@@ -731,7 +731,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               )
             })()}
             {isChurch && canManage && (
-              <p style={{ fontSize: 11, color: "#8A8497", marginTop: 10, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>
                 Member changes sync to the small group home page if this chat is linked to a group.
               </p>
             )}
@@ -740,29 +740,29 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           {/* Preferences + Manage */}
           <div>
             {/* Preferences */}
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>PREFERENCES</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Preferences</h3>
-            <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>PREFERENCES</p>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Preferences</h3>
+            <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #EFE9DA" }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Mute notifications</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
+                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
                 </div>
                 <div
                   onClick={() => setMuted(!muted)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "#3E1540" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "var(--plum)" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
                 >
                   <div style={{ position: "absolute", top: 2, ...(muted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Pin to top of chats</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Keeps it above the fold.</p>
+                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
                 </div>
                 <div
                   onClick={() => setPinned(!pinned)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "#3E1540" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
+                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "var(--plum)" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
                 >
                   <div style={{ position: "absolute", top: 2, ...(pinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
                 </div>
@@ -771,16 +771,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
             {canManage && (
               <>
-                <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
-                <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
-                <div style={{ background: "#FDFCF8", border: "1px solid #E8E2D2", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
+                <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
+                <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
+                <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
                   <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FDFCF8", border: "1px solid #E8E2D2", display: "flex", alignItems: "center", justifyContent: "center", color: "#3E1540", flexShrink: 0 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FDFCF8", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--plum)", flexShrink: 0 }}>
                       <Plus style={{ width: 13, height: 13 }} />
                     </div>
                     <div style={{ flex: 1, textAlign: "left" }}>
-                      <p style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>Add members</p>
-                      <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>Invite from the directory</p>
+                      <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Add members</p>
+                      <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Invite from the directory</p>
                     </div>
                     <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
                   </button>
@@ -791,12 +791,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Danger */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {canArchive && (
-                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #E8E2D2", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "var(--body)", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer" }}>
                   Archive chat
                 </button>
               )}
               {canUnarchive && (
-                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "#5A5466", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #E8E2D2", cursor: "pointer" }}>
+                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "var(--body)", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer" }}>
                   Unarchive chat
                 </button>
               )}
@@ -812,13 +812,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               )}
               {confirmAction && (
                 <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>
+                  <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>
                     {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
                      confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
                      "Delete this chat and all its messages? This cannot be undone."}
                   </p>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
                     <button
                       onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
                       style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
@@ -836,11 +836,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <div className="md:hidden">
           {/* CHAT INFO */}
           <div className="px-5 pt-6 pb-2">
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>CHAT INFO</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
+            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>CHAT INFO</p>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
               Chat info
             </h3>
-            <div className="bg-[#FDFCF8] rounded-2xl border border-[#E8E2D2] p-5 mb-4 flex items-center gap-4">
+            <div className="bg-[#FDFCF8] rounded-2xl border border-[var(--line)] p-5 mb-4 flex items-center gap-4">
               <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-bold text-[16px] tracking-wide" />
               <div className="flex-1 min-w-0">
                 {renaming ? (
@@ -850,8 +850,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     onChange={e => setNewName(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
                     onBlur={handleRename}
-                    className="text-[16px] font-bold text-[#13101A] tracking-tight bg-transparent outline-none border-none w-full"
-                    style={{ borderBottom: "1px solid #E2DDCF", padding: 0 }}
+                    className="text-[16px] font-bold text-[var(--ink)] tracking-tight bg-transparent outline-none border-none w-full"
+                    style={{ borderBottom: "1px solid var(--line-2)", padding: 0 }}
                   />
                 ) : (
                   <div
@@ -859,8 +859,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ cursor: canManage ? "text" : "default" }}
                     onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
                   >
-                    <h3 className="text-[16px] font-bold text-[#13101A] tracking-tight">{displayGroupName}</h3>
-                    {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "#8A8497", flexShrink: 0 }} />}
+                    <h3 className="text-[16px] font-bold text-[var(--ink)] tracking-tight">{displayGroupName}</h3>
+                    {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
                   </div>
                 )}
                 <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length + pendingAddMembers.length - pendingRemoveIds.size} member{members.length + pendingAddMembers.length - pendingRemoveIds.size !== 1 ? "s" : ""}</p>
@@ -876,30 +876,30 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   return (
                   <div
                     key={member.user_id}
-                    className="rounded-xl border border-[#E8E2D2] p-3.5 flex items-center gap-3"
+                    className="rounded-xl border border-[var(--line)] p-3.5 flex items-center gap-3"
                     style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "#FDFCF8", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className={`text-[13px] font-semibold truncate ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{member.name}</p>
-                        {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[#3E1540] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
+                        <p className={`text-[13px] font-semibold truncate ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[var(--ink)]"}`}>{member.name}</p>
+                        {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[var(--plum)] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
                         {isPendingRemove && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
-                        {isPendingAdd && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
+                        {isPendingAdd && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[#3E1540] border-transparent"}`}>{member.role}</span>}
+                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[var(--plum)] border-transparent"}`}>{member.role}</span>}
                         {member.graduation_year && <span className="text-[11px] text-[#8A8497]/50">Class of {member.graduation_year}</span>}
                       </div>
                     </div>
                     {canManage && member.user_id !== userId && (
                       isPendingAdd ? (
-                        <button onClick={e => { e.stopPropagation(); unstagePendingAdd(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497" }}>
+                        <button onClick={e => { e.stopPropagation(); unstagePendingAdd(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)" }}>
                           <X style={{ width: 14, height: 14 }} />
                         </button>
                       ) : isPendingRemove ? (
-                        <button onClick={e => { e.stopPropagation(); unstageRemoveMember(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497" }}>
+                        <button onClick={e => { e.stopPropagation(); unstageRemoveMember(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)" }}>
                           <X style={{ width: 14, height: 14 }} />
                         </button>
                       ) : isConfirming ? (
@@ -907,14 +907,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                           <button onClick={e => { e.stopPropagation(); stageRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
                             <Check className="w-4 h-4" />
                           </button>
-                          <button onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}>
+                          <button onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}>
                             <X className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
                         >
                           <X style={{ width: 14, height: 14 }} />
                         </button>
@@ -928,19 +928,19 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           </div>
           {isChurch && canManage && (
             <div className="px-5 pb-2">
-              <p style={{ fontSize: 11, color: "#8A8497", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.5 }}>
                 Member changes sync to the small group home page if this chat is linked to a group.
               </p>
             </div>
           )}
           {canManage && (
             <div className="px-5 pb-4">
-              <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
-              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
-              <div className="bg-[#FDFCF8] rounded-2xl border border-[#E8E2D2] overflow-hidden">
+              <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
+              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
+              <div className="bg-[#FDFCF8] rounded-2xl border border-[var(--line)] overflow-hidden">
                 <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
-                  <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[#3E1540]" /></div>
-                  <span className="flex-1 text-[14px] font-semibold text-[#13101A] text-left">Add Members</span>
+                  <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[var(--plum)]" /></div>
+                  <span className="flex-1 text-[14px] font-semibold text-[var(--ink)] text-left">Add Members</span>
                   <ChevronRight className="w-4 h-4 text-[#8A8497]/30" />
                 </button>
               </div>
@@ -948,19 +948,19 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="px-5 pb-10 flex flex-col gap-3">
-              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Archive chat</button>}
-              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Unarchive chat</button>}
-              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#5A5466] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[#E8E2D2]">Leave chat</button>}
+              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Archive chat</button>}
+              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Unarchive chat</button>}
+              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Leave chat</button>}
               {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>}
               {confirmAction && (
                 <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <p style={{ fontSize: 13, color: "#5A5466", flex: 1, margin: 0 }}>
+                  <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>
                     {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
                      confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
                      "Delete this chat and all its messages? This cannot be undone."}
                   </p>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
                     <button
                       onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
                       style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
@@ -2048,7 +2048,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       if (idx === -1) { parts.push(text.slice(i)); break }
       if (idx > i) parts.push(text.slice(i, idx))
       parts.push(
-        <mark key={key++} style={{ background: isCurrent ? "#D4A45C" : "rgba(212,164,92,0.45)", color: "#13101A", borderRadius: 2, padding: "0 1px" }}>
+        <mark key={key++} style={{ background: isCurrent ? "#D4A45C" : "rgba(212,164,92,0.45)", color: "var(--ink)", borderRadius: 2, padding: "0 1px" }}>
           {text.slice(idx, idx + q.length)}
         </mark>
       )
@@ -2107,13 +2107,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-12 pb-3 md:py-3.5 border-b border-[#E8E2D2]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-12 pb-3 md:py-3.5 border-b border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
             <button
               onClick={closeSearch}
-              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0 }}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0 }}
             >
               <X size={14} />
             </button>
@@ -2128,19 +2128,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 else if (e.key === "ArrowUp") { e.preventDefault(); goToPrevMatch() }
               }}
               placeholder="Search messages…"
-              className="flex-1 bg-transparent outline-none text-[14px] text-[#13101A] placeholder:text-[#A09A8C] min-w-0"
+              className="flex-1 bg-transparent outline-none text-[14px] text-[var(--ink)] placeholder:text-[#A09A8C] min-w-0"
             />
             {searchQuery.trim() && (
-              <span style={{ fontSize: "12px", color: "#8A8497", whiteSpace: "nowrap", flexShrink: 0 }}>
+              <span style={{ fontSize: "12px", color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>
                 {searchMatches.length === 0 ? "No results" : `${searchMatchIndex + 1} / ${searchMatches.length}`}
               </span>
             )}
             {searchMatches.length > 0 && (
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={goToPrevMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <button onClick={goToPrevMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                   <ChevronUp size={12} />
                 </button>
-                <button onClick={goToNextMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                <button onClick={goToNextMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                   <ChevronDown size={12} />
                 </button>
               </div>
@@ -2153,7 +2153,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 onClick={onClose}
                 className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
               >
-                <ArrowLeft className="w-5 h-5 text-[#13101A]" />
+                <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
               </button>
             )}
             {/* Group avatar */}
@@ -2164,7 +2164,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none" style={{ fontFamily: "var(--serif)", fontSize: "16px", color: "#13101A", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                <h2 className="truncate leading-none" style={{ fontFamily: "var(--serif)", fontSize: "16px", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
@@ -2181,30 +2181,30 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     >{name.charAt(0).toUpperCase()}</span>
                   ))}
                 </div>
-                <p className="hidden md:block text-[12px] text-[#8A8497] truncate">
+                <p className="hidden md:block text-[12px] text-[var(--muted-text)] truncate">
                   {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
                 </p>
               </div>
-              <p className="md:hidden text-[12px] text-[#8A8497] mt-0.5">
+              <p className="md:hidden text-[12px] text-[var(--muted-text)] mt-0.5">
                 {memberCount} member{memberCount !== 1 ? "s" : ""}
               </p>
             </div>
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
-              <button onClick={openSearch} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+              <button onClick={openSearch} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                 <Search size={14} />
               </button>
-              <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "grid", placeItems: "center" }}>
+              <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                 <User size={14} />
               </button>
             </div>
             {/* Mobile: search + settings */}
             <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
               <button onClick={openSearch} className="p-1.5 hover:bg-[#F2EDE0] rounded-lg transition-colors">
-                <Search className="w-4 h-4 text-[#8A8497]" />
+                <Search className="w-4 h-4 text-[var(--muted-text)]" />
               </button>
               <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors">
-                <Settings className="w-5 h-5 text-[#8A8497]" />
+                <Settings className="w-5 h-5 text-[var(--muted-text)]" />
               </button>
             </div>
           </>
@@ -2215,20 +2215,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
         <div
-          className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#F8F4EA] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
+          className="flex-shrink-0 border-b border-[var(--line)] bg-[#F8F4EA] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
           onClick={() => scrollToMessage(pinnedMessage.id)}
         >
-          <Pin className="w-3.5 h-3.5 text-[#3E1540] flex-shrink-0" />
+          <Pin className="w-3.5 h-3.5 text-[var(--plum)] flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-semibold text-[#3E1540]">{pinnedMessage.sender_name}</p>
-            <p className="text-[12px] text-[#5A5466] truncate">
+            <p className="text-[11px] font-semibold text-[var(--plum)]">{pinnedMessage.sender_name}</p>
+            <p className="text-[12px] text-[var(--body)] truncate">
               {pinnedMessage.content || (pinnedMessage.attachment_type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")}
             </p>
           </div>
           {canPin && (
             <button
               onClick={(e) => { e.stopPropagation(); handleUnpin() }}
-              className="flex-shrink-0 p-1 text-[#C4C4C4] hover:text-[#5A5466] transition-colors"
+              className="flex-shrink-0 p-1 text-[#C4C4C4] hover:text-[var(--body)] transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -2316,14 +2316,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       </div>
                     )}
                     <div className="flex flex-col items-center mt-4 mb-1">
-                      <div className="w-full max-w-[290px] bg-white border border-[#E8E2D2] rounded-2xl overflow-hidden shadow-sm">
+                      <div className="w-full max-w-[290px] bg-white border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm">
                         {poll ? (
                           <>
                             {/* Card header */}
                             <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6] flex items-start gap-2">
                               <div className="flex-1 text-center">
-                                <p className="text-[15px] font-bold text-[#13101A] leading-snug">{poll.question}</p>
-                                <p className="text-[11px] text-[#8A8497] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
+                                <p className="text-[15px] font-bold text-[var(--ink)] leading-snug">{poll.question}</p>
+                                <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
                               </div>
                               {/* Delete button — visible to creator or admin/leader */}
                               {(msg.sender_id === userId || isAdminOrLeader) && (
@@ -2332,10 +2332,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                     onClick={e => { e.stopPropagation(); setPollMenuFor(pollMenuFor === msg.id ? null : msg.id) }}
                                     className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F0EDE6] transition-colors"
                                   >
-                                    <MoreHorizontal className="w-3.5 h-3.5 text-[#8A8497]" />
+                                    <MoreHorizontal className="w-3.5 h-3.5 text-[var(--muted-text)]" />
                                   </button>
                                   {pollMenuFor === msg.id && (
-                                    <div className="absolute right-0 top-8 z-[160] bg-white rounded-xl border border-[#E8E2D2] shadow-lg overflow-hidden min-w-[130px]">
+                                    <div className="absolute right-0 top-8 z-[160] bg-white rounded-xl border border-[var(--line)] shadow-lg overflow-hidden min-w-[130px]">
                                       <button
                                         onClick={() => handleDeletePoll(msg.id, msg.poll_id!)}
                                         className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
@@ -2359,29 +2359,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                     <div className="flex items-center justify-between mb-1">
                                       {hasVoted ? (
                                         <>
-                                          <span className={`text-[13px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                                          <span className={`text-[13px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
                                           <div className="flex items-center gap-1 flex-shrink-0">
-                                            {isSelected && <Check className="w-3 h-3 text-[#3E1540]" />}
-                                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count}</span>
+                                            {isSelected && <Check className="w-3 h-3 text-[var(--plum)]" />}
+                                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count}</span>
                                           </div>
                                         </>
                                       ) : (
                                         <div className="flex items-center gap-2">
                                           <div className="w-3.5 h-3.5 rounded-full border-2 border-[#D8D3C8] flex-shrink-0" />
-                                          <span className="text-[13px] text-[#13101A]">{opt}</span>
+                                          <span className="text-[13px] text-[var(--ink)]">{opt}</span>
                                         </div>
                                       )}
                                     </div>
                                     {hasVoted && (
                                       <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "#3E1540" : "#C4BDB8" }} />
+                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
                                       </div>
                                     )}
                                   </div>
                                 )
                               })}
                               {poll.options.length > 3 && (
-                                <p className="text-[12px] text-[#8A8497] mt-0.5">and {poll.options.length - 3} more option{poll.options.length - 3 !== 1 ? "s" : ""}…</p>
+                                <p className="text-[12px] text-[var(--muted-text)] mt-0.5">and {poll.options.length - 3} more option{poll.options.length - 3 !== 1 ? "s" : ""}…</p>
                               )}
                             </div>
                             <div className="px-4 pb-4 pt-1">
@@ -2392,7 +2392,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   if (hasVoted) setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))
                                   setVotingPollId(msg.poll_id!)
                                 }}
-                                className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[#F4F1E8] hover:bg-[#ECE8DE] text-[#5A5466]" : "bg-[#3E1540] hover:bg-[#2D0F2E] text-white"}`}
+                                className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[#F4F1E8] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
                               >
                                 {hasVoted ? "Change vote" : "Vote"}
                               </button>
@@ -2400,8 +2400,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           </>
                         ) : (
                           <div className="px-4 py-4 flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
-                            <span className="text-[13px] text-[#8A8497]">Loading poll…</span>
+                            <div className="w-4 h-4 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[13px] text-[var(--muted-text)]">Loading poll…</span>
                           </div>
                         )}
                       </div>
@@ -2430,7 +2430,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     )}
                     <div className="flex items-center gap-3 my-2 px-1">
                       <div className="flex-1 h-px bg-[#E8E2D2]/70" />
-                      <span style={{ fontSize: "12px", color: "#8A8497", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
+                      <span style={{ fontSize: "12px", color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
                         {displayContent}
                       </span>
                       <div className="flex-1 h-px bg-[#E8E2D2]/70" />
@@ -2472,7 +2472,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           <button
                             onClick={(e) => { e.stopPropagation(); setEmojiPickerFor(null); setFullReactionPickerFor(msg.id) }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[#5A5466] hover:bg-[#ECE8DE] transition-colors"
+                            className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -2495,26 +2495,26 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                           >
-                            <CornerUpLeft className="w-4 h-4 text-[#5A5466]" />
+                            <CornerUpLeft className="w-4 h-4 text-[var(--body)]" />
                             Reply
                           </button>
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); openForwardSheet(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                           >
-                            <Forward className="w-4 h-4 text-[#5A5466]" />
+                            <Forward className="w-4 h-4 text-[var(--body)]" />
                             Forward
                           </button>
                           {!msg.deleted && canPin && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); pinnedMessageId === msg.id ? handleUnpin() : handlePin(msg.id) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                             >
-                              <Pin className="w-4 h-4 text-[#5A5466]" />
+                              <Pin className="w-4 h-4 text-[var(--body)]" />
                               {pinnedMessageId === msg.id ? "Unpin" : "Pin"}
                             </button>
                           )}
@@ -2522,9 +2522,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content); setEditOriginalText(msg.content) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[#13101A] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                             >
-                              <Pencil className="w-4 h-4 text-[#5A5466]" />
+                              <Pencil className="w-4 h-4 text-[var(--body)]" />
                               Edit
                             </button>
                           )}
@@ -2552,17 +2552,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                     {/* Forwarded indicator */}
                     {msg.message_type === "forwarded" && (
                       <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
-                        <Forward className="w-3 h-3 text-[#8A8497]" />
-                        <span className="text-[11px] text-[#8A8497]">Forwarded</span>
+                        <Forward className="w-3 h-3 text-[var(--muted-text)]" />
+                        <span className="text-[11px] text-[var(--muted-text)]">Forwarded</span>
                       </div>
                     )}
                     {!isOwn && isFirstInGroup && (
                       <div className="flex items-baseline gap-1.5 mb-1 ml-9">
-                        <span className="text-[13px] font-semibold text-[#13101A]">{msg.sender_name || "Former Member"}</span>
+                        <span className="text-[13px] font-semibold text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
                         {msg.sender_id && departedIds.has(msg.sender_id) && (
                           <span className="text-[11px] text-[#A09A8C] italic">· left the ministry</span>
                         )}
-                        <span className="text-[12px] text-[#8A8497]">{formatMessageTime(msg.created_at)}</span>
+                        <span className="text-[12px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
                       </div>
                     )}
 
@@ -2588,10 +2588,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                           msg.deleted
                             ? isOwn
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                              : `bg-[#FBF8F2] border border-[#E8E2D2] text-[#8A8497] ${incomingRadius} px-4 py-2`
+                              : `bg-[#FBF8F2] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                             : isOwn
-                              ? `bg-[#2D0F2E] text-[#F6F4EF] ${outgoingRadius}`
-                              : `bg-[#FBF8F2] border border-[#E8E2D2] text-[#13101A] ${incomingRadius}`
+                              ? `bg-[var(--plum-2)] text-[#F6F4EF] ${outgoingRadius}`
+                              : `bg-[#FBF8F2] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
                         } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
                       >
                         {msg.deleted ? (
@@ -2606,14 +2606,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                                     isOwn
                                       ? "bg-white/10 border-l-[2px] border-[#F6F4EF]/50"
-                                      : "bg-[#F1ECDE] border-l-[2px] border-[#3E1540]"
+                                      : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
                                   }`}
                                 >
-                                  <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[#3E1540]"}`}>
+                                  <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[var(--plum)]"}`}>
                                     <CornerUpLeft className="w-3 h-3" />
                                     {msg.reply_to_sender}
                                   </span>
-                                  <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[#8A8497]"}`}>
+                                  <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[var(--muted-text)]"}`}>
                                     {msg.reply_to_content.slice(0, 80)}
                                   </span>
                                 </button>
@@ -2643,8 +2643,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                   />
                                 </div>
                                 <div className="flex gap-2 justify-end mt-1.5">
-                                  <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[#8A8497] hover:text-[#5A5466]"}`}>Cancel</button>
-                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[#3E1540]"}`}>Save</button>
+                                  <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
+                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[var(--plum)]"}`}>Save</button>
                                 </div>
                               </div>
                             ) : (
@@ -2676,13 +2676,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                       }
                                     }}
                                   >
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[#F1ECDE]"}`}>
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[var(--ivory)]"}`}>
                                       <FileDown className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <p className="text-[13px] font-medium truncate">{msg.attachment_name ?? "File"}</p>
                                       {msg.attachment_size != null && (
-                                        <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[#8A8497]"}`}>{formatFileSize(msg.attachment_size)}</p>
+                                        <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{formatFileSize(msg.attachment_size)}</p>
                                       )}
                                     </div>
                                     <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[#C4C4C4]"}`} />
@@ -2710,16 +2710,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                           rel="noopener noreferrer"
                                           onPointerDown={(e) => e.stopPropagation()}
                                           onClick={(e) => e.stopPropagation()}
-                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-white/10" : "border-[#E8E2D2] bg-[#F4F1E8]"}`}
+                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-white/10" : "border-[var(--line)] bg-[#F4F1E8]"}`}
                                           style={{ textDecoration: "none" }}
                                         >
                                           {preview.image && (
                                             <img src={preview.image} alt="" className="w-full max-h-[120px] object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
                                           )}
                                           <div className="px-3 py-2">
-                                            <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[#8A8497]"}`}>{preview.hostname}</p>
-                                            {preview.title && <p className={`text-[13px] font-semibold leading-snug ${isOwn ? "text-white" : "text-[#13101A]"}`}>{preview.title.slice(0, 80)}</p>}
-                                            {preview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[#5A5466]"}`}>{preview.description.slice(0, 120)}</p>}
+                                            <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{preview.hostname}</p>
+                                            {preview.title && <p className={`text-[13px] font-semibold leading-snug ${isOwn ? "text-white" : "text-[var(--ink)]"}`}>{preview.title.slice(0, 80)}</p>}
+                                            {preview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[var(--body)]"}`}>{preview.description.slice(0, 120)}</p>}
                                           </div>
                                         </a>
                                       )}
@@ -2750,12 +2750,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             onClick={() => handleReact(msg.id, emoji)}
                             className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
                               userReacted
-                                ? "bg-[#3E1540] border-[#3E1540]"
-                                : "bg-white border-[#ECE8DE]"
+                                ? "bg-[var(--plum)] border-[var(--plum)]"
+                                : "bg-white border-[var(--line)]"
                             }`}
                           >
                             <span>{emoji}</span>
-                            <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[#8A8497]"}`}>{count}</span>
+                            <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[var(--muted-text)]"}`}>{count}</span>
                           </button>
                         ))}
                       </div>
@@ -2767,9 +2767,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
-                        <span className="text-[12px] text-[#5A5466]">Delete this message?</span>
+                        <span className="text-[12px] text-[var(--body)]">Delete this message?</span>
                         <button onClick={() => handleDeleteMessage(msg.id)} className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors">Delete</button>
-                        <button onClick={() => setDeletingId(null)} className="text-[12px] text-[#8A8497] hover:text-[#5A5466] transition-colors">Cancel</button>
+                        <button onClick={() => setDeletingId(null)} className="text-[12px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors">Cancel</button>
                       </div>
                     )}
 
@@ -2801,12 +2801,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
                 <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-bold" />
-                <div className="bg-[#FBF8F2] border border-[#E8E2D2] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
+                <div className="bg-[#FBF8F2] border border-[var(--line)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </div>
-                <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "12px", color: "#8A8497" }}>{name} is typing…</span>
+                <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "12px", color: "var(--muted-text)" }}>{name} is typing…</span>
               </div>
             ))}
 
@@ -2818,14 +2818,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* ── Reply preview bar ── */}
       {replyingTo && (
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
-          <div className="flex-1 border-l-2 border-[#3E1540] pl-2.5 min-w-0">
-            <p className="text-[11px] font-semibold text-[#3E1540] flex items-center gap-1 mb-0.5">
+          <div className="flex-1 border-l-2 border-[var(--plum)] pl-2.5 min-w-0">
+            <p className="text-[11px] font-semibold text-[var(--plum)] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
               {replyingTo.sender_name}
             </p>
-            <p className="text-[12px] text-[#8A8497] truncate">{replyingTo.content.slice(0, 60)}</p>
+            <p className="text-[12px] text-[var(--muted-text)] truncate">{replyingTo.content.slice(0, 60)}</p>
           </div>
-          <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+          <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -2834,27 +2834,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
       {/* ── GIF Picker panel ── */}
       {showGifPicker && !groupArchived && (
-        <div className="flex-shrink-0 bg-white border-t border-[#E8E2D2] z-[156] relative" style={{ height: 240 }}>
+        <div className="flex-shrink-0 bg-white border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
             <input
               autoFocus
               value={gifSearch}
               onChange={e => setGifSearch(e.target.value)}
               placeholder="Search GIFs…"
-              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[#E8E2D2] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
+              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[var(--line)] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
             />
-            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="overflow-y-auto h-[188px]">
             {gifLoading ? (
               <div className="flex items-center justify-center h-full">
-                <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : gifResults.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-[13px] text-[#8A8497]">No GIFs found</p>
+                <p className="text-[13px] text-[var(--muted-text)]">No GIFs found</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1 p-1">
@@ -2876,13 +2876,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* ── Input bar ── */}
       {groupArchived ? (
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center justify-center">
-          <p className="text-[13px] text-[#8A8497]">This chat is archived</p>
+          <p className="text-[13px] text-[var(--muted-text)]">This chat is archived</p>
         </div>
       ) : (
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[#ECE8DE] overflow-hidden min-w-[180px] z-10">
+            <div className="absolute bottom-full left-4 mb-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
               {filteredMentions.map((member, idx) => (
                 <button
                   key={member.id}
@@ -2891,7 +2891,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[#FBF8F2]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
                 >
                   <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
-                  <span className="text-[14px] font-medium text-[#13101A]">{member.name.split(" ")[0]}</span>
+                  <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
                 </button>
               ))}
             </div>
@@ -2908,30 +2908,30 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex-shrink-0 text-[#5A5466] hover:text-[#13101A] transition-colors disabled:opacity-40 mb-2"
+              className="flex-shrink-0 text-[var(--body)] hover:text-[var(--ink)] transition-colors disabled:opacity-40 mb-2"
               title="Attach file"
             >
               {uploading
-                ? <div className="w-4 h-4 border-2 border-[#5A5466] border-t-transparent rounded-full animate-spin" />
+                ? <div className="w-4 h-4 border-2 border-[var(--body)] border-t-transparent rounded-full animate-spin" />
                 : <Paperclip className="w-4 h-4" />
               }
             </button>
             <button
               onClick={() => { setShowGifPicker(p => !p); setShowPollCreator(false) }}
-              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[#3E1540] text-white border-[#3E1540]" : "text-[#5A5466] border-[#E2DDCF] hover:border-[#3E1540]/30 hover:text-[#13101A]"}`}
+              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
               title="Send a GIF"
             >
               GIF
             </button>
             <button
               onClick={() => { setShowPollCreator(p => !p); setShowGifPicker(false) }}
-              className={`flex-shrink-0 transition-colors mb-2 ${showPollCreator ? "text-[#3E1540]" : "text-[#5A5466] hover:text-[#13101A]"}`}
+              className={`flex-shrink-0 transition-colors mb-2 ${showPollCreator ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
               title="Create a poll"
             >
               <BarChart2 className="w-4 h-4" />
             </button>
             {/* Textarea bubble — its own bordered component */}
-            <div className="flex-1 border border-[#E2DDCF] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
+            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
               {/* Attachment preview — inside the bubble, above the textarea */}
               {pendingAttachment && (
                 <div className="mb-2">
@@ -2940,25 +2940,25 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                       <img
                         src={pendingAttachment.previewUrl}
                         alt="Preview"
-                        className="w-16 h-16 rounded-xl object-cover border border-[#E8E2D2]"
+                        className="w-16 h-16 rounded-xl object-cover border border-[var(--line)]"
                       />
                       <button
                         onClick={clearPendingAttachment}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#13101A] flex items-center justify-center"
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--ink)] flex items-center justify-center"
                       >
                         <X className="w-2.5 h-2.5 text-white" />
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 bg-[#EDE9DF] rounded-xl px-2.5 py-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[#E8E2D2] flex items-center justify-center flex-shrink-0">
-                        <FileDown className="w-3.5 h-3.5 text-[#5A5466]" />
+                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[var(--line)] flex items-center justify-center flex-shrink-0">
+                        <FileDown className="w-3.5 h-3.5 text-[var(--body)]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-medium text-[#13101A] truncate">{pendingAttachment.file.name}</p>
-                        <p className="text-[10px] text-[#8A8497]">{formatFileSize(pendingAttachment.file.size)}</p>
+                        <p className="text-[12px] font-medium text-[var(--ink)] truncate">{pendingAttachment.file.name}</p>
+                        <p className="text-[10px] text-[var(--muted-text)]">{formatFileSize(pendingAttachment.file.size)}</p>
                       </div>
-                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -2972,7 +2972,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 onKeyDown={handleKeyDown}
                 placeholder={`Message ${displayName}`}
                 rows={1}
-                className="w-full resize-none bg-transparent text-[14px] text-[#13101A] placeholder:text-[#8A8497] focus:outline-none border-none max-h-36 overflow-y-auto block"
+                className="w-full resize-none bg-transparent text-[14px] text-[var(--ink)] placeholder:text-[var(--muted-text)] focus:outline-none border-none max-h-36 overflow-y-auto block"
                 style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
               />
             </div>
@@ -2980,7 +2980,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             <div className="relative mb-2">
               <button
                 onClick={() => setShowComposerEmojiPicker(p => !p)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5A5466] hover:bg-[#E8E2D2] transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--body)] hover:bg-[var(--line)] transition-colors"
               >
                 <Smile className="w-4 h-4" />
               </button>
@@ -3001,7 +3001,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             <button
               onClick={handleSend}
               disabled={(!inputText.trim() && !pendingAttachment) || sending}
-              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[#13101A] transition-all active:scale-95 bg-[#2D0F2E] mb-2"
+              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)] mb-2"
               style={{ width: 34, height: 34, borderRadius: 10 }}
             >
               <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
@@ -3036,28 +3036,28 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const confirmLabel = pendingVoteOption === "unvote" ? "Remove vote" : vUserVote !== undefined ? "Change vote" : "Submit vote"
         return (
           <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={closeFn}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
                 <div className="flex-1">
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Poll</p>
-                  {vPoll && <p className="text-[11px] text-[#8A8497] mt-0.5">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>}
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Poll</p>
+                  {vPoll && <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>}
                 </div>
                 {vTotal > 0 && (
                   <button
                     onClick={() => { setVotersPollId(votingPollId); closeFn() }}
-                    className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 transition-opacity mr-3"
+                    className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity mr-3"
                   >
                     See all votes
                   </button>
                 )}
                 <button onClick={closeFn} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
-                  <X className="w-4 h-4 text-[#5A5466]" />
+                  <X className="w-4 h-4 text-[var(--body)]" />
                 </button>
               </div>
               {vPoll ? (
                 <>
                   <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
-                    <p className="text-[15px] font-bold text-[#13101A] leading-snug mb-2">{vPoll.question}</p>
+                    <p className="text-[15px] font-bold text-[var(--ink)] leading-snug mb-2">{vPoll.question}</p>
                     {vPoll.options.map((opt, oi) => {
                       const count = vCounts[oi] ?? 0
                       const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
@@ -3076,14 +3076,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             }
                           }}
                           className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
-                          style={{ borderColor: isSelected ? "#3E1540" : "#E8E2D2", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
+                          style={{ borderColor: isSelected ? "var(--plum)" : "var(--line)", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[#3E1540] bg-[#3E1540]" : "border-[#D8D3C8]"}`}>
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[var(--plum)] bg-[var(--plum)]" : "border-[#D8D3C8]"}`}>
                                 {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                               </div>
-                              <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[#3E1540]" : "text-[#13101A]"}`}>{opt}</span>
+                              <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                               {optVoters.length > 0 && (
@@ -3097,17 +3097,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                     </div>
                                   ))}
                                   {count > 3 && (
-                                    <div className="-ml-1.5 w-5 h-5 rounded-full bg-[#E8E2D2] border border-white flex items-center justify-center flex-shrink-0">
-                                      <span style={{ fontSize: 7, fontWeight: 700, color: "#5A5466" }}>+{count - 3}</span>
+                                    <div className="-ml-1.5 w-5 h-5 rounded-full bg-[var(--line)] border border-white flex items-center justify-center flex-shrink-0">
+                                      <span style={{ fontSize: 7, fontWeight: 700, color: "var(--body)" }}>+{count - 3}</span>
                                     </div>
                                   )}
                                 </div>
                               )}
-                              <span className={`text-[12px] font-semibold ${isSelected ? "text-[#3E1540]" : "text-[#8A8497]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                              <span className={`text-[12px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count > 0 ? `${pct}%` : ""}</span>
                             </div>
                           </div>
                           <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "#3E1540" : "#C4BDB8" }} />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
                           </div>
                         </button>
                       )
@@ -3117,7 +3117,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   <div className="px-5 pb-5 pt-3 border-t border-[#F0EDE6] flex-shrink-0 flex gap-2">
                     <button
                       onClick={closeFn}
-                      className="flex-1 py-2.5 rounded-xl border border-[#E8E2D2] text-[13px] font-semibold text-[#5A5466] hover:bg-[#F4F1E8] transition-colors"
+                      className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[#F4F1E8] transition-colors"
                     >
                       Cancel
                     </button>
@@ -3132,7 +3132,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         closeFn()
                       }}
                       className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
-                      style={{ background: hasPending ? "#3E1540" : "#E8E2D2", color: hasPending ? "#F6F4EF" : "#8A8497", cursor: hasPending ? "pointer" : "default" }}
+                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "#F6F4EF" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
                     >
                       {hasPending ? confirmLabel : "Select an option"}
                     </button>
@@ -3140,7 +3140,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                 </>
               ) : (
                 <div className="flex items-center justify-center py-10">
-                  <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
@@ -3154,11 +3154,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const vVoters = pollVoters[votersPollId] ?? []
         return (
           <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40" onClick={() => setVotersPollId(null)}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", flex: 1 }}>Votes</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", flex: 1 }}>Votes</p>
                 <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
-                  <X className="w-4 h-4 text-[#5A5466]" />
+                  <X className="w-4 h-4 text-[var(--body)]" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
@@ -3168,8 +3168,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   return (
                     <div key={oi}>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[13px] font-semibold text-[#13101A]">{opt}</p>
-                        <span className="text-[11px] text-[#8A8497] font-medium">{optVoters.length} vote{optVoters.length !== 1 ? "s" : ""}</span>
+                        <p className="text-[13px] font-semibold text-[var(--ink)]">{opt}</p>
+                        <span className="text-[11px] text-[var(--muted-text)] font-medium">{optVoters.length} vote{optVoters.length !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         {optVoters.map(v => (
@@ -3180,7 +3180,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 : <span className="font-bold" style={{ fontSize: 10, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                               }
                             </div>
-                            <span className="text-[13px] text-[#13101A]">{v.name}</span>
+                            <span className="text-[13px] text-[var(--ink)]">{v.name}</span>
                           </div>
                         ))}
                       </div>
@@ -3188,7 +3188,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   )
                 }) : (
                   <div className="flex items-center justify-center py-8">
-                    <div className="w-5 h-5 border-2 border-[#3E1540] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
               </div>
@@ -3200,26 +3200,26 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* Poll creator modal */}
       {showPollCreator && !groupArchived && (
         <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowPollCreator(false)}>
-          <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Create a poll</p>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Create a poll</p>
               <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
-                <X className="w-4 h-4 text-[#5A5466]" />
+                <X className="w-4 h-4 text-[var(--body)]" />
               </button>
             </div>
             <div className="px-5 py-4 flex flex-col gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wide mb-1.5 block">Question</label>
+                <label className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Question</label>
                 <input
                   autoFocus
                   value={pollQuestion}
                   onChange={e => setPollQuestion(e.target.value)}
                   placeholder="Ask something…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[#8A8497] uppercase tracking-wide mb-1.5 block">Options</label>
+                <label className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Options</label>
                 <div className="flex flex-col gap-2">
                   {pollOptions.map((opt, oi) => (
                     <div key={oi} className="flex items-center gap-2">
@@ -3227,10 +3227,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         value={opt}
                         onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
                         placeholder={`Option ${oi + 1}`}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#E8E2D2] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
                       />
                       {pollOptions.length > 2 && (
-                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[#C4C4C4] hover:text-[#5A5466] transition-colors">
+                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
                           <X className="w-4 h-4" />
                         </button>
                       )}
@@ -3239,7 +3239,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   {pollOptions.length < 5 && (
                     <button
                       onClick={() => setPollOptions(prev => [...prev, ""])}
-                      className="flex items-center gap-1.5 text-[13px] text-[#3E1540] font-medium hover:opacity-70 transition-opacity self-start mt-1"
+                      className="flex items-center gap-1.5 text-[13px] text-[var(--plum)] font-medium hover:opacity-70 transition-opacity self-start mt-1"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add option
@@ -3252,7 +3252,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               <button
                 onClick={handleCreatePoll}
                 disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
-                className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
+                className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
               >
                 Create poll
               </button>
@@ -3264,16 +3264,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       {/* Forward sheet */}
       {forwardingMsg && (
         <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center" onClick={() => setForwardingMsg(null)}>
-          <div className="w-full max-w-[390px] md:max-w-[420px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[#E8E2D2] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-[390px] md:max-w-[420px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A" }}>Forward to</p>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Forward to</p>
               <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
-                <X className="w-4 h-4 text-[#5A5466]" />
+                <X className="w-4 h-4 text-[var(--body)]" />
               </button>
             </div>
             <div className="px-3 py-2 max-h-[50vh] overflow-y-auto">
               {forwardGroups.length === 0 ? (
-                <p className="text-[13px] text-[#8A8497] px-3 py-4">No other chats available.</p>
+                <p className="text-[13px] text-[var(--muted-text)] px-3 py-4">No other chats available.</p>
               ) : (
                 forwardGroups.map((g) => (
                   <button
@@ -3283,7 +3283,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                   >
                     <div className="flex items-center gap-3">
                       <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-semibold" />
-                      <span className="text-[14px] font-medium text-[#13101A]">{g.name}</span>
+                      <span className="text-[14px] font-medium text-[var(--ink)]">{g.name}</span>
                     </div>
                     {forwardSentTo === g.id ? (
                       <Check className="w-4 h-4 text-green-500" />
@@ -3295,7 +3295,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               )}
             </div>
             <div className="px-5 py-3 border-t border-[#F0EEF8]">
-              <p className="text-[11px] text-[#8A8497] truncate">"{forwardingMsg.content.slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
+              <p className="text-[11px] text-[var(--muted-text)] truncate">"{forwardingMsg.content.slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
             </div>
           </div>
         </div>
@@ -3470,31 +3470,25 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     : rawActive
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "10px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
+  const monoStyle = MONO_STYLE
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
       {/* Desktop Plan C header */}
       <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", lineHeight: 1.1, color: "#13101A", marginTop: "4px" }}>{ministryName}</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", lineHeight: 1.1, color: "var(--ink)", marginTop: "4px" }}>{ministryName}</p>
       </div>
 
       {/* Desktop search */}
-      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3.5 py-2.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[#8A8497] flex-shrink-0">
+      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3.5 py-2.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[var(--muted-text)] flex-shrink-0">
         <Search className="w-4 h-4 flex-shrink-0" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search messages"
-          className="flex-1 text-[13px] bg-transparent outline-none placeholder:text-[#8A8497] text-[#13101A]"
+          className="flex-1 text-[13px] bg-transparent outline-none placeholder:text-[var(--muted-text)] text-[var(--ink)]"
         />
       </div>
 
@@ -3512,9 +3506,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             }}
             style={{
               flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 600,
-              color: subTab === t ? "#13101A" : "#8A8497",
+              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
               background: "transparent", border: "none",
-              borderBottom: `2px solid ${subTab === t ? "#3E1540" : "transparent"}`,
+              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
               cursor: "pointer", transition: "color 0.15s",
             }}
           >
@@ -3528,17 +3522,17 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       <div className="flex items-center justify-between mb-6 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#3E1540" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="#3E1540" />
+            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
         <button
           onClick={onOpenDirectory}
           className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors"
           aria-label="Directory"
         >
-          <Users className="w-5 h-5 text-[#3E1540]" />
+          <Users className="w-5 h-5 text-[var(--plum)]" />
         </button>
       </div>
 
@@ -3556,8 +3550,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             }}
             className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
               subTab === t
-                ? "bg-white text-[#3E1540] shadow-sm"
-                : "text-[#8A8497] hover:text-[#3E1540]/70"
+                ? "bg-white text-[var(--plum)] shadow-sm"
+                : "text-[var(--muted-text)] hover:text-[#3E1540]/70"
             }`}
           >
             {t === "church" ? "Church Chats" : "My Chats"}
@@ -3573,26 +3567,26 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
         />
       </div>
 
       {/* Section header with + button */}
       <div className="flex items-center justify-between mb-3 md:px-4">
-        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
+        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
           className="md:hidden">
           {subTab === "church" ? "Church chats" : "My chats"}
         </h3>
         {/* Desktop mono section label */}
-        <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497" }}>
+        <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
           {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
         </p>
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
+            className="size-8 rounded-xl bg-[#FBF8F2] border border-[var(--line)] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
           >
-            <Plus className="w-4 h-4 text-[#3E1540] md:w-3.5 md:h-3.5" />
+            <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
           </button>
         )}
       </div>
@@ -3683,7 +3677,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
   return (
     <button onClick={onClick} className="w-full text-left group">
       {/* Mobile style */}
-      <div className="md:hidden bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
+      <div className="md:hidden bg-[#FBF8F2] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
           <MonogramChip
             initials={firstInitial}
@@ -3692,17 +3686,17 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-[15px] font-semibold text-[#13101A] truncate pr-2">{group.name}</h3>
-              {group.last_message_time && <span className="text-[11px] text-[#8A8497] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
+              <h3 className="text-[15px] font-semibold text-[var(--ink)] truncate pr-2">{group.name}</h3>
+              {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[13px] text-[#5A5466] truncate">
+              <p className="text-[13px] text-[var(--body)] truncate">
                 {group.last_message
-                  ? group.last_sender ? <><span className="font-semibold text-[#5A5466]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
-                  : <span className="italic text-[#8A8497]">No messages yet</span>}
+                  ? group.last_sender ? <><span className="font-semibold text-[var(--body)]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
+                  : <span className="italic text-[var(--muted-text)]">No messages yet</span>}
               </p>
               {group.unread_count > 0 && (
-                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[#13101A] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
+                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[var(--ink)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
               )}
             </div>
           </div>
