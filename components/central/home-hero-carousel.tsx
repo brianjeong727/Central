@@ -45,6 +45,19 @@ const PANEL_FALLBACK_RGB = "27, 10, 30"
 // Tall side-pill arrow width — component constant (no spacing token for chrome width).
 const ARROW_W = 54
 
+// ── Option A photo-slide treatment (desktop) ──────────────────────────────────
+// "Light ramp + soft broad scrim, no solid panel." The clamped panel_color makes a
+// LIGHT mood ramp that fades out by ~70% (photo reads through nearly everywhere); a
+// separate soft radial SCRIM of near-black hugs the text for legibility. The near-
+// black (#0c0a10 backdrop, 8,6,10 scrim) is intentionally darker than --ink — a true
+// floor under cream text over a photo. Kept inline: one component's internal curve.
+const PHOTO_BACKDROP = "#0c0a10"
+const SCRIM = "8, 6, 10"
+const rampBg = (c: string) =>
+  `linear-gradient(90deg, rgb(${c}) 0%, rgba(${c},0.9) 4%, rgba(${c},0.46) 22%, rgba(${c},0.13) 48%, rgba(${c},0) 70%)`
+const SCRIM_BG = `radial-gradient(135% 105% at 0% 52%, rgba(${SCRIM},0.5) 0%, rgba(${SCRIM},0.24) 36%, rgba(${SCRIM},0) 64%)`
+const CAP_SHADOW = `0 1px 10px rgba(${SCRIM},0.28)`
+
 // "#rrggbb" → "r, g, b" for building the clamped-color gradient stops.
 function rgbFromHex(hex?: string | null): string {
   if (!hex) return PANEL_FALLBACK_RGB
@@ -198,48 +211,36 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
     )
   }
 
-  // Desktop: full-bleed photo; the clamped panel_color fades to transparent
-  // across the seam (Option B) over a left-anchored ink legibility scrim, so the
-  // image emerges out of the color with no hard slab edge. The solid-vs-clear
-  // ratio is the single --hero-panel-fade knob. Pure static CSS — SSR-safe, no blur.
+  // Desktop: full-bleed photo (Option A — "light ramp + soft broad scrim, no solid
+  // panel"). The clamped panel_color becomes a LIGHT mood ramp that fades out by ~70%
+  // so the photo reads through almost everywhere; a SEPARATE soft radial near-black
+  // scrim hugs the text for legibility. No solid slab, no seam. Pure static CSS — SSR-safe.
   const c = rgbFromHex(panelColor)
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%", background: panel }}>
+    <div style={{ position: "relative", height: "100%", width: "100%", background: PHOTO_BACKDROP }}>
       <img
         src={imageUrl}
         alt=""
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "75% center", display: "block" }}
       />
-      {/* ink legibility scrim — left-anchored, --ink-token based (the hard floor) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(90deg, color-mix(in srgb, var(--ink) 72%, transparent) 0%, color-mix(in srgb, var(--ink) 50%, transparent) 34%, transparent 60%)",
-        }}
-      />
-      {/* clamped panel_color → transparent across the seam (Option B) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `linear-gradient(90deg, rgba(${c}, 0.96) 0%, rgba(${c}, 0.88) var(--hero-panel-fade), rgba(${c}, 0) 100%)`,
-        }}
-      />
+      {/* light clamped-color mood ramp — fades out by ~70%, photo reads through */}
+      <div style={{ position: "absolute", inset: 0, background: rampBg(c) }} />
+      {/* soft broad radial ink scrim — hugs the text for legibility, never a panel */}
+      <div style={{ position: "absolute", inset: 0, background: SCRIM_BG }} />
       {/* content */}
-      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-10)", display: "flex", flexDirection: "column", zIndex: 1 }}>
+      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-9)", display: "flex", flexDirection: "column", zIndex: 1 }}>
         <Eyebrow text={eyebrow} />
         <div
           style={{
             fontFamily: "var(--serif)",
             fontSize: event ? 46 : 34,
             fontWeight: 600,
-            letterSpacing: "-0.015em",
+            letterSpacing: "-0.02em",
             lineHeight: event ? 1.02 : 1.1,
             color: "var(--cream)",
             marginTop: "var(--space-7)",
             maxWidth: "92%",
+            textShadow: CAP_SHADOW,
           }}
         >
           {title}
@@ -250,7 +251,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           </p>
         )}
         {meta && !event && (
-          <div style={{ marginTop: "auto", fontSize: 14, color: "var(--cream)", opacity: 0.62 }}>{meta}</div>
+          <div style={{ marginTop: "auto", fontSize: 12, color: "var(--cream)", opacity: 0.72 }}>{meta}</div>
         )}
       </div>
       {/* event glass chip — surgical backdrop-blur material (contained to this chip) */}
