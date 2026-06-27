@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle } from "@/components/central"
+import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -896,7 +896,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
       <div className="md:flex-1 md:overflow-y-auto">
       {loading ? (
-        <div className="px-5 md:px-14"><Spinner /></div>
+        <AnnouncementsListSkeleton />
       ) : announcements.length === 0 ? (
         <div className="px-5 md:px-14">
           <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement." : "Check back soon for updates"} />

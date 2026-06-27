@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { MessageCircle } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
@@ -16,19 +17,36 @@ import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 
 // Tabs
+// HomeTab stays eager — it's the default landing tab. Every other tab (and the
+// extra overlay/sidebar symbols home-app references from those tab files) is
+// code-split via next/dynamic so its JS only ships when that tab/overlay opens.
+// ssr:false is safe: tabs render conditionally on the client. Each dynamic gets
+// the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
-import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
-import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
-import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionNav } from "./tabs/plan-tab"
+import { Spinner } from "./components/shared"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton } from "@/components/central"
 import type { CalendarEvent } from "./types"
-import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
-import { GivingTab } from "./tabs/giving-tab"
-import { ProfileTab } from "./tabs/profile-tab"
-import { SettingsTab } from "./tabs/settings-tab"
-import { FormsTab } from "./tabs/forms-tab"
-import { CongregationTab } from "./tabs/congregation-tab"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
+
+const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
+const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
+
+const ChatsTab = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatsTab), { loading: () => <Spinner />, ssr: false })
+const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScreen), { loading: () => <Spinner />, ssr: false })
+const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
+
+const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
+const QuickCreateTeamModal = dynamic(() => import("./tabs/plan-tab").then(m => m.QuickCreateTeamModal), { loading: () => <Spinner />, ssr: false })
+const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
+const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
+
+const DirectoryTab = dynamic(() => import("./tabs/directory-tab").then(m => m.DirectoryTab), { loading: () => <DirectoryTabSkeleton />, ssr: false })
+const GivingTab = dynamic(() => import("./tabs/giving-tab").then(m => m.GivingTab), { loading: () => <Spinner />, ssr: false })
+const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.ProfileTab), { loading: () => <Spinner />, ssr: false })
+const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.SettingsTab), { loading: () => <Spinner />, ssr: false })
+const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
+const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded }: HomeAppProps) {
   const supabase = createClient()

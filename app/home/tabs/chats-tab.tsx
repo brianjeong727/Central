@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -10,10 +11,54 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
-import Picker from "@emoji-mart/react"
-import data from "@emoji-mart/data"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
 import { InsetHairline } from "@/components/central/hairline"
+
+// emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
+// Picker component and its data lazily — only when a picker actually opens — so
+// nothing emoji-mart ships in the chats chunk until the user reaches for it.
+const EmojiMartPicker = dynamic(() => import("@emoji-mart/react"), { ssr: false })
+
+function LazyEmojiPicker({
+  onEmojiSelect,
+  theme = "light",
+  previewPosition = "none",
+  skinTonePosition = "none",
+}: {
+  onEmojiSelect: (e: { native: string }) => void
+  theme?: string
+  previewPosition?: string
+  skinTonePosition?: string
+}) {
+  const [emojiData, setEmojiData] = useState<unknown>(null)
+  useEffect(() => {
+    let active = true
+    import("@emoji-mart/data").then((m) => { if (active) setEmojiData(m.default) })
+    return () => { active = false }
+  }, [])
+  if (!emojiData) {
+    return (
+      <div
+        style={{
+          width: 280, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)",
+          boxShadow: "0 8px 30px color-mix(in srgb, var(--ink) 12%, transparent)",
+        }}
+      >
+        <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--plum)", animation: "spin 0.7s linear infinite" }} />
+      </div>
+    )
+  }
+  return (
+    <EmojiMartPicker
+      data={emojiData}
+      onEmojiSelect={onEmojiSelect}
+      theme={theme}
+      previewPosition={previewPosition}
+      skinTonePosition={skinTonePosition}
+    />
+  )
+}
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
@@ -1122,7 +1167,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current)
     gifDebounceRef.current = setTimeout(() => handleGifSearch(gifSearch), 400)
     return () => { if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gifSearch, showGifPicker])
 
   // Fetch link previews for URLs found in messages
@@ -1819,7 +1863,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     if (searchMatches.length === 0) return
     const matchId = searchMatches[searchMatchIndex]
     if (matchId) messageRefs.current[matchId]?.scrollIntoView({ behavior: "smooth", block: "center" })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchMatchIndex, searchMatches])
 
   function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -2479,7 +2522,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         </div>
                         {fullReactionPickerFor === msg.id && (
                           <div className={`absolute z-[161] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`} onPointerDown={(e) => e.stopPropagation()}>
-                            <Picker data={data} onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} theme="light" previewPosition="none" skinTonePosition="none" />
+                            <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
                           </div>
                         )}
                       </div>
@@ -2986,14 +3029,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               </button>
               {showComposerEmojiPicker && (
                 <div className="absolute bottom-full right-0 mb-2 z-[160]">
-                  <Picker
-                    data={data}
+                  <LazyEmojiPicker
                     onEmojiSelect={(emoji: { native: string }) => {
                       insertEmojiAtCursor(emoji.native)
                     }}
-                    theme="light"
-                    previewPosition="none"
-                    skinTonePosition="none"
                   />
                 </div>
               )}

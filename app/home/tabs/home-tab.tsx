@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { Spinner, RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
+import { RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeTabSkeleton } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 import { HomeSlideManager } from "../components/home-slide-manager"
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
@@ -456,7 +456,7 @@ export function HomeTab({
       )}
 
       {loading ? (
-        <div className="px-5 md:px-14 pt-8"><Spinner /></div>
+        <HomeTabSkeleton />
       ) : (
         <>
           {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}

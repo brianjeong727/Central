@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
-import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip } from "@/components/central"
+import { EmptyState, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton } from "@/components/central"
 import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
 
@@ -76,7 +76,7 @@ export function DirectoryMemberListPanel({
       {/* Member list */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4"><Spinner /></div>
+          <div className="pt-2"><DirectoryListSkeleton /></div>
         ) : filtered.length === 0 ? (
           <div className="p-4">
             <EmptyState
@@ -241,7 +241,7 @@ export function DirectoryTab({
         </div>
 
         {mobileLoading ? (
-          <div className="px-5"><Spinner /></div>
+          <div className="px-2"><DirectoryListSkeleton /></div>
         ) : mobileFiltered.length === 0 ? (
           <div className="px-5">
             <EmptyState
