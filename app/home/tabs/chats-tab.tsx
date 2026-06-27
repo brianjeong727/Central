@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
+import useSWR from "swr"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -3382,27 +3383,79 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
+// ── Shared chat-list SWR fetcher ─────────────────────────────────────────────
+// Single DB round-trip via get_chat_list RPC (replaces load-groups + N+1 per-group
+// unread/last-message queries). Both ChatsTab (mobile) and ChatListPanel (desktop)
+// use the SAME stable key ["chat-list", userId, ministryId] + this fetcher, so SWR
+// dedupes them to one cache entry and revisits paint instantly from cache.
+// Pure: no side effects (onTotalUnreadChange lives in a component effect, not here).
+type ChatListRow = {
+  group_id: string; group_name: string; group_type: string
+  group_archived: boolean | null; last_read_at: string | null
+  last_msg_content: string | null; last_msg_sender_id: string | null
+  last_msg_sender_name: string | null; last_msg_at: string | null
+  last_msg_type: string | null; unread_count: number
+}
+
+async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
   const supabase = createClient()
+  const { data } = await supabase.rpc("get_chat_list", {
+    p_user_id: userId,
+    p_ministry_id: ministryId,
+  })
+
+  const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
+    id: row.group_id,
+    name: row.group_name,
+    type: row.group_type,
+    archived: row.group_archived ?? false,
+    last_message: row.last_msg_content ?? null,
+    last_sender: row.last_msg_sender_name ?? null,
+    last_message_time: row.last_msg_at ?? null,
+    unread_count: Number(row.unread_count),
+  })) as ChatGroup[]
+
+  // Sort by most recent message first (nulls last)
+  groups.sort((a, b) => {
+    if (!a.last_message_time && !b.last_message_time) return 0
+    if (!a.last_message_time) return 1
+    if (!b.last_message_time) return -1
+    return b.last_message_time.localeCompare(a.last_message_time)
+  })
+
+  return groups
+}
+
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
   const router = useRouter()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
   })
-  const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
-  const [archivedChurchChats, setArchivedChurchChats] = useState<ChatGroup[]>([])
-  const [myChats, setMyChats] = useState<ChatGroup[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
+  // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
+  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+    userId && ministryId ? ["chat-list", userId, ministryId] : null,
+    fetchChatList,
+  )
+
+  const allGroups = data ?? []
+  const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
+  const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
+  const myChats = allGroups.filter((g) => g.type !== "church")
+  const loading = isLoading
+
+  // Optimistic unread-clear on the shared cache key (survives revalidation timing).
   function clearUnread(groupId: string) {
-    const zero = (list: ChatGroup[]) => list.map(g => g.id === groupId ? { ...g, unread_count: 0 } : g)
-    setChurchChats(zero)
-    setMyChats(zero)
+    mutate(
+      (current) => (current ?? []).map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)),
+      { revalidate: false },
+    )
   }
 
   function handleOpenChat(groupId: string, groupName: string) {
@@ -3416,92 +3469,21 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId])
 
+  // Revalidate the shared list when a chat closes (refreshKey bumps) — without
+  // putting refreshKey in the SWR key (that would fragment the cache).
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("group_members")
-        .select("groups(id, name, type, archived, ministry_id), last_read_at")
-        .eq("user_id", userId)
-
-      type RawMember = {
-        groups: { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null } | { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null }[] | null
-        last_read_at: string | null
-      }
-
-      const allWithLastRead = (data ?? [])
-        .map((m: RawMember) => {
-          if (!m.groups) return null
-          const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-          if (!g || g.ministry_id !== ministryId) return null
-          return {
-            id: g.id,
-            name: g.name,
-            type: g.type,
-            archived: g.archived ?? false,
-            last_message: null,
-            last_sender: null,
-            last_message_time: null,
-            unread_count: 0,
-            _lastReadAt: m.last_read_at,
-          }
-        })
-        .filter(Boolean) as (ChatGroup & { _lastReadAt: string | null })[]
-
-      // Fetch unread counts + last message preview in parallel per group
-      const withUnread = await Promise.all(
-        allWithLastRead.map(async ({ _lastReadAt, ...group }) => {
-          let countQuery = supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", group.id)
-            .neq("sender_id", userId)
-            .eq("message_type", "user")
-          if (_lastReadAt) countQuery = countQuery.gt("created_at", _lastReadAt)
-
-          const [{ count }, { data: lastMsgData }] = await Promise.all([
-            countQuery,
-            supabase
-              .from("messages")
-              .select("content, created_at, profiles!sender_id(name)")
-              .eq("group_id", group.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-          ])
-
-          const senderProfile = lastMsgData
-            ? (Array.isArray(lastMsgData.profiles) ? lastMsgData.profiles[0] : lastMsgData.profiles) as { name: string } | null
-            : null
-
-          return {
-            ...group,
-            unread_count: count ?? 0,
-            last_message: lastMsgData?.content ?? null,
-            last_sender: senderProfile?.name ?? null,
-            last_message_time: lastMsgData?.created_at ?? null,
-          }
-        })
-      )
-
-      // Sort by most recent message first (nulls last)
-      withUnread.sort((a, b) => {
-        if (!a.last_message_time && !b.last_message_time) return 0
-        if (!a.last_message_time) return 1
-        if (!b.last_message_time) return -1
-        return b.last_message_time.localeCompare(a.last_message_time)
-      })
-
-      setChurchChats(withUnread.filter((g) => g.type === "church" && !g.archived))
-      setArchivedChurchChats(withUnread.filter((g) => g.type === "church" && g.archived))
-      setMyChats(withUnread.filter((g) => g.type !== "church"))
-
-      const total = withUnread.filter((g) => !g.archived).reduce((s, g) => s + g.unread_count, 0)
-      onTotalUnreadChange(total)
-      setLoading(false)
-    }
-    load()
+    if (refreshKey) mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, refreshKey])
+  }, [refreshKey])
+
+  // Drive the bottom-nav unread badge off SWR data (side effect out of the fetcher).
+  useEffect(() => {
+    if (data) {
+      const total = data.filter((g) => !g.archived).reduce((s, g) => s + g.unread_count, 0)
+      onTotalUnreadChange(total)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
 
   const rawActive = subTab === "church" ? churchChats : myChats
   const active = search.trim()
@@ -3694,11 +3676,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               unread_count: 0,
               archived: false,
             }
-            if (showCreateChat === "church") {
-              setChurchChats(prev => [newGroup, ...prev])
-            } else {
-              setMyChats(prev => [newGroup, ...prev])
-            }
+            mutate((current) => [newGroup, ...(current ?? [])], { revalidate: false })
             setShowCreateChat(null)
             onOpenChat(group.id, group.name)
           }}
@@ -3800,24 +3778,34 @@ export interface ChatListPanelProps {
 }
 
 export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole }: ChatListPanelProps) {
-  const supabase = createClient()
   const router = useRouter()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
   })
-  const [churchChats, setChurchChats] = useState<ChatGroup[]>([])
-  const [archivedChurchChats, setArchivedChurchChats] = useState<ChatGroup[]>([])
-  const [myChats, setMyChats] = useState<ChatGroup[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
+  // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
+  // entry; revisits paint instantly from cache (no skeleton).
+  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+    userId && ministryId ? ["chat-list", userId, ministryId] : null,
+    fetchChatList,
+  )
+
+  const allGroups = data ?? []
+  const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
+  const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
+  const myChats = allGroups.filter((g) => g.type !== "church")
+  const loading = isLoading
+
+  // Optimistic unread-clear on the shared cache key.
   function clearUnread(groupId: string) {
-    const zero = (list: ChatGroup[]) => list.map(g => g.id === groupId ? { ...g, unread_count: 0 } : g)
-    setChurchChats(zero)
-    setMyChats(zero)
+    mutate(
+      (current) => (current ?? []).map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)),
+      { revalidate: false },
+    )
   }
 
   function handleOpenChatPanel(groupId: string, groupName: string) {
@@ -3830,50 +3818,12 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId])
 
+  // Revalidate the shared list when a chat closes (refreshKey bumps) — without
+  // fragmenting the cache by putting refreshKey in the SWR key.
   useEffect(() => {
-    async function load() {
-      // Single DB round-trip via get_chat_list RPC (replaces load-groups + N+1 per-group
-      // unread/last-message queries). Sibling of get_chat_previews but includes archived
-      // groups and adds the group_archived flag. Ministry scoping is enforced server-side.
-      type ChatListRow = {
-        group_id: string; group_name: string; group_type: string
-        group_archived: boolean | null; last_read_at: string | null
-        last_msg_content: string | null; last_msg_sender_id: string | null
-        last_msg_sender_name: string | null; last_msg_at: string | null
-        last_msg_type: string | null; unread_count: number
-      }
-
-      const { data } = await supabase.rpc("get_chat_list", {
-        p_user_id: userId,
-        p_ministry_id: ministryId,
-      })
-
-      const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
-        id: row.group_id,
-        name: row.group_name,
-        type: row.group_type,
-        archived: row.group_archived ?? false,
-        last_message: row.last_msg_content ?? null,
-        last_sender: row.last_msg_sender_name ?? null,
-        last_message_time: row.last_msg_at ?? null,
-        unread_count: Number(row.unread_count),
-      })) as ChatGroup[]
-
-      groups.sort((a, b) => {
-        if (!a.last_message_time && !b.last_message_time) return 0
-        if (!a.last_message_time) return 1
-        if (!b.last_message_time) return -1
-        return b.last_message_time.localeCompare(a.last_message_time)
-      })
-
-      setChurchChats(groups.filter((g) => g.type === "church" && !g.archived))
-      setArchivedChurchChats(groups.filter((g) => g.type === "church" && g.archived))
-      setMyChats(groups.filter((g) => g.type !== "church"))
-      setLoading(false)
-    }
-    load()
+    if (refreshKey) mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, refreshKey])
+  }, [refreshKey])
 
   const rawActive = subTab === "church" ? churchChats : myChats
   const active = search.trim()
@@ -4026,11 +3976,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
               unread_count: 0,
               archived: false,
             }
-            if (showCreateChat === "church") {
-              setChurchChats(prev => [newGroup, ...prev])
-            } else {
-              setMyChats(prev => [newGroup, ...prev])
-            }
+            mutate((current) => [newGroup, ...(current ?? [])], { revalidate: false })
             setShowCreateChat(null)
             onOpenChat(group.id, group.name)
           }}
