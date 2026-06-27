@@ -119,10 +119,13 @@ export function HomeTab({
 
 
   async function loadHomeData(): Promise<HomeData> {
+    // ── RT1: announcements, home verses, and curated slide rows ──
+    // All three need only ministryId, so they parallelize. (home_slides moved up
+    // from its old sequential position; the dead prayer-profile query is removed.)
     const [
       { data: anns },
-      { data: prayerProfile },
       { data: verses },
+      { data: slideRows },
     ] = await Promise.all([
       supabase
         .from("announcements")
@@ -132,22 +135,17 @@ export function HomeTab({
         .order("created_at", { ascending: false })
         .limit(10),
       supabase
-        .from("profiles")
-        .select("name, pray_for_me")
-        .eq("ministry_id", ministryId)
-        .not("pray_for_me", "is", null)
-        .neq("id", profile.id)
-        .limit(1)
-        .maybeSingle(),
-      supabase
         .from("home_verses")
         .select("reference, text")
         .eq("ministry_id", ministryId)
         .order("order_index", { ascending: true }),
+      supabase
+        .from("home_slides")
+        .select("id, slide_type, announcement_id, calendar_event_id, order_index, image_url, caption, eyebrow, panel_color, created_at")
+        .eq("ministry_id", ministryId)
+        .eq("is_active", true)
+        .order("order_index", { ascending: true }),
     ])
-
-    // suppress unused variable warning for prayerProfile (state was removed but fetch kept)
-    void prayerProfile
 
     let homeVerse: { reference: string; text: string } | null = null
     if (verses && verses.length > 0) {
@@ -161,7 +159,18 @@ export function HomeTab({
     const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
     const eventCount = list.filter((a) => a.is_event).length
 
-    const [{ data: myRsvps }, { data: heroRsvpRows }] = await Promise.all([
+    const rows = slideRows ?? []
+    const slideAnnIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
+    const slideEvIds = rows.filter((r) => r.slide_type === "event").map((r) => r.calendar_event_id).filter(Boolean) as string[]
+
+    // ── RT2: my RSVPs + hero attendee rows (need announcement data) AND slide
+    // announcement/event resolution (need home_slides rows) — all from RT1, parallel. ──
+    const [
+      { data: myRsvps },
+      { data: heroRsvpRows },
+      { data: slideAnns },
+      { data: slideEvents },
+    ] = await Promise.all([
       list.length > 0
         ? supabase
             .from("rsvps")
@@ -172,10 +181,21 @@ export function HomeTab({
       hero
         ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
         : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+      slideAnnIds.length
+        ? supabase.from("announcements").select("id, title, body, is_event").in("id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
+      slideEvIds.length
+        ? supabase
+            .from("calendar_events")
+            .select("id, title, description, location, start_date, end_date, all_day, linked_announcement_id")
+            .in("id", slideEvIds)
+            .eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
     ])
 
     const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
 
+    // Hero RSVP scalar state (attendee NAMES are resolved in the combined RT4 below).
     let featuredShowAttendees = false
     let userHasRsvped = false
     let rsvpCount = 0
@@ -183,16 +203,7 @@ export function HomeTab({
     if (hero) {
       featuredShowAttendees = hero.show_attendees ?? false
       userHasRsvped = userRsvpIds.has(hero.id)
-      const rows = heroRsvpRows ?? []
-      rsvpCount = rows.length
-
-      if (rows.length > 0) {
-        const { data: profileRows } = await supabase
-          .from("profiles").select("id, name")
-          .in("id", rows.map((r) => r.user_id))
-          .eq("ministry_id", ministryId)
-        rsvpAttendees = (profileRows ?? []).map((p) => ({ user_id: p.id, name: p.name }))
-      }
+      rsvpCount = (heroRsvpRows ?? []).length
     }
 
     const heroId = hero?.id
@@ -205,117 +216,109 @@ export function HomeTab({
       })
       .slice(0, 3)
 
-    // ── Curated hero slides: resolve each home_slides row to LIVE referenced data ──
-    const { data: slideRows } = await supabase
-      .from("home_slides")
-      .select("id, slide_type, announcement_id, calendar_event_id, order_index, image_url, caption, eyebrow, panel_color, created_at")
-      .eq("ministry_id", ministryId)
-      .eq("is_active", true)
-      .order("order_index", { ascending: true })
+    // ── Build curated hero slides from the resolved announcement/event data (RT2). ──
+    const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
+    const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
 
-    const rows = slideRows ?? []
-    let slides: HeroSlide[] = []
+    const slides: HeroSlide[] = []
+    for (const r of rows) {
+      if (r.slide_type === "photo") {
+        if (!r.image_url) continue
+        slides.push({
+          kind: "photo",
+          key: r.id,
+          imageUrl: r.image_url,
+          caption: r.caption ?? "",
+          eyebrow: r.eyebrow ?? "Featured",
+          panelColor: r.panel_color,
+          meta: r.created_at
+            ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+            : null,
+        })
+      } else if (r.slide_type === "announcement") {
+        const a = annMap.get(r.announcement_id ?? "")
+        if (!a) continue
+        slides.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
+      } else {
+        const e = evMap.get(r.calendar_event_id ?? "")
+        if (!e) continue
+        slides.push({
+          kind: "event",
+          key: r.id,
+          calendarEventId: e.id,
+          linkedAnnouncementId: e.linked_announcement_id,
+          title: e.title,
+          body: e.description,
+          eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
+          imageUrl: r.image_url,
+          panelColor: r.panel_color,
+        })
+      }
+    }
+
+    // RSVP wiring keyed on announcement_id (event slides reuse their linked announcement).
+    const rsvpAnnIds = new Set<string>()
+    for (const s of slides) {
+      if (s.kind === "announcement" && s.isEvent) rsvpAnnIds.add(s.announcementId)
+      else if (s.kind === "event" && s.linkedAnnouncementId) rsvpAnnIds.add(s.linkedAnnouncementId)
+    }
+    const rsvpIdArr = [...rsvpAnnIds]
+
     let slideRsvpedIds = new Set<string>()
     let slideRsvpCounts: Record<string, number> = {}
-    let slideRsvpAttendees: Record<string, RsvpAttendee[]> = {}
+    const slideRsvpAttendees: Record<string, RsvpAttendee[]> = {}
     let slideShowAttendeesIds = new Set<string>()
+    let slideByAnnUserIds: Record<string, string[]> = {}
+    let slideUserIds: string[] = []
 
-    if (rows.length > 0) {
-      const annIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
-      const evIds = rows.filter((r) => r.slide_type === "event").map((r) => r.calendar_event_id).filter(Boolean) as string[]
-
-      const [{ data: slideAnns }, { data: slideEvents }] = await Promise.all([
-        annIds.length
-          ? supabase.from("announcements").select("id, title, body, is_event").in("id", annIds).eq("ministry_id", ministryId)
-          : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
-        evIds.length
-          ? supabase
-              .from("calendar_events")
-              .select("id, title, description, location, start_date, end_date, all_day, linked_announcement_id")
-              .in("id", evIds)
-              .eq("ministry_id", ministryId)
-          : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
+    // ── RT3: slide RSVP state (needs the slide announcement IDs from RT2). ──
+    if (rsvpIdArr.length > 0) {
+      const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
+        supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
+        supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
+        supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
       ])
 
-      const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
-      const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
-
-      const built: HeroSlide[] = []
-      for (const r of rows) {
-        if (r.slide_type === "photo") {
-          if (!r.image_url) continue
-          built.push({
-            kind: "photo",
-            key: r.id,
-            imageUrl: r.image_url,
-            caption: r.caption ?? "",
-            eyebrow: r.eyebrow ?? "Featured",
-            panelColor: r.panel_color,
-            meta: r.created_at
-              ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-              : null,
-          })
-        } else if (r.slide_type === "announcement") {
-          const a = annMap.get(r.announcement_id ?? "")
-          if (!a) continue
-          built.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
-        } else {
-          const e = evMap.get(r.calendar_event_id ?? "")
-          if (!e) continue
-          built.push({
-            kind: "event",
-            key: r.id,
-            calendarEventId: e.id,
-            linkedAnnouncementId: e.linked_announcement_id,
-            title: e.title,
-            body: e.description,
-            eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
-            imageUrl: r.image_url,
-            panelColor: r.panel_color,
-          })
-        }
+      const counts: Record<string, number> = {}
+      const byAnnUserIds: Record<string, string[]> = {}
+      for (const row of allR ?? []) {
+        counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
+        ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
       }
-      slides = built
 
-      // RSVP wiring keyed on announcement_id (event slides reuse their linked announcement).
-      const rsvpAnnIds = new Set<string>()
-      for (const s of built) {
-        if (s.kind === "announcement" && s.isEvent) rsvpAnnIds.add(s.announcementId)
-        else if (s.kind === "event" && s.linkedAnnouncementId) rsvpAnnIds.add(s.linkedAnnouncementId)
-      }
-      const rsvpIdArr = [...rsvpAnnIds]
+      slideRsvpedIds = new Set((myR ?? []).map((r) => r.announcement_id))
+      slideRsvpCounts = counts
+      slideByAnnUserIds = byAnnUserIds
+      slideShowAttendeesIds = new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id))
+      slideUserIds = (allR ?? []).map((r) => r.user_id)
+    }
 
-      if (rsvpIdArr.length > 0) {
-        const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
-          supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
-          supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
-          supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
-        ])
+    // ── RT4: ONE profiles lookup for BOTH hero attendees (RT2) and slide
+    // attendees (RT3), unioned + deduped — replaces the two old separate fetches. ──
+    const profileUserIds = new Set<string>()
+    for (const r of heroRsvpRows ?? []) profileUserIds.add(r.user_id)
+    for (const uid of slideUserIds) profileUserIds.add(uid)
 
-        const counts: Record<string, number> = {}
-        const byAnnUserIds: Record<string, string[]> = {}
-        for (const row of allR ?? []) {
-          counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
-          ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
-        }
+    let nameById = new Map<string, string>()
+    if (profileUserIds.size > 0) {
+      const { data: profs } = await supabase
+        .from("profiles").select("id, name")
+        .in("id", [...profileUserIds])
+        .eq("ministry_id", ministryId)
+      nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
+    }
 
-        const allUserIds = [...new Set((allR ?? []).map((r) => r.user_id))]
-        let nameById = new Map<string, string>()
-        if (allUserIds.length) {
-          const { data: profs } = await supabase.from("profiles").select("id, name").in("id", allUserIds).eq("ministry_id", ministryId)
-          nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
-        }
+    // Hero attendees: derive from the fetched profiles (drop any user whose profile
+    // wasn't returned — matches the original behavior, which mapped only profile rows).
+    if (hero && (heroRsvpRows ?? []).length > 0) {
+      rsvpAttendees = (heroRsvpRows ?? [])
+        .filter((r) => nameById.has(r.user_id))
+        .map((r) => ({ user_id: r.user_id, name: nameById.get(r.user_id)! }))
+    }
 
-        const attendeesMap: Record<string, RsvpAttendee[]> = {}
-        for (const [annId, uids] of Object.entries(byAnnUserIds)) {
-          attendeesMap[annId] = uids.map((uid) => ({ user_id: uid, name: nameById.get(uid) ?? "" }))
-        }
-
-        slideRsvpedIds = new Set((myR ?? []).map((r) => r.announcement_id))
-        slideRsvpCounts = counts
-        slideRsvpAttendees = attendeesMap
-        slideShowAttendeesIds = new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id))
-      }
+    // Slide attendees: keep every RSVPer (empty name if profile missing) — matches original.
+    for (const [annId, uids] of Object.entries(slideByAnnUserIds)) {
+      slideRsvpAttendees[annId] = uids.map((uid) => ({ user_id: uid, name: nameById.get(uid) ?? "" }))
     }
 
     return {
