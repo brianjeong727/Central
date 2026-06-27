@@ -762,15 +762,23 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     loadAnnouncements
   )
 
-  // True toggle: flips going state and count, and optimistically updates attendee
-  // list. Desktop RSVP buttons call this for a display-only optimistic update
-  // (matching prior behavior — they did not persist to the DB); revalidate:false
-  // keeps the cache from refetching over the optimistic edit.
+  // True toggle: flips going state and count, optimistically updates the attendee
+  // list, AND persists to the rsvps table. Used by the desktop RSVP buttons and
+  // passed to the mobile AnnouncementCard as onRsvpToggle (single source of truth).
+  // SWR optimistic mutate: `optimisticData` flips the cache instantly, the DB
+  // write runs inside the async updater, and `rollbackOnError` reverts the cache
+  // if the write throws. revalidate:false keeps the cache from refetching over
+  // the optimistic edit. Mirrors the canonical rsvps write (delete on un-RSVP /
+  // upsert on RSVP); rsvps has no ministry_id column — ministry scoping is
+  // enforced by the table's RLS join to announcements (correct exception to #8).
   function handleRsvpToggle(announcementId: string) {
-    mutateAnnouncements((prev) =>
-      (prev ?? []).map((ann) => {
+    const current = (announcements ?? []).find((a) => a.id === announcementId)
+    if (!current) return
+    const wasRsvped = current.user_has_rsvped
+
+    const applyToggle = (list: EnrichedAnnouncement[] | undefined): EnrichedAnnouncement[] =>
+      (list ?? []).map((ann) => {
         if (ann.id !== announcementId) return ann
-        const wasRsvped = ann.user_has_rsvped
         const newAttendees = wasRsvped
           ? ann.rsvp_attendees.filter((a) => a.user_id !== userId)
           : [...ann.rsvp_attendees, { user_id: userId, name: userName }]
@@ -780,8 +788,20 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           rsvp_count: wasRsvped ? Math.max(0, ann.rsvp_count - 1) : ann.rsvp_count + 1,
           rsvp_attendees: newAttendees,
         }
-      }),
-      { revalidate: false }
+      })
+
+    mutateAnnouncements(
+      async (prev) => {
+        if (wasRsvped) {
+          const { error } = await supabase.from("rsvps").delete().eq("announcement_id", announcementId).eq("user_id", userId)
+          if (error) throw error
+        } else {
+          const { error } = await supabase.from("rsvps").upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+          if (error) throw error
+        }
+        return applyToggle(prev)
+      },
+      { optimisticData: applyToggle, rollbackOnError: true, revalidate: false, populateCache: true }
     )
   }
 
@@ -1137,25 +1157,18 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, isPinned, featured = false, userId, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, isPinned, featured = false, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
   const supabase = createClient()
-  const [rsvping, setRsvping] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
-  async function handleRsvp() {
-    if (rsvping) return
-    setRsvping(true)
+  // Persistence is owned by the parent's handleRsvpToggle (single source of truth);
+  // this only triggers the optimistic toggle, which reads back via the prop.
+  function handleRsvp() {
     onRsvpToggle(announcement.id)
-    if (announcement.user_has_rsvped) {
-      await supabase.from("rsvps").delete().eq("announcement_id", announcement.id).eq("user_id", userId)
-    } else {
-      await supabase.from("rsvps").upsert({ announcement_id: announcement.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
-    }
-    setRsvping(false)
   }
 
   async function handleDelete() {
@@ -1222,7 +1235,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1310,7 +1323,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
           {announcement.is_event && (
             <div className="pt-3 border-t border-[var(--line-3)]">
               <div className="flex items-center gap-3">
-                <button onClick={handleRsvp} disabled={rsvping} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
+                <button onClick={handleRsvp} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                   {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
                 </button>
                 {announcement.rsvp_count > 0 && <span className="text-[12px] text-[var(--muted-text)] font-medium">{announcement.rsvp_count} going</span>}
