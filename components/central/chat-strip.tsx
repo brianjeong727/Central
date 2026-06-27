@@ -3,6 +3,7 @@
 import { CSSProperties } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
 import { EYEBROW_STYLE } from "@/app/home/components/shared"
+import { MonogramChip } from "./MonogramChip"
 
 interface ChatStripProps {
   chats: ChatPreview[]
@@ -89,22 +90,10 @@ function StripCard({ chat, index, onOpen }: {
       onMouseLeave={e => (e.currentTarget.style.background = "var(--cream-3)")}
     >
       {/* Serif monogram */}
-      <div style={{
-        width: 36,
-        height: 36,
-        borderRadius: 999,
-        flexShrink: 0,
-        background: "var(--plum)",
-        display: "grid",
-        placeItems: "center",
-        overflow: "hidden",
-        fontSize: 16,
-        fontWeight: 400,
-        fontFamily: "var(--serif)",
-        color: "var(--cream)",
-      }}>
-        {chat.groupName.charAt(0)}
-      </div>
+      <MonogramChip
+        initials={chat.groupName.charAt(0)}
+        style={{ width: 36, height: 36, fontSize: 16, fontWeight: 400, fontFamily: "var(--serif)" }}
+      />
 
       {/* Text content */}
       <div style={{ flex: 1, minWidth: 0 }}>

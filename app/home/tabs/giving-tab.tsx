@@ -8,8 +8,7 @@ import {
   FileText, ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE } from "../components/shared"
-import { TabPageHeader, PageTitle } from "@/components/central"
-import { PlanSubTabStrip } from "./plan-tab"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
@@ -126,7 +125,7 @@ function RPersonChip({ name }: { name: string }) {
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 3px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>
-      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "grid", placeItems: "center", fontSize: 7.5, fontWeight: 600, flexShrink: 0, letterSpacing: 0.3 }}>{initials.toUpperCase()}</span>
+      <MonogramChip initials={initials.toUpperCase()} style={{ width: 20, height: 20, fontSize: 7.5, fontWeight: 600, letterSpacing: 0.3 }} />
       {name}
     </span>
   )
@@ -145,9 +144,7 @@ function Initials({ name, size = 28 }: { name: string; size?: number }) {
   const parts = name.trim().split(" ")
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.36, fontWeight: 600, flexShrink: 0 }}>
-      {initials.toUpperCase()}
-    </div>
+    <MonogramChip initials={initials.toUpperCase()} style={{ width: size, height: size, fontSize: size * 0.36, fontWeight: 600 }} />
   )
 }
 

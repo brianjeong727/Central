@@ -24,8 +24,7 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { getInitials } from "../utils"
-import { MonogramChip, PageTitle, SectionHeader, TabPageHeader } from "@/components/central"
-import { PlanSubTabStrip } from "./plan-tab"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader } from "@/components/central"
 
 interface MemberRow {
   id: string

@@ -43,7 +43,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip } from "@/components/central"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -2269,53 +2269,6 @@ export function PlanTab({
         />
       )}
 
-    </div>
-  )
-}
-
-// ── PlanSubTabStrip ────────────────────────────────────────────────────────────
-// Single canonical tab strip used by every team page in the Plan tab.
-// Implements §4.2 exactly: underline only, no pills, no segmented backgrounds.
-export function PlanSubTabStrip({
-  tabs,
-  active,
-  onChange,
-}: {
-  tabs: readonly { key: string; label: string }[]
-  active: string
-  onChange: (key: string) => void
-}) {
-  return (
-    // Outer div: scroll container only — no border (replaced by soft hairline below)
-    <div style={{ overflowX: "auto", scrollbarWidth: "none" as const }}>
-      {/* Label row: 56px left inset on desktop, aligns with TabPageHeader's px-14 */}
-      <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            style={{
-              padding: "12px 0 14px",
-              fontSize: 15,
-              fontFamily: "var(--font-inter)",
-              fontWeight: active === key ? 600 : 400,
-              color: active === key ? "#2D0F2E" : "#8A8497",
-              border: "none",
-              borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
-              marginBottom: -1,
-              background: "none",
-              cursor: "pointer",
-              whiteSpace: "nowrap" as const,
-              outline: "none",
-              flexShrink: 0,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
-      <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
     </div>
   )
 }
@@ -11721,9 +11674,7 @@ function SmallGroupLeadersTab({
                             className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}
                             style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
                           >
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
-                              {getInitials(m.name)}
-                            </div>
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-semibold" />
                             <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
                             {selected && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
                           </div>
@@ -11753,9 +11704,7 @@ function SmallGroupLeadersTab({
                 <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
-                        {getInitials(m.name)}
-                      </div>
+                      <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                       <p className="flex-1 text-[14px] text-[#13101A]">{m.name}</p>
                     </div>
                   ))}
@@ -11804,7 +11753,7 @@ function SmallGroupLeadersTab({
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                             <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
@@ -11830,7 +11779,7 @@ function SmallGroupLeadersTab({
                         if (!person) return null
                         return (
                           <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[#EFE9DA]" style={{ background: "rgba(62,21,64,0.03)" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(person.name)}</div>
+                            <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-semibold" />
                             <p className="flex-1 text-[14px] text-[#13101A]">{person.name}</p>
                             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
                             <button onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
@@ -11849,7 +11798,7 @@ function SmallGroupLeadersTab({
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
                               <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}>
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(p.name)}</div>
+                                <MonogramChip initials={getInitials(p.name)} className="w-7 h-7 text-[11px] font-semibold" />
                                 <p style={{ fontSize: 13, color: "#13101A" }}>{p.name}</p>
                               </div>
                             ))}
@@ -11884,7 +11833,7 @@ function SmallGroupLeadersTab({
                         <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
+                          <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                           <p className="text-[14px] text-[#13101A]">{m.name}</p>
                         </div>
                       ))}
@@ -12607,9 +12556,7 @@ function BibleStudySubTab({
               return (
                 <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                      {getInitials(p.name)}
-                    </div>
+                    <MonogramChip initials={getInitials(p.name)} style={{ width: 28, height: 28, fontSize: 11, fontWeight: 600 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, color: "#13101A", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
                       {p.progress_note && !isMe && (
