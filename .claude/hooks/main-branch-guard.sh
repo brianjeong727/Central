@@ -3,6 +3,10 @@
 # `git push` that would update main/master on the remote.
 # Exit 2 blocks the tool call and feeds the message back to Claude.
 #
+# EXCEPTION: a single-use sentinel at .claude/.ship-authorized (created only by
+# /ship, which Brian types himself) permits exactly ONE protected-branch write,
+# then is consumed. The guard re-arms immediately.
+#
 # Parses the ACTUAL git command (handles compound commands, global options,
 # and push refspecs) and the ACTUAL current branch — no loose string-matching.
 INPUT=$(cat)
@@ -18,10 +22,19 @@ esac
 # Actual current branch (empty if not a repo / detached HEAD).
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
+# Sentinel: created only by /ship. Single-use — consumed on first honor.
+SENTINEL="${CLAUDE_PROJECT_DIR:-.}/.claude/.ship-authorized"
+
 is_protected() { [ "$1" = "main" ] || [ "$1" = "master" ]; }
 
 block() {
-  echo "BLOCKED: $1 Switch to a feature branch first (e.g. \`git switch -c <name>\`) — never commit or push on main/master." >&2
+  # The ONE sanctioned exception: a present /ship sentinel. Consume and allow.
+  if [ -f "$SENTINEL" ]; then
+    rm -f "$SENTINEL"
+    echo "main-branch-guard: /ship sentinel honored (single-use, now consumed)." >&2
+    exit 0
+  fi
+  echo "BLOCKED: $1 Switch to a feature branch first (e.g. \`git switch -c <name>\`) — never commit or push on main/master. (Sanctioned merges to main go through /ship, which Brian types himself, or a GitHub PR.)" >&2
   exit 2
 }
 
