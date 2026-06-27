@@ -3832,80 +3832,43 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("group_members")
-        .select("groups(id, name, type, archived, ministry_id), last_read_at")
-        .eq("user_id", userId)
-
-      type RawMember = {
-        groups: { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null } | { id: string; name: string; type: string; archived: boolean | null; ministry_id: string | null }[] | null
-        last_read_at: string | null
+      // Single DB round-trip via get_chat_list RPC (replaces load-groups + N+1 per-group
+      // unread/last-message queries). Sibling of get_chat_previews but includes archived
+      // groups and adds the group_archived flag. Ministry scoping is enforced server-side.
+      type ChatListRow = {
+        group_id: string; group_name: string; group_type: string
+        group_archived: boolean | null; last_read_at: string | null
+        last_msg_content: string | null; last_msg_sender_id: string | null
+        last_msg_sender_name: string | null; last_msg_at: string | null
+        last_msg_type: string | null; unread_count: number
       }
 
-      const allWithLastRead = (data ?? [])
-        .map((m: RawMember) => {
-          if (!m.groups) return null
-          const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-          if (!g || g.ministry_id !== ministryId) return null
-          return {
-            id: g.id,
-            name: g.name,
-            type: g.type,
-            archived: g.archived ?? false,
-            last_message: null,
-            last_sender: null,
-            last_message_time: null,
-            unread_count: 0,
-            _lastReadAt: m.last_read_at,
-          }
-        })
-        .filter(Boolean) as (ChatGroup & { _lastReadAt: string | null })[]
+      const { data } = await supabase.rpc("get_chat_list", {
+        p_user_id: userId,
+        p_ministry_id: ministryId,
+      })
 
-      const withUnread = await Promise.all(
-        allWithLastRead.map(async ({ _lastReadAt, ...group }) => {
-          let countQuery = supabase
-            .from("messages")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", group.id)
-            .neq("sender_id", userId)
-            .eq("message_type", "user")
-          if (_lastReadAt) countQuery = countQuery.gt("created_at", _lastReadAt)
+      const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
+        id: row.group_id,
+        name: row.group_name,
+        type: row.group_type,
+        archived: row.group_archived ?? false,
+        last_message: row.last_msg_content ?? null,
+        last_sender: row.last_msg_sender_name ?? null,
+        last_message_time: row.last_msg_at ?? null,
+        unread_count: Number(row.unread_count),
+      })) as ChatGroup[]
 
-          const [{ count }, { data: lastMsgData }] = await Promise.all([
-            countQuery,
-            supabase
-              .from("messages")
-              .select("content, created_at, profiles!sender_id(name)")
-              .eq("group_id", group.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle(),
-          ])
-
-          const senderProfile = lastMsgData
-            ? (Array.isArray(lastMsgData.profiles) ? lastMsgData.profiles[0] : lastMsgData.profiles) as { name: string } | null
-            : null
-
-          return {
-            ...group,
-            unread_count: count ?? 0,
-            last_message: lastMsgData?.content ?? null,
-            last_sender: senderProfile?.name ?? null,
-            last_message_time: lastMsgData?.created_at ?? null,
-          }
-        })
-      )
-
-      withUnread.sort((a, b) => {
+      groups.sort((a, b) => {
         if (!a.last_message_time && !b.last_message_time) return 0
         if (!a.last_message_time) return 1
         if (!b.last_message_time) return -1
         return b.last_message_time.localeCompare(a.last_message_time)
       })
 
-      setChurchChats(withUnread.filter((g) => g.type === "church" && !g.archived))
-      setArchivedChurchChats(withUnread.filter((g) => g.type === "church" && g.archived))
-      setMyChats(withUnread.filter((g) => g.type !== "church"))
+      setChurchChats(groups.filter((g) => g.type === "church" && !g.archived))
+      setArchivedChurchChats(groups.filter((g) => g.type === "church" && g.archived))
+      setMyChats(groups.filter((g) => g.type !== "church"))
       setLoading(false)
     }
     load()
