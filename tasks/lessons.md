@@ -183,3 +183,14 @@ Date: 2026-06-27
 `npm run build` (next build) and `npm run dev` (next dev) BOTH write to the same `.next` directory. If a dev server is live in a worktree while verification/build cycles run `npm run build` in that SAME worktree, they corrupt each other's Turbopack persistent cache — symptom: `Failed to write page endpoint`, `Failed to restore task data (corrupted database or bug)`, missing `.sst` / `build-manifest.json`, Turbopack panics, and the dev server returns 500 even though `npm run build` passes standalone. The code is fine; only the cache is poisoned.
 
 **Rule:** while actively running engineer/tester build cycles in a worktree, keep that worktree's dev server STOPPED. Start the dev server only for a testing handoff, after the build cycles are done — and don't run `npm run build` again while it's up. Recovery if it happens: kill the dev server, `rm -rf .next`, restart. (Caused by the `git worktree move` era too: a moved `.next` carries stale absolute paths — always `rm -rf .next` after moving a worktree.)
+
+## Adding a dependency: update the lockfile the project ACTUALLY uses (pnpm here)
+Date: 2026-06-27
+
+This repo commits BOTH `package-lock.json` (npm) and `pnpm-lock.yaml` (pnpm), but **Vercel builds with `pnpm install --frozen-lockfile`**. When `swr` was added via `npm install --legacy-peer-deps`, only `package-lock.json` updated — `pnpm-lock.yaml` stayed stale. Local `npm run build` passed (npm had swr), but EVERY Vercel deploy failed at the install step in 4–7s with `ERR_PNPM_OUTDATED_LOCKFILE` (lockfile not up to date with package.json). The code was never the problem.
+
+**Rules:**
+- When adding/removing a dependency, run **`pnpm install`** (this project uses pnpm on Vercel) and commit the updated **`pnpm-lock.yaml`**. Don't add deps with npm here.
+- A fast Vercel failure (a few seconds, before compilation) is almost always the **install step** (lockfile/peer mismatch), NOT a code/type error. A passing local `npm run build` does NOT prove the Vercel install will succeed if the two package managers' lockfiles diverge.
+- Diagnose Vercel failures from the actual build log (`mcp__vercel__get_deployment_build_logs`, errorsOnly) before guessing.
+- To verify before pushing, run the exact thing Vercel runs: `pnpm install --frozen-lockfile` (exit 0 = good).
