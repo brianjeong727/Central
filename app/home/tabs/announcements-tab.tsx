@@ -174,11 +174,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     return (
       <div className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[var(--shell-offset)]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
-          <CheckCircle2 className="w-8 h-8 text-[#3E1540]" />
+          <CheckCircle2 className="w-8 h-8 text-[var(--plum)]" />
         </div>
         <div className="text-center">
-          <p className="text-[16px] font-bold text-[#13101A]">{isEditing ? "Announcement updated!" : savedAsDraft ? "Draft saved!" : "Announcement posted!"}</p>
-          <p className="text-[13px] text-[#8A8497] mt-1">{isEditing ? "Your changes have been saved." : savedAsDraft ? "Only leaders and admins can see this." : "Your announcement is now live."}</p>
+          <p className="text-[16px] font-bold text-[var(--ink)]">{isEditing ? "Announcement updated!" : savedAsDraft ? "Draft saved!" : "Announcement posted!"}</p>
+          <p className="text-[13px] text-[var(--muted-text)] mt-1">{isEditing ? "Your changes have been saved." : savedAsDraft ? "Only leaders and admins can see this." : "Your announcement is now live."}</p>
         </div>
       </div>
     )
@@ -189,14 +189,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   return (
     <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
+      <div className="flex-shrink-0 border-b border-[var(--line)] bg-[#FBF8F2]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
           <p style={monoStyle}>{isEditing ? "Edit announcement" : "New announcement · Draft"}</p>
           <button
             onClick={onClose}
-            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
           >
-            <X className="w-3.5 h-3.5 text-[#5A5466]" />
+            <X className="w-3.5 h-3.5 text-[var(--body)]" />
           </button>
         </div>
       </div>
@@ -204,50 +204,50 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       {/* Mobile: scrollable single column */}
       <div className="md:hidden flex-1 overflow-y-auto min-h-0">
         <form id="ann-form" onSubmit={handleSubmit} className="px-5 py-5 flex flex-col gap-4">
-          {error && <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+          {error && <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">{error}</div>}
+          <div className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
             <div className="px-4 pt-4 pb-1">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Title</label>
+              <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Title</label>
             </div>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }} className="w-full px-4 pt-1 pb-4 text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent border-b border-[#F2EDE8]" />
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" required style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em" }} className="w-full px-4 pt-1 pb-4 text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent border-b border-[#F2EDE8]" />
             <div className="px-4 pt-3 pb-1">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Body</label>
+              <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Body</label>
             </div>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={6} className="w-full px-4 pt-1 pb-4 text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent resize-none" style={{ lineHeight: "1.6" }} />
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={6} className="w-full px-4 pt-1 pb-4 text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent resize-none" style={{ lineHeight: "1.6" }} />
           </div>
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
-            <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase block mb-3">Audience</label>
+          <div className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+            <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase block mb-3">Audience</label>
             <div className="flex flex-wrap gap-2">
               {AUDIENCE_OPTIONS.map((opt) => (
-                <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[#3E1540] text-[#F6F4EF] border-[#3E1540]" : "bg-[#FBF8F2] text-[#5A5466] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
+                <button key={opt.value} type="button" onClick={() => setAudience(opt.value)} className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all ${audience === opt.value ? "bg-[var(--plum)] text-[#F6F4EF] border-[var(--plum)]" : "bg-[#FBF8F2] text-[var(--body)] border-[#E5E0D2] hover:border-[#3E1540]/40"}`}>{opt.label}</button>
               ))}
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
+          <div className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[13px] font-semibold text-[#13101A]">This is an event</p>
-                <p className="text-[11px] text-[#8A8497] mt-0.5">Shows an RSVP button on the card</p>
+                <p className="text-[13px] font-semibold text-[var(--ink)]">This is an event</p>
+                <p className="text-[11px] text-[var(--muted-text)] mt-0.5">Shows an RSVP button on the card</p>
               </div>
-              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "#3E1540" : "#E5E0D2" }}>
+              <button type="button" onClick={() => setIsEvent((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: isEvent ? "var(--plum)" : "#E5E0D2" }}>
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${isEvent ? "left-[22px]" : "left-0.5"}`} />
               </button>
             </div>
             {isEvent && (
               <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-[#F2EDE8]">
                 <div>
-                  <p className="text-[13px] font-semibold text-[#13101A]">Show attendees publicly</p>
-                  <p className="text-[11px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
+                  <p className="text-[13px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[11px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
-                <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: showAttendees ? "#3E1540" : "#E5E0D2" }}>
+                <button type="button" onClick={() => setShowAttendees((v) => !v)} className="relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0" style={{ background: showAttendees ? "var(--plum)" : "#E5E0D2" }}>
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ${showAttendees ? "left-[22px]" : "left-0.5"}`} />
                 </button>
               </div>
             )}
           </div>
-          <div className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+          <div className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
             <div className="px-4 pt-4 pb-3">
-              <label className="text-[10px] font-semibold text-[#8A8497] tracking-wider uppercase">Image <span className="text-[#C4C4C4] normal-case font-medium">— optional</span></label>
+              <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Image <span className="text-[#C4C4C4] normal-case font-medium">— optional</span></label>
             </div>
             {imagePreview ? (
               <div className="px-4 pb-4">
@@ -258,7 +258,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 </div>
               </div>
             ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-4 mb-4 h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[#8A8497] hover:border-[#3E1540]/40 hover:bg-[#FBF8F2] hover:text-[#3E1540]/70 transition-all" style={{ width: "calc(100% - 32px)" }}>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-4 mb-4 h-24 rounded-xl border-2 border-dashed border-[#3E1540]/20 flex flex-col items-center justify-center gap-2 text-[var(--muted-text)] hover:border-[#3E1540]/40 hover:bg-[#FBF8F2] hover:text-[#3E1540]/70 transition-all" style={{ width: "calc(100% - 32px)" }}>
                 <ImageIcon className="w-5 h-5" />
                 <span className="text-[12px] font-medium">Tap to add image</span>
               </button>
@@ -266,12 +266,12 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
           </div>
         </form>
-        <div className="bg-[#FBF8F2] border-t border-[#ECE8DE] px-5 py-4 flex flex-col gap-2">
-          <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-[#F6F4EF] font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide">
+        <div className="bg-[#FBF8F2] border-t border-[var(--line)] px-5 py-4 flex flex-col gap-2">
+          <button type="submit" form="ann-form" disabled={submitting} className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-[#F6F4EF] font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide">
             {submitting ? "Posting…" : isEditing ? "Save Changes" : "Post Announcement"}
           </button>
           {!isEditing && (
-            <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="w-full bg-transparent border border-[#E5E0D2] disabled:opacity-50 text-[#5A5466] font-semibold py-3 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
+            <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="w-full bg-transparent border border-[#E5E0D2] disabled:opacity-50 text-[var(--body)] font-semibold py-3 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
               Save as Draft
             </button>
           )}
@@ -281,50 +281,50 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       {/* Desktop: two-column editorial layout */}
       <form id="ann-form" onSubmit={handleSubmit} className="hidden md:flex flex-1 overflow-hidden">
         {/* Writing surface */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-[#E8E2D2]">
+        <div className="flex-1 flex flex-col overflow-hidden border-r border-[var(--line)]">
           <div className="flex-1 overflow-y-auto flex flex-col px-10 pt-8 pb-6">
-            {error && <div className="mb-6 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>}
+            {error && <div className="mb-6 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">{error}</div>}
             {/* Inline serif title — §4.4 */}
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="A clear, scannable headline"
-              className="placeholder:text-[#8A8497]"
+              className="placeholder:text-[var(--muted-text)]"
               style={{
                 fontFamily: "var(--font-instrument-serif)", fontSize: "40px",
-                letterSpacing: "-0.5px", color: "#13101A", lineHeight: 1.1,
-                background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF",
+                letterSpacing: "-0.5px", color: "var(--ink)", lineHeight: 1.1,
+                background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)",
                 outline: "none", width: "100%", paddingBottom: "16px", flexShrink: 0,
               }}
             />
             {/* 1px hairline separates title from body */}
-            <div style={{ height: 1, background: "#E2DDCF", flexShrink: 0, marginTop: 0 }} />
+            <div style={{ height: 1, background: "var(--line-2)", flexShrink: 0, marginTop: 0 }} />
             {/* Serif body — §4.4 */}
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write the full announcement here. Take all the space you need — share scripture, walk through logistics, link to sign-ups."
-              className="placeholder:text-[#8A8497] flex-1"
+              className="placeholder:text-[var(--muted-text)] flex-1"
               style={{
                 fontFamily: "var(--font-instrument-serif)", fontSize: "19px", lineHeight: "1.65",
-                color: "#13101A", background: "transparent", border: "none", outline: "none",
+                color: "var(--ink)", background: "transparent", border: "none", outline: "none",
                 resize: "none", width: "100%", marginTop: "20px", minHeight: "540px",
               }}
             />
           </div>
           {/* Footer — §7.3 */}
-          <div className="flex-shrink-0 border-t border-[#E8E2D2] px-10 py-4 flex items-center">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[10px] border border-[#E2DDCF] text-[13px] text-[#5A5466] hover:bg-[#F1ECDE] transition-colors">
+          <div className="flex-shrink-0 border-t border-[var(--line)] px-10 py-4 flex items-center">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-[10px] border border-[var(--line-2)] text-[13px] text-[var(--body)] hover:bg-[var(--ivory)] transition-colors">
               Cancel
             </button>
             <div className="flex-1" />
             {!isEditing && (
-              <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="mr-2 px-5 py-2.5 rounded-[10px] border border-[#E2DDCF] disabled:opacity-50 text-[#5A5466] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px] hover:bg-[#F1ECDE]">
+              <button type="button" disabled={submitting} onClick={e => handleSubmit(e as unknown as React.FormEvent, true)} className="mr-2 px-5 py-2.5 rounded-[10px] border border-[var(--line-2)] disabled:opacity-50 text-[var(--body)] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px] hover:bg-[var(--ivory)]">
                 Save draft
               </button>
             )}
-            <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[#2D0F2E] hover:bg-[#13101A] disabled:opacity-50 text-[#F6F4EF] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
+            <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-[10px] bg-[var(--plum-2)] hover:bg-[var(--ink)] disabled:opacity-50 text-[#F6F4EF] font-semibold active:scale-[0.97] transition-[transform,background-color] duration-150 text-[13px]">
               {submitting ? "Posting…" : isEditing ? "Save changes" : "Publish"}
             </button>
           </div>
@@ -343,9 +343,9 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                   onClick={() => setAudience(opt.value)}
                   style={{
                     padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                    border: `1px solid ${audience === opt.value ? "#2D0F2E" : "#E2DDCF"}`,
-                    background: audience === opt.value ? "#2D0F2E" : "#FBF8F2",
-                    color: audience === opt.value ? "#FBF8F2" : "#5A5466",
+                    border: `1px solid ${audience === opt.value ? "var(--plum-2)" : "var(--line-2)"}`,
+                    background: audience === opt.value ? "var(--plum-2)" : "#FBF8F2",
+                    color: audience === opt.value ? "#FBF8F2" : "var(--body)",
                     transition: "all 0.15s",
                   }}
                 >
@@ -355,7 +355,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+          <div style={{ borderTop: "1px solid var(--line)" }} />
 
           {/* Options — §4.9 toggles */}
           <div className="px-6 py-6 flex flex-col gap-5">
@@ -364,13 +364,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               <button
                 type="button"
                 onClick={() => setIsEvent((v) => !v)}
-                style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
               >
                 <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
               </button>
               <div>
-                <p className="text-[13px] font-medium text-[#13101A]">This is an event</p>
-                <p className="text-[12px] text-[#8A8497] mt-0.5">Adds RSVP button + calendar marker</p>
+                <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
+                <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Adds RSVP button + calendar marker</p>
               </div>
             </div>
             {isEvent && (
@@ -378,19 +378,19 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 <button
                   type="button"
                   onClick={() => setShowAttendees((v) => !v)}
-                  style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                  style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
                 >
                   <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                 </button>
                 <div>
-                  <p className="text-[13px] font-medium text-[#13101A]">Show attendees publicly</p>
-                  <p className="text-[12px] text-[#8A8497] mt-0.5">Members can see who&apos;s going</p>
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
               </div>
             )}
           </div>
 
-          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+          <div style={{ borderTop: "1px solid var(--line)" }} />
 
           {/* Attachment — §4.18 dashed placeholder */}
           <div className="px-6 py-6">
@@ -407,7 +407,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-7 rounded-[10px] border border-dashed border-[#C4C0B0] bg-transparent flex flex-col items-center justify-center gap-2 text-[#5A5466] hover:border-[#3E1540]/40 hover:bg-[#F1ECDE] transition-all"
+                className="w-full py-7 rounded-[10px] border border-dashed border-[#C4C0B0] bg-transparent flex flex-col items-center justify-center gap-2 text-[var(--body)] hover:border-[#3E1540]/40 hover:bg-[var(--ivory)] transition-all"
               >
                 <ImageIcon className="w-4 h-4" />
                 <span className="text-[12px]">Add image or file</span>
@@ -416,7 +416,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
           </div>
 
-          <div style={{ borderTop: "1px solid #E8E2D2" }} />
+          <div style={{ borderTop: "1px solid var(--line)" }} />
 
           {/* Form builder */}
           <div className="px-6 py-6">
@@ -430,24 +430,24 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     setFormFields([{ tempId: newTempId(), label: '', type: 'text', options: [], required: false }])
                   }
                 }}
-                style={{ width: 34, height: 20, borderRadius: 999, background: hasForm ? "#3E1540" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, transition: "background 0.2s" }}
+                style={{ width: 34, height: 20, borderRadius: 999, background: hasForm ? "var(--plum)" : "#D6D0C0", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, transition: "background 0.2s" }}
               >
                 <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "#FBF8F2", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: hasForm ? "16px" : "2px" }} />
               </button>
             </div>
-            <p className="text-[12px] text-[#8A8497] mb-4">Attach questions to this announcement</p>
+            <p className="text-[12px] text-[var(--muted-text)] mb-4">Attach questions to this announcement</p>
 
             {hasForm && (
               <div className="flex flex-col gap-4">
                 {formFields.map((field, idx) => (
-                  <div key={field.tempId} style={{ border: "1px solid #E8E2D2", borderRadius: 10, padding: "12px 14px", background: "#FAFAF8" }}>
+                  <div key={field.tempId} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", background: "#FAFAF8" }}>
                     {/* Field label */}
                     <input
                       type="text"
                       value={field.label}
                       onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, label: e.target.value } : f))}
                       placeholder="Question label…"
-                      style={{ width: "100%", fontSize: 13, color: "#13101A", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid #E2DDCF", paddingBottom: 6, marginBottom: 10 }}
+                      style={{ width: "100%", fontSize: 13, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 6, marginBottom: 10 }}
                     />
                     {/* Type pills */}
                     <div className="flex flex-wrap gap-1.5 mb-3">
@@ -463,9 +463,9 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                           onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, type: t.value, options: t.value !== 'text' && f.options.length === 0 ? ['Option 1'] : f.options } : f))}
                           style={{
                             padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: "pointer",
-                            border: `1px solid ${field.type === t.value ? "#3E1540" : "#E2DDCF"}`,
-                            background: field.type === t.value ? "#3E1540" : "transparent",
-                            color: field.type === t.value ? "#F6F4EF" : "#5A5466",
+                            border: `1px solid ${field.type === t.value ? "var(--plum)" : "var(--line-2)"}`,
+                            background: field.type === t.value ? "var(--plum)" : "transparent",
+                            color: field.type === t.value ? "#F6F4EF" : "var(--body)",
                           }}
                         >{t.label}</button>
                       ))}
@@ -484,7 +484,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                                 const opts = [...f.options]; opts[oi] = e.target.value
                                 return { ...f, options: opts }
                               }))}
-                              style={{ flex: 1, fontSize: 12, color: "#13101A", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid #E2DDCF", paddingBottom: 3 }}
+                              style={{ flex: 1, fontSize: 12, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 3 }}
                               placeholder={`Option ${oi + 1}`}
                             />
                             <button
@@ -497,7 +497,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                         <button
                           type="button"
                           onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: [...f.options, `Option ${f.options.length + 1}`] } : f))}
-                          style={{ fontSize: 11, color: "#8A8497", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0", marginTop: 2 }}
+                          style={{ fontSize: 11, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0", marginTop: 2 }}
                         >+ Add option</button>
                       </div>
                     )}
@@ -506,11 +506,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     <div className="flex items-center justify-between">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" checked={field.required} onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, required: e.target.checked } : f))} className="w-3 h-3" />
-                        <span style={{ fontSize: 11, color: "#8A8497" }}>Required</span>
+                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Required</span>
                       </label>
                       <div className="flex items-center gap-1">
-                        <button type="button" disabled={idx === 0} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#D6D0C0" : "#8A8497" }}><ChevronUp style={{ width: 12, height: 12 }} /></button>
-                        <button type="button" disabled={idx === formFields.length - 1} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === formFields.length - 1 ? "default" : "pointer", color: idx === formFields.length - 1 ? "#D6D0C0" : "#8A8497" }}><ChevronDown style={{ width: 12, height: 12 }} /></button>
+                        <button type="button" disabled={idx === 0} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#D6D0C0" : "var(--muted-text)" }}><ChevronUp style={{ width: 12, height: 12 }} /></button>
+                        <button type="button" disabled={idx === formFields.length - 1} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === formFields.length - 1 ? "default" : "pointer", color: idx === formFields.length - 1 ? "#D6D0C0" : "var(--muted-text)" }}><ChevronDown style={{ width: 12, height: 12 }} /></button>
                         <button type="button" onClick={() => setFormFields(prev => prev.filter(f => f.tempId !== field.tempId))} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#C4C0B0", marginLeft: 2 }}><Trash2 style={{ width: 11, height: 11 }} /></button>
                       </div>
                     </div>
@@ -520,7 +520,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 <button
                   type="button"
                   onClick={() => setFormFields(prev => [...prev, { tempId: newTempId(), label: '', type: 'text', options: [], required: false }])}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "transparent", color: "#8A8497", fontSize: 12, cursor: "pointer" }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "transparent", color: "var(--muted-text)", fontSize: 12, cursor: "pointer" }}
                 >
                   <Plus style={{ width: 12, height: 12 }} /> Add question
                 </button>
@@ -546,14 +546,14 @@ function InlineEditFields({
   onSave: () => void; onCancel: () => void
   saving: boolean; dark?: boolean
 }) {
-  const fg = dark ? "#F6F4EF" : "#13101A"
-  const fgMuted = dark ? "rgba(246,244,239,0.55)" : "#8A8497"
-  const fgBody = dark ? "rgba(246,244,239,0.78)" : "#5A5466"
-  const borderColor = dark ? "rgba(246,244,239,0.18)" : "#ECE8DE"
-  const chipSel = dark ? "rgba(246,244,239,0.22)" : "#3E1540"
+  const fg = dark ? "#F6F4EF" : "var(--ink)"
+  const fgMuted = dark ? "rgba(246,244,239,0.55)" : "var(--muted-text)"
+  const fgBody = dark ? "rgba(246,244,239,0.78)" : "var(--body)"
+  const borderColor = dark ? "rgba(246,244,239,0.18)" : "var(--line)"
+  const chipSel = dark ? "rgba(246,244,239,0.22)" : "var(--plum)"
   const chipSelText = dark ? "#F6F4EF" : "#F6F4EF"
   const chipUnsel = dark ? "transparent" : "transparent"
-  const chipUnselText = dark ? "rgba(246,244,239,0.45)" : "#5A5466"
+  const chipUnselText = dark ? "rgba(246,244,239,0.45)" : "var(--body)"
   const chipBorder = dark ? "rgba(246,244,239,0.2)" : "#E5E0D2"
 
   return (
@@ -604,7 +604,7 @@ function InlineEditFields({
           onClick={() => onIsEvent(!isEvent)}
           style={{
             width: 36, height: 20, borderRadius: 999, position: "relative", border: "none", cursor: "pointer",
-            background: isEvent ? (dark ? "rgba(246,244,239,0.4)" : "#3E1540") : (dark ? "rgba(246,244,239,0.15)" : "#E5E0D2"),
+            background: isEvent ? (dark ? "rgba(246,244,239,0.4)" : "var(--plum)") : (dark ? "rgba(246,244,239,0.15)" : "#E5E0D2"),
           }}
         >
           <span style={{
@@ -622,7 +622,7 @@ function InlineEditFields({
             onClick={() => onShowAttendees(!showAttendees)}
             style={{
               width: 36, height: 20, borderRadius: 999, position: "relative", border: "none", cursor: "pointer",
-              background: showAttendees ? (dark ? "rgba(246,244,239,0.4)" : "#3E1540") : (dark ? "rgba(246,244,239,0.15)" : "#E5E0D2"),
+              background: showAttendees ? (dark ? "rgba(246,244,239,0.4)" : "var(--plum)") : (dark ? "rgba(246,244,239,0.15)" : "#E5E0D2"),
             }}
           >
             <span style={{
@@ -645,7 +645,7 @@ function InlineEditFields({
           disabled={saving || !title.trim() || !body.trim()}
           style={{
             padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer",
-            background: dark ? "rgba(246,244,239,0.22)" : "#3E1540",
+            background: dark ? "rgba(246,244,239,0.22)" : "var(--plum)",
             color: dark ? "#F6F4EF" : "#F6F4EF",
             border: "none", opacity: saving || !title.trim() || !body.trim() ? 0.5 : 1,
           }}
@@ -1161,7 +1161,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
   if (featured) {
     return (
       <>
-        <div className="relative rounded-[22px] bg-[#3E1540] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
+        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
           <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
 
           {announcement.image_url && (
@@ -1190,16 +1190,16 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
                       <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
                     </button>
                     {showMenu && (
-                      <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[#ECE8DE] py-1 min-w-[140px]">
-                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
-                          {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[#3E1540]" /> : <Pin className="w-3.5 h-3.5 text-[#3E1540]" />}
+                      <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
+                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left">
+                          {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                           {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left">
-                          <Pin className="w-3.5 h-3.5 text-[#3E1540]" style={{ transform: "rotate(-45deg)" }} />
+                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left">
+                          <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
                           {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[#13101A] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[#3E1540]" />Edit</button>
+                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
                         <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
                     )}
@@ -1215,7 +1215,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[#3E1540] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} disabled={rsvping} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1468,13 +1468,13 @@ export function AnnouncementDetailView({
   function DetailContent() {
     if (loading) return (
       <div className="flex-1 flex items-center justify-center">
-        <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #E8E2D2", borderTopColor: "#3E1540", animation: "spin 0.7s linear infinite" }} />
+        <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--plum)", animation: "spin 0.7s linear infinite" }} />
       </div>
     )
     if (!ann) return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3">
-        <p className="text-[15px] font-medium text-[#13101A]">Announcement not found.</p>
-        <button onClick={onClose} className="text-[13px] text-[#5A5466] bg-transparent border-none cursor-pointer">← Close</button>
+        <p className="text-[15px] font-medium text-[var(--ink)]">Announcement not found.</p>
+        <button onClick={onClose} className="text-[13px] text-[var(--body)] bg-transparent border-none cursor-pointer">← Close</button>
       </div>
     )
     return (
@@ -1490,23 +1490,23 @@ export function AnnouncementDetailView({
             <div className="flex flex-wrap items-center gap-2">
               <span style={monoStyle}>{formatDate(ann.created_at)}</span>
               {ann.audience && ann.audience !== "all" && (
-                <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+                <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
               )}
-              {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
+              {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
             </div>
             {/* Serif title */}
-            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#13101A", margin: 0 }}>{ann.title}</h1>
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0 }}>{ann.title}</h1>
             {/* Body — newlines preserved */}
             <div style={{ fontFamily: DETAIL_SERIF, fontSize: 16, lineHeight: 1.7, color: "#2D2836", whiteSpace: "pre-wrap" }}>{ann.body}</div>
             {/* Divider + stats */}
-            <div style={{ height: 1, background: "#E8E2D2" }} />
+            <div style={{ height: 1, background: "var(--line)" }} />
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-              {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
+              <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+              {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
             </div>
             {/* RSVP */}
             {ann.is_event && (
-              <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+              <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
                 {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
               </button>
             )}
@@ -1515,7 +1515,7 @@ export function AnnouncementDetailView({
               <div>
                 <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+                  {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
                 </div>
               </div>
             )}
@@ -1523,7 +1523,7 @@ export function AnnouncementDetailView({
             {ann.has_form && (
               ann.user_has_responded
                 ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
             )}
           </div>
         </div>
@@ -1541,23 +1541,23 @@ export function AnnouncementDetailView({
               <div className="flex flex-wrap items-center gap-2.5 mb-3">
                 <span style={monoStyle}>{formatDate(ann.created_at)}</span>
                 {ann.audience && ann.audience !== "all" && (
-                  <span style={{ ...monoStyle, background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+                  <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
                 )}
-                {ann.is_pinned && <span style={{ ...monoStyle, color: "#3E1540" }}>📌 Pinned</span>}
+                {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
               </div>
               {/* Serif title — same sizing as edit modal's title input (40px) */}
-              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "#13101A", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid #E2DDCF", flexShrink: 0 }}>{ann.title}</h1>
+              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "var(--ink)", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid var(--line-2)", flexShrink: 0 }}>{ann.title}</h1>
               {/* Body — serif 19px, newlines preserved (matches edit modal body textarea) */}
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "#13101A", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "var(--ink)", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
               {/* Stats */}
-              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #E8E2D2", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-                <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-                {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[#8A8497]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
+              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--line)", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
+                {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
               </div>
               {/* RSVP */}
               {ann.is_event && (
                 <div style={{ marginTop: 20 }}>
-                  <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "#F1ECDE" : "#2D0F2E", color: ann.user_has_rsvped ? "#3E1540" : "#FBF8F2", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
+                  <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "#FBF8F2", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
                     {ann.user_has_rsvped ? <><Check style={{ width: 14, height: 14 }} />Going — click to undo</> : "RSVP"}
                   </button>
                 </div>
@@ -1567,7 +1567,7 @@ export function AnnouncementDetailView({
                 <div style={{ marginTop: 20 }}>
                   <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "#5A5466", background: "#F1ECDE", border: "1px solid #E2DDCF", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+                    {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
                   </div>
                 </div>
               )}
@@ -1576,7 +1576,7 @@ export function AnnouncementDetailView({
                 <div style={{ marginTop: 20 }}>
                   {ann.user_has_responded
                     ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-                    : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #3E1540", background: "transparent", color: "#3E1540", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
+                    : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
                   }
                 </div>
               )}
@@ -1592,11 +1592,11 @@ export function AnnouncementDetailView({
       {/* Exact same shell as CreateAnnouncementModal */}
       <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
         {/* Header — mirrors CreateAnnouncementModal: mono label left, close right, border-b */}
-        <div className="flex-shrink-0 border-b border-[#E8E2D2] bg-[#FBF8F2]">
+        <div className="flex-shrink-0 border-b border-[var(--line)] bg-[#FBF8F2]">
           <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
             <p style={monoStyle}>Announcement</p>
-            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X className="w-3.5 h-3.5 text-[#5A5466]" />
+            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <X className="w-3.5 h-3.5 text-[var(--body)]" />
             </button>
           </div>
         </div>
