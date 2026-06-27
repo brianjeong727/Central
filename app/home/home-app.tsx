@@ -24,6 +24,7 @@ import type { CalendarEvent } from "./types"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
 import { GivingTab } from "./tabs/giving-tab"
+import { GiveView } from "./components/give-view"
 import { ProfileTab } from "./tabs/profile-tab"
 import { SettingsTab } from "./tabs/settings-tab"
 import { FormsTab } from "./tabs/forms-tab"
@@ -158,16 +159,27 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
   const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
 
-  const validFinanceSections = ["give", "reimbursements", "budget", "allocation"] as const
-  const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | "allocation" | null
-  const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget" | "allocation">(
+  // Finance (back-office) is reimbursements / budget / allocation only. "Give" (member
+  // donation) is a separate surface — the `give` tab — not a finance section.
+  const canAccessFinance = isAdmin || isTreasurer || isDGL
+  const validFinanceSections = ["reimbursements", "budget", "allocation"] as const
+  const initialFinanceSection = searchParams.get("finance") as "reimbursements" | "budget" | "allocation" | null
+  const [financeSection, setFinanceSection] = useState<"reimbursements" | "budget" | "allocation">(
     initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
   )
 
-  function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
+  function handleFinanceSectionChange(s: "reimbursements" | "budget" | "allocation") {
     setFinanceSection(s)
-    replaceParam("finance", s === "give" ? null : s)
+    replaceParam("finance", s === "reimbursements" ? null : s)
   }
+
+  // Guard: a member with no finance access must never land on the (now back-office) Finance
+  // tab and see a blank content area. userTeams is seeded from the server (initialUserTeams),
+  // so canAccessFinance is correct on first render — no async bounce.
+  useEffect(() => {
+    if (activeTab === "giving" && !canAccessFinance) setActiveTab("home")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, canAccessFinance])
 
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
   const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
@@ -237,7 +249,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     switch (activeTab) {
       case "home":          return ["Central", "Home"]
       case "announcements": return ["Central", "Announcements"]
-      case "give":          return ["Central", "Finance"]
+      case "give":          return ["Central", "Give"]
       case "forms":         return ["Central", "Forms"]
       case "settings":      return ["Central", "Settings"]
       case "chats":         return ["Central", "Chats"]
@@ -711,7 +723,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             </div>
           )}
 
-          {(activeTab === "giving" || activeTab === "give") && (
+          {/* Member-facing Give surface — reachable by everyone */}
+          {activeTab === "give" && (
+            <div className="md:h-full md:overflow-y-auto">
+              <GiveView
+                ministryId={ministryId}
+                userId={userId}
+                userRole={initialProfile.role}
+              />
+            </div>
+          )}
+
+          {/* Back-office Finance — gated to finance-access users (never blank for others) */}
+          {activeTab === "giving" && canAccessFinance && (
             <div className="md:h-full md:overflow-y-auto">
               <GivingTab
                 ministryId={ministryId}
@@ -721,7 +745,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 isAdmin={isAdmin}
                 isTreasurer={isTreasurer}
                 isDGL={isDGL}
-                activeSection={activeTab === "give" ? "give" : financeSection}
+                activeSection={financeSection}
                 onSectionChange={handleFinanceSectionChange}
               />
             </div>

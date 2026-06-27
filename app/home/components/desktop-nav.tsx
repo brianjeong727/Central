@@ -72,7 +72,8 @@ export function DesktopSidebar({
     { id: "chats",     label: "Messages",  icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
-    { id: "giving",    label: "Finance",   icon: Wallet },
+    // Finance is back-office only — show only to users with finance access (never to plain members).
+    ...((isAdmin || isTreasurer || isDGL) ? [{ id: "giving" as Tab, label: "Finance", icon: Wallet }] : []),
     { id: "profile",   label: "You",       icon: User },
   ]
 

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { createClient } from "@/lib/supabase"
 import {
-  Pencil, Check, Copy, ExternalLink, Plus, ChevronDown, X,
+  Plus, X,
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
-  FileText, ImageIcon,
+  ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE } from "../components/shared"
 import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
@@ -39,8 +39,8 @@ interface Props {
   isAdmin: boolean
   isTreasurer: boolean
   isDGL: boolean
-  activeSection: "give" | "reimbursements" | "budget" | "allocation"
-  onSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
+  activeSection: "reimbursements" | "budget" | "allocation"
+  onSectionChange: (s: "reimbursements" | "budget" | "allocation") => void
 }
 
 interface DynamicCategory {
@@ -89,8 +89,6 @@ const DISMISSAL_REASONS = [
   { value: "cancelled", label: "Cancelled" },
   { value: "provided", label: "Provided" },
 ]
-
-const PRESET_AMOUNTS = ["10", "25", "50", "100", "250"]
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "10px 12px", border: "1px solid var(--line)",
@@ -145,25 +143,6 @@ function Initials({ name, size = 28 }: { name: string; size?: number }) {
   const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
   return (
     <MonogramChip initials={initials.toUpperCase()} style={{ width: size, height: size, fontSize: size * 0.36, fontWeight: 600 }} />
-  )
-}
-
-function GivingTrustPanel({ zelleInfo, onCopy, copied }: { zelleInfo: string; onCopy: () => void; copied: boolean }) {
-  return (
-    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
-      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Giving destination</p>
-      <div style={{ padding: "12px 14px", border: "1px solid var(--line)", background: "var(--cream)", borderRadius: 12, marginBottom: 12 }}>
-        <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 600, lineHeight: 1.2 }}>{zelleInfo}</p>
-        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>Zelle email or phone</p>
-      </div>
-      <button onClick={onCopy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
-        {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
-        {copied ? "Copied" : "Copy Zelle info"}
-      </button>
-      <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>
-        Central only stores your ministry&apos;s Zelle destination. Gifts, receipts, statements, and tax records stay with your ministry.
-      </p>
-    </div>
   )
 }
 
@@ -765,15 +744,7 @@ function ReimbursementCard({
 export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isTreasurer, isDGL, activeSection, onSectionChange }: Props) {
   const supabase = createClient()
 
-  // Give section
-  const [zelleInfo, setZelleInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [editValue, setEditValue] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [zelleFallback, setZelleFallback] = useState(false)
-  const [amount, setAmount] = useState("50")
 
   // Reimbursements
   const [dgForms, setDgForms] = useState<ReimbursementForm[]>([])
@@ -825,13 +796,11 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
   useEffect(() => {
     async function load() {
-      const [givingRes, limitsRes, eventsRes, customCatRes] = await Promise.all([
-        supabase.from("ministry_giving").select("zelle_info").eq("ministry_id", ministryId).maybeSingle(),
+      const [limitsRes, eventsRes, customCatRes] = await Promise.all([
         getReceiptLimits(ministryId),
         supabase.from("calendar_events").select("title").eq("ministry_id", ministryId).order("start_date"),
         getBudgetCategories(ministryId),
       ])
-      setZelleInfo(givingRes.data?.zelle_info ?? null)
       setLimits(limitsRes.data)
       // Dedupe calendar event titles (exclude "DG Dinner" — it's already permanent)
       const seen = new Set<string>(["DG Dinner"])
@@ -876,37 +845,21 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection])
 
+  // Defense-in-depth: never render a blank Finance tab. If the active section isn't
+  // accessible to this user (e.g. a DGL-only user deep-linked to ?finance=budget),
+  // fall back to the first section they can actually open.
+  useEffect(() => {
+    if ((activeSection === "budget" || activeSection === "allocation") && !canAccessBudget) {
+      onSectionChange("reimbursements")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, canAccessBudget])
+
   async function loadBudget() {
     setBudgetLoading(true)
     const { data } = await getBudgetEntries(ministryId)
     setBudgetEntries(data)
     setBudgetLoading(false)
-  }
-
-  async function handleSave() {
-    if (!isAdmin) return
-    const val = editValue.trim(); if (!val) return
-    setSaving(true)
-    const { error } = await supabase.from("ministry_giving").upsert({ ministry_id: ministryId, zelle_info: val, updated_by: userId, updated_at: new Date().toISOString() }, { onConflict: "ministry_id" })
-    if (!error) { setZelleInfo(val); setEditing(false) }
-    setSaving(false)
-  }
-
-  function handleCopy() {
-    if (!zelleInfo) return
-    navigator.clipboard.writeText(zelleInfo).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
-  }
-
-  function handleOpenZelle() {
-    if (window.innerWidth < 768) {
-      setZelleFallback(false)
-      window.location.href = "zelle://"
-      const t = setTimeout(() => setZelleFallback(true), 500)
-      const onHide = () => { clearTimeout(t); document.removeEventListener("visibilitychange", onHide) }
-      document.addEventListener("visibilitychange", onHide)
-    } else {
-      window.open("https://zellepay.com", "_blank", "noopener,noreferrer")
-    }
   }
 
   async function handleCreateOtherForm() {
@@ -945,7 +898,6 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     return form.assigned_dgl_ids.includes(userId)
   }
 
-  const displayAmount = amount || "0"
   // Build category summary from dynamic categories + any orphaned categories in actual entries
   const allEntryCategories = Array.from(new Set(budgetEntries.map(e => e.category)))
   const orphanedCategories = allEntryCategories
@@ -957,15 +909,14 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     total: budgetEntries.filter(e => e.category === cat.value).reduce((sum, e) => sum + Number(e.amount), 0),
   })).filter(c => c.total > 0)
 
-  const visibleSections: { id: "give" | "reimbursements" | "budget" | "allocation"; label: string }[] = [
-    { id: "give", label: "Give" },
+  const visibleSections: { id: "reimbursements" | "budget" | "allocation"; label: string }[] = [
     ...(canAccessReimbursements ? [{ id: "reimbursements" as const, label: "Reimbursements" }] : []),
     ...(canAccessBudget ? [{ id: "budget" as const, label: "Budget" }] : []),
     ...(canAccessBudget ? [{ id: "allocation" as const, label: "Allocation" }] : []),
   ]
 
-  const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : "Budget"
-  const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : "Track expenses, reimbursements, and per-fund spending targets."
+  const sectionLabel = activeSection === "reimbursements" ? "Reimbursements" : "Budget"
+  const sectionSubtitle = activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : "Track expenses, reimbursements, and per-fund spending targets."
   const monoStyle = EYEBROW_STYLE
 
   return (
@@ -1021,76 +972,6 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
         {loading ? <Spinner /> : (
           <>
-            {/* ── Give ── */}
-            {activeSection === "give" && (
-              <>
-                <div className="md:grid md:gap-5" style={{ gridTemplateColumns: !zelleInfo && !isAdmin ? "1fr" : "1.3fr 1fr" }}>
-                  <div style={!zelleInfo && !isAdmin
-                    ? { border: "1px dashed var(--dashed)", borderRadius: 12, background: "transparent", padding: "20px 24px", marginBottom: 16 }
-                    : { background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 20, padding: "28px 28px 24px", marginBottom: 16 }
-                  } className="md:mb-0">
-                    <div>
-                      {editing ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                          <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
-                          <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" autoFocus style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
-                            <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : !zelleInfo && !isAdmin ? (
-                        <div>
-                          <p style={{ fontSize: 14, color: "var(--body)", fontWeight: 500, marginBottom: 4 }}>Giving info coming soon</p>
-                          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry hasn&apos;t set up giving info yet — check back later.</p>
-                        </div>
-                      ) : !zelleInfo && isAdmin ? (
-                        <div>
-                          <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 8 }}>Set up giving</p>
-                          <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>Add your Zelle email or phone number so members can give.</p>
-                          <button onClick={() => { setEditValue(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
-                            <Pencil style={{ width: 13, height: 13 }} /> Add Zelle info
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
-                            <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
-                            <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
-                          </div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-                            {PRESET_AMOUNTS.map(v => (
-                              <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 600 : 400 }}>${v}</button>
-                            ))}
-                          </div>
-                          <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-                            <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
-                          </button>
-                          {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleInfo}</strong></p>}
-                          <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-                            {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
-                            {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
-                          </button>
-                          {isAdmin && <button onClick={() => { setEditValue(zelleInfo ?? ""); setEditing(true) }} style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", padding: 0 }}><Pencil style={{ width: 11, height: 11 }} /> Edit Zelle info</button>}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {zelleInfo && !editing && (
-                    <div className="hidden md:flex flex-col gap-4">
-                      <GivingTrustPanel zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
-                    </div>
-                  )}
-                </div>
-                {zelleInfo && !editing && (
-                  <div className="md:hidden mt-4">
-                    <GivingTrustPanel zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
-                  </div>
-                )}
-              </>
-            )}
-
             {/* ── Reimbursements ── */}
             {activeSection === "reimbursements" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
