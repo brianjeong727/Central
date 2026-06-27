@@ -10,13 +10,7 @@ import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
 import { CentralButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
-import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
-
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  praying:  { label: "Praying",  bg: "var(--ivory)", text: "var(--plum)" },
-  answered: { label: "Answered", bg: "var(--cream)", text: "var(--body)" },
-  ongoing:  { label: "Ongoing",  bg: "var(--cream)", text: "var(--muted-text)" },
-}
+import type { Profile, Devotional, Prayer, Verse } from "../types"
 
 const JOURNAL_TABS = [
   { key: "devotionals", label: "Devotionals" },
@@ -100,10 +94,6 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   return (
     <div>
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Devotionals · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>Reflections</h2>
-      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
@@ -207,14 +197,12 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   const [entries, setEntries] = useState<Prayer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState<PrayerStatus | "all">("all")
   const [showEditor, setShowEditor] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Prayer | null>(null)
-  const [draft, setDraft] = useState({ title: "", content: "", status: "praying" as PrayerStatus })
+  const [draft, setDraft] = useState({ title: "", content: "" })
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -228,24 +216,22 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   }, [userId, ministryId])
 
   const filtered = useMemo(() => {
-    let base = entries
-    if (filterStatus !== "all") base = base.filter(e => e.status === filterStatus)
-    if (!searchQuery.trim()) return base
+    if (!searchQuery.trim()) return entries
     const q = searchQuery.toLowerCase()
-    return base.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
-  }, [entries, searchQuery, filterStatus])
+    return entries.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
+  }, [entries, searchQuery])
 
-  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "", status: "praying" }); setShowEditor(true); setOpenMenuId(null) }
-  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content, status: entry.status }); setShowEditor(true); setOpenMenuId(null) }
+  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "" }); setShowEditor(true); setOpenMenuId(null) }
+  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content }); setShowEditor(true); setOpenMenuId(null) }
 
   async function handleSave() {
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && data) { setEntries(prev => { const updated = prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e); onCountChange?.(updated.length); return updated }) }
     } else {
-      const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
+      const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content }).select().single()
       if (!error && data) { setEntries(prev => { const updated = [data as Prayer, ...prev]; onCountChange?.(updated.length); return updated }) }
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
@@ -257,55 +243,12 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     setOpenMenuId(null)
   }
 
-  async function updateStatus(id: string, status: PrayerStatus) {
-    const { data, error } = await supabase.from("prayers").update({ status }).eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-    if (!error && data) setEntries(prev => prev.map(e => e.id === id ? (data as Prayer) : e))
-    setStatusMenuId(null)
-  }
-
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
-
-  function StatusBadge({ status, entryId }: { status: PrayerStatus; entryId: string }) {
-    const cfg = STATUS_CONFIG[status]
-    const isOpen = statusMenuId === entryId
-    return (
-      <div style={{ position: "relative", display: "inline-block" }}>
-        <button onClick={e => { e.stopPropagation(); setStatusMenuId(isOpen ? null : entryId); setOpenMenuId(null) }} style={{ padding: "2px 9px", borderRadius: 20, background: cfg.bg, color: cfg.text, fontSize: 11, fontWeight: 600, border: "1px solid var(--line)", cursor: "pointer", letterSpacing: "0.03em" }}>
-          {cfg.label}
-        </button>
-        {isOpen && (
-          <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, overflow: "hidden", minWidth: 130 }}>
-            {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => (
-              <button key={s} onClick={e => { e.stopPropagation(); updateStatus(entryId, s) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: s === status ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_CONFIG[s].text, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>{STATUS_CONFIG[s].label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Prayers · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>What you&apos;re praying</h2>
-      </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["all", "praying", "answered", "ongoing"] as const).map(f => {
-          const isActive = filterStatus === f
-          const label = f === "all" ? "All" : STATUS_CONFIG[f].label
-          return (
-            <button key={f} onClick={() => setFilterStatus(f)} style={{ padding: "4px 12px", borderRadius: 20, border: isActive ? "none" : "1px solid var(--line-2)", background: isActive ? "var(--plum-2)" : "var(--ivory)", color: isActive ? "var(--cream)" : "var(--body)", fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: "pointer", transition: "background 150ms" }}>
-              {label}
-            </button>
-          )
-        })}
-      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
@@ -330,15 +273,6 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             </div>
           </RoleDescriptionEditor>
           <div style={{ padding: "0 26px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Status</span>
-              {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
-                const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
-                return (
-                  <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "var(--muted-text)", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "1px solid var(--line)" : "1px solid var(--line-2)", cursor: "pointer" }}>{cfg.label}</button>
-                )
-              })}
-            </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
               <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</CentralButton>
@@ -365,16 +299,15 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
               <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
-                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <h3 style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
-                      <div onClick={e => e.stopPropagation()}><StatusBadge status={entry.status} entryId={entry.id} /></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id); setStatusMenuId(null) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
@@ -663,12 +596,20 @@ export function JournalSection({
         <VerseCard />
       </div>
 
-      {/* Desktop: two-column */}
-      <div className="hidden md:block">
-        <div style={{ display: "grid", paddingTop: showStats ? 0 : 28, paddingBottom: 52, gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
-          <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />
-          <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />
+      {/* Desktop: tab strip + single full-width column. The strip breaks out of the
+          parent px-14 wrapper (-mx-14) so it runs full-bleed and its internal md:pl-14
+          re-insets the labels to align with the px-14 content below (§4.2 / convention #16). */}
+      <div className="hidden md:block" style={{ paddingTop: showStats ? 0 : 4, paddingBottom: 52 }}>
+        <div className="-mx-14" style={{ marginBottom: 28 }}>
+          <PlanSubTabStrip
+            tabs={JOURNAL_TABS}
+            active={journalTab}
+            onChange={k => setJournalTab(k as JournalTabId)}
+          />
         </div>
+        {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
+        {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
+        {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
         <VerseCard />
       </div>
     </>
