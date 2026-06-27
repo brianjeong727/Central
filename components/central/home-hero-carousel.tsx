@@ -326,7 +326,9 @@ function Eyebrow({ text }: { text: string }) {
 }
 
 // Tall flanking nav pill (desktop) — cream/line tokens, hover → ivory/plum-2.
-function TallArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void }) {
+// `onPhoto` keeps the darker cream-2 against image slides; ivory reference slides
+// pass false so the resting fill matches the lighter --cream page background.
+function TallArrow({ dir, disabled, onClick, onPhoto }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void; onPhoto: boolean }) {
   const [hover, setHover] = useState(false)
   const Icon = dir === "prev" ? ChevronLeft : ChevronRight
   return (
@@ -342,7 +344,7 @@ function TallArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled:
         width: ARROW_W,
         alignSelf: "stretch",
         border: "1px solid var(--line-2)",
-        background: !disabled && hover ? "var(--ivory)" : "var(--cream-2)",
+        background: !disabled && hover ? "var(--ivory)" : onPhoto ? "var(--cream-2)" : "var(--cream)",
         color: !disabled && hover ? "var(--plum-2)" : "var(--body)",
         borderRadius: "var(--r-pill-lg)",
         cursor: disabled ? "default" : "pointer",
@@ -536,9 +538,9 @@ export function HomeHeroCarousel({
   return (
     <div style={style}>
       <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
-        {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} />}
+        {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} onPhoto={usePhoto} />}
         <HeroFrame style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
-        {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} />}
+        {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} onPhoto={usePhoto} />}
       </div>
       {multi && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: "var(--space-7)" }}>
