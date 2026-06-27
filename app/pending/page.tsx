@@ -51,32 +51,32 @@ export default function PendingPage() {
         {/* Logo */}
         <div className="flex items-center gap-2.5 mb-10">
           <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#3E1540" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="#3E1540" />
+            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
             Central
           </span>
         </div>
 
         {/* Status icon */}
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center mb-6">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3E1540" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--plum)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
 
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, marginBottom: 8 }}>
           Application under review
         </h1>
 
         {ministryName && (
-          <p className="text-[14px] font-semibold text-[#3E1540] mb-3">{ministryName}</p>
+          <p className="text-[14px] font-semibold text-[var(--plum)] mb-3">{ministryName}</p>
         )}
 
-        <p className="text-[14px] text-[#5A5466] leading-relaxed mb-8 max-w-[300px]">
+        <p className="text-[14px] text-[var(--body)] leading-relaxed mb-8 max-w-[300px]">
           We&apos;ve received your ministry application and will review it within 24–48 hours. You&apos;ll gain full access once approved.
         </p>
 
@@ -84,29 +84,29 @@ export default function PendingPage() {
           <button
             onClick={checkStatus}
             disabled={checking}
-            className="w-full py-3.5 rounded-xl bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-60 text-[#F6F4EF] font-bold text-[14px] transition-colors"
+            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[#F6F4EF] font-bold text-[14px] transition-colors"
           >
             {checking ? "Checking…" : "Check status"}
           </button>
 
           <button
             onClick={() => window.location.href = "/landing"}
-            className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[#5A5466] hover:border-[#3E1540]/40 hover:text-[#3E1540] transition-colors"
+            className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
           >
             Back to home
           </button>
 
           <button
             onClick={signOut}
-            className="w-full py-3.5 rounded-xl text-[13px] font-medium text-[#8A8497] hover:text-[#3E1540] transition-colors"
+            className="w-full py-3.5 rounded-xl text-[13px] font-medium text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
           >
             Sign out
           </button>
         </div>
 
-        <p className="text-[12px] text-[#8A8497] mt-8">
+        <p className="text-[12px] text-[var(--muted-text)] mt-8">
           Questions?{" "}
-          <a href="mailto:brianjeong13@gmail.com" className="text-[#3E1540] hover:underline">
+          <a href="mailto:brianjeong13@gmail.com" className="text-[var(--plum)] hover:underline">
             Contact us
           </a>
         </p>

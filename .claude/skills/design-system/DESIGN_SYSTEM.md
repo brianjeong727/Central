@@ -214,7 +214,7 @@ The home "Up Next" slot is a manually-advanced carousel of curated slides sharin
 **Do not:** use pill tabs, segmented background tabs, or boxed tabs. Always underline.
 
 #### Critical implementation rule
-There is exactly **one** tab strip component in this codebase: `PlanSubTabStrip` in `app/home/tabs/plan-tab.tsx`. Every tab strip — team pages, event plan pages, profile pages, anywhere — must use this same component. Never inline tab styles or create a new tab implementation. If you need a tab strip, import and use the existing shared component.
+There is exactly **one** tab strip component in this codebase: `PlanSubTabStrip` in `components/central/plan-sub-tab-strip.tsx` (barrel-exported from `@/components/central`). Every tab strip — team pages, event plan pages, profile pages, anywhere — must use this same component. Never inline tab styles or create a new tab implementation. If you need a tab strip, import and use the existing shared component.
 
 The wrapper `<div>` around `PlanSubTabStrip` must have **zero horizontal padding**. The `border-bottom: 1px solid #E8E2D2` inside the component must run edge-to-edge within its parent container. Horizontal breathing room belongs on the **content div below**, not on the tab strip wrapper. Adding horizontal padding to the tab strip wrapper breaks the border alignment and makes the strip look different from every other tab strip in the app.
 

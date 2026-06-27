@@ -1,4 +1,5 @@
 import { ReactNode, CSSProperties } from "react"
+import { EYEBROW_STYLE } from "@/app/home/components/shared"
 
 interface PageTitleProps {
   // Omit to suppress the eyebrow entirely — title top-spacing tightens automatically.
@@ -19,17 +20,7 @@ export function PageTitle({ eyebrow, title, titleSize, compact = false, children
   return (
     <div style={style}>
       {showEyebrow && (
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 11,
-            letterSpacing: "1.4px",
-            color: "var(--muted-text)",
-            textTransform: "uppercase",
-          }}
-        >
-          {eyebrow}
-        </div>
+        <div style={EYEBROW_STYLE}>{eyebrow}</div>
       )}
       <h1
         style={{

@@ -13,9 +13,9 @@ const SANS  = "var(--font-inter)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
-const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "#13101A", margin: 0 }
+const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
 type View = "role-choice" | "admin" | "member"
 
@@ -45,13 +45,13 @@ function Field({ label, hint, helper, value, onChange, placeholder, type = "text
         <span style={mono}>{label}</span>
         {hint}
       </div>
-      <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 10, padding: "0 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
         <input
           type={type} value={value} onChange={onChange} placeholder={placeholder}
           autoFocus={autoFocus} required={required}
           style={{
             flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0",
-            fontFamily: SANS, fontSize: 15, color: "#13101A",
+            fontFamily: SANS, fontSize: 15, color: "var(--ink)",
           }}
         />
         {trailing}
@@ -68,7 +68,7 @@ function Primary({ children, disabled, loading, onClick }: {
   return (
     <button type={onClick ? "button" : "submit"} disabled={disabled} onClick={onClick} style={{
       width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
-      background: disabled ? "#E2DDCF" : "#2D0F2E",
+      background: disabled ? "var(--line-2)" : "var(--plum-2)",
       color: disabled ? "#A09A8C" : "#FBF8F2",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer", letterSpacing: "0.01em",
@@ -87,7 +87,7 @@ function BackLink({ onClick }: { onClick: () => void }) {
     <button type="button" onClick={onClick} style={{
       background: "transparent", border: "none", cursor: "pointer", padding: 0,
       display: "inline-flex", alignItems: "center", gap: 8,
-      fontFamily: SANS, fontSize: 14, color: "#8A8497",
+      fontFamily: SANS, fontSize: 14, color: "var(--muted-text)",
     }}>
       <Icon d="M19 12H5M12 19l-7-7 7-7" size={15}/> Back
     </button>
@@ -99,9 +99,9 @@ function Pill({ label, on, onClick }: { label: string; on: boolean; onClick: () 
   return (
     <button type="button" onClick={onClick} style={{
       padding: "9px 16px", borderRadius: 999,
-      border: "1px solid " + (on ? "#3E1540" : "#E2DDCF"),
-      background: on ? "#2D0F2E" : "#FBF8F2",
-      color: on ? "#FBF8F2" : "#5A5466",
+      border: "1px solid " + (on ? "var(--plum)" : "var(--line-2)"),
+      background: on ? "var(--plum-2)" : "#FBF8F2",
+      color: on ? "#FBF8F2" : "var(--body)",
       fontSize: 14, fontWeight: on ? 500 : 400, fontFamily: SANS, cursor: "pointer",
       transition: "all .12s",
     }}>{label}</button>
@@ -115,14 +115,14 @@ function SelectTile({ title, sub, on, onClick }: {
   return (
     <button type="button" onClick={onClick} style={{
       flex: 1, textAlign: "left", padding: "16px 18px", borderRadius: 12,
-      border: "1px solid " + (on ? "#2D0F2E" : "#E2DDCF"),
-      background: on ? "#2D0F2E" : "#FBF8F2", cursor: "pointer",
+      border: "1px solid " + (on ? "var(--plum-2)" : "var(--line-2)"),
+      background: on ? "var(--plum-2)" : "#FBF8F2", cursor: "pointer",
       fontFamily: SANS, transition: "all .12s",
     }}>
-      <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "#FBF8F2" : "#13101A" }}>
+      <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "#FBF8F2" : "var(--ink)" }}>
         {title}
       </div>
-      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "#8A8497" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "var(--muted-text)" }}>{sub}</div>}
     </button>
   )
 }
@@ -135,18 +135,18 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
   return (
     <button type="button" onClick={onClick} style={{
       width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 18,
-      padding: "22px 24px", borderRadius: 14, border: "1px solid #E2DDCF",
+      padding: "22px 24px", borderRadius: 14, border: "1px solid var(--line-2)",
       background: "#FBF8F2", cursor: "pointer", fontFamily: SANS, transition: "border-color .15s",
     }}
-      className="hover:border-[#3E1540]"
+      className="hover:border-[var(--plum)]"
     >
       <span style={{
         width: 52, height: 52, borderRadius: 13, background: iconBg, color: iconFg,
         display: "grid", placeItems: "center", flexShrink: 0,
       }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontFamily: SANS, fontSize: 19, fontWeight: 500, color: "#13101A", lineHeight: 1.2 }}>{title}</span>
-        <span style={{ display: "block", fontSize: 14, color: "#5A5466", marginTop: 3, lineHeight: 1.5 }}>{body}</span>
+        <span style={{ display: "block", fontFamily: SANS, fontSize: 19, fontWeight: 500, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 14, color: "var(--body)", marginTop: 3, lineHeight: 1.5 }}>{body}</span>
       </span>
       <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "#A09A8C" }}/>
     </button>
@@ -240,7 +240,7 @@ function SignupContent() {
   const alreadyHaveAccount = (
     <span>
       Already have an account?{" "}
-      <Link href="/login" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+      <Link href="/login" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
         Sign in
       </Link>
     </span>
@@ -251,7 +251,7 @@ function SignupContent() {
     <SplitShell topBar={<>
       <Link href="/" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
-        color: "#5A5466", textDecoration: "none", marginRight: "auto", fontSize: 14,
+        color: "var(--body)", textDecoration: "none", marginRight: "auto", fontSize: 14,
       }}>
         <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
       </Link>
@@ -261,21 +261,21 @@ function SignupContent() {
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         How are you joining?
       </h1>
-      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 0" }}>
+      <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 0" }}>
         Two ways into Central — start a ministry, or join one that&apos;s already here.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 34 }}>
         <PathRow
           icon={<Icon d="M3 11l9-8 9 8M5 10v10h14V10" size={20}/>}
-          iconBg="#3E1540" iconFg="#FBF8F2"
+          iconBg="var(--plum)" iconFg="#FBF8F2"
           title="Register a church"
           body="I'm a pastor, deacon, or elder starting a new ministry on Central."
           onClick={() => setView("admin")}
         />
         <PathRow
           icon={<Icon d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M22 21v-2a4 4 0 00-3-3.87M9 11a4 4 0 100-8 4 4 0 000 8zm7-8a4 4 0 010 7.75" size={20}/>}
-          iconBg="#F1ECDE" iconFg="#3E1540"
+          iconBg="var(--ivory)" iconFg="var(--plum)"
           title="Join a ministry"
           body="I'm a student or member looking to join an existing ministry."
           onClick={() => setView("member")}
@@ -294,7 +294,7 @@ function SignupContent() {
       )}
       <span>
         Already have an account?{" "}
-        <Link href="/login?intent=register" style={{ color: "#2D0F2E", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+        <Link href="/login?intent=register" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
           Sign in
         </Link>
       </span>
@@ -303,7 +303,7 @@ function SignupContent() {
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         Register your church.
       </h1>
-      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 30px" }}>
+      <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 30px" }}>
         Create your admin account — you&apos;ll set up the workspace next.
       </p>
 
@@ -333,16 +333,16 @@ function SignupContent() {
           {adminLoading ? "Creating account…" : "Create account"}
         </Primary>
         {!founderRole && !adminLoading && (
-          <div style={{ fontSize: 13, color: "#8A8497", textAlign: "center", marginTop: -6 }}>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -6 }}>
             Select your role to continue.
           </div>
         )}
       </form>
 
-      <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid #E8E2D2", fontSize: 13, color: "#5A5466" }}>
+      <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 13, color: "var(--body)" }}>
         Not a pastor, deacon, or elder?{" "}
         <button type="button" onClick={() => setView("member")}
-          style={{ color: "#2D0F2E", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SANS, fontSize: 13 }}
+          style={{ color: "var(--plum-2)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SANS, fontSize: 13 }}
           className="hover:underline underline-offset-2">
           Join a ministry instead →
         </button>
@@ -362,7 +362,7 @@ function SignupContent() {
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
         Create your account.
       </h1>
-      <p style={{ fontSize: 16, color: "#5A5466", lineHeight: 1.6, margin: "16px 0 30px" }}>
+      <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 30px" }}>
         Get started with Central in minutes.
       </p>
 
@@ -376,7 +376,7 @@ function SignupContent() {
 
         <div>
           <div style={mono}>GENDER</div>
-          <div style={{ fontSize: 13, color: "#8A8497", margin: "4px 0 10px" }}>Helps us place you in the right small group.</div>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 10px" }}>Helps us place you in the right small group.</div>
           <div style={{ display: "flex", gap: 8 }}>
             {["Male", "Female"].map(g => (
               <Pill key={g} label={g} on={gender === g.toLowerCase()} onClick={() => setGender(g.toLowerCase())}/>
@@ -403,7 +403,7 @@ function SignupContent() {
           {memberLoading ? "Creating account…" : "Create account"}
         </Primary>
         {(!gradYearValid || !gender) && !memberLoading && (
-          <div style={{ fontSize: 13, color: "#8A8497", textAlign: "center", marginTop: -6 }}>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -6 }}>
             {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
           </div>
         )}

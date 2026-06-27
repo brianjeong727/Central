@@ -137,3 +137,22 @@ Date: 2026-06-26
 The `dev` script is `rm -rf .next && next dev`. If a second `npm run dev` starts (or `npm run build`, which also `rm -rf .next`, runs while `next dev` is live), the two processes delete and rewrite each other's Turbopack cache mid-flight. Symptoms: `Failed to restore task data (corrupted database or bug)`, `Unable to open static sorted file …sst`, `Another write batch or compaction is already active`, surfaced in the browser as **Internal Server Error** or an infinite "Compiling…". It is NOT a code bug — `curl` may hit the healthy instance while the browser hits the broken one, which is the tell.
 
 **Rule:** Keep exactly one `next dev` running. Don't run `npm run build` while it's up. Recovery: `pkill -9 -f next-server; pkill -9 -f "next dev"; lsof -ti:3000 | xargs kill -9; rm -rf .next node_modules/.cache; npm run dev`. Verify one logical server before testing.
+
+## Audit findings are SURFACE reads — verify actual values before unifying
+Date: 2026-06-26
+
+The explorer/enforcer audit flags duplicates and "matches" by pattern, but the read is shallow and was wrong repeatedly. Before unifying ANY "duplicate," read the actual values on both sides:
+- A1 "the same mono-label object copy-pasted 8×" was actually THREE families: `MONO_STYLE` (10px/0.06em), an eyebrow (11px/1.4px), and a scattered 11px/0.04–0.12em label family. Flattening them would have shrunk every eyebrow and changed tracking — a visual regression, not a dedup.
+- A3/A4 "getInitials/formatDate duplicated" were NOT duplicates: different output (whitespace/unicode handling; `"Jun 26, 2026"` vs `"Fri, Jun 26"`). Merging would change behavior.
+- A8 "inline hairline matches InsetHairline" — the component was 56px on ALL viewports; the inline was `md:mx-14` (responsive, 0 on mobile). A naive swap adds a 112px mobile inset.
+
+**Rule:** "looks identical" ≠ "is identical." For any consolidation, have the engineer read both definitions and confirm byte-equal behavior; if values genuinely differ, do NOT force-fit — report it. A half-done dedup that flattens real variation is worse than none.
+
+## Hex→token sweep recipe (zero-visual when token == literal)
+Date: 2026-06-26
+
+When a CSS var is DEFINED as the exact hex it replaces (verify in `app/globals.css`), swapping raw hex → `var(--token)` is provably zero-visual, so localhost sign-off is just "does it look identical?" Scripted two-pass regex, per file, case-insensitive:
+- Pass A (Tailwind arbitrary): `\[#HEX\](?!/)` → `[var(--token)]` — negative lookahead protects `/opacity`.
+- Pass B (inline-style/literal): `(?<!\[)#HEX\b` → `var(--token)` — lookbehind protects bracket leftovers; `\b` protects 8-digit alpha.
+
+**Always LEAVE:** Tailwind opacity-modified arbitrary hex (`bg-[#3E1540]/95` — `/opacity` does NOT compute on a `var()` color in Tailwind v4), `rgba(...)`, 8-digit alpha hex, `<meta theme-color>` / `themeColor` (browser chrome needs a literal), and any hex NOT in the token map. Verify with a symmetric diff (equal insertions/deletions = pure 1:1 swaps) and a final grep proving zero plain target hexes remain outside the intended exceptions. Off-token hexes that have no matching token (e.g. `#ECE8DE`) need an explicit snap decision, not a silent merge.

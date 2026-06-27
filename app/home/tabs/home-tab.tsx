@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { Spinner, RingCrossLogo, HeaderActionButton } from "../components/shared"
+import { Spinner, RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel } from "@/components/central"
@@ -16,13 +16,7 @@ export { HomeTabProps }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
-const EYEBROW: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  color: "var(--muted-text)",
-  textTransform: "uppercase",
-}
+const EYEBROW = EYEBROW_STYLE
 
 
 function pulseTypeLabel(type: string) {
@@ -837,7 +831,7 @@ export function HomeTab({
               {/* ── Up Next — mobile ── */}
               <section>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", color: "var(--plum)", textTransform: "uppercase" }}>
+                  <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>
                     Up next
                   </div>
                   <button

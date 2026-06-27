@@ -39,28 +39,28 @@ export default function PickMinistryPage() {
       {/* Logo */}
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
         <RingCrossLogo size={28} />
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
           Central
         </span>
       </div>
-      <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 40 }}>College ministry community</p>
+      <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 40 }}>College ministry community</p>
 
       <div style={{ width: "100%", maxWidth: 420 }}>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", fontWeight: 400, marginBottom: 6 }}>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 6 }}>
           Choose a ministry
         </h2>
-        <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 24 }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 24 }}>
           You belong to multiple ministries. Which one do you want to open?
         </p>
 
         {error && (
-          <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#3E1540", fontWeight: 500, marginBottom: 16 }}>
+          <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "var(--plum)", fontWeight: 500, marginBottom: 16 }}>
             {error}
           </div>
         )}
 
         {loading && (
-          <div style={{ textAlign: "center", color: "#8A8497", fontSize: 14, padding: "32px 0" }}>Loading…</div>
+          <div style={{ textAlign: "center", color: "var(--muted-text)", fontSize: 14, padding: "32px 0" }}>Loading…</div>
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -71,8 +71,8 @@ export default function PickMinistryPage() {
               disabled={!!selecting}
               style={{
                 display: "flex", alignItems: "center", gap: 16,
-                padding: 16, borderRadius: 16, border: "1px solid #ECE8DE",
-                background: selecting === m.id ? "#3E1540" : "white",
+                padding: 16, borderRadius: 16, border: "1px solid var(--line)",
+                background: selecting === m.id ? "var(--plum)" : "white",
                 cursor: selecting ? "default" : "pointer",
                 opacity: selecting && selecting !== m.id ? 0.5 : 1,
                 textAlign: "left", width: "100%",
@@ -81,7 +81,7 @@ export default function PickMinistryPage() {
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                background: selecting === m.id ? "rgba(246,244,239,0.15)" : "#3E1540",
+                background: selecting === m.id ? "rgba(246,244,239,0.15)" : "var(--plum)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#F6F4EF" }}>
@@ -89,10 +89,10 @@ export default function PickMinistryPage() {
                 </span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "#F6F4EF" : "#13101A", margin: 0, marginBottom: 2 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "#F6F4EF" : "var(--ink)", margin: 0, marginBottom: 2 }}>
                   {selecting === m.id ? "Opening…" : m.name}
                 </p>
-                <p style={{ fontSize: 12, color: selecting === m.id ? "rgba(246,244,239,0.65)" : "#8A8497", margin: 0 }}>
+                <p style={{ fontSize: 12, color: selecting === m.id ? "rgba(246,244,239,0.65)" : "var(--muted-text)", margin: 0 }}>
                   {m.university} · {ROLE_LABEL[m.role] ?? m.role}
                 </p>
               </div>

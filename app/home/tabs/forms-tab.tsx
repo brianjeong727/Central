@@ -131,11 +131,11 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
     return (
       <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[var(--shell-offset)]">
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
-          <Check className="w-8 h-8 text-[#3E1540]" />
+          <Check className="w-8 h-8 text-[var(--plum)]" />
         </div>
         <div className="text-center">
-          <p className="text-[16px] font-bold text-[#13101A]">Response submitted!</p>
-          <p className="text-[13px] text-[#8A8497] mt-1">Thank you for filling out the form.</p>
+          <p className="text-[16px] font-bold text-[var(--ink)]">Response submitted!</p>
+          <p className="text-[13px] text-[var(--muted-text)] mt-1">Thank you for filling out the form.</p>
         </div>
       </AnimateIn>
     )
@@ -143,14 +143,14 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
 
   return (
     <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-      <div className="flex-shrink-0 border-b border-[#E8E2D2]">
+      <div className="flex-shrink-0 border-b border-[var(--line)]">
         <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
           <div>
             <p style={MONO_STYLE}>Form</p>
-            <p className="text-[15px] font-semibold text-[#13101A] mt-0.5 line-clamp-1">{announcementTitle}</p>
+            <p className="text-[15px] font-semibold text-[var(--ink)] mt-0.5 line-clamp-1">{announcementTitle}</p>
           </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-            <X className="w-3.5 h-3.5 text-[#5A5466]" />
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <X className="w-3.5 h-3.5 text-[var(--body)]" />
           </button>
         </div>
       </div>
@@ -166,11 +166,11 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-[640px] mx-auto px-5 md:px-10 py-6 flex flex-col gap-6">
               {error && (
-                <div style={{ background: "rgba(62,21,64,0.07)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>{error}</div>
+                <div style={{ background: "rgba(62,21,64,0.07)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
               )}
               {fields.map(field => (
                 <div key={field.id}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 10 }}>
                     {field.label}
                     {field.required && <span style={{ color: "#9D2D2D", marginLeft: 4 }}>*</span>}
                   </p>
@@ -182,8 +182,8 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
                       rows={3}
                       style={{
                         width: '100%', padding: '10px 12px', borderRadius: 10,
-                        border: '1px solid #E2DDCF', background: '#FBF8F2',
-                        fontSize: 14, color: '#13101A', outline: 'none', resize: 'vertical', lineHeight: 1.55,
+                        border: '1px solid var(--line-2)', background: '#FBF8F2',
+                        fontSize: 14, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
                       }}
                     />
                   )}
@@ -195,9 +195,9 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
                           <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
                             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
                             cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
-                            border: `1px solid ${selected ? '#3E1540' : '#E2DDCF'}`,
-                            background: selected ? '#3E1540' : '#FBF8F2',
-                            color: selected ? '#F6F4EF' : '#13101A',
+                            border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
+                            background: selected ? 'var(--plum)' : '#FBF8F2',
+                            color: selected ? '#F6F4EF' : 'var(--ink)',
                           }}>
                             <span style={{
                               width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
@@ -218,9 +218,9 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
                           <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
                             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
                             cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
-                            border: `1px solid ${checked ? '#3E1540' : '#E2DDCF'}`,
-                            background: checked ? '#3E1540' : '#FBF8F2',
-                            color: checked ? '#F6F4EF' : '#13101A',
+                            border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
+                            background: checked ? 'var(--plum)' : '#FBF8F2',
+                            color: checked ? '#F6F4EF' : 'var(--ink)',
                           }}>
                             <span style={{
                               width: 16, height: 16, borderRadius: 3, flexShrink: 0,
@@ -240,13 +240,13 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
               ))}
             </div>
           </div>
-          <div className="flex-shrink-0 border-t border-[#E8E2D2] px-5 md:px-10 py-4">
+          <div className="flex-shrink-0 border-t border-[var(--line)] px-5 md:px-10 py-4">
             <div className="max-w-[640px] mx-auto">
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
                 style={{
-                  width: '100%', padding: '14px', borderRadius: 10, background: '#2D0F2E',
+                  width: '100%', padding: '14px', borderRadius: 10, background: 'var(--plum-2)',
                   color: '#F6F4EF', fontSize: 14, fontWeight: 600, border: 'none',
                   cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1,
                 }}
@@ -351,14 +351,14 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
 
   return (
     <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-      <div className="flex-shrink-0 border-b border-[#E8E2D2]">
+      <div className="flex-shrink-0 border-b border-[var(--line)]">
         <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-5 md:px-10">
           <div>
             <p style={MONO_STYLE}>Responses · {loading ? '…' : respondents.length}</p>
-            <p className="text-[15px] font-semibold text-[#13101A] mt-0.5 line-clamp-1">{announcementTitle}</p>
+            <p className="text-[15px] font-semibold text-[var(--ink)] mt-0.5 line-clamp-1">{announcementTitle}</p>
           </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-            <X className="w-3.5 h-3.5 text-[#5A5466]" />
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <X className="w-3.5 h-3.5 text-[var(--body)]" />
           </button>
         </div>
         <div style={{ display: 'flex', gap: 20, paddingLeft: 20, paddingRight: 20 }} className="md:!px-10">
@@ -366,8 +366,8 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
             <button key={t} onClick={() => setSubTab(t)} style={{
               padding: '8px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer',
               background: 'transparent', border: 'none',
-              borderBottom: subTab === t ? '2px solid #3E1540' : '2px solid transparent',
-              color: subTab === t ? '#13101A' : '#8A8497', transition: 'all 0.15s',
+              borderBottom: subTab === t ? '2px solid var(--plum)' : '2px solid transparent',
+              color: subTab === t ? 'var(--ink)' : 'var(--muted-text)', transition: 'all 0.15s',
               textTransform: 'capitalize',
             }}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -389,7 +389,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
                   {respondents.map(resp => {
                     const isExpanded = expandedUserId === resp.userId
                     return (
-                      <div key={resp.userId} style={{ border: '1px solid #E8E2D2', borderRadius: 12, background: '#FBF8F2', overflow: 'hidden' }}>
+                      <div key={resp.userId} style={{ border: '1px solid var(--line)', borderRadius: 12, background: '#FBF8F2', overflow: 'hidden' }}>
                         <button
                           onClick={() => setExpandedUserId(isExpanded ? null : resp.userId)}
                           style={{
@@ -398,10 +398,10 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
                           }}
                         >
                           <div>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: '#13101A', margin: 0 }}>{resp.userName}</p>
-                            <p style={{ fontSize: 11, color: '#8A8497', margin: '2px 0 0' }}>{new Date(resp.submittedAt).toLocaleDateString()}</p>
+                            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', margin: 0 }}>{resp.userName}</p>
+                            <p style={{ fontSize: 11, color: 'var(--muted-text)', margin: '2px 0 0' }}>{new Date(resp.submittedAt).toLocaleDateString()}</p>
                           </div>
-                          <ChevronDown style={{ width: 16, height: 16, color: '#8A8497', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                          <ChevronDown style={{ width: 16, height: 16, color: 'var(--muted-text)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
                         </button>
                         {isExpanded && (
                           <div style={{ borderTop: '1px solid #EFEAE0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -412,8 +412,8 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
                                 : ans?.value || '—'
                               return (
                                 <div key={f.id}>
-                                  <p style={{ fontSize: 10, color: '#8A8497', marginBottom: 3, letterSpacing: '0.8px', textTransform: 'uppercase' }}>{f.label}</p>
-                                  <p style={{ fontSize: 13, color: '#13101A', lineHeight: 1.5, margin: 0 }}>{display}</p>
+                                  <p style={{ fontSize: 10, color: 'var(--muted-text)', marginBottom: 3, letterSpacing: '0.8px', textTransform: 'uppercase' }}>{f.label}</p>
+                                  <p style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>{display}</p>
                                 </div>
                               )
                             })}
@@ -431,13 +431,13 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
                 <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
               ) : summaryByField.map(({ field, counts, textAnswers, maxCount }) => (
                 <div key={field.id}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: '#13101A', marginBottom: 14 }}>{field.label}</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>
                   {field.type === 'text' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {textAnswers.length === 0 ? (
-                        <p style={{ fontSize: 13, color: '#8A8497' }}>No text responses</p>
+                        <p style={{ fontSize: 13, color: 'var(--muted-text)' }}>No text responses</p>
                       ) : textAnswers.map((ans, i) => (
-                        <div key={i} style={{ padding: '8px 12px', background: '#F4F1E8', borderRadius: 8, fontSize: 13, color: '#5A5466', lineHeight: 1.5 }}>{ans}</div>
+                        <div key={i} style={{ padding: '8px 12px', background: '#F4F1E8', borderRadius: 8, fontSize: 13, color: 'var(--body)', lineHeight: 1.5 }}>{ans}</div>
                       ))}
                     </div>
                   ) : (
@@ -448,11 +448,11 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
                         return (
                           <div key={opt}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                              <span style={{ fontSize: 13, color: '#13101A' }}>{opt}</span>
-                              <span style={{ fontSize: 12, color: '#8A8497', fontWeight: 500 }}>{count} / {respondents.length}</span>
+                              <span style={{ fontSize: 13, color: 'var(--ink)' }}>{opt}</span>
+                              <span style={{ fontSize: 12, color: 'var(--muted-text)', fontWeight: 500 }}>{count} / {respondents.length}</span>
                             </div>
                             <div style={{ height: 8, borderRadius: 999, background: '#EFEAE0', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: '#3E1540', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--plum)', borderRadius: 999, transition: 'width 0.4s ease' }} />
                             </div>
                           </div>
                         )

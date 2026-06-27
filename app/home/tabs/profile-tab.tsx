@@ -8,8 +8,8 @@ import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
-import { CentralButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
+import { RoleDescriptionEditor } from "./plan-tab"
+import { CentralButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle } from "@/components/central"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
