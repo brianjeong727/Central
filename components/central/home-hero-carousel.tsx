@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, CSSProperties, ReactNode } from "react"
+import { useState, useRef, useEffect, CSSProperties, ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { UpNextCard, UpNextEventDetail } from "./up-next-card"
 
@@ -73,15 +73,18 @@ function rgbFromHex(hex?: string | null): string {
 // ── Shared frame: single source of truth for height/radius/border/clip ───────
 // Owns the border, radius (--r-hero), and overflow so every slide interior fills
 // the same --hero-h frame. Used by the carousel AND the home-tab fallback.
-export function HeroFrame({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+// `bare` mode (photo slides): the frame is just the fixed-height footprint and
+// centers a floating card — the card itself owns border/radius/clip so it can be
+// sized to the image's aspect (see PhotoSlide desktop).
+export function HeroFrame({ children, style, bare = false }: { children: ReactNode; style?: CSSProperties; bare?: boolean }) {
   return (
     <div
       style={{
         position: "relative",
         height: "var(--hero-h)",
-        borderRadius: "var(--r-hero)",
-        overflow: "hidden",
-        border: "1px solid var(--line-2)",
+        ...(bare
+          ? { display: "flex", alignItems: "center", justifyContent: "center" }
+          : { borderRadius: "var(--r-hero)", overflow: "hidden", border: "1px solid var(--line-2)" }),
         ...style,
       }}
     >
@@ -149,8 +152,43 @@ interface PhotoSlideProps {
 // Photo interior — full-height image with an adaptive dark panel on the left.
 // The panel is filled with the STORED clamped color (panel_color), not a live
 // blur; an ink-based scrim sits on top purely for cream-text legibility.
+// Card aspect-ratio (w/h) is clamped to this band. Inside the band the card takes the
+// image's true aspect so the photo shows IN FULL (cover with matching aspect = no crop);
+// outside it (extreme pano / very tall) the card clamps and cover trims to the bound.
+// These two numbers + --hero-h are the dials for the size/crop tradeoff.
+const CARD_AR_MIN = 0.8 // portrait floor (~4:5)
+const CARD_AR_MAX = 2.1 // landscape cap (~21:10)
+const CARD_AR_FALLBACK = 16 / 9 // before the image reports its natural size
+
 function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, mobile = false }: PhotoSlideProps) {
   const panel = panelColor || PANEL_FALLBACK
+
+  // Desktop: measure the fixed footprint + read the image's natural aspect, then size a
+  // centered card that fits inside it (contain) so the whole image is visible.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  const [naturalAR, setNaturalAR] = useState<number | null>(null)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const cardAR = Math.min(CARD_AR_MAX, Math.max(CARD_AR_MIN, naturalAR ?? CARD_AR_FALLBACK))
+  // Fit a cardAR box inside the measured footprint (contain). Falls back to filling the
+  // frame until measured (avoids a 0-size flash on first paint / SSR).
+  let cardW: number | string = "100%"
+  let cardH: number | string = "100%"
+  if (box.w > 0 && box.h > 0) {
+    let w = box.w
+    let h = box.w / cardAR
+    if (h > box.h) { h = box.h; w = box.h * cardAR }
+    cardW = Math.round(w)
+    cardH = Math.round(h)
+  }
 
   if (mobile) {
     return (
@@ -217,12 +255,15 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
   // scrim hugs the text for legibility. No solid slab, no seam. Pure static CSS — SSR-safe.
   const c = rgbFromHex(panelColor)
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%", background: PHOTO_BACKDROP }}>
-      <img
-        src={imageUrl}
-        alt=""
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "75% center", display: "block" }}
-      />
+    <div ref={boxRef} style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* card sized to the image's aspect (clamped), centered in the fixed footprint — shows the whole image */}
+      <div style={{ position: "relative", width: cardW, height: cardH, flexShrink: 0, borderRadius: "var(--r-hero)", overflow: "hidden", border: "1px solid var(--line-2)", background: PHOTO_BACKDROP }}>
+        <img
+          src={imageUrl}
+          alt=""
+          onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setNaturalAR(t.naturalWidth / t.naturalHeight) }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+        />
       {/* light clamped-color mood ramp — fades out by ~70%, photo reads through */}
       <div style={{ position: "absolute", inset: 0, background: rampBg(c) }} />
       {/* soft broad radial ink scrim — hugs the text for legibility, never a panel */}
@@ -300,6 +341,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -540,7 +582,7 @@ export function HomeHeroCarousel({
     <div style={style}>
       <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
         {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} onPhoto={usePhoto} />}
-        <HeroFrame style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
+        <HeroFrame bare={usePhoto} style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
         {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} onPhoto={usePhoto} />}
       </div>
       {multi && (
