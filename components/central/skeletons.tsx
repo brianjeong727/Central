@@ -155,6 +155,167 @@ export function DirectoryTabSkeleton() {
   )
 }
 
+// ── Finance — generic stacked row cards (reimbursement rows / budget ledger) ──
+export function FinanceListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-card)", overflow: "hidden", background: "var(--cream)" }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--space-6)",
+            padding: "var(--space-7) var(--space-6)",
+            borderTop: i > 0 ? "1px solid var(--line-3)" : "none",
+          }}
+        >
+          <SkeletonBlock width="40%" height={18} radius="var(--r-chip)" />
+          <SkeletonBlock width={88} height={22} radius="var(--r-pill)" />
+          <SkeletonBlock width={64} height={22} radius="var(--r-pill)" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Finance — Give section content (gift card + trust panel) ──────────────────
+export function GivingGiveSkeleton() {
+  return (
+    <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
+      {/* Gift card */}
+      <div
+        style={{
+          background: "var(--cream)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--r-hero)",
+          padding: "var(--space-9) var(--space-9) var(--space-8)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-7)",
+          marginBottom: "var(--space-6)",
+        }}
+        className="md:mb-0"
+      >
+        <SkeletonBlock width={72} height={11} radius="var(--r-pill)" />
+        <SkeletonBlock width={180} height={56} radius="var(--r-chip)" />
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} width={52} height={30} radius="var(--r-pill-lg)" />
+          ))}
+        </div>
+        <SkeletonBlock width="100%" height={48} radius="var(--r-card)" />
+        <SkeletonBlock width="100%" height={38} radius="var(--r-input)" />
+      </div>
+      {/* Trust panel */}
+      <div className="hidden md:flex md:flex-col" style={{ gap: "var(--space-5)" }}>
+        <div
+          style={{
+            background: "var(--cream)",
+            border: "1px solid var(--line)",
+            borderRadius: 16,
+            padding: "var(--space-7) var(--space-8)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-5)",
+          }}
+        >
+          <SkeletonBlock width={110} height={11} radius="var(--r-pill)" />
+          <SkeletonBlock width="100%" height={56} radius="var(--r-card)" />
+          <SkeletonBlock width="100%" height={38} radius="var(--r-input)" />
+          <SkeletonBlock width="90%" height={12} radius="var(--r-pill)" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Finance — full skeleton (header + Give content) for the dynamic fallback ──
+export function GivingTabSkeleton() {
+  return (
+    <div className="pb-28 md:pb-0">
+      <TabPageHeader>
+        <SkeletonBlock width={140} height={30} radius="var(--r-chip)" />
+      </TabPageHeader>
+      <div className="px-5 md:px-14 pt-6 md:pt-5 max-w-[740px] md:max-w-none">
+        <GivingGiveSkeleton />
+      </div>
+    </div>
+  )
+}
+
+// ── Journal — entry-card rows (devotionals / prayers / verses lists) ──────────
+export function JournalListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            background: "var(--cream)",
+            borderRadius: "var(--r-card)",
+            border: "1px solid var(--line)",
+            padding: "var(--space-7)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-4)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-5)" }}>
+            <SkeletonBlock width="50%" height={16} radius="var(--r-chip)" />
+            <SkeletonBlock width={58} height={10} radius="var(--r-pill)" />
+          </div>
+          {i === 0 && (
+            <>
+              <SkeletonBlock width="100%" height={12} radius="var(--r-pill)" />
+              <SkeletonBlock width="80%" height={12} radius="var(--r-pill)" />
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Profile — full skeleton (identity header + profile section cards) ─────────
+export function ProfileTabSkeleton() {
+  return (
+    <div className="pb-6 md:pb-0">
+      <TabPageHeader style={{ gap: 24 }}>
+        <SkeletonBlock width={64} height={64} radius={999} />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <SkeletonBlock width={130} height={11} radius="var(--r-pill)" />
+          <SkeletonBlock width={260} height={40} radius="var(--r-chip)" />
+          <SkeletonBlock width={200} height={13} radius="var(--r-pill)" />
+        </div>
+        <SkeletonBlock width={110} height={34} radius="var(--r-input)" />
+      </TabPageHeader>
+      <div className="px-5 md:px-14 pt-6" style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+        {[0, 1].map((s) => (
+          <div key={s} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            <SkeletonBlock width={70} height={10} radius="var(--r-pill)" />
+            <div
+              style={{
+                border: "1px solid var(--line)",
+                borderRadius: "var(--r-card)",
+                background: "var(--cream)",
+                padding: "var(--space-6) var(--space-7)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-5)",
+              }}
+            >
+              <SkeletonBlock width="40%" height={12} radius="var(--r-pill)" />
+              <SkeletonBlock width="85%" height={12} radius="var(--r-pill)" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Chat list — sidebar panel rows (used as ChatListPanel dynamic fallback) ───
 export function ChatListSkeleton() {
   return (

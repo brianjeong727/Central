@@ -25,7 +25,7 @@ import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, GivingTabSkeleton, ProfileTabSkeleton } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -43,8 +43,8 @@ const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
 
 const DirectoryTab = dynamic(() => import("./tabs/directory-tab").then(m => m.DirectoryTab), { loading: () => <DirectoryTabSkeleton />, ssr: false })
-const GivingTab = dynamic(() => import("./tabs/giving-tab").then(m => m.GivingTab), { loading: () => <Spinner />, ssr: false })
-const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.ProfileTab), { loading: () => <Spinner />, ssr: false })
+const GivingTab = dynamic(() => import("./tabs/giving-tab").then(m => m.GivingTab), { loading: () => <GivingTabSkeleton />, ssr: false })
+const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.ProfileTab), { loading: () => <ProfileTabSkeleton />, ssr: false })
 const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.SettingsTab), { loading: () => <Spinner />, ssr: false })
 const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
 const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
