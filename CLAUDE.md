@@ -35,6 +35,9 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 
 ## Workflow
 
+### Build-task orchestration — load this first
+0. **Load the orchestration skill before dispatching.** For ANY build, fix, design, or implementation task, load `.claude/skills/orchestration/SKILL.md` as the FIRST move, before any subagent dispatch or code edit. It is the conductor: it governs prompt expansion, the request-challenge step, when to spawn the explorer/reconciler, the build loop, the per-doc escalation rules, the `/designchange` flag, and the multiple-choice escalation format. Pure strategic/direction questions are NOT build tasks — they skip the loop and go to the upstream thinking layer, not this skill.
+
 ### Before every non-trivial task
 1. **Enter plan mode first** — for any task with 3+ steps, architectural decisions, or multiple files touched. Write the full plan before touching any code. Get approval before implementing.
 2. **Ask clarifying questions** — if the request is ambiguous about behavior, ownership, UI placement, or access control, use `AskUserQuestion` to resolve it before starting. Don't guess and implement the wrong thing.
