@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { SWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -520,6 +521,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
+    <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
     <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]">
 
       {/* Desktop sidebar — hidden on mobile */}
@@ -894,5 +896,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         </div>
       )}
     </div>
+    </SWRConfig>
   )
 }

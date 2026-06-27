@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
@@ -24,6 +25,27 @@ function pulseTypeLabel(type: string) {
   if (type === "scale") return "1–5 Scale"
   if (type === "prayer") return "Prayer"
   return "Open"
+}
+
+// Everything the home tab loads in one round-trip. Held as a single SWR cache
+// object so the tab paints instantly from cache on revisit; RSVP toggles update
+// this object optimistically via the bound `mutate`.
+type HomeData = {
+  heroAnn: Announcement | null
+  latestAnn: Announcement | null
+  eventCount: number
+  featuredShowAttendees: boolean
+  userHasRsvped: boolean
+  rsvpCount: number
+  rsvpAttendees: RsvpAttendee[]
+  forYouItems: Announcement[]
+  rsvpedAnnIds: Set<string>
+  slides: HeroSlide[]
+  slideRsvpedIds: Set<string>
+  slideRsvpCounts: Record<string, number>
+  slideRsvpAttendees: Record<string, RsvpAttendee[]>
+  slideShowAttendeesIds: Set<string>
+  homeVerse: { reference: string; text: string } | null
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -53,30 +75,12 @@ export function HomeTab({
     respondToGradCheck(profile.id, graduated)
   }
 
-  const [heroAnn, setHeroAnn] = useState<Announcement | null>(null)
-  const [latestAnn, setLatestAnn] = useState<Announcement | null>(null)
-  const [userHasRsvped, setUserHasRsvped] = useState(false)
   const [rsvping, setRsvping] = useState(false)
-  const [rsvpCount, setRsvpCount] = useState(0)
-  const [rsvpAttendees, setRsvpAttendees] = useState<{ user_id: string; name: string }[]>([])
-  const [featuredShowAttendees, setFeaturedShowAttendees] = useState(false)
-
-  const [forYouItems, setForYouItems] = useState<Announcement[]>([])
-  const [rsvpedAnnIds, setRsvpedAnnIds] = useState<Set<string>>(new Set())
-  const [eventCount, setEventCount] = useState(0)
 
   // ── Curated home hero carousel ──
-  const [slides, setSlides] = useState<HeroSlide[]>([])
-  const [slideRsvpedIds, setSlideRsvpedIds] = useState<Set<string>>(new Set())
-  const [slideRsvpCounts, setSlideRsvpCounts] = useState<Record<string, number>>({})
-  const [slideRsvpAttendees, setSlideRsvpAttendees] = useState<Record<string, RsvpAttendee[]>>({})
-  const [slideShowAttendeesIds, setSlideShowAttendeesIds] = useState<Set<string>>(new Set())
   const [slideRsvping, setSlideRsvping] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
-  const [slidesRefreshKey, setSlidesRefreshKey] = useState(0)
   const canCurateHome = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
-  const [loading, setLoading] = useState(true)
-  const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
   const [pulseInput, setPulseInput] = useState<string>("")
   const [pulseScale, setPulseScale] = useState<number | null>(null)
@@ -106,7 +110,6 @@ export function HomeTab({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
-  const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
   const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
@@ -115,274 +118,331 @@ export function HomeTab({
   const greetingNode = <>{greetingPrefix}<span style={{ color: "var(--plum)" }}>{roleLabel}</span> {firstName}</>
 
 
-  useEffect(() => {
-    async function load() {
-      const [
-        { data: anns },
-        { data: prayerProfile },
-        { data: verses },
-      ] = await Promise.all([
-        supabase
-          .from("announcements")
-          .select("*")
-          .eq("ministry_id", ministryId)
-          .order("is_pinned", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(10),
-        supabase
-          .from("profiles")
-          .select("name, pray_for_me")
-          .eq("ministry_id", ministryId)
-          .not("pray_for_me", "is", null)
-          .neq("id", profile.id)
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("home_verses")
-          .select("reference, text")
-          .eq("ministry_id", ministryId)
-          .order("order_index", { ascending: true }),
-      ])
+  async function loadHomeData(): Promise<HomeData> {
+    const [
+      { data: anns },
+      { data: prayerProfile },
+      { data: verses },
+    ] = await Promise.all([
+      supabase
+        .from("announcements")
+        .select("*")
+        .eq("ministry_id", ministryId)
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("profiles")
+        .select("name, pray_for_me")
+        .eq("ministry_id", ministryId)
+        .not("pray_for_me", "is", null)
+        .neq("id", profile.id)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("home_verses")
+        .select("reference, text")
+        .eq("ministry_id", ministryId)
+        .order("order_index", { ascending: true }),
+    ])
 
-      // suppress unused variable warning for prayerProfile (state was removed but fetch kept)
-      void prayerProfile
+    // suppress unused variable warning for prayerProfile (state was removed but fetch kept)
+    void prayerProfile
 
-      if (verses && verses.length > 0) {
-        const now = new Date()
-        const dayOfYear = Math.floor(
-          (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
-        )
-        const v = verses[dayOfYear % verses.length] as { reference: string; text: string }
-        setHomeVerse(v)
+    let homeVerse: { reference: string; text: string } | null = null
+    if (verses && verses.length > 0) {
+      const now = new Date()
+      const dayOfYear = Math.floor(
+        (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000
+      )
+      homeVerse = verses[dayOfYear % verses.length] as { reference: string; text: string }
+    }
+    const list = anns ?? []
+    const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
+    const eventCount = list.filter((a) => a.is_event).length
+
+    const [{ data: myRsvps }, { data: heroRsvpRows }] = await Promise.all([
+      list.length > 0
+        ? supabase
+            .from("rsvps")
+            .select("announcement_id")
+            .eq("user_id", profile.id)
+            .in("announcement_id", list.map((a) => a.id))
+        : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
+      hero
+        ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
+        : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+    ])
+
+    const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
+
+    let featuredShowAttendees = false
+    let userHasRsvped = false
+    let rsvpCount = 0
+    let rsvpAttendees: RsvpAttendee[] = []
+    if (hero) {
+      featuredShowAttendees = hero.show_attendees ?? false
+      userHasRsvped = userRsvpIds.has(hero.id)
+      const rows = heroRsvpRows ?? []
+      rsvpCount = rows.length
+
+      if (rows.length > 0) {
+        const { data: profileRows } = await supabase
+          .from("profiles").select("id, name")
+          .in("id", rows.map((r) => r.user_id))
+          .eq("ministry_id", ministryId)
+        rsvpAttendees = (profileRows ?? []).map((p) => ({ user_id: p.id, name: p.name }))
       }
-      const list = anns ?? []
-      const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
-      setHeroAnn(hero)
-      setLatestAnn(list[0] ?? null)
-      setEventCount(list.filter((a) => a.is_event).length)
+    }
 
-      const [{ data: myRsvps }, { data: heroRsvpRows }] = await Promise.all([
-        list.length > 0
+    const heroId = hero?.id
+    const forYouItems = list
+      .filter((a) => a.id !== heroId)
+      .sort((a, b) => {
+        const aScore = (a.is_sub_pinned ? 1000 : 0) + (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0)
+        const bScore = (b.is_sub_pinned ? 1000 : 0) + (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0)
+        return bScore - aScore
+      })
+      .slice(0, 3)
+
+    // ── Curated hero slides: resolve each home_slides row to LIVE referenced data ──
+    const { data: slideRows } = await supabase
+      .from("home_slides")
+      .select("id, slide_type, announcement_id, calendar_event_id, order_index, image_url, caption, eyebrow, panel_color, created_at")
+      .eq("ministry_id", ministryId)
+      .eq("is_active", true)
+      .order("order_index", { ascending: true })
+
+    const rows = slideRows ?? []
+    let slides: HeroSlide[] = []
+    let slideRsvpedIds = new Set<string>()
+    let slideRsvpCounts: Record<string, number> = {}
+    let slideRsvpAttendees: Record<string, RsvpAttendee[]> = {}
+    let slideShowAttendeesIds = new Set<string>()
+
+    if (rows.length > 0) {
+      const annIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
+      const evIds = rows.filter((r) => r.slide_type === "event").map((r) => r.calendar_event_id).filter(Boolean) as string[]
+
+      const [{ data: slideAnns }, { data: slideEvents }] = await Promise.all([
+        annIds.length
+          ? supabase.from("announcements").select("id, title, body, is_event").in("id", annIds).eq("ministry_id", ministryId)
+          : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
+        evIds.length
           ? supabase
-              .from("rsvps")
-              .select("announcement_id")
-              .eq("user_id", profile.id)
-              .in("announcement_id", list.map((a) => a.id))
-          : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
-        hero
-          ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
-          : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+              .from("calendar_events")
+              .select("id, title, description, location, start_date, end_date, all_day, linked_announcement_id")
+              .in("id", evIds)
+              .eq("ministry_id", ministryId)
+          : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
       ])
 
-      const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
-      setRsvpedAnnIds(userRsvpIds)
+      const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
+      const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
 
-      if (hero) {
-        setFeaturedShowAttendees(hero.show_attendees ?? false)
-        setUserHasRsvped(userRsvpIds.has(hero.id))
-        const rows = heroRsvpRows ?? []
-        setRsvpCount(rows.length)
-
-        if (rows.length > 0) {
-          const { data: profileRows } = await supabase
-            .from("profiles").select("id, name")
-            .in("id", rows.map((r) => r.user_id))
-            .eq("ministry_id", ministryId)
-          setRsvpAttendees((profileRows ?? []).map((p) => ({ user_id: p.id, name: p.name })))
+      const built: HeroSlide[] = []
+      for (const r of rows) {
+        if (r.slide_type === "photo") {
+          if (!r.image_url) continue
+          built.push({
+            kind: "photo",
+            key: r.id,
+            imageUrl: r.image_url,
+            caption: r.caption ?? "",
+            eyebrow: r.eyebrow ?? "Featured",
+            panelColor: r.panel_color,
+            meta: r.created_at
+              ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+              : null,
+          })
+        } else if (r.slide_type === "announcement") {
+          const a = annMap.get(r.announcement_id ?? "")
+          if (!a) continue
+          built.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
+        } else {
+          const e = evMap.get(r.calendar_event_id ?? "")
+          if (!e) continue
+          built.push({
+            kind: "event",
+            key: r.id,
+            calendarEventId: e.id,
+            linkedAnnouncementId: e.linked_announcement_id,
+            title: e.title,
+            body: e.description,
+            eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
+            imageUrl: r.image_url,
+            panelColor: r.panel_color,
+          })
         }
       }
+      slides = built
 
-      const heroId = hero?.id
-      const forYou = list
-        .filter((a) => a.id !== heroId)
-        .sort((a, b) => {
-          const aScore = (a.is_sub_pinned ? 1000 : 0) + (a.is_event && !userRsvpIds.has(a.id) ? 10 : 0)
-          const bScore = (b.is_sub_pinned ? 1000 : 0) + (b.is_event && !userRsvpIds.has(b.id) ? 10 : 0)
-          return bScore - aScore
-        })
-        .slice(0, 3)
-      setForYouItems(forYou)
+      // RSVP wiring keyed on announcement_id (event slides reuse their linked announcement).
+      const rsvpAnnIds = new Set<string>()
+      for (const s of built) {
+        if (s.kind === "announcement" && s.isEvent) rsvpAnnIds.add(s.announcementId)
+        else if (s.kind === "event" && s.linkedAnnouncementId) rsvpAnnIds.add(s.linkedAnnouncementId)
+      }
+      const rsvpIdArr = [...rsvpAnnIds]
 
-      // ── Curated hero slides: resolve each home_slides row to LIVE referenced data ──
-      const { data: slideRows } = await supabase
-        .from("home_slides")
-        .select("id, slide_type, announcement_id, calendar_event_id, order_index, image_url, caption, eyebrow, panel_color, created_at")
-        .eq("ministry_id", ministryId)
-        .eq("is_active", true)
-        .order("order_index", { ascending: true })
-
-      const rows = slideRows ?? []
-      if (rows.length === 0) {
-        setSlides([])
-      } else {
-        const annIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
-        const evIds = rows.filter((r) => r.slide_type === "event").map((r) => r.calendar_event_id).filter(Boolean) as string[]
-
-        const [{ data: slideAnns }, { data: slideEvents }] = await Promise.all([
-          annIds.length
-            ? supabase.from("announcements").select("id, title, body, is_event").in("id", annIds).eq("ministry_id", ministryId)
-            : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
-          evIds.length
-            ? supabase
-                .from("calendar_events")
-                .select("id, title, description, location, start_date, end_date, all_day, linked_announcement_id")
-                .in("id", evIds)
-                .eq("ministry_id", ministryId)
-            : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
+      if (rsvpIdArr.length > 0) {
+        const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
+          supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
+          supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
+          supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
         ])
 
-        const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
-        const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
-
-        const built: HeroSlide[] = []
-        for (const r of rows) {
-          if (r.slide_type === "photo") {
-            if (!r.image_url) continue
-            built.push({
-              kind: "photo",
-              key: r.id,
-              imageUrl: r.image_url,
-              caption: r.caption ?? "",
-              eyebrow: r.eyebrow ?? "Featured",
-              panelColor: r.panel_color,
-              meta: r.created_at
-                ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                : null,
-            })
-          } else if (r.slide_type === "announcement") {
-            const a = annMap.get(r.announcement_id ?? "")
-            if (!a) continue
-            built.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
-          } else {
-            const e = evMap.get(r.calendar_event_id ?? "")
-            if (!e) continue
-            built.push({
-              kind: "event",
-              key: r.id,
-              calendarEventId: e.id,
-              linkedAnnouncementId: e.linked_announcement_id,
-              title: e.title,
-              body: e.description,
-              eventDetail: { startDate: e.start_date, endDate: e.end_date, allDay: e.all_day, location: e.location },
-              imageUrl: r.image_url,
-              panelColor: r.panel_color,
-            })
-          }
+        const counts: Record<string, number> = {}
+        const byAnnUserIds: Record<string, string[]> = {}
+        for (const row of allR ?? []) {
+          counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
+          ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
         }
-        setSlides(built)
 
-        // RSVP wiring keyed on announcement_id (event slides reuse their linked announcement).
-        const rsvpAnnIds = new Set<string>()
-        for (const s of built) {
-          if (s.kind === "announcement" && s.isEvent) rsvpAnnIds.add(s.announcementId)
-          else if (s.kind === "event" && s.linkedAnnouncementId) rsvpAnnIds.add(s.linkedAnnouncementId)
+        const allUserIds = [...new Set((allR ?? []).map((r) => r.user_id))]
+        let nameById = new Map<string, string>()
+        if (allUserIds.length) {
+          const { data: profs } = await supabase.from("profiles").select("id, name").in("id", allUserIds).eq("ministry_id", ministryId)
+          nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
         }
-        const rsvpIdArr = [...rsvpAnnIds]
 
-        if (rsvpIdArr.length === 0) {
-          setSlideRsvpedIds(new Set())
-          setSlideRsvpCounts({})
-          setSlideRsvpAttendees({})
-          setSlideShowAttendeesIds(new Set())
-        } else {
-          const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
-            supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
-            supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
-            supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
-          ])
-
-          const counts: Record<string, number> = {}
-          const byAnnUserIds: Record<string, string[]> = {}
-          for (const row of allR ?? []) {
-            counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
-            ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
-          }
-
-          const allUserIds = [...new Set((allR ?? []).map((r) => r.user_id))]
-          let nameById = new Map<string, string>()
-          if (allUserIds.length) {
-            const { data: profs } = await supabase.from("profiles").select("id, name").in("id", allUserIds).eq("ministry_id", ministryId)
-            nameById = new Map((profs ?? []).map((p) => [p.id, p.name]))
-          }
-
-          const attendeesMap: Record<string, RsvpAttendee[]> = {}
-          for (const [annId, uids] of Object.entries(byAnnUserIds)) {
-            attendeesMap[annId] = uids.map((uid) => ({ user_id: uid, name: nameById.get(uid) ?? "" }))
-          }
-
-          setSlideRsvpedIds(new Set((myR ?? []).map((r) => r.announcement_id)))
-          setSlideRsvpCounts(counts)
-          setSlideRsvpAttendees(attendeesMap)
-          setSlideShowAttendeesIds(new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id)))
+        const attendeesMap: Record<string, RsvpAttendee[]> = {}
+        for (const [annId, uids] of Object.entries(byAnnUserIds)) {
+          attendeesMap[annId] = uids.map((uid) => ({ user_id: uid, name: nameById.get(uid) ?? "" }))
         }
+
+        slideRsvpedIds = new Set((myR ?? []).map((r) => r.announcement_id))
+        slideRsvpCounts = counts
+        slideRsvpAttendees = attendeesMap
+        slideShowAttendeesIds = new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id))
       }
-
-      setLoading(false)
     }
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, slidesRefreshKey])
+
+    return {
+      heroAnn: hero,
+      latestAnn: list[0] ?? null,
+      eventCount,
+      featuredShowAttendees,
+      userHasRsvped,
+      rsvpCount,
+      rsvpAttendees,
+      forYouItems,
+      rsvpedAnnIds: userRsvpIds,
+      slides,
+      slideRsvpedIds,
+      slideRsvpCounts,
+      slideRsvpAttendees,
+      slideShowAttendeesIds,
+      homeVerse,
+    }
+  }
+
+  // SWR cache keyed on ministry + user — instant on revisit, revalidates in the
+  // background. The whole home payload lives in one cache entry.
+  const { data, isLoading, mutate } = useSWR(
+    ["home-tab", ministryId, profile.id],
+    loadHomeData
+  )
+
+  const loading = isLoading || !data
+  const heroAnn = data?.heroAnn ?? null
+  const latestAnn = data?.latestAnn ?? null
+  const eventCount = data?.eventCount ?? 0
+  const featuredShowAttendees = data?.featuredShowAttendees ?? false
+  const userHasRsvped = data?.userHasRsvped ?? false
+  const rsvpCount = data?.rsvpCount ?? 0
+  const rsvpAttendees = data?.rsvpAttendees ?? []
+  const forYouItems = data?.forYouItems ?? []
+  const rsvpedAnnIds = data?.rsvpedAnnIds ?? new Set<string>()
+  const slides = data?.slides ?? []
+  const slideRsvpedIds = data?.slideRsvpedIds ?? new Set<string>()
+  const slideRsvpCounts = data?.slideRsvpCounts ?? {}
+  const slideRsvpAttendees = data?.slideRsvpAttendees ?? {}
+  const slideShowAttendeesIds = data?.slideShowAttendeesIds ?? new Set<string>()
+  const homeVerse = data?.homeVerse ?? null
+  const showAttendeeList = rsvpAttendees.length > 0 && (isLeaderOrAdmin || featuredShowAttendees)
 
   async function handleHomeRsvp() {
-    if (!heroAnn || rsvping) return
+    if (!data?.heroAnn || rsvping) return
     setRsvping(true)
-    if (userHasRsvped) {
-      setUserHasRsvped(false)
-      setRsvpCount((c) => Math.max(0, c - 1))
-      setRsvpAttendees((prev) => prev.filter((a) => a.user_id !== profile.id))
-      await supabase.from("rsvps").delete().eq("announcement_id", heroAnn.id).eq("user_id", profile.id)
-    } else {
-      setUserHasRsvped(true)
-      setRsvpCount((c) => c + 1)
-      setRsvpAttendees((prev) => [...prev, { user_id: profile.id, name: profile.name }])
-      await supabase.from("rsvps").upsert(
-        { announcement_id: heroAnn.id, user_id: profile.id },
-        { onConflict: "announcement_id,user_id" }
-      )
+    const hero = data.heroAnn
+    const has = data.userHasRsvped
+    const optimistic: HomeData = {
+      ...data,
+      userHasRsvped: !has,
+      rsvpCount: has ? Math.max(0, data.rsvpCount - 1) : data.rsvpCount + 1,
+      rsvpAttendees: has
+        ? data.rsvpAttendees.filter((a) => a.user_id !== profile.id)
+        : [...data.rsvpAttendees, { user_id: profile.id, name: profile.name }],
     }
+    await mutate(
+      async () => {
+        if (has) {
+          await supabase.from("rsvps").delete().eq("announcement_id", hero.id).eq("user_id", profile.id)
+        } else {
+          await supabase.from("rsvps").upsert(
+            { announcement_id: hero.id, user_id: profile.id },
+            { onConflict: "announcement_id,user_id" }
+          )
+        }
+        return optimistic
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
+    )
     setRsvping(false)
   }
 
   async function handleForYouRsvp(annId: string) {
-    const isRsvped = rsvpedAnnIds.has(annId)
-    setRsvpedAnnIds((prev) => {
-      const s = new Set(prev)
-      if (isRsvped) s.delete(annId); else s.add(annId)
-      return s
-    })
-    if (isRsvped) {
-      await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
-    } else {
-      await supabase.from("rsvps").upsert(
-        { announcement_id: annId, user_id: profile.id },
-        { onConflict: "announcement_id,user_id" }
-      )
-    }
+    if (!data) return
+    const isRsvped = data.rsvpedAnnIds.has(annId)
+    const nextSet = new Set(data.rsvpedAnnIds)
+    if (isRsvped) nextSet.delete(annId); else nextSet.add(annId)
+    const optimistic: HomeData = { ...data, rsvpedAnnIds: nextSet }
+    await mutate(
+      async () => {
+        if (isRsvped) {
+          await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
+        } else {
+          await supabase.from("rsvps").upsert(
+            { announcement_id: annId, user_id: profile.id },
+            { onConflict: "announcement_id,user_id" }
+          )
+        }
+        return optimistic
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
+    )
   }
 
   async function handleSlideRsvp(annId: string) {
-    if (slideRsvping) return
+    if (slideRsvping || !data) return
     setSlideRsvping(true)
-    const has = slideRsvpedIds.has(annId)
-    setSlideRsvpedIds((prev) => {
-      const s = new Set(prev)
-      if (has) s.delete(annId)
-      else s.add(annId)
-      return s
-    })
-    setSlideRsvpCounts((prev) => ({ ...prev, [annId]: Math.max(0, (prev[annId] ?? 0) + (has ? -1 : 1)) }))
-    setSlideRsvpAttendees((prev) => {
-      const cur = prev[annId] ?? []
-      const next = has
-        ? cur.filter((a) => a.user_id !== profile.id)
-        : [...cur, { user_id: profile.id, name: profile.name }]
-      return { ...prev, [annId]: next }
-    })
-    if (has) {
-      await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
-    } else {
-      await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id" })
+    const has = data.slideRsvpedIds.has(annId)
+    const nextIds = new Set(data.slideRsvpedIds)
+    if (has) nextIds.delete(annId); else nextIds.add(annId)
+    const cur = data.slideRsvpAttendees[annId] ?? []
+    const optimistic: HomeData = {
+      ...data,
+      slideRsvpedIds: nextIds,
+      slideRsvpCounts: { ...data.slideRsvpCounts, [annId]: Math.max(0, (data.slideRsvpCounts[annId] ?? 0) + (has ? -1 : 1)) },
+      slideRsvpAttendees: {
+        ...data.slideRsvpAttendees,
+        [annId]: has
+          ? cur.filter((a) => a.user_id !== profile.id)
+          : [...cur, { user_id: profile.id, name: profile.name }],
+      },
     }
+    await mutate(
+      async () => {
+        if (has) {
+          await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
+        } else {
+          await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id" })
+        }
+        return optimistic
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
+    )
     setSlideRsvping(false)
   }
 
@@ -1113,7 +1173,7 @@ export function HomeTab({
           ministryId={ministryId}
           onClose={() => {
             setManagerOpen(false)
-            setSlidesRefreshKey((k) => k + 1)
+            mutate()
           }}
         />
       )}

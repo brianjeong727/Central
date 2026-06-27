@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -659,8 +660,6 @@ function InlineEditFields({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const [announcements, setAnnouncements] = useState<EnrichedAnnouncement[]>([])
-  const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [compact, setCompact] = useState(false)
   const [filter, setFilter] = useState<FilterType>("all")
@@ -672,7 +671,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
-  const loadAnnouncements = useCallback(async () => {
+  const loadAnnouncements = useCallback(async (): Promise<EnrichedAnnouncement[]> => {
     let annQuery = supabase
       .from("announcements")
       .select("*")
@@ -691,7 +690,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     const { data: annData } = await annQuery
     const anns: Announcement[] = annData ?? []
 
-    if (anns.length === 0) { setAnnouncements([]); setLoading(false); return }
+    if (anns.length === 0) return []
 
     const ids = anns.map((a) => a.id)
     const [{ data: viewRows }, { data: rsvpRows }, { data: formRows }] = await Promise.all([
@@ -742,7 +741,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       if (r.user_id === userId) userRsvpSet.add(r.announcement_id)
     }
 
-    setAnnouncements(anns.map((ann) => ({
+    return anns.map((ann) => ({
       ...ann,
       show_attendees: ann.show_attendees ?? false,
       view_count: viewMap[ann.id] ?? 0,
@@ -752,17 +751,24 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       has_form: !!formByAnn[ann.id],
       form_id: formByAnn[ann.id] ?? null,
       user_has_responded: formByAnn[ann.id] ? respondedFormIds.has(formByAnn[ann.id]) : false,
-    })))
-    setLoading(false)
+    }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, ministryId, isLeaderOrAdmin, userGradYear])
 
-  useEffect(() => { loadAnnouncements() }, [loadAnnouncements])
+  // SWR cache: keyed on every param the query branches on, so revisiting the tab
+  // shows cached data instantly while revalidating in the background.
+  const { data: announcements = [], isLoading: loading, mutate: mutateAnnouncements } = useSWR(
+    ["announcements", ministryId, userId, isLeaderOrAdmin, userGradYear],
+    loadAnnouncements
+  )
 
-  // True toggle: flips going state and count, and optimistically updates attendee list
+  // True toggle: flips going state and count, and optimistically updates attendee
+  // list. Desktop RSVP buttons call this for a display-only optimistic update
+  // (matching prior behavior — they did not persist to the DB); revalidate:false
+  // keeps the cache from refetching over the optimistic edit.
   function handleRsvpToggle(announcementId: string) {
-    setAnnouncements((prev) =>
-      prev.map((ann) => {
+    mutateAnnouncements((prev) =>
+      (prev ?? []).map((ann) => {
         if (ann.id !== announcementId) return ann
         const wasRsvped = ann.user_has_rsvped
         const newAttendees = wasRsvped
@@ -774,23 +780,24 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           rsvp_count: wasRsvped ? Math.max(0, ann.rsvp_count - 1) : ann.rsvp_count + 1,
           rsvp_attendees: newAttendees,
         }
-      })
+      }),
+      { revalidate: false }
     )
   }
 
   function handleNewAnnouncement(newAnn: Announcement) {
-    setAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: false, form_id: null, user_has_responded: false }, ...prev])
+    mutateAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: false, form_id: null, user_has_responded: false }, ...(prev ?? [])], { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.create", entityType: "announcement", entityId: newAnn.id, entityLabel: newAnn.title })
   }
 
   function handleDeleteAnnouncement(id: string) {
     const target = announcements.find(a => a.id === id)
-    setAnnouncements((prev) => prev.filter((ann) => ann.id !== id))
+    mutateAnnouncements((prev) => (prev ?? []).filter((ann) => ann.id !== id), { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: id, entityLabel: target?.title ?? null })
   }
 
   function handleEditSuccess(updated: Announcement) {
-    setAnnouncements((prev) => prev.map((ann) => ann.id === updated.id ? { ...ann, ...updated } : ann))
+    mutateAnnouncements((prev) => (prev ?? []).map((ann) => ann.id === updated.id ? { ...ann, ...updated } : ann), { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.edit", entityType: "announcement", entityId: updated.id, entityLabel: updated.title })
   }
 
@@ -799,7 +806,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   }
 
   async function handleDesktopDelete(ann: EnrichedAnnouncement) {
-    setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id))
+    mutateAnnouncements((prev) => (prev ?? []).filter((a) => a.id !== ann.id), { revalidate: false })
     await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: ann.id, entityLabel: ann.title })
   }
@@ -812,11 +819,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       await client.from("announcements").update({ is_pinned: false }).eq("ministry_id", ministryId).eq("is_pinned", true)
     }
     await client.from("announcements").update({ is_pinned: !currentlyPinned }).eq("id", annId).eq("ministry_id", ministryId)
-    setAnnouncements(prev => prev.map(a =>
+    mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId
         ? { ...a, is_pinned: !currentlyPinned }
         : { ...a, is_pinned: currentlyPinned ? a.is_pinned : false }
-    ))
+    ), { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlyPinned ? "announcement.unpin" : "announcement.pin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
@@ -824,9 +831,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     const client = createClient()
     const target = announcements.find(a => a.id === annId)
     await client.from("announcements").update({ is_sub_pinned: !currentlySubPinned }).eq("id", annId).eq("ministry_id", ministryId)
-    setAnnouncements(prev => prev.map(a =>
+    mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
-    ))
+    ), { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlySubPinned ? "announcement.unsubpin" : "announcement.subpin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
@@ -1119,7 +1126,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           ministryId={ministryId}
           onClose={() => setFormFillState(null)}
           onSubmitted={() => {
-            setAnnouncements(prev => prev.map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a))
+            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
             setFormFillState(null)
           }}
         />
