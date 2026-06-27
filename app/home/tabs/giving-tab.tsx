@@ -7,7 +7,7 @@ import {
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
   FileText, ImageIcon,
 } from "lucide-react"
-import { Spinner } from "../components/shared"
+import { Spinner, EYEBROW_STYLE } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
 import { PlanSubTabStrip } from "./plan-tab"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
@@ -969,7 +969,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
 
   const sectionLabel = activeSection === "give" ? "Give" : activeSection === "reimbursements" ? "Reimbursements" : "Budget"
   const sectionSubtitle = activeSection === "give" ? "Give directly and track ministry expenses in one place." : activeSection === "reimbursements" ? "Submit receipts and track reimbursement forms for ministry expenses." : "Track expenses, reimbursements, and per-fund spending targets."
-  const monoStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle = EYEBROW_STYLE
 
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
@@ -1469,7 +1469,7 @@ function AllocationSection({
       {/* Section header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
+          <p style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>
             Annual Budget · {fiscalYear}
           </p>
           <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: -0.4 }}>

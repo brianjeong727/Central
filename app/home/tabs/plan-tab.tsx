@@ -39,7 +39,7 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
@@ -2231,7 +2231,7 @@ export function PlanTab({
                     <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
                     <div>
                       <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
-                      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
                     </div>
                   </div>
                 ))}
@@ -9750,7 +9750,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       {/* Default role picker */}
       {roles.length > 0 && (
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 6 }}>Default role</p>
+          <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>Default role</p>
           <p style={{ fontSize: 12, color: "#A09A8C", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
@@ -10366,7 +10366,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           </div>
         ) : (
           <div className="hidden md:block px-10 py-8">
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: 6 }}>
+            <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>
               TEAM SETTINGS · {team.name.toUpperCase()}
             </p>
             <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>

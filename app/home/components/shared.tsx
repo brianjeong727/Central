@@ -6,11 +6,21 @@ import { Plus } from "lucide-react"
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
 export const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+  fontFamily: "var(--mono)",
   fontSize: "10px",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
-  color: "#8A8497",
+  color: "var(--muted-text)",
+}
+
+// Canonical "eyebrow" micro-label: 11px / 1.4px tracking / uppercase mono.
+// Distinct from MONO_STYLE (10px / 0.06em) — do not flatten the two together.
+export const EYEBROW_STYLE: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: "11px",
+  letterSpacing: "1.4px",
+  textTransform: "uppercase",
+  color: "var(--muted-text)",
 }
 
 // ── Shared brand mark ─────────────────────────────────────────────────────────
@@ -28,7 +38,7 @@ export function RingCrossLogo({ size = 32, color = "#3E1540" }: { size?: number;
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#8A8497]">{children}</span>
+    <span className="text-[11px] font-normal tracking-[0.15em] uppercase text-[#8A8497]">{children}</span>
   )
 }
 

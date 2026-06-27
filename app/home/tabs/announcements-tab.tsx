@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { ArrowLeft, ChevronDown, X, Check, CheckCircle2, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, AnimateIn } from "../components/shared"
+import { Spinner, EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -184,10 +184,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     )
   }
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, ‘SF Mono’, Menlo, monospace",
-    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "#8A8497",
-  }
+  const monoStyle = EYEBROW_STYLE
 
   return (
     <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
@@ -944,7 +941,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <p style={{ display: "flex", alignItems: "center", gap: 6, margin: 0 }}>
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
-                      <span style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--plum)" }}>Pinned</span>
+                      <span style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>Pinned</span>
                     </p>
                     <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "var(--ink)" }}>{pinnedAnn.title}</h2>
                     <p style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
@@ -1354,13 +1351,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, use
 
 const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
-const DETAIL_MONO: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  textTransform: "uppercase" as const,
-  color: "var(--muted-text)",
-}
+const DETAIL_MONO = EYEBROW_STYLE
 
 interface DetailAnnouncement {
   id: string
@@ -1472,10 +1463,7 @@ export function AnnouncementDetailView({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "11px", letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const monoStyle = EYEBROW_STYLE
 
   function DetailContent() {
     if (loading) return (

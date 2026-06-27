@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
-import { Spinner, EmptyState, AnimateIn } from "../components/shared"
+import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import Picker from "@emoji-mart/react"
@@ -3470,13 +3470,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     : rawActive
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "10px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: "#8A8497",
-  }
+  const monoStyle = MONO_STYLE
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">

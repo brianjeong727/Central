@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
+import { EYEBROW_STYLE } from "../components/shared"
 import {
   updateMinistryPublic,
   updateMinistryInfo,
@@ -63,10 +64,7 @@ function roleBadge(role: string) {
   )
 }
 
-const SECTION_LABEL: React.CSSProperties = {
-  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-  fontSize: "11px", fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px",
-}
+const SECTION_LABEL: React.CSSProperties = { ...EYEBROW_STYLE, fontWeight: 400 }
 
 const CARD: React.CSSProperties = {
   background: "#FBF8F2", borderRadius: "14px", border: "1px solid #E8E2D2",
@@ -603,7 +601,7 @@ export function SettingsTab({
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header */}
       <div className="md:hidden px-5 pt-14 pb-5">
-        <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase" }}>
+        <p style={EYEBROW_STYLE}>
           {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
         </p>
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, margin: "12px 0 0" }}>Church Settings</h1>
