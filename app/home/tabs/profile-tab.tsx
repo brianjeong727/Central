@@ -24,6 +24,32 @@ function fmtJournalDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
+// Full-body editor sub-page shell — a header (eyebrow + Cancel/Save) over the editor
+// body. Each journal tab early-returns this in place of its list while adding/editing,
+// so creating an entry takes over the whole content area instead of an inline card.
+function JournalEditorShell({ eyebrow, onCancel, onSave, saving, canSave, saveLabel, children }: {
+  eyebrow: string
+  onCancel: () => void
+  onSave: () => void
+  saving: boolean
+  canSave: boolean
+  saveLabel: string
+  children: React.ReactNode
+}) {
+  return (
+    <div style={{ paddingBottom: 52 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 24 }}>
+        <p style={{ ...MONO_STYLE, margin: 0 }}>{eyebrow}</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <CentralButton variant="secondary" onClick={onCancel} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
+          <CentralButton onClick={onSave} disabled={saving || !canSave} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : saveLabel}</CentralButton>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 // ── Journal Devotionals Tab ───────────────────────────────────────────────────
 
 export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void }) {
@@ -91,9 +117,47 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit devotional" : "New devotional"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.title.trim()}
+        saveLabel={editingEntry ? "Update" : "Save entry"}
+      >
+        <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <RoleDescriptionEditor
+          key={editingEntry?.id ?? "new"}
+          initialContent={draft.content}
+          onChange={html => setDraft(d => ({ ...d, content: html }))}
+          placeholder="Write your reflections here…"
+          minHeight={340}
+        >
+          <div style={{ paddingBottom: 4 }}>
+            <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", marginBottom: 6, letterSpacing: "-0.02em" }} />
+            <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 14, color: "var(--plum)", borderBottom: "1px solid var(--line)", marginBottom: 0, paddingBottom: 10 }} />
+          </div>
+        </RoleDescriptionEditor>
+        <div style={{ paddingTop: 16 }}>
+          {draft.image_url ? (
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <img src={draft.image_url} alt="" style={{ maxHeight: 220, maxWidth: "100%", borderRadius: 8 }} />
+              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+            </div>
+          ) : (
+            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer" }}>
+              <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
+            </button>
+          )}
+        </div>
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
-      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
@@ -103,38 +167,6 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
           <Plus size={14} />New entry
         </CentralButton>
       </div>
-
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
-          <RoleDescriptionEditor
-            key={editingEntry?.id ?? "new"}
-            initialContent={draft.content}
-            onChange={html => setDraft(d => ({ ...d, content: html }))}
-            placeholder="Write your reflections here…"
-          >
-            <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 6, letterSpacing: "-0.02em" }} />
-              <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 14, color: "var(--plum)", borderBottom: "1px solid var(--line)", marginBottom: 0, paddingBottom: 10 }} />
-            </div>
-          </RoleDescriptionEditor>
-          <div style={{ padding: "0 26px 20px" }}>
-            {draft.image_url ? (
-              <div style={{ position: "relative", marginBottom: 14, display: "inline-block" }}>
-                <img src={draft.image_url} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 8 }} />
-                <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
-              </div>
-            ) : (
-              <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
-                <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
-              </button>
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</CentralButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <Spinner />
@@ -247,6 +279,31 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
 
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit prayer" : "New prayer"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.title.trim()}
+        saveLabel={editingEntry ? "Update" : "Save prayer"}
+      >
+        <RoleDescriptionEditor
+          key={editingEntry?.id ?? "new"}
+          initialContent={draft.content}
+          onChange={html => setDraft(d => ({ ...d, content: html }))}
+          placeholder="Write your prayer here…"
+          minHeight={340}
+        >
+          <div style={{ paddingBottom: 4 }}>
+            <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid var(--line)", paddingBottom: 10 }} />
+          </div>
+        </RoleDescriptionEditor>
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
@@ -258,28 +315,6 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
           <Plus size={14} />New prayer
         </CentralButton>
       </div>
-
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
-          <RoleDescriptionEditor
-            key={editingEntry?.id ?? "new"}
-            initialContent={draft.content}
-            onChange={html => setDraft(d => ({ ...d, content: html }))}
-            placeholder="Write your prayer here…"
-            minHeight={152}
-          >
-            <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid var(--line)", paddingBottom: 10 }} />
-            </div>
-          </RoleDescriptionEditor>
-          <div style={{ padding: "0 26px 20px" }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</CentralButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <Spinner />
@@ -389,6 +424,23 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit verse" : "New verse"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.reference.trim() && !!draft.verse_text.trim()}
+        saveLabel={editingEntry ? "Update" : "Save verse"}
+      >
+        <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 24, color: "var(--plum)", marginBottom: 14, letterSpacing: "-0.01em" }} />
+        <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, color: "var(--ink)", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid var(--line)", outline: "none", resize: "none", marginBottom: 18, paddingBottom: 14 }} />
+        <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={8} style={{ display: "block", width: "100%", fontSize: 15, color: "var(--body)", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", minHeight: 200, fontFamily: "inherit" }} />
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
@@ -400,18 +452,6 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
           <Plus size={14} />Add verse
         </CentralButton>
       </div>
-
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", padding: "26px 26px 20px", marginBottom: 20 }}>
-          <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 20, color: "var(--plum)", marginBottom: 12, letterSpacing: "-0.01em" }} />
-          <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid var(--line)", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
-          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "var(--body)", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-            <CentralButton onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</CentralButton>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <Spinner />
