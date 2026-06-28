@@ -2062,9 +2062,13 @@ export function PlanTab({
           </div>
         )}
         {/* Submit-receipt affordance — any team member (or gov-write admin) can send a
-            receipt to Finance. Hidden in gov-view (read-only) and on the finance team
-            itself (FinanceWorkspace renders the treasurer's own originate trigger). */}
-        {activeTeamId && !govView && !isFinanceTeam && (!!activeUserTeam || govWrite) && (
+            receipt to Finance. Shown for anyone viewing a team workspace —
+            members AND governing admins (gov-view) — because submitting a receipt is a
+            PERSONAL reimbursement request (writes the submitter's own receipts row, not
+            the team's data), so it's exempt from the gov-view content read-only rule.
+            Hidden only on the finance team itself (FinanceWorkspace renders the
+            treasurer's own originate trigger). */}
+        {activeTeamId && !isFinanceTeam && (
           <div className="flex justify-end px-5 md:px-14 pt-5">
             <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceipt(true)} />
           </div>
