@@ -9400,6 +9400,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   // Co-presidency — persisted per-team setting (teams.allow_co_presidency)
   const [allowCoPresidency, setAllowCoPresidency] = useState(team.allow_co_presidency)
   const [savingCoPres, setSavingCoPres] = useState(false)
+  // "Replace a president?" swap flow — opened when an assignment would exceed max presidents
+  const [replaceCtx, setReplaceCtx] = useState<{
+    mode: "change" | "add"
+    targetName: string
+    targetUserId?: string
+    rows?: { team_id: string; user_id: string; role_id: string; added_by: string }[]
+  } | null>(null)
+  const [replacePickId, setReplacePickId] = useState<string | null>(null)
+  const [replacing, setReplacing] = useState(false)
 
   const myRoleId = members.find(m => m.user_id === userId)?.role_id
   const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
@@ -9408,6 +9417,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const canManageTeam = isAdmin || myRolePerms.includes("can_manage_team")
   const isTechTeam = /\btech\b/i.test(team.name)
   const canCreateGroupChat = isTechTeam || isAdmin || isPresident
+
+  // President identity & limit (Phase 2a/2b)
+  const presidentRole = roles.find(r => r.is_president) ?? null
+  const maxPresidents = allowCoPresidency ? 2 : 1
+  // Default fallback (non-president) role for demotions — last non-president role, matching the create wizard's defaultMemberRoleIdx.
+  const defaultNonPresidentRole = (() => {
+    for (let i = roles.length - 1; i >= 0; i--) {
+      if (!roles[i].is_president) return roles[i]
+    }
+    return roles[0] ?? null
+  })()
+  // Current president members (reflects optimistically-staged role changes already applied to `members`).
+  const presidentMembers = members.filter(m => roles.some(r => r.id === m.role_id && r.is_president))
 
   const [creatingChat, setCreatingChat] = useState(false)
   const [chatCreated, setChatCreated] = useState<{ id: string; name: string } | null>(null)
@@ -9498,14 +9520,28 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleAddMembers() {
     if (selectedIds.size === 0) return
     if (!defaultRoleId && roles.length > 0) { setError("Select a role before adding."); return }
-    setSaving(true)
-    setError(null)
     const rows = Array.from(selectedIds).map((uid) => ({
       team_id: team.id,
       user_id: uid,
       role_id: memberRoles[uid] ?? defaultRoleId,
       added_by: userId,
     }))
+    // President overflow guard — if adding these would exceed the max, route into the Replace flow.
+    const presidentTargets = rows.filter(r => roles.some(role => role.id === r.role_id && role.is_president))
+    if (presidentTargets.length > 0 && presidentMembers.length + presidentTargets.length > maxPresidents) {
+      const targetName = presidentTargets
+        .map(r => ministryMembers.find(mm => mm.id === r.user_id)?.name ?? "New member")
+        .join(" & ")
+      setReplacePickId(presidentMembers.length === 1 ? presidentMembers[0].user_id : null)
+      setReplaceCtx({ mode: "add", targetName, rows })
+      return
+    }
+    await commitAddMembers(rows)
+  }
+
+  async function commitAddMembers(rows: { team_id: string; user_id: string; role_id: string; added_by: string }[]) {
+    setSaving(true)
+    setError(null)
     const { error: err } = await supabase.from("team_members").insert(rows)
     if (err) { setError(err.message); setSaving(false); return }
 
@@ -9514,7 +9550,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     const isLeaderTeam = allTeamPerms.includes("can_create_dgs") || allTeamPerms.includes("can_view_dgs") ||
       (allTeamPerms.includes("can_view_finances") && allTeamPerms.includes("can_manage_members"))
     if (isLeaderTeam) {
-      await elevateToLeader(Array.from(selectedIds), ministryId)
+      await elevateToLeader(rows.map(r => r.user_id), ministryId)
     }
 
     // Reload members locally and return to settings — do NOT call onChanged() which closes settings
@@ -9545,9 +9581,63 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   function handleChangeRole(memberId: string, newRoleId: string) {
     const newRole = roles.find(r => r.id === newRoleId)
+    // President overflow guard — promoting past the max routes into the Replace flow instead of staging.
+    if (newRole?.is_president) {
+      const others = presidentMembers.filter(m => m.user_id !== memberId)
+      if (others.length >= maxPresidents) {
+        const target = members.find(m => m.user_id === memberId)
+        setReplacePickId(others.length === 1 ? others[0].user_id : null)
+        setReplaceCtx({ mode: "change", targetName: target?.name ?? "this member", targetUserId: memberId })
+        return // controlled <select> reverts to the prior role since `members` is untouched
+      }
+    }
     // Stage the change — persisted on Save
     setPendingMemberRoles(prev => ({ ...prev, [memberId]: newRoleId }))
     setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
+  }
+
+  // Confirm the president swap: demote the outgoing president to the default non-president role and promote the target.
+  async function confirmReplace() {
+    if (!replaceCtx || !presidentRole || !defaultNonPresidentRole) return
+    const outgoing = replacePickId ?? presidentMembers[0]?.user_id
+    if (!outgoing) return
+
+    if (replaceCtx.mode === "change" && replaceCtx.targetUserId) {
+      // Stage both the demote and the promote (consistent with the staged role-change model — persisted on Save).
+      const targetUserId = replaceCtx.targetUserId
+      setPendingMemberRoles(prev => ({ ...prev, [outgoing]: defaultNonPresidentRole.id, [targetUserId]: presidentRole.id }))
+      setMembers(prev => prev.map(m => {
+        if (m.user_id === outgoing) return { ...m, role_id: defaultNonPresidentRole.id, role_name: defaultNonPresidentRole.name }
+        if (m.user_id === targetUserId) return { ...m, role_id: presidentRole.id, role_name: presidentRole.name }
+        return m
+      }))
+      setReplaceCtx(null)
+      setReplacePickId(null)
+      return
+    }
+
+    // Add mode — writes are immediate, matching handleAddMembers.
+    setReplacing(true)
+    setError(null)
+    const snapshot = members
+    // Optimistic demote of the outgoing president.
+    setMembers(prev => prev.map(m => m.user_id === outgoing ? { ...m, role_id: defaultNonPresidentRole.id, role_name: defaultNonPresidentRole.name } : m))
+    const { error: demoteErr } = await supabase
+      .from("team_members")
+      .update({ role_id: defaultNonPresidentRole.id })
+      .eq("team_id", team.id)
+      .eq("user_id", outgoing)
+    if (demoteErr) {
+      setMembers(snapshot)
+      setError(demoteErr.message)
+      setReplacing(false)
+      return
+    }
+    // Insert the selected members (the new president keeps the president role).
+    await commitAddMembers(replaceCtx.rows ?? [])
+    setReplacing(false)
+    setReplaceCtx(null)
+    setReplacePickId(null)
   }
 
   async function handleRenameTeam() {
@@ -10400,6 +10490,67 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           </div>
         </div>
       )}
+
+      {/* "Replace a president?" swap dialog */}
+      {replaceCtx && (() => {
+        const isCoPres = presidentMembers.length >= 2
+        const confirmDisabled = replacing || (isCoPres && !replacePickId)
+        const close = () => { if (!replacing) { setReplaceCtx(null); setReplacePickId(null) } }
+        const presLabel = (presidentRole?.name ?? "President")
+        return (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center animate-backdrop-in"
+            style={{ background: "rgba(20,16,26,0.32)" }}
+            onClick={e => { if (e.target === e.currentTarget) close() }}
+          >
+            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+              <div style={{ padding: "26px 26px 20px" }}>
+                <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 8 }}>{presLabel}</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>
+                  {isCoPres ? "Replace a co-president?" : `Replace the ${presLabel.toLowerCase()}?`}
+                </h2>
+                {isCoPres ? (
+                  <>
+                    <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 16px" }}>
+                      There are 2 co-presidents. Which one is{" "}
+                      <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span> replacing?
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {presidentMembers.map(p => {
+                        const picked = replacePickId === p.user_id
+                        return (
+                          <button
+                            key={p.user_id}
+                            onClick={() => setReplacePickId(p.user_id)}
+                            style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "white", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
+                          >
+                            <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-semibold" />
+                            <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{p.name}</span>
+                            <div style={{ width: 18, height: 18, borderRadius: 999, border: `1.5px solid ${picked ? "var(--plum)" : "var(--line-2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {picked && <div style={{ width: 9, height: 9, borderRadius: 999, background: "var(--plum)" }} />}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+                    <span style={{ fontWeight: 500, color: "var(--ink)" }}>{presidentMembers[0]?.name}</span> is the {presLabel.toLowerCase()}. Replace them with{" "}
+                    <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span>?
+                  </p>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+                <button onClick={close} disabled={replacing} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: replacing ? "not-allowed" : "pointer" }}>Cancel</button>
+                <button onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: confirmDisabled ? "not-allowed" : "pointer", opacity: confirmDisabled ? 0.6 : 1 }}>
+                  {replacing ? "Replacing…" : "Replace"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
     </AnimateIn>
   )
