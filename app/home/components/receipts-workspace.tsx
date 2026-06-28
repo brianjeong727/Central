@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip } from "@/components/central"
+import { createPortal } from "react-dom"
+import { X, ArrowLeft, Plus, Image as ImageIcon } from "lucide-react"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
 import { HeaderActionButton } from "./shared"
+import { createClient } from "@/lib/supabase"
+import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
 import {
   listReceiptCategories,
   createReceiptCategory,
@@ -31,6 +34,7 @@ const FUND_OPTIONS = [
 
 export function ReceiptsWorkspace({
   ministryId,
+  userId,
   teams,
   activeReceiptsTeamId,
   onReceiptsTeamChange,
@@ -145,26 +149,16 @@ export function ReceiptsWorkspace({
             </p>
             <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
           </div>
-        ) : (
-          /* Placeholder content region for the active category. Submit + entries +
-             detail land in B2 — this just lays out the region. */
-          <div
-            style={{
-              background: "var(--ivory)",
-              border: "1px solid var(--line)",
-              borderRadius: 16,
-              padding: "40px 28px",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>
-              {activeCategory?.name ?? ""} · {FUND_OPTIONS.find(f => f.value === activeCategory?.fund)?.label ?? activeCategory?.fund}
-            </p>
-            <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
-              No receipts yet.
-            </p>
-          </div>
-        )}
+        ) : activeCategory ? (
+          <CategoryContent
+            key={activeCategory.id}
+            ministryId={ministryId}
+            userId={userId}
+            teamId={teamId!}
+            teamName={activeTeam?.name ?? ""}
+            category={activeCategory}
+          />
+        ) : null}
       </div>
 
       {showAddCategory && teamId && (
@@ -177,6 +171,301 @@ export function ReceiptsWorkspace({
       )}
     </>
   )
+}
+
+// ── A single category's body: submit affordance + the current user's own
+//    receipts for this category as compact one-line rows, plus the immersive
+//    read-only detail overlay. ────────────────────────────────────────────────
+
+interface ReceiptRow {
+  id: string
+  event_name: string | null
+  amount: number
+  fund: string
+  category: string | null
+  purchase_date: string
+  receipt_image_url: string | null
+  notes: string | null
+  submitted_by_name: string | null
+  submitted_at: string
+  status: string
+  decision_reason: string | null
+}
+
+const RECEIPT_SELECT =
+  "id, event_name, amount, fund, category, purchase_date, receipt_image_url, notes, submitted_by_name, submitted_at, status, decision_reason"
+
+function fundLabel(fund?: string) {
+  return FUND_OPTIONS.find(f => f.value === fund)?.label ?? fund ?? ""
+}
+
+function CategoryContent({
+  ministryId, userId, teamId, teamName, category,
+}: {
+  ministryId: string
+  userId: string
+  teamId: string
+  teamName: string
+  category: ReceiptCategory
+}) {
+  const supabase = createClient()
+  const [receipts, setReceipts] = useState<ReceiptRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showSubmit, setShowSubmit] = useState(false)
+  const [detail, setDetail] = useState<ReceiptRow | null>(null)
+
+  const refresh = useCallback(async () => {
+    const { data } = await supabase
+      .from("receipts")
+      .select(RECEIPT_SELECT)
+      .eq("category_id", category.id)
+      .eq("submitted_by", userId)
+      .order("submitted_at", { ascending: false })
+    setReceipts((data as ReceiptRow[] | null) ?? [])
+    setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category.id, userId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return (
+    <div>
+      {/* Category eyebrow + submit affordance */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+          {category.name} · {fundLabel(category.fund)}
+        </p>
+        <button
+          onClick={() => setShowSubmit(true)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            height: 36, padding: "0 14px", borderRadius: "var(--r-pill)",
+            background: "var(--plum)", color: "var(--cream)", border: "none",
+            fontSize: 13, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <Plus size={14} />
+          Submit a receipt
+        </button>
+      </div>
+
+      {/* Entries */}
+      {loading ? null : receipts.length === 0 ? (
+        <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
+          No receipts in {category.name} yet.
+        </p>
+      ) : (
+        <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
+          {receipts.map((r, i) => (
+            <ReceiptOneLine
+              key={r.id}
+              receipt={r}
+              first={i === 0}
+              onClick={() => setDetail(r)}
+            />
+          ))}
+        </div>
+      )}
+
+      {showSubmit && (
+        <SubmitReceiptModal
+          ministryId={ministryId}
+          teamId={teamId}
+          categoryId={category.id}
+          categoryName={category.name}
+          categoryFund={category.fund}
+          onClose={() => setShowSubmit(false)}
+          onSubmitted={() => { setShowSubmit(false); refresh() }}
+        />
+      )}
+
+      {detail && (
+        <ReceiptDetailOverlay
+          receipt={detail}
+          categoryName={category.name}
+          teamName={teamName}
+          onClose={() => setDetail(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function StatusPill({ status }: { status: string }) {
+  const m = STATUS_META[status] ?? STATUS_META.pending
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
+      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
+    }}>
+      {m.label}
+    </span>
+  )
+}
+
+function ReceiptOneLine({
+  receipt, first, onClick,
+}: {
+  receipt: ReceiptRow
+  first: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="hover:bg-[#F4F1E8] transition-colors"
+      style={{
+        display: "flex", alignItems: "center", gap: 12, width: "100%",
+        padding: "11px 16px", background: "transparent", border: "none",
+        borderTop: first ? "none" : "1px solid var(--line)",
+        cursor: "pointer", textAlign: "left",
+      }}
+    >
+      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+        {receipt.event_name || "Receipt"}
+      </span>
+      <span style={{ fontSize: 13, color: "var(--body)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+        ${Number(receipt.amount).toFixed(2)}
+      </span>
+      <StatusPill status={receipt.status} />
+    </button>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 4px" }}>{label}</p>
+      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>{value}</p>
+    </div>
+  )
+}
+
+const STATUS_STEPS = ["Submitted", "Approved", "Reimbursed"] as const
+
+function ReceiptDetailOverlay({
+  receipt, categoryName, teamName, onClose,
+}: {
+  receipt: ReceiptRow
+  categoryName: string
+  teamName: string
+  onClose: () => void
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const isNegative = receipt.status === "rejected" || receipt.status === "declined"
+  // Where the receipt sits on the Submitted → Approved → Reimbursed path.
+  const reachedIndex = receipt.status === "reimbursed" ? 2 : receipt.status === "approved" ? 1 : 0
+
+  const submitterName = receipt.submitted_by_name ?? "Unknown"
+  const initials = (() => {
+    const parts = submitterName.trim().split(" ")
+    return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
+  })()
+
+  const overlay = (
+    <div className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 pt-12 md:pt-5 pb-3.5 border-b border-[var(--line)]">
+        <button
+          onClick={onClose}
+          className="hover:bg-[#F2EDE0] transition-colors"
+          style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ivory)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+        >
+          <ArrowLeft size={16} color="var(--ink)" />
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Receipt</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {receipt.event_name || "Receipt"}
+          </p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "22px 20px 40px" }}>
+        {/* Amount + status */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
+            ${Number(receipt.amount).toFixed(2)}
+          </p>
+          <div style={{ marginTop: 6 }}><StatusPill status={receipt.status} /></div>
+        </div>
+
+        {/* Status path */}
+        {isNegative ? (
+          <div style={{ background: "#FDF9F9", border: "1px solid #E8C5C5", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>
+              {STATUS_META[receipt.status]?.label ?? "Declined"}
+            </p>
+            {receipt.decision_reason && (
+              <p style={{ fontSize: 13, color: "var(--body)", margin: "6px 0 0", lineHeight: 1.5 }}>{receipt.decision_reason}</p>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+            {STATUS_STEPS.map((step, i) => {
+              const done = i <= reachedIndex
+              return (
+                <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < STATUS_STEPS.length - 1 ? 1 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                  </div>
+                  {i < STATUS_STEPS.length - 1 && (
+                    <span style={{ flex: 1, height: 1, background: i < reachedIndex ? "var(--plum)" : "var(--line)" }} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Details */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+          <DetailRow label="Fund" value={fundLabel(receipt.fund)} />
+          <DetailRow label="Purchase date" value={new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} />
+          <DetailRow label="Category" value={categoryName} />
+          <DetailRow label="Team" value={teamName || "—"} />
+        </div>
+
+        <div style={{ marginBottom: 22 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>Submitted by</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MonogramChip initials={initials} style={{ width: 24, height: 24, fontSize: 9, fontWeight: 600 }} />
+            <span style={{ fontSize: 14, color: "var(--ink)" }}>{submitterName}</span>
+          </div>
+        </div>
+
+        {receipt.notes && (
+          <div style={{ marginBottom: 22 }}>
+            <DetailRow label="Notes" value={receipt.notes} />
+          </div>
+        )}
+
+        {/* Receipt image */}
+        <div>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>Receipt image</p>
+          {receipt.receipt_image_url ? (
+            <a href={receipt.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--line)", maxWidth: 280 }}>
+              <img src={receipt.receipt_image_url} alt="Receipt" style={{ width: "100%", display: "block", objectFit: "cover" }} />
+            </a>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", border: "1px dashed var(--dashed)", borderRadius: 12, color: "var(--muted-text)" }}>
+              <ImageIcon size={16} />
+              <span style={{ fontSize: 13 }}>No image attached</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
+  if (!mounted) return null
+  return createPortal(overlay, document.body)
 }
 
 function EmptyBlock({ title, subtitle }: { title: string; subtitle: string }) {

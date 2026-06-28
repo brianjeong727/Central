@@ -45,7 +45,7 @@ import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
-import { FinanceWorkspace, SubmitReceiptModal, type FinanceSection } from "../components/finance-workspace"
+import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
@@ -1815,7 +1815,6 @@ export function PlanTab({
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   const [financeSection, setFinanceSection] = useState<FinanceSection>("reimbursements")
-  const [showSubmitReceipt, setShowSubmitReceipt] = useState(false)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
 
@@ -2071,26 +2070,9 @@ export function PlanTab({
             </span>
           </div>
         )}
-        {/* Submit-receipt affordance — any team member (or gov-write admin) can send a
-            receipt to Finance. Shown for anyone viewing a team workspace —
-            members AND governing admins (gov-view) — because submitting a receipt is a
-            PERSONAL reimbursement request (writes the submitter's own receipts row, not
-            the team's data), so it's exempt from the gov-view content read-only rule.
-            Hidden only on the finance team itself (FinanceWorkspace renders the
-            treasurer's own originate trigger). */}
-        {activeTeamId && activeTeamId !== "receipts" && !isFinanceTeam && (
-          <div className="flex justify-end px-5 md:px-14 pt-5">
-            <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceipt(true)} />
-          </div>
-        )}
-        {activeTeamId && activeTeamId !== "receipts" && showSubmitReceipt && (
-          <SubmitReceiptModal
-            ministryId={ministryId}
-            teamId={activeTeamId}
-            onClose={() => setShowSubmitReceipt(false)}
-            onSubmitted={() => setShowSubmitReceipt(false)}
-          />
-        )}
+        {/* Receipt submission now lives exclusively in the Receipts workspace
+            (sidebar → Receipts), filed under a team's receipt category. The old
+            per-team-workspace "Submit receipt" affordance was removed in B2. */}
         {!activeTeamId ? (
           /* ── Three-way branch: 0 teams → empty state | 2+ teams (or any
              governance-accessible team) → picker

@@ -58,10 +58,11 @@ const DELETE_CONFIRM_BG = "#FEF2F2"
 const BUDGET_GREEN = "#2D5445"
 const REIMBURSED_TINT = "#EDE5F0"
 
-const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
+export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
   approved:   { label: "Approved",  bg: "#E6F4EA",       text: "#1E6B3C" },
   rejected:   { label: "Rejected",  bg: "#FEE2E2",       text: "var(--danger)" },
+  declined:   { label: "Declined",  bg: "#FEE2E2",       text: "var(--danger)" },
   reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
@@ -134,15 +135,23 @@ const DEFAULT_RECEIPT_CATEGORIES: DynamicCategory[] = [
 ]
 
 export function SubmitReceiptModal({
-  ministryId, limits: limitsProp, categories: categoriesProp, teamId, onClose, onSubmitted,
+  ministryId, limits: limitsProp, categories: categoriesProp, teamId,
+  categoryId, categoryName, categoryFund, onClose, onSubmitted,
 }: {
   ministryId: string; limits?: ReceiptLimit[];
   categories?: DynamicCategory[];
   teamId?: string | null;
+  // Category mode: when categoryId is provided the category + fund pickers are
+  // hidden and the receipt is filed under the given category (with its inherited
+  // fund). Used by the Receipts workspace, where the active category is fixed.
+  categoryId?: string;
+  categoryName?: string;
+  categoryFund?: string;
   onClose: () => void; onSubmitted: (r: ReceiptType) => void
 }) {
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
+  const categoryMode = !!categoryId
   // When not supplied (called outside FinanceWorkspace), self-fetch limits and
   // fall back to a default category list.
   const [fetchedLimits, setFetchedLimits] = useState<ReceiptLimit[]>([])
@@ -154,8 +163,8 @@ export function SubmitReceiptModal({
     getReceiptLimits(ministryId).then(res => { if (active) setFetchedLimits(res.data) })
     return () => { active = false }
   }, [limitsProp, ministryId])
-  const [category, setCategory] = useState(() => categories[0]?.value ?? "DG Dinner")
-  const [fund, setFund] = useState("church")
+  const [category, setCategory] = useState(() => categoryName ?? categories[0]?.value ?? "DG Dinner")
+  const [fund, setFund] = useState(categoryFund ?? "church")
   const [amount, setAmount] = useState("")
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0])
   const [eventName, setEventName] = useState("")
@@ -185,7 +194,7 @@ export function SubmitReceiptModal({
   async function handleSubmit() {
     if (!amount || numAmount <= 0) { setError("Please enter a valid amount."); return }
     setSubmitting(true); setError(null)
-    const { data, error: err } = await submitReceipt({ ministryId, teamId: teamId ?? null, eventName, category, fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrl, notes })
+    const { data, error: err } = await submitReceipt({ ministryId, teamId: teamId ?? null, categoryId: categoryId ?? null, eventName, category: categoryMode ? (categoryName ?? category) : category, fund: categoryMode ? (categoryFund ?? fund) : fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrl, notes })
     if (err) { setError(err); setSubmitting(false); return }
     if (data) onSubmitted(data)
     onClose()
@@ -199,10 +208,16 @@ export function SubmitReceiptModal({
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ivory)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} color="var(--body)" /></button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label style={labelStyle}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>{categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-            <div><label style={labelStyle}>Fund</label><select value={fund} onChange={e => setFund(e.target.value)} style={inputStyle}>{FUNDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}</select></div>
-          </div>
+          {categoryMode ? (
+            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+              {categoryName} · {FUNDS.find(f => f.value === categoryFund)?.label ?? categoryFund}
+            </p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div><label style={labelStyle}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>{categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+              <div><label style={labelStyle}>Fund</label><select value={fund} onChange={e => setFund(e.target.value)} style={inputStyle}>{FUNDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}</select></div>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} /></div>
             <div><label style={labelStyle}>Purchase date</label><input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={inputStyle} /></div>
