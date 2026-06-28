@@ -8,7 +8,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
-  FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle,
+  FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -50,6 +50,7 @@ import type {
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category, CreateStep,
   EventType, EventExtraTab, EventNewFolk,
 } from "../types"
+import { teamAccessLevel, type TeamAccess } from "../governance"
 
 const PERMISSION_LABELS: Record<string, string> = {
   can_manage_worship_set: "Manage worship set",
@@ -1154,7 +1155,7 @@ export function MeetingNotesSection({
 // General = month calendar (click → EventPlanWorkspace directly) + UP NEXT + QUICK ADD + notes timeline
 
 export function StudentOrgTeamHome({
-  teamId, teamName, teamIcon, ministryId, userId, userName, userRole, isAdmin, canEdit, canEditBudget, onTeamSettings,
+  teamId, teamName, teamIcon, ministryId, userId, userName, userRole, canEdit, canEditBudget, onTeamSettings,
   planningEvent, onPlanningEventChange, refreshSignal, onOpenChat,
   desktopSection, isDesktopView, onCalEventsChange, onEditEvent,
 }: {
@@ -1165,7 +1166,6 @@ export function StudentOrgTeamHome({
   userId: string
   userName: string
   userRole: string
-  isAdmin: boolean
   canEdit: boolean
   canEditBudget: boolean
   onTeamSettings?: () => void
@@ -1580,7 +1580,7 @@ export function StudentOrgTeamHome({
             teamId={teamId}
             ministryId={ministryId}
             userId={userId}
-            canEdit={canEdit || isAdmin}
+            canEdit={canEdit}
           />
         )}
       </div>
@@ -1754,7 +1754,11 @@ export function PlanTab({
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
   sglSection, onSglSectionChange,
 }: PlanTabProps) {
-  const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? (isAdmin ? ministryName : "Plan")
+  // Resolve from membership first, then from allTeams (a governance admin may be
+  // viewing a team they don't belong to), then the ministry-name fallback.
+  const activeTeamName = userTeams.find(t => t.teamId === activeTeamId)?.teamName
+    ?? allTeams.find(t => t.id === activeTeamId)?.name
+    ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const router = useRouter()
   const supabase = createClient()
@@ -1864,9 +1868,25 @@ export function PlanTab({
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
   const activeTeamLabel = activeTeamName.toLowerCase()
   const activeTeamPerms = activeUserTeam?.permissions ?? []
+
+  // The active team object — from membership if a member, else from allTeams
+  // (a governance admin entering a team they don't belong to).
+  const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency, admin_access: 'view' } : undefined)
+
+  // Effective access this user has to the active team. Member → full domain
+  // access. Non-member governance admin → gov-write / gov-view per the matrix.
+  const activeTeamAccess: TeamAccess = teamAccessLevel({
+    isMember: !!activeUserTeam,
+    isGovernanceAdmin,
+    adminAccess: activeTeamFull?.admin_access ?? "view",
+  })
+  const govWrite = activeTeamAccess === "gov-write"
+  const govView = activeTeamAccess === "gov-view"
+
   const isStudentOrgBoard = /\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
   const studentOrgRole = (isStudentOrgBoard ? activeUserTeam?.roleName : undefined) ?? ""
-  const canEditStudentOrg = isAdmin || activeTeamPerms.includes("can_plan_events")
+  const canEditStudentOrg = activeTeamPerms.includes("can_plan_events") || govWrite
 
   // Tech Team detected by name first — before isPraiseTeam — to avoid permission overlap
   // (Tech Team shares can_view_worship_set / can_generate_slides with praise team members)
@@ -1875,23 +1895,32 @@ export function PlanTab({
 
   const isPraiseTeam = !isTechTeam && (/\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p)))
   const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
-  const canManageWorship = isAdmin || praiseTeamPerms.includes("can_manage_worship_set")
-  const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
-
-  const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
-    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency, admin_access: 'view' } : undefined)
+  const canManageWorship = praiseTeamPerms.includes("can_manage_worship_set") || govWrite
+  const canManageSchedule = praiseTeamPerms.includes("can_manage_schedule") || govWrite
 
   const isActiveTeamPresident = activeUserTeam?.isPresident ?? false
-  // Structural gate: only governing admins (or the team president) may open settings.
-  const canOpenTeamSettings = isGovernanceAdmin || isActiveTeamPresident
+  // Structural gate: a team president may open settings; a governance admin may
+  // open settings only when the team grants them view or write (matrix ≠ none).
+  const canOpenTeamSettings = isActiveTeamPresident || activeTeamAccess === "gov-view" || activeTeamAccess === "gov-write"
 
   const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
-  const isDGLPresident = isDGLTeam && isActiveTeamPresident
+  const isDGLPresident = isDGLTeam && (isActiveTeamPresident || govWrite)
 
   const isDgPraiseTeam = activeTeamFull?.team_type === 'dg_praise'
   const isOneTimeTeam = activeTeamFull?.team_type === 'one_time'
   // isPraiseTeamMember: used for CreateTeamOverlay visibility
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
+
+  // Governance-accessible teams: ministry teams the user is NOT a member of but
+  // may enter as a governing admin (matrix grants view or write). Empty for
+  // non-governance users (teamAccessLevel returns "none"). Shown in the picker
+  // as a separate "Admin access" group; selecting one enters its CONTENT view.
+  const memberTeamIds = new Set(userTeams.map(t => t.teamId))
+  const govTeams = allTeams.filter(t => {
+    if (memberTeamIds.has(t.id)) return false
+    const access = teamAccessLevel({ isMember: false, isGovernanceAdmin, adminAccess: t.admin_access })
+    return access === "gov-view" || access === "gov-write"
+  })
 
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
@@ -1959,10 +1988,19 @@ export function PlanTab({
 
         {/* Scrollable team content */}
         <div className="flex-1 overflow-y-auto">
+        {activeTeamId && govView && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 56px", background: "var(--ivory)", borderBottom: "1px solid var(--line)" }}>
+            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
+              Viewing as admin · read-only
+            </span>
+          </div>
+        )}
         {!activeTeamId ? (
-          /* ── Three-way branch: 0 teams → empty state | 2+ teams → picker
+          /* ── Three-way branch: 0 teams → empty state | 2+ teams (or any
+             governance-accessible team) → picker
              (1-team case auto-entered in home-app before this renders) ── */
-          userTeams.length >= 2 ? (
+          (userTeams.length >= 2 || govTeams.length > 0) ? (
             /* PICKER — full-width, no sidebar */
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "72px 48px 80px" }}>
               <div style={{ width: "100%", maxWidth: 860 }}>
@@ -1973,43 +2011,95 @@ export function PlanTab({
                   Which team are you planning for?
                 </h1>
                 <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 48px", lineHeight: 1.6, textAlign: "center" }}>
-                  You coordinate across {userTeams.length} teams. Pick one to open its planning workspace.
+                  {userTeams.length >= 2
+                    ? `You coordinate across ${userTeams.length} teams. Pick one to open its planning workspace.`
+                    : "Pick a team to open its planning workspace."}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-                  {userTeams.map(t => {
-                    const evCount = teamEventCounts[t.teamId] ?? 0
-                    const secCount = getPickerSectionCount(t)
-                    return (
-                      <button
-                        key={t.teamId}
-                        onClick={() => onTeamSelect?.(t.teamId)}
-                        className="text-left transition-all hover:border-[var(--plum)]"
-                        style={{
-                          background: "var(--ivory)",
-                          border: "1px solid var(--line)",
-                          borderRadius: 16,
-                          padding: "28px 28px 24px",
-                          cursor: "pointer",
-                          display: "block",
-                          width: "100%",
-                        }}
-                      >
-                        <div style={{ marginBottom: 22 }}>
-                          <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
-                        </div>
-                        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
-                          {t.roleName}
-                        </p>
-                        <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
-                          {t.teamName}
-                        </p>
-                        <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
-                          {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
-                        </p>
-                      </button>
-                    )
-                  })}
-                </div>
+                {userTeams.length > 0 && (
+                  <>
+                    {govTeams.length > 0 && (
+                      <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px" }}>
+                        Your teams
+                      </p>
+                    )}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                      {userTeams.map(t => {
+                        const evCount = teamEventCounts[t.teamId] ?? 0
+                        const secCount = getPickerSectionCount(t)
+                        return (
+                          <button
+                            key={t.teamId}
+                            onClick={() => onTeamSelect?.(t.teamId)}
+                            className="text-left transition-all hover:border-[var(--plum)]"
+                            style={{
+                              background: "var(--ivory)",
+                              border: "1px solid var(--line)",
+                              borderRadius: 16,
+                              padding: "28px 28px 24px",
+                              cursor: "pointer",
+                              display: "block",
+                              width: "100%",
+                            }}
+                          >
+                            <div style={{ marginBottom: 22 }}>
+                              <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
+                            </div>
+                            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                              {t.roleName}
+                            </p>
+                            <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
+                              {t.teamName}
+                            </p>
+                            <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
+                              {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+                {govTeams.length > 0 && (
+                  <>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: `${userTeams.length > 0 ? "32px" : "0"} 0 14px` }}>
+                      Admin access
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                      {govTeams.map(t => {
+                        const canWrite = t.admin_access === "write"
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => onTeamSelect?.(t.id)}
+                            className="text-left transition-all hover:border-[var(--plum)]"
+                            style={{
+                              background: "var(--ivory)",
+                              border: "1px solid var(--line)",
+                              borderRadius: 16,
+                              padding: "28px 28px 24px",
+                              cursor: "pointer",
+                              display: "block",
+                              width: "100%",
+                            }}
+                          >
+                            <div style={{ marginBottom: 22 }}>
+                              <PlanLineIcon iconKey={t.icon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
+                            </div>
+                            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                              {canWrite ? "Admin · can edit" : "Admin · view only"}
+                            </p>
+                            <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
+                              {t.name}
+                            </p>
+                            <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
+                              {t.member_count} member{t.member_count !== 1 ? "s" : ""}
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
                 {isAdmin && (
                   <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
@@ -2056,7 +2146,7 @@ export function PlanTab({
               teamId={activeTeamId}
               ministryId={ministryId}
               userId={userId}
-              canManage={canManageWorship || isAdmin}
+              canManage={canManageWorship}
             />
           </div>
         ) : isOneTimeTeam && activeTeamId ? (
@@ -2065,7 +2155,7 @@ export function PlanTab({
               teamId={activeTeamId}
               ministryId={ministryId}
               userId={userId}
-              canManage={canManageWorship || isAdmin}
+              canManage={canManageWorship}
             />
           </div>
         ) : isTechTeam ? (
@@ -2089,9 +2179,8 @@ export function PlanTab({
               userId={userId}
               userName={userName}
               userRole={studentOrgRole}
-              isAdmin={isAdmin}
               canEdit={canEditStudentOrg}
-              canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
+              canEditBudget={activeTeamPerms.includes("can_view_finances") || govWrite}
               onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
               planningEvent={studentOrgPlanningEvent ?? null}
               onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
@@ -2124,13 +2213,15 @@ export function PlanTab({
         ) : (() => {
           /* Fallback: team selected but not a recognized special type → ministry calendar */
           const perms = activeUserTeam?.permissions ?? []
-          if (!isAdmin && !perms.includes("can_plan_events")) return null
+          // Visible to members who can view/plan, or any governance access (view/write).
+          // Edit comes from member perm or governance-write — never raw admin.
+          if (!perms.includes("can_plan_events") && !govWrite && !govView) return null
           return (
             <MinistryCalendar
               ministryId={ministryId}
               teamId={activeTeamId}
               userId={userId}
-              canEdit={isAdmin || perms.includes("can_plan_events")}
+              canEdit={perms.includes("can_plan_events") || govWrite}
               onOpenChat={onOpenChat}
             />
           )
@@ -2140,19 +2231,27 @@ export function PlanTab({
 
       {/* Mobile content */}
       <div className="md:hidden px-5 pb-4">
+        {activeTeamId && govView && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
+            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
+              Viewing as admin · read-only
+            </span>
+          </div>
+        )}
         {isDgPraiseTeam && activeTeamId ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
-            canManage={canManageWorship || isAdmin}
+            canManage={canManageWorship}
           />
         ) : isOneTimeTeam && activeTeamId ? (
           <OneTimeTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
-            canManage={canManageWorship || isAdmin}
+            canManage={canManageWorship}
           />
         ) : isTechTeam ? (
           <TechTeamTab ministryId={ministryId} userId={userId} />
@@ -2173,9 +2272,8 @@ export function PlanTab({
             userId={userId}
             userName={userName}
             userRole={studentOrgRole}
-            isAdmin={isAdmin}
             canEdit={canEditStudentOrg}
-            canEditBudget={isAdmin || activeTeamPerms.includes("can_view_finances")}
+            canEditBudget={activeTeamPerms.includes("can_view_finances") || govWrite}
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             planningEvent={studentOrgPlanningEvent ?? null}
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
