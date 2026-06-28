@@ -328,6 +328,8 @@ export interface UserTeam {
   permissions: string[]
   isPresident: boolean
   allowCoPresidency: boolean
+  // Per-team override: when false (default), admin-tier users can't be team members.
+  allowAdminMembers: boolean
 }
 
 export interface Team {
@@ -341,6 +343,9 @@ export interface Team {
   allow_co_presidency: boolean
   // Per-team admin governance matrix: what governing admins get on this team.
   admin_access: 'none' | 'view' | 'write'
+  // Per-team override: when false (default), admin-tier users (admin/deacon/elder/pastor)
+  // can't be added as members. Admins govern from outside unless this is enabled.
+  allow_admin_members: boolean
 }
 
 // Global governance roster (ministries.governance_settings). When all_admins is

@@ -1857,7 +1857,7 @@ export function PlanTab({
     const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
       const ut = userTeams.find(t => t.teamId === activeTeamId)
       if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency, admin_access: 'view' } satisfies Team
+      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency, admin_access: 'view', allow_admin_members: ut.allowAdminMembers } satisfies Team
     })()
     if (!team) return
     setOpenTeam(team)
@@ -1900,7 +1900,7 @@ export function PlanTab({
   // The active team object — from membership if a member, else from allTeams
   // (a governance admin entering a team they don't belong to).
   const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
-    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency, admin_access: 'view' } : undefined)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency, admin_access: 'view', allow_admin_members: activeUserTeam.allowAdminMembers } : undefined)
 
   // Effective access this user has to the active team. Member → full domain
   // access. Non-member governance admin → gov-write / gov-view per the matrix.
@@ -8975,6 +8975,13 @@ function GroupGeneratorWizard({
 }
 
 // Shared toggle component for GroupGeneratorWizard
+// Admin-tier roles (CLAUDE.md convention #2 — admin-tier). Governance separation:
+// these users can't be team members unless the team's allow_admin_members is on.
+const ADMIN_TIER_ROLES = ["admin", "deacon", "elder", "pastor"]
+function isAdminTierRole(role: string | null | undefined): boolean {
+  return !!role && ADMIN_TIER_ROLES.includes(role.toLowerCase())
+}
+
 function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
   checked: boolean
   onChange: (v: boolean) => void
@@ -9029,12 +9036,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const [teamDesc, setTeamDesc] = useState("")
   const [roles, setRoles] = useState<DraftRole[]>([{ name: "President", permissions: [], is_president: true }, { name: "Member", permissions: [] }])
   const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; role?: string }[]>([])
   const [memberSearch, setMemberSearch] = useState("")
   const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
   const [presidentPick, setPresidentPick] = useState<string | null>(null)
   const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
   const [coPresidency, setCoPresidency] = useState(false)
+  // New teams default to governance separation: admin-tier users excluded from membership.
+  const [allowAdminMembers, setAllowAdminMembers] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -9052,7 +9061,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     if (step !== "members") return
     supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, role")
       .eq("ministry_id", ministryId)
       .neq("id", userId)
       .order("name")
@@ -9118,7 +9127,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
     const { data: team, error: teamErr } = await supabase
       .from("teams")
-      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType, allow_co_presidency: coPresidency })
+      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType, allow_co_presidency: coPresidency, allow_admin_members: allowAdminMembers })
       .select("id")
       .single()
 
@@ -9162,7 +9171,10 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     onCreated(team.id)
   }
 
-  const filteredMembers = ministryMembers.filter((m) =>
+  // Governance separation: exclude admin-tier candidates unless this new team allows admin members.
+  const eligibleMembers = allowAdminMembers ? ministryMembers : ministryMembers.filter((m) => !isAdminTierRole(m.role))
+
+  const filteredMembers = eligibleMembers.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase()) &&
     m.id !== presidentPick &&
     m.id !== presidentPick2
@@ -9446,7 +9458,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                     className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                   >
                     <option value="" disabled>Select a person…</option>
-                    {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
+                    {eligibleMembers.filter(m => m.id !== presidentPick2).map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                   </select>
@@ -9469,7 +9481,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                       className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                     >
                       <option value="" disabled>Select second person…</option>
-                      {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
+                      {eligibleMembers.filter(m => m.id !== presidentPick).map(m => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
@@ -9477,6 +9489,29 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 )}
               </div>
             )}
+
+            {/* Allow admins as members — governance override (default off) */}
+            <button
+              type="button"
+              onClick={() => setAllowAdminMembers(v => {
+                const next = !v
+                if (!next) {
+                  if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick)?.role)) setPresidentPick(null)
+                  if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick2)?.role)) setPresidentPick2(null)
+                  setSelectedMembers(prev => prev.filter(sm => !isAdminTierRole(ministryMembers.find(m => m.id === sm.userId)?.role)))
+                }
+                return next
+              })}
+              className="flex items-start gap-2.5 rounded-xl border border-[var(--line)] bg-white p-3 text-left"
+            >
+              <span className={`mt-0.5 w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${allowAdminMembers ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"}`}>
+                {allowAdminMembers && <Check className="w-2.5 h-2.5 text-white" />}
+              </span>
+              <span className="flex flex-col">
+                <span className="text-[13px] font-medium text-[var(--ink)]">Allow admins as members</span>
+                <span className="text-[12px] text-[var(--muted-text)]">By default admins govern teams without being members.</span>
+              </span>
+            </button>
 
             {/* Creator row — always added with non-president role */}
             <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[var(--line)] p-3">
@@ -9570,7 +9605,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; email?: string }[]>([])
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; email?: string; role?: string }[]>([])
   const [addSearch, setAddSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [defaultRoleId, setDefaultRoleId] = useState<string>("")
@@ -9590,6 +9625,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   // Co-presidency — persisted per-team setting (teams.allow_co_presidency)
   const [allowCoPresidency, setAllowCoPresidency] = useState(team.allow_co_presidency)
   const [savingCoPres, setSavingCoPres] = useState(false)
+  // Admin governance separation — persisted per-team (teams.allow_admin_members).
+  // Off by default: admin-tier users can't be members unless this is enabled.
+  const [allowAdminMembers, setAllowAdminMembers] = useState(team.allow_admin_members)
+  const [savingAdminMembers, setSavingAdminMembers] = useState(false)
   // "Replace a president?" swap flow — opened when an assignment would exceed max presidents
   const [replaceCtx, setReplaceCtx] = useState<{
     mode: "change" | "add"
@@ -9685,7 +9724,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     const memberIds = new Set([...members.map((m) => m.user_id)])
     supabase
       .from("profiles")
-      .select("id, name, email")
+      .select("id, name, email, role")
       .eq("ministry_id", ministryId)
       .order("name")
       .then(({ data }) => {
@@ -9710,7 +9749,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   async function handleAddMembers() {
     if (selectedIds.size === 0) return
     if (!defaultRoleId && roles.length > 0) { setError("Select a role before adding."); return }
-    const rows = Array.from(selectedIds).map((uid) => ({
+    let addIds = Array.from(selectedIds)
+    // Belt-and-suspenders behind the picker filter: never insert admin-tier members
+    // unless this team allows it. Drop them and surface a brief inline message.
+    if (!allowAdminMembers) {
+      const blocked = addIds.filter((uid) => isAdminTierRole(ministryMembers.find((m) => m.id === uid)?.role))
+      if (blocked.length > 0) {
+        addIds = addIds.filter((uid) => !blocked.includes(uid))
+        setSelectedIds(new Set(addIds))
+        setMemberRoles((prev) => { const r = { ...prev }; blocked.forEach((id) => delete r[id]); return r })
+        setError("Admins can't be added as members of this team — enable it in team settings.")
+        if (addIds.length === 0) return
+      }
+    }
+    const rows = addIds.map((uid) => ({
       team_id: team.id,
       user_id: uid,
       role_id: memberRoles[uid] ?? defaultRoleId,
@@ -9848,6 +9900,18 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       .eq("ministry_id", ministryId)
     if (err) { setAllowCoPresidency(!next); setError(err.message) }
     setSavingCoPres(false)
+  }
+
+  async function handleToggleAdminMembers(next: boolean) {
+    setAllowAdminMembers(next)
+    setSavingAdminMembers(true)
+    const { error: err } = await supabase
+      .from("teams")
+      .update({ allow_admin_members: next })
+      .eq("id", team.id)
+      .eq("ministry_id", ministryId)
+    if (err) { setAllowAdminMembers(!next); setError(err.message) }
+    setSavingAdminMembers(false)
   }
 
   function handleDeleteRole(roleId: string) {
@@ -9997,7 +10061,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
-    m.name.toLowerCase().includes(addSearch.toLowerCase())
+    m.name.toLowerCase().includes(addSearch.toLowerCase()) &&
+    // Governance separation: hide admin-tier candidates unless the team allows admin members.
+    (allowAdminMembers || !isAdminTierRole(m.role))
   )
 
   const addMemberForm = (
@@ -10289,13 +10355,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   {canManageTeam && (
                     <div>
                       <PlanSectionHeader>Leadership</PlanSectionHeader>
-                      <div className="bg-white rounded-2xl border border-[var(--line)] p-4">
+                      <div className="bg-white rounded-2xl border border-[var(--line)] p-4 flex flex-col gap-4">
                         <GgToggle
                           checked={allowCoPresidency}
                           onChange={handleToggleCoPresidency}
                           disabled={savingCoPres}
                           label="Co-presidency"
                           desc="Allow this team to have two presidents instead of one."
+                        />
+                        <div className="h-px bg-[var(--line)]" />
+                        <GgToggle
+                          checked={allowAdminMembers}
+                          onChange={handleToggleAdminMembers}
+                          disabled={savingAdminMembers}
+                          label="Allow admins as members"
+                          desc="By default admins govern teams without being members. Enable this to let an admin also be a member."
                         />
                       </div>
                     </div>
@@ -10562,13 +10636,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 {canManageTeam && (
                   <>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Leadership</p>
-                    <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 22px", marginBottom: 28 }}>
+                    <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 22px", marginBottom: 28, display: "flex", flexDirection: "column", gap: 16 }}>
                       <GgToggle
                         checked={allowCoPresidency}
                         onChange={handleToggleCoPresidency}
                         disabled={savingCoPres}
                         label="Co-presidency"
                         desc="Allow this team to have two presidents instead of one."
+                      />
+                      <div style={{ height: 1, background: "var(--line)" }} />
+                      <GgToggle
+                        checked={allowAdminMembers}
+                        onChange={handleToggleAdminMembers}
+                        disabled={savingAdminMembers}
+                        label="Allow admins as members"
+                        desc="By default admins govern teams without being members. Enable this to let an admin also be a member."
                       />
                     </div>
                   </>
@@ -10804,7 +10886,9 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   const [presidentPick, setPresidentPick] = useState<string | null>(null)
   const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
   const [coPresidency, setCoPresidency] = useState(false)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
+  // New teams default to governance separation: admin-tier users excluded from membership.
+  const [allowAdminMembers, setAllowAdminMembers] = useState(false)
+  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; role?: string }[]>([])
 
   // Index of the first president role (by explicit flag) — drives the required picker in step 3
   const presidentRoleIdx = roles.findIndex(r => r.is_president)
@@ -10819,7 +10903,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
     if (step !== 3 || presidentRoleIdx < 0) return
     supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, role")
       .eq("ministry_id", ministryId)
       .neq("id", userId)
       .order("name")
@@ -10860,7 +10944,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
     const presetData = TEAM_PRESETS.find(p => p.id === selectedPresetId)
     const teamType = (presetData as { teamType?: string } | undefined)?.teamType ?? "standard"
     const { data: team, error: tErr } = await supabase
-      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType, allow_co_presidency: coPresidency })
+      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType, allow_co_presidency: coPresidency, allow_admin_members: allowAdminMembers })
       .select("id").single()
     if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
 
@@ -10910,6 +10994,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   const visiblePerms = getVisiblePerms()
   const selectedDisplay = WIZARD_PRESETS_DISPLAY.find(p => p.id === selectedPresetId)
   const topRoleName = roles[0]?.name ?? "Admin"
+  // Governance separation: exclude admin-tier candidates unless this new team allows admin members.
+  const eligibleMembers = allowAdminMembers ? ministryMembers : ministryMembers.filter((m) => !isAdminTierRole(m.role))
 
   const stepTitles = { 1: "Choose a template", 2: "Name your team", 3: "Review & create" } as const
 
@@ -11122,7 +11208,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                       style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit", marginBottom: coPresidency ? 8 : 0 }}
                     >
                       <option value="" disabled>Select a person…</option>
-                      {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
+                      {eligibleMembers.filter(m => m.id !== presidentPick2).map(m => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
@@ -11143,7 +11229,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                         style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit" }}
                       >
                         <option value="" disabled>Select second person…</option>
-                        {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
+                        {eligibleMembers.filter(m => m.id !== presidentPick).map(m => (
                           <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
                       </select>
@@ -11151,6 +11237,28 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   )}
                 </div>
               )}
+
+              {/* Allow admins as members — governance override (default off) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !allowAdminMembers
+                  if (!next) {
+                    if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick)?.role)) setPresidentPick(null)
+                    if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick2)?.role)) setPresidentPick2(null)
+                  }
+                  setAllowAdminMembers(next)
+                }}
+                style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", border: "1px solid var(--line)", background: "#fff", borderRadius: 12, padding: "12px 14px", marginBottom: 24, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}
+              >
+                <span style={{ marginTop: 2, width: 14, height: 14, borderRadius: 3, border: `1px solid ${allowAdminMembers ? "var(--plum)" : "#C4C4C4"}`, background: allowAdminMembers ? "var(--plum)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                  {allowAdminMembers && <Check style={{ width: 9, height: 9, color: "#fff" }} />}
+                </span>
+                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Allow admins as members</span>
+                  <span style={{ fontSize: 12, color: "var(--muted-text)" }}>By default admins govern teams without being members.</span>
+                </span>
+              </button>
 
               {/* Roles header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>

@@ -333,7 +333,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [userId, ministryId])
 
   const loadUserTeams = useCallback(async () => {
-    type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null }
+    type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
     type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
     type RawMembership = {
       team_id: string
@@ -343,7 +343,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     }
     const { data } = await supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency), team_roles(id, name, permissions, is_president)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency, allow_admin_members), team_roles(id, name, permissions, is_president)")
       .eq("user_id", userId)
     if (!data) return
     const teams: UserTeam[] = (data as RawMembership[]).flatMap((m) => {
@@ -352,7 +352,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       if (!t || !r) return []
       const rawType = t.team_type ?? 'standard'
       const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
-      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency }]
+      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency, allowAdminMembers: !!t.allow_admin_members }]
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
@@ -369,7 +369,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     if (!isGovernanceAdmin) return
     const { data } = await supabase
       .from("teams")
-      .select("id, name, icon, description, created_by, team_type, allow_co_presidency, admin_access")
+      .select("id, name, icon, description, created_by, team_type, allow_co_presidency, admin_access, allow_admin_members")
       .eq("ministry_id", ministryId)
       .order("created_at")
     if (!data) return
@@ -379,13 +379,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
     }
-    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null }
+    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null; allow_admin_members: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
       const rawType = t.team_type ?? 'standard'
       const team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       const rawAccess = t.admin_access ?? 'view'
       const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
-      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, member_count: countMap[t.id] ?? 0 }
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0 }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGovernanceAdmin, ministryId])

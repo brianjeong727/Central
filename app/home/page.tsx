@@ -14,7 +14,7 @@ type PreviewRow = {
   last_msg_type: string | null; unread_count: number
 }
 
-type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null }
+type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
 type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
 type RawMembership = {
   team_id: string
@@ -47,7 +47,7 @@ export default async function HomePage() {
     supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
     supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency), team_roles(id, name, permissions, is_president)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency, allow_admin_members), team_roles(id, name, permissions, is_president)")
       .eq("user_id", user.id),
     supabase
       .from("congregation_questions")
@@ -90,6 +90,7 @@ export default async function HomePage() {
       teamType, roleId: r.id, roleName: r.name,
       permissions: Array.isArray(r.permissions) ? r.permissions : [],
       isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency,
+      allowAdminMembers: !!t.allow_admin_members,
     }]
   })
 
