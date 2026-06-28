@@ -2160,7 +2160,7 @@ export function PlanTab({
           </div>
         ) : isTechTeam ? (
           <div className="px-14 py-7">
-            <TechTeamTab ministryId={ministryId} userId={userId} />
+            <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
           </div>
         ) : isPraiseTeam && activeTeamId ? (
           <PraiseTeamTab
@@ -2254,7 +2254,7 @@ export function PlanTab({
             canManage={canManageWorship}
           />
         ) : isTechTeam ? (
-          <TechTeamTab ministryId={ministryId} userId={userId} />
+          <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
         ) : isPraiseTeam && activeTeamId ? (
           <PraiseTeamTab
             teamId={activeTeamId}
@@ -4301,7 +4301,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
 
 // ── TechTeamTab ────────────────────────────────────────────────────────────────
 
-function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: string }) {
+function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
   const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
 
@@ -4446,7 +4446,7 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
             {showTeamName && !event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.teamName}</p>}
             <p style={{ fontSize: 15, color: event.event_name || showTeamName ? "var(--muted-text)" : "var(--ink)", marginTop: event.event_name || showTeamName ? 1 : 0, fontFamily: "var(--font-instrument-serif)" }}>{dateStr}</p>
           </div>
-          {songs.length > 0 && (
+          {songs.length > 0 && canManage && (
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => slidesDeck && slidesEventLabel === label ? setSlidesOverlayOpen(true) : handleGenerateSlides(songs, label)}

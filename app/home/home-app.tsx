@@ -10,7 +10,7 @@ import type { ChatPreview } from "@/components/ui/chats-section"
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
-import { isGovernanceAdmin as computeIsGovernanceAdmin } from "./governance"
+import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -110,14 +110,31 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Graduation prompt — show once per session if user's graduation year has passed
   const [showGradPrompt, setShowGradPrompt] = useState(false)
   const [gradPromptLoading, setGradPromptLoading] = useState(false)
+
+  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+  // WHO governs teams: by default every admin-tier user; if the roster narrows it,
+  // only listed admins. Behavior-preserving while governance is all_admins.
+  const governanceSettings: GovernanceSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
+  const isGovernanceAdmin = computeIsGovernanceAdmin(userId, isAdmin, governanceSettings)
+  // Governance-accessible non-member teams: teams the user is NOT on but can enter
+  // via the matrix (gov-view/gov-write). Mirrors plan-tab's `govTeams` derivation.
+  const memberTeamIds = new Set(userTeams.map(t => t.teamId))
+  const govTeamCount = allTeams.filter(t => {
+    if (memberTeamIds.has(t.id)) return false
+    const access = teamAccessLevel({ isMember: false, isGovernanceAdmin, adminAccess: t.admin_access })
+    return access === "gov-view" || access === "gov-write"
+  }).length
+
   // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
   // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
+  // Skip auto-enter when the user also has governance-accessible teams, so the picker
+  // (and its "Admin access" group) stays reachable.
   useEffect(() => {
-    if (activeTab === "plan" && userTeams.length === 1 && !activeTeamId) {
+    if (activeTab === "plan" && userTeams.length === 1 && govTeamCount === 0 && !activeTeamId) {
       handleTeamChange(userTeams[0].teamId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, userTeams.length, activeTeamId])
+  }, [activeTab, userTeams.length, govTeamCount, activeTeamId])
 
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
@@ -153,11 +170,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     return () => mq.removeEventListener("change", handler)
   }, [])
 
-  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
-  // WHO governs teams: by default every admin-tier user; if the roster narrows it,
-  // only listed admins. Behavior-preserving while governance is all_admins.
-  const governanceSettings: GovernanceSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
-  const isGovernanceAdmin = computeIsGovernanceAdmin(userId, isAdmin, governanceSettings)
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
@@ -582,7 +594,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(isStudentOrgActive || isDGLActive) && activeTeamId && userTeams.length > 1 ? (
+            right={(isStudentOrgActive || isDGLActive) && activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
                 style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
