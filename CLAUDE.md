@@ -89,6 +89,28 @@ When you learn something from a mistake, discover a non-obvious constraint, or a
 14. **"Register your ministry" CTAs must route to `/register-ministry`:** Never point these directly to `/signup?intent=register` or `/onboarding` — the middleware bounces logged-in users off `/signup` to `/home`, silently breaking the flow. `/register-ministry` is the canonical entry point that handles routing by auth state and role. Any new "Register" CTA anywhere in the codebase must point here.
 13. **Shell migration — pattern must be on the tab component's own root div:** When migrating a tab onto the shell mount pattern, `md:flex md:flex-col md:h-full md:overflow-hidden` must be on the **tab component's own root div**, not only the wrapper in `home-app.tsx`. Without it, `md:flex-1` on the desktop section has no flex parent to resolve against — the root div grows to full content height and gets clipped by the wrapper's `overflow: hidden` instead of scrolling. Match `DirectoryTab`'s root div structure exactly: `<div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">`. Tabs migrated: Directory, Planning, Chat.
 16. **`PlanSubTabStrip` placement — always outside the padded content wrapper:** The strip manages its own horizontal inset via an internal `md:pl-14` label row and `md:mx-14` hairline. It must always be placed as a sibling to `TabPageHeader` at the component root — never inside a `px-5 md:px-14` content div. Placing it inside stacks the paddings → 112px left offset on desktop instead of 56px. Desktop instance: `<div className="hidden md:block"><PlanSubTabStrip .../></div>` outside the content wrapper. Mobile instance (if needed): `<div className="md:hidden">` inside the content wrapper is fine — mobile has no `md:pl-14` applied by the strip.
+17. **Session worktrees — one slot per session:** Every session runs in its own reusable git worktree on its own dev port —
+never do feature work or run the dev server in the shared `central` (main) checkout. Slots are a FIXED pool defined in
+`.claude/session-slots.json` and REUSED across sessions (never create ad-hoc worktrees):
+
+   | Slot | Dir | Port |
+   |---|---|---|
+   | main | `central` | 3000 (shared — no feature work) |
+   | s1 | `central-s1` | 3001 |
+   | s2 | `central-s2` | 3002 |
+   | s3 | `central-s3` | 3003 |
+
+   Start a session with `./scripts/session.sh` — it claims a free slot, resets it to a fresh **copy of `origin/main`**
+(detached; `feat/<slug>` when a task is named; `--base <ref>` to start from another branch), boots the dev server on the
+slot's port, and launches Claude in the slot. A session thus always LANDS as latest integrated `main`; **work propagates
+only by merging to `main`** (a fresh session won't see another session's unmerged branch). Inspect with
+`./scripts/session-status.sh` (`BUSY`=locked / `held`=unmerged work / `free`); free with `./scripts/session-release.sh`. The
+launcher refuses to reclaim a slot holding uncommitted or unmerged work (`--force` overrides). The `SessionStart` hook
+announces your slot+port (or warns if you're in the shared checkout); `SessionEnd` frees the slot. Ports are bound to the
+directory, not the session. Full guide: `scripts/SESSIONS.md`.
+
+Drop it right after Critical Convention #16. If you'd rather it read as a Workflow item than a numbered convention, say so
+and I'll reformat — but as a hard "always do X" rule it belongs with the conventions.
 
 ## Database Migrations
 Never create migration files in the `supabase/` folder and ask the user to run them manually. The Supabase MCP is connected — always run migrations directly against the database using the MCP. When a schema change is needed, execute it immediately as part of the task. After running, verify the tables and policies were created correctly by querying the database before moving on.
@@ -168,13 +190,19 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 
 | File | Purpose |
 |------|---------|
-| `app/home/home-app.tsx` | Tab orchestrator (~713 lines) — owns global state, renders the active tab, mounts global overlays (ChatScreen, AnnouncementDetailView, CommandPalette). Imports all tabs from `app/home/tabs/`. |
+| `app/home/home-app.tsx` | Tab orchestrator — owns global state, **code-splits tabs via `next/dynamic`**, renders the active tab, mounts global overlays. Also owns governance (`governance_settings`/`govTeams`), the Receipts-workspace sidebar + `?rteam`/`?fsec` URL state, and the team-agnostic "← All workspaces" back button. |
 | `app/home/tabs/home-tab.tsx` | Home tab — greeting, role badge, up-next hero, recent chats, congregation question prompt. The Up Next slot renders `HomeHeroCarousel` when curated `home_slides` exist, else falls back to the pinned-or-latest announcement (existing behavior). Leader/admin "Curate hero" `HeaderActionButton` in the `TabPageHeader` right slot opens `HomeSlideManager` (desktop only). |
 | `app/home/tabs/announcements-tab.tsx` | Announcements tab — full feed, RSVP, admin/leader CRUD, pinning, announcement detail view |
 | `app/home/tabs/chats-tab.tsx` | Chats tab — on desktop: `ChatListPanel` (conversation list) renders in `DesktopSidebar` via `chatPanelContent` prop; `ChatScreen inline` renders in the content area. Mobile: `ChatsTab` (full list + overlay chat) wrapped in `md:hidden`. Also exports `ChatScreen`, `ChatSettings`, `CreateChatScreen`. |
 | `app/home/tabs/plan-tab.tsx` | Plan tab — team planning. Desktop uses the shared shell pattern: `hidden md:flex` section + `TabPageHeader` (keeps its bottom `InsetHairline` always) + optional cream event sub-header (back-to-calendar, event title, edit pencil; `borderBottom: 1px solid var(--line)`) + `flex-1 overflow-y-auto` body. Strip-bearing teams (PraiseTeamTab, StudentOrgTeamHome, SmallGroupLeadersTab) render with no outer `px-14` wrapper; `PlanSubTabStrip` labels are inset via inner `md:pl-14`; the under-tabs hairline is `md:mx-14` inset matching `InsetHairline`. Non-strip teams (DgPraiseTeam, OneTimeTeam, TechTeam) use `px-14 py-7` wrappers. Mobile (`md:hidden`) is a sibling outside the desktop section, untouched. |
 | `app/home/tabs/directory-tab.tsx` | Directory tab — master/detail: member list in shell context panel (DirectoryMemberListPanel), member detail in content area (TabPageHeader + PageTitle); mobile path unchanged |
-| `app/home/tabs/giving-tab.tsx` | Finance tab — giving info, reimbursements, budget, fund allocation |
+| `app/home/components/give-view.tsx` | Member-facing **Give** (Zelle donation) — the `give` Home tab. Congregation-wide, ungated. |
+| `app/home/components/finance-workspace.tsx` | Back-office **Finance** — budget, allocation, the Reimbursements approval inbox (treasurer approve → president sign-off). Rendered INSIDE the **Finance Plan-team**, NOT a top-level tab. Exports `FinanceWorkspace`, `SubmitReceiptModal`. |
+| `app/home/components/receipts-workspace.tsx` | The **Receipts** workspace (in Plan, sentinel `activeTeamId==='receipts'`): teams sidebar + per-team category subtab strip + submit modal + one-line entries + immersive read-only detail. |
+| `app/home/governance.ts` | Governance helpers: `isGovernanceAdmin`, `teamAccessLevel` (roster × per-team none/view/write matrix). |
+| `app/home/team-type.ts` | `classifyTeam()` — the single team-type classifier (by `team_type`, then name; **NEVER** by permission). Drives both plan-tab dispatch + home-app sidebar. |
+| `app/actions/finance-auth.ts` | Finance authorization (single source of truth): `getFinanceCapability`/`computeFinanceCapability` — treasurer approve / president sign-off / budget write. |
+| `app/actions/receipt-categories.ts` | Per-team receipt category CRUD (team-membership RLS). |
 | `app/home/tabs/profile-tab.tsx` | Profile tab — spiritual profile fields, journal (devotionals/prayers/verses sub-tabs), sign out |
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
 | `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, form fill overlay (FormFillView), admin responses view (FormResponsesView) |
@@ -251,16 +279,16 @@ New users with no `ministry_id` are redirected to `/join` by middleware.
 ### Tab structure (orchestrated by `home-app.tsx`, each tab is its own file in `app/home/tabs/`)
 
 Valid tab values (from `app/home/types.ts`):
-`"home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"`
+`"home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"`
 
 ```
 HomeApp (root — owns all global state)
 ├── home           → HomeTab         — greeting, up-next event, recent chats, congregation prompt
 ├── announcements  → AnnouncementsTab — feed, RSVP, admin/leader CRUD, pinning
 ├── chats          → ChatsTab         — Church Chats / My Chats, ChatScreen, ChatSettings
-├── plan           → PlanTab          — teams, worship, DGL rotation, event planning (shown when user has teams or is admin; hidden for deacons/elders)
+├── plan           → PlanTab          — teams (incl. the Finance Plan-team) + the Receipts workspace, worship, event planning (shown if on ANY team OR governance admin; deacon/elder NO LONGER excluded)
 ├── directory      → DirectoryTab     — member list + member sheet
-├── giving/give    → GivingTab        — 4 sections: give (Zelle info), reimbursements, budget, allocation
+├── give           → GiveView         — member-facing Zelle donation page (back-office Finance is now a Plan team, not a top-level tab)
 ├── profile        → ProfileTab       — spiritual profile + journal (devotionals/prayers/verses)
 ├── settings       → SettingsTab      — admin-only: ministry settings, member roles
 ├── forms          → FormsTab         — announcement-linked forms and responses
@@ -293,7 +321,7 @@ HomeApp (root — owns all global state)
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
 - Storage buckets: `announcement-images` (public; also holds reimbursement `receipts/` and home hero `home-slides/{ministryId}/` photos), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
-- Storage RLS: `storage.objects` policy `home_slides_photo_insert` (INSERT, `authenticated`) permits uploads to `announcement-images` only under `home-slides/<auth_ministry_id()>/` — ministry-scoped, mirroring Convention #8 (verified: own-ministry path allowed, cross-ministry denied). ⚠️ Known gap: `announcement-images` has **no** INSERT policy for the announcement-image or `receipts/` paths, so those uploads are silently RLS-denied (separate unfixed issue); `chat-attachments`/`worship-charts` carry unscoped bucket-wide authenticated INSERT.
+- Storage RLS: `storage.objects` policy `home_slides_photo_insert` (INSERT, `authenticated`) permits uploads to `announcement-images` only under `home-slides/<auth_ministry_id()>/` — ministry-scoped, mirroring Convention #8 (verified: own-ministry path allowed, cross-ministry denied). Receipt uploads under `receipts/<auth_ministry_id()>/` now have an INSERT policy (`receipts_photo_insert`, added in the receipts redesign). ⚠️ Known gap: `announcement-images` still has **no** INSERT policy for the announcement-image path, so those uploads are silently RLS-denied (separate unfixed issue); `chat-attachments`/`worship-charts` carry unscoped bucket-wide authenticated INSERT.
 
 ## Environment Variables (required on Vercel)
 
@@ -313,7 +341,7 @@ HomeApp (root — owns all global state)
 
 | Table | Key Columns |
 |-------|-------------|
-| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code`, `status` (`active`/`pending`/`rejected`), `is_public`, `location`, `automation_settings` (jsonb), `created_by` |
+| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code`, `status` (`active`/`pending`/`rejected`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `created_by` |
 | `profiles` | `id`, `ministry_id`, `name`, `email`, `role`, `graduation_year`, `grade`, `needs_grad_check`, `gender`, `avatar_url`, `about_me`, `bible_verse`, `prayer_request`, `pray_for_me`, `phone`, `bio`, `testimony`, `favorite_worship_song`, `favorite_verse`, `favorite_book_of_bible`, `show_journal_entries`, `show_journal_streak`, `school_id`, `saved_signature`, `sidebar_note` |
 | `groups` | `id`, `ministry_id`, `name`, `type` (`church`/`my`/`dm`), `created_by`, `archived`, `pinned_message_id` |
 | `group_members` | `group_id`, `user_id`, `last_read_at` |
@@ -321,8 +349,8 @@ HomeApp (root — owns all global state)
 | `announcements` | `id`, `ministry_id`, `title`, `body`, `is_pinned`, `is_sub_pinned`, `is_event`, `image_url`, `audience`, `created_by`, `show_attendees`, `status` |
 | `announcement_views` | `announcement_id`, `user_id` — UNIQUE |
 | `rsvps` | `announcement_id`, `user_id` — UNIQUE(announcement_id, user_id) |
-| `teams` | `id`, `ministry_id`, `name`, `icon`, `description`, `team_type` (`standard`/`dg_praise`/`one_time`), `created_by` |
-| `team_roles` | `id`, `team_id`, `name`, `permissions` (jsonb array of strings) |
+| `teams` | `id`, `ministry_id`, `name`, `icon`, `description`, `team_type` (`standard`/`dg_praise`/`one_time`/`finance`), `allow_co_presidency`, `allow_admin_members`, `admin_access` (`none`/`view`/`write`), `created_by` |
+| `team_roles` | `id`, `team_id`, `name`, `permissions` (jsonb array of strings), `is_president` |
 | `team_members` | `id`, `team_id`, `user_id`, `role_id`, `added_by` — UNIQUE(team_id, user_id) |
 | `home_slides` | `id`, `ministry_id`, `slide_type` (`announcement`/`event`/`photo`), `announcement_id` FK→`announcements`, `calendar_event_id` FK→`calendar_events`, `image_url`, `caption`, `eyebrow`, `panel_color` (stored clamped dark hex, computed once at upload), `order_index`, `is_active`, `created_by`. Curated home hero slides. CHECK: `announcement` → announcement_id set, image_url null; `event` → calendar_event_id set (image_url optional, its own uploaded photo); `photo` → image_url set, no refs. RLS: select = ministry members; insert/update/delete via `auth_is_admin_or_leader()`. Photo images live in the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 
@@ -356,7 +384,7 @@ HomeApp (root — owns all global state)
 `congregation_questions`, `congregation_responses`
 
 **Finance**
-`budget_categories`, `budget_entries`, `ministry_budgets`, `reimbursement_forms`, `receipts`, `receipt_limits`, `ministry_giving`
+`budget_categories`, `budget_entries`, `ministry_budgets`, `receipt_categories` (per-team), `receipts` (+ `team_id`/`category_id`/`signed_off_*`/`decision_reason`), `receipt_limits`, `ministry_giving`. (`reimbursement_forms` = the **retired** DG-dinner flow — code removed, table orphaned, data kept.)
 
 **Team management**
 `meeting_notes`, `team_role_links`, `team_role_descriptions`
