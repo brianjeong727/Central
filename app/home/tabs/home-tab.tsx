@@ -874,6 +874,7 @@ export function HomeTab({
                 </CardTitle>
               </CentralCard>
             )}
+
           </div>
 
           {/* ══════════════════════════════════════════════════════ MOBILE ══ */}

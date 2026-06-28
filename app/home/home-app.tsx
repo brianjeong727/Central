@@ -3,19 +3,21 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { SWRConfig } from "swr"
 import dynamic from "next/dynamic"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, ArrowLeft } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
+import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
+import { classifyTeam } from "./team-type"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
-import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
+import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
 
 // Tabs
 // HomeTab stays eager — it's the default landing tab. Every other tab (and the
@@ -25,7 +27,7 @@ import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, GivingTabSkeleton, ProfileTabSkeleton } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -41,21 +43,22 @@ const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { 
 const QuickCreateTeamModal = dynamic(() => import("./tabs/plan-tab").then(m => m.QuickCreateTeamModal), { loading: () => <Spinner />, ssr: false })
 const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
+const FinanceSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.FinanceSectionNav), { loading: () => <Spinner />, ssr: false })
 
 const DirectoryTab = dynamic(() => import("./tabs/directory-tab").then(m => m.DirectoryTab), { loading: () => <DirectoryTabSkeleton />, ssr: false })
-const GivingTab = dynamic(() => import("./tabs/giving-tab").then(m => m.GivingTab), { loading: () => <GivingTabSkeleton />, ssr: false })
+const GiveView = dynamic(() => import("./components/give-view").then(m => m.GiveView), { loading: () => <Spinner />, ssr: false })
 const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.ProfileTab), { loading: () => <ProfileTabSkeleton />, ssr: false })
 const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.SettingsTab), { loading: () => <Spinner />, ssr: false })
 const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
 const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
 
-export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded }: HomeAppProps) {
+export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "give", "profile", "settings", "forms", "congregation"]
-  const TAB_ALIASES: Record<string, Tab> = { finance: "giving", you: "profile" }
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
+  const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
   const rawTab = searchParams.get("tab")
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
   const initialTab = resolvedTab && validTabs.includes(resolvedTab) ? resolvedTab : "home"
@@ -107,6 +110,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("team", teamId)
   }
 
+  // Team selected WITHIN the Receipts workspace (sentinel activeTeamId === "receipts").
+  const [activeReceiptsTeamId, setActiveReceiptsTeamId] = useState<string | null>(
+    () => searchParams.get("rteam")
+  )
+
+  function handleReceiptsTeamChange(teamId: string) {
+    setActiveReceiptsTeamId(teamId)
+    // One atomic replace (convention #5) — build the full param set, replace once.
+    const params = new URLSearchParams(window.location.search)
+    params.set("rteam", teamId)
+    router.replace(`/home?${params.toString()}`, { scroll: false })
+  }
+
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
     setProfileSection(section)
     replaceParam("section", section === "spiritual-profile" ? null : section)
@@ -127,14 +143,37 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Graduation prompt — show once per session if user's graduation year has passed
   const [showGradPrompt, setShowGradPrompt] = useState(false)
   const [gradPromptLoading, setGradPromptLoading] = useState(false)
+
+  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+  // WHO governs teams: by default every admin-tier user; if the roster narrows it,
+  // only listed admins. Behavior-preserving while governance is all_admins.
+  const governanceSettings: GovernanceSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
+  const isGovernanceAdmin = computeIsGovernanceAdmin(userId, isAdmin, governanceSettings)
+  // Governance-accessible non-member teams: teams the user is NOT on but can enter
+  // via the matrix (gov-view/gov-write). Mirrors plan-tab's `govTeams` derivation.
+  const memberTeamIds = new Set(userTeams.map(t => t.teamId))
+  const govTeams = allTeams.filter(t => {
+    if (memberTeamIds.has(t.id)) return false
+    const access = teamAccessLevel({ isMember: false, isGovernanceAdmin, adminAccess: t.admin_access })
+    return access === "gov-view" || access === "gov-write"
+  })
+  const govTeamCount = govTeams.length
+  // Teams shown in the Receipts workspace sidebar: member teams OR governed teams.
+  const receiptsTeams = [
+    ...userTeams.map(t => ({ id: t.teamId, name: t.teamName })),
+    ...govTeams.map(t => ({ id: t.id, name: t.name })),
+  ]
+
   // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
   // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
+  // Skip auto-enter when the user also has governance-accessible teams, so the picker
+  // (and its "Admin access" group) stays reachable.
   useEffect(() => {
-    if (activeTab === "plan" && userTeams.length === 1 && !activeTeamId) {
+    if (activeTab === "plan" && userTeams.length === 1 && govTeamCount === 0 && !activeTeamId) {
       handleTeamChange(userTeams[0].teamId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, userTeams.length, activeTeamId])
+  }, [activeTab, userTeams.length, govTeamCount, activeTeamId])
 
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
@@ -170,23 +209,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     return () => mq.removeEventListener("change", handler)
   }, [])
 
-  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
   const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
-
-  const validFinanceSections = ["give", "reimbursements", "budget", "allocation"] as const
-  const initialFinanceSection = searchParams.get("finance") as "give" | "reimbursements" | "budget" | "allocation" | null
-  const [financeSection, setFinanceSection] = useState<"give" | "reimbursements" | "budget" | "allocation">(
-    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
-  )
-
-  function handleFinanceSectionChange(s: "give" | "reimbursements" | "budget" | "allocation") {
-    setFinanceSection(s)
-    replaceParam("finance", s === "give" ? null : s)
-  }
 
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
   const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
@@ -214,24 +241,52 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("sgltab", s === "bible_study" ? null : s)
   }
 
+  // Finance Team section state — lifted here so it drives the sidebar nav (not a content strip)
+  const validFinanceSections = ["reimbursements", "budget", "allocation"] as const
+  const initialFinanceSection = searchParams.get("fsec")
+  const [financeTeamSection, setFinanceTeamSection] = useState<string>(
+    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
+  )
+
+  function handleFinanceSectionChange(s: string) {
+    setFinanceTeamSection(s)
+    replaceParam("fsec", s === "reimbursements" ? null : s)
+  }
+
   // Congregation sub-view — lifted so shell can build accurate crumbs
   const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
 
-  // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb)
+  // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb).
+  // Resolve from membership first, then from allTeams — a governance admin may be viewing a team
+  // they don't belong to (gov-view). Without the allTeams fallback the shell would mirror the user's
+  // member-team list instead of the team actually being viewed.
   const activeUserTeamForPlan = userTeams.find(t => t.teamId === activeTeamId)
-  const activeTeamLabelForPlan = (activeUserTeamForPlan?.teamName ?? "").toLowerCase()
-  const activeTeamPermsForPlan = activeUserTeamForPlan?.permissions ?? []
-  const isStudentOrgActive = activeTab === "plan" && isDesktop && (
-    /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
-    activeTeamPermsForPlan.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
+  const activeAllTeamForPlan = allTeams.find(t => t.id === activeTeamId)
+  const activeTeamNameForPlan = activeUserTeamForPlan?.teamName ?? activeAllTeamForPlan?.name ?? ""
+  // Single classifier — team_type + name only, no permission probes (see
+  // app/home/team-type.ts). Resolve from allTeams (carries team_type even for
+  // gov-entered teams), falling back to the UserTeam name when not in allTeams.
+  const planTeamKind = classifyTeam(
+    activeAllTeamForPlan ?? (activeTeamNameForPlan ? { name: activeTeamNameForPlan } : null)
   )
-  const isDGLActive = activeTab === "plan" && isDesktop && !isStudentOrgActive && (
-    /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabelForPlan) ||
-    activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
-  )
+  const isPlanDesktopTeam = activeTab === "plan" && isDesktop
+  const isFinanceActive = isPlanDesktopTeam && planTeamKind === "finance"
+  const isStudentOrgActive = isPlanDesktopTeam && planTeamKind === "studentOrg"
+  const isDGLActive = isPlanDesktopTeam && planTeamKind === "dgl"
 
-  // Plan context sidebar — replaces the flat team list when student org or DGL is active
-  const planContextContent = isStudentOrgActive && activeUserTeamForPlan ? (
+  // Receipts sentinel active → its sidebar lists the user's member/governed teams.
+  const isReceiptsActive = activeTab === "plan" && isDesktop && activeTeamId === "receipts"
+
+  // Plan context sidebar — replaces the flat team list when student org or DGL is active.
+  // The section-nav components only need activeSection/onSectionChange (not the member object),
+  // so these render for gov-entered teams too — no `&& activeUserTeamForPlan` guard.
+  const planContextContent = isReceiptsActive ? (
+    <ReceiptsSidebarNav
+      teams={receiptsTeams}
+      active={activeReceiptsTeamId}
+      onSelect={handleReceiptsTeamChange}
+    />
+  ) : isStudentOrgActive ? (
     <StudentOrgSectionNav
       activeSection={studentOrgSection}
       onSectionChange={handleStudentOrgSectionChange}
@@ -242,34 +297,35 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         setStudentOrgPlanningEvent(ev)
       }}
     />
-  ) : isDGLActive && activeUserTeamForPlan ? (
+  ) : isDGLActive ? (
     <SmallGroupSectionNav
       activeSection={sglSection}
       onSectionChange={handleSglSectionChange}
+    />
+  ) : isFinanceActive ? (
+    <FinanceSectionNav
+      active={financeTeamSection}
+      onChange={handleFinanceSectionChange}
     />
   ) : undefined
 
   // Shell breadcrumb computation — derived from shell-known state, no tab props needed
   function getShellCrumbs(): string[] {
-    const financeLabels: Record<string, string> = { reimbursements: "Reimbursements", budget: "Budget", allocation: "Allocation" }
     const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
     switch (activeTab) {
       case "home":          return ["Central", "Home"]
       case "announcements": return ["Central", "Announcements"]
-      case "give":          return ["Central", "Finance"]
+      case "give":          return ["Central", "Give"]
       case "forms":         return ["Central", "Forms"]
       case "settings":      return ["Central", "Settings"]
       case "chats":         return ["Central", "Chats"]
-      case "giving":        return financeSection !== "reimbursements"
-                              ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
-                              : ["Central", "Finance"]
       case "plan": {
-        const team = userTeams.find(t => t.teamId === activeTeamId)
-        if (!team) return ["Central", "Planning"]
+        if (activeTeamId === "receipts") return ["Central", "Planning", "Receipts"]
+        if (!activeTeamId || !activeTeamNameForPlan) return ["Central", "Planning"]
         if (isStudentOrgActive && studentOrgPlanningEvent) {
-          return ["Central", "Planning", team.teamName, studentOrgPlanningEvent.title]
+          return ["Central", "Planning", activeTeamNameForPlan, studentOrgPlanningEvent.title]
         }
-        return ["Central", "Planning", team.teamName]
+        return ["Central", "Planning", activeTeamNameForPlan]
       }
       case "directory":     return ["Central", "Directory"]
       case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
@@ -317,15 +373,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [userId, ministryId])
 
   const loadUserTeams = useCallback(async () => {
+    type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
+    type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
     type RawMembership = {
       team_id: string
       role_id: string
-      teams: { id: string; name: string; icon: string | null; description: string | null; team_type: string } | { id: string; name: string; icon: string | null; description: string | null; team_type: string }[] | null
-      team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
+      teams: RawTeamRef | RawTeamRef[] | null
+      team_roles: RawRoleRef | RawRoleRef[] | null
     }
     const { data } = await supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description, team_type), team_roles(id, name, permissions)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency, allow_admin_members), team_roles(id, name, permissions, is_president)")
       .eq("user_id", userId)
     if (!data) return
     const teams: UserTeam[] = (data as RawMembership[]).flatMap((m) => {
@@ -333,11 +391,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
       if (!t || !r) return []
       const rawType = t.team_type ?? 'standard'
-      const teamType: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
-      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
+      const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
+      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency, allowAdminMembers: !!t.allow_admin_members }]
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
+      // The Receipts sentinel is not a real team — never reconcile it away on refresh.
+      if (prev === "receipts") return prev
       // Keep a valid existing selection; otherwise apply three-way routing
       if (prev && teams.some((t) => t.teamId === prev)) return prev
       return teams.length === 1 ? teams[0].teamId : null
@@ -346,10 +406,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [userId])
 
   const loadAllTeams = useCallback(async () => {
-    if (!isAdmin) return
+    // The all-teams governance list is for governing admins only. Non-roster admins
+    // don't get it (settings-tab access stays gated on raw isAdmin — anti-lockout).
+    if (!isGovernanceAdmin) return
     const { data } = await supabase
       .from("teams")
-      .select("id, name, icon, description, created_by, team_type")
+      .select("id, name, icon, description, created_by, team_type, allow_co_presidency, admin_access, allow_admin_members")
       .eq("ministry_id", ministryId)
       .order("created_at")
     if (!data) return
@@ -359,14 +421,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
     }
-    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string }
+    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null; allow_admin_members: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
       const rawType = t.team_type ?? 'standard'
-      const team_type: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
-      return { ...t, team_type, member_count: countMap[t.id] ?? 0 }
+      const team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
+      const rawAccess = t.admin_access ?? 'view'
+      const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0 }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, ministryId])
+  }, [isGovernanceAdmin, ministryId])
 
   const loadActiveQuestion = useCallback(async () => {
     const { data: q } = await supabase
@@ -527,8 +591,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     window.location.assign("/login")
   }
 
-  const isDeaconOrElder = ["deacon", "elder"].includes(initialProfile.role.toLowerCase())
-  const showPlanTab = !isDeaconOrElder && (isAdmin || userTeams.length > 0)
+  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {
@@ -560,11 +623,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         canCreateTeam={canCreateTeam}
         onCreateTeam={() => setShowQuickCreateTeam(true)}
         activeTeamId={activeTeamId}
+        activeTeamName={activeTeamNameForPlan || undefined}
         onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
         onProfileSectionChange={handleProfileSectionChange}
-        financeSection={financeSection}
-        onFinanceSectionChange={handleFinanceSectionChange}
         isTreasurer={isTreasurer}
         isDGL={isDGL}
         userId={userId}
@@ -596,12 +658,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(isStudentOrgActive || isDGLActive) && activeTeamId && userTeams.length > 1 ? (
+            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
+              /* Team-agnostic back-to-picker button — shown for the receipts sentinel
+                 AND any team workspace. Don't gate on a per-type flag or new team types
+                 (finance, etc.) silently lose their way back. */
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                className="hover:bg-[#F2EDE0] transition-colors"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 999, padding: "6px 13px", cursor: "pointer" }}
               >
-                ← All teams
+                <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
               </button>
             ) : undefined}
           />
@@ -702,6 +768,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 userTeams={userTeams}
                 allTeams={allTeams}
                 isAdmin={isAdmin}
+                isGovernanceAdmin={isGovernanceAdmin}
+                governanceSettings={governanceSettings}
                 isDGL={isDGL}
                 isPastor={isPastor}
                 onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}
@@ -725,6 +793,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onStudentOrgCalEventsChange={setStudentOrgCalEvents}
                 sglSection={sglSection}
                 onSglSectionChange={handleSglSectionChange}
+                financeSection={financeTeamSection}
+                onFinanceSectionChange={handleFinanceSectionChange}
+                activeReceiptsTeamId={activeReceiptsTeamId}
+                onReceiptsTeamChange={handleReceiptsTeamChange}
               />
             </div>
           )}
@@ -748,18 +820,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             </div>
           )}
 
-          {(activeTab === "giving" || activeTab === "give") && (
+          {/* Member-facing Give surface — reachable by everyone */}
+          {activeTab === "give" && (
             <div className="md:h-full md:overflow-y-auto">
-              <GivingTab
+              <GiveView
                 ministryId={ministryId}
                 userId={userId}
-                userName={initialProfile.name}
                 userRole={initialProfile.role}
-                isAdmin={isAdmin}
-                isTreasurer={isTreasurer}
-                isDGL={isDGL}
-                activeSection={activeTab === "give" ? "give" : financeSection}
-                onSectionChange={handleFinanceSectionChange}
               />
             </div>
           )}

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { getFinanceCapability } from "./finance-auth"
 
 export interface BudgetAllocation {
   id: string
@@ -57,6 +58,10 @@ export async function upsertBudgetAllocation(params: {
   notes?: string
 }): Promise<{ error: string | null }> {
   const admin = createAdminClient()
+
+  // Finance-capability gate (admin-tier OR finance team w/ can_view_finances).
+  const cap = await getFinanceCapability(params.ministryId)
+  if (!cap.canApprove) return { error: "Not authorized" }
 
   // Verify caller is authenticated (additional safety layer)
   const supabase = await createClient()
@@ -135,6 +140,10 @@ export async function addBudgetCategory(
   name: string,
   userId: string,
 ): Promise<{ data: BudgetCategory | null; error: string | null }> {
+  // Finance-capability gate (admin-tier OR finance team w/ can_view_finances).
+  const cap = await getFinanceCapability(ministryId)
+  if (!cap.canApprove) return { data: null, error: "Not authorized" }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("budget_categories")
@@ -149,6 +158,10 @@ export async function deleteBudgetCategory(
   ministryId: string,
   categoryName: string,
 ): Promise<{ error: string | null }> {
+  // Finance-capability gate (admin-tier OR finance team w/ can_view_finances).
+  const cap = await getFinanceCapability(ministryId)
+  if (!cap.canApprove) return { error: "Not authorized" }
+
   const admin = createAdminClient()
   // Delete allocations first (uses admin to bypass RLS on ministry_budgets)
   await admin

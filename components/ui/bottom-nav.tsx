@@ -2,7 +2,7 @@
 
 import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
 
-type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"
 
 interface BottomNavProps {
   activeTab: Tab
@@ -32,7 +32,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 md:hidden">
       <div className="flex items-center justify-around h-full">
         {tabs.map((tab) => {
-          const isActive = tab.id === activeTab || (tab.id === "giving" && activeTab === "give") || (tab.id === "profile" && activeTab === "congregation")
+          const isActive = tab.id === activeTab || (tab.id === "profile" && activeTab === "congregation")
           const Icon = tab.icon
           const showBadge = tab.id === "chats" && chatsUnread > 0
 

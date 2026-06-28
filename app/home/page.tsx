@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { formatRelativeTime, getInitials } from "./utils"
-import type { UserTeam, CongregationQuestion } from "./types"
+import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
@@ -14,11 +14,13 @@ type PreviewRow = {
   last_msg_type: string | null; unread_count: number
 }
 
+type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
+type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
 type RawMembership = {
   team_id: string
   role_id: string
-  teams: { id: string; name: string; icon: string | null; description: string | null; team_type: string } | { id: string; name: string; icon: string | null; description: string | null; team_type: string }[] | null
-  team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
+  teams: RawTeamRef | RawTeamRef[] | null
+  team_roles: RawRoleRef | RawRoleRef[] | null
 }
 
 export default async function HomePage() {
@@ -41,11 +43,11 @@ export default async function HomePage() {
 
   // Parallel fetch: ministry name + chat previews + user teams + active question
   const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([
-    supabase.from("ministries").select("name").eq("id", profile.ministry_id).single(),
+    supabase.from("ministries").select("name, governance_settings").eq("id", profile.ministry_id).single(),
     supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
     supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description, team_type), team_roles(id, name, permissions)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency, allow_admin_members), team_roles(id, name, permissions, is_president)")
       .eq("user_id", user.id),
     supabase
       .from("congregation_questions")
@@ -87,10 +89,22 @@ export default async function HomePage() {
       teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description,
       teamType, roleId: r.id, roleName: r.name,
       permissions: Array.isArray(r.permissions) ? r.permissions : [],
+      isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency,
+      allowAdminMembers: !!t.allow_admin_members,
     }]
   })
 
   // Active question + whether this user already responded (sequential — depends on question)
+  // Global governance roster — defaults to "all admins govern" when unset.
+  const rawGov = (ministryResult.data as { governance_settings?: unknown } | null)?.governance_settings as
+    | Partial<GovernanceSettings>
+    | null
+    | undefined
+  const initialGovernanceSettings: GovernanceSettings = {
+    all_admins: rawGov?.all_admins ?? true,
+    roster_ids: Array.isArray(rawGov?.roster_ids) ? rawGov!.roster_ids : [],
+  }
+
   const initialActiveQuestion = (questionResult.data ?? null) as CongregationQuestion | null
   let initialHasResponded = false
   if (initialActiveQuestion) {
@@ -130,6 +144,7 @@ export default async function HomePage() {
       initialUserTeams={initialUserTeams}
       initialActiveQuestion={initialActiveQuestion}
       initialHasResponded={initialHasResponded}
+      initialGovernanceSettings={initialGovernanceSettings}
     />
   )
 }
