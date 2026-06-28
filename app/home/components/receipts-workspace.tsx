@@ -85,7 +85,7 @@ export function ReceiptsWorkspace({
           eyebrow={activeTeam ? `RECEIPTS · ${activeTeam.name.toUpperCase()}` : "RECEIPTS"}
           title="Receipts"
         />
-        {teamId && categories.length > 0 && (
+        {teamId && (
           <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
         )}
       </TabPageHeader>
@@ -144,10 +144,9 @@ export function ReceiptsWorkspace({
             <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px" }}>
               Create a category to start adding receipts
             </h2>
-            <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 360, lineHeight: 1.6, margin: "0 0 24px" }}>
+            <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 360, lineHeight: 1.6, margin: 0 }}>
               Categories group receipts for {activeTeam?.name ?? "this team"} — like dinners, supplies, or events.
             </p>
-            <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
           </div>
         ) : activeCategory ? (
           <CategoryContent
