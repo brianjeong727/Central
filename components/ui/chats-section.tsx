@@ -22,10 +22,10 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "#13101A", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
+        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
           Your chats
           {totalUnread > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center w-6 h-6 bg-[#C9A34B] text-[#13101A] rounded-full text-[11px] font-bold align-middle" style={{ verticalAlign: "middle", marginBottom: 2 }}>
+            <span className="ml-2 inline-flex items-center justify-center w-6 h-6 bg-[#C9A34B] text-[var(--ink)] rounded-full text-[11px] font-bold align-middle" style={{ verticalAlign: "middle", marginBottom: 2 }}>
               {totalUnread}
             </span>
           )}
@@ -33,7 +33,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
         {onSeeAll && (
           <button
             onClick={onSeeAll}
-            className="text-[13px] text-[#5A5466] font-medium flex items-center gap-0.5 hover:text-[#3E1540] transition-colors"
+            className="text-[13px] text-[var(--body)] font-medium flex items-center gap-0.5 hover:text-[var(--plum)] transition-colors"
           >
             See all
             <ChevronRight className="w-3.5 h-3.5" />
@@ -56,7 +56,7 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
   return (
     <button
       onClick={onClick}
-      className="w-full bg-[#FBF8F2] border border-[#ECE8DE] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
+      className="w-full bg-[#FBF8F2] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
     >
       <div className="flex items-center gap-3.5">
         <MonogramChip
@@ -67,23 +67,23 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-[#13101A] text-[15px] truncate pr-2 tracking-tight">{chat.groupName}</h3>
-            <span className="text-[11px] text-[#8A8497] font-medium flex-shrink-0">{chat.time}</span>
+            <h3 className="font-semibold text-[var(--ink)] text-[15px] truncate pr-2 tracking-tight">{chat.groupName}</h3>
+            <span className="text-[11px] text-[var(--muted-text)] font-medium flex-shrink-0">{chat.time}</span>
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] text-[#5A5466] truncate">
+            <p className="text-[13px] text-[var(--body)] truncate">
               {chat.lastMessageSender ? (
                 <>
-                  <span className="font-semibold text-[#5A5466]">{chat.lastMessageSender}:</span>{" "}
+                  <span className="font-semibold text-[var(--body)]">{chat.lastMessageSender}:</span>{" "}
                   {chat.lastMessage}
                 </>
               ) : (
-                chat.lastMessage || <span className="italic text-[#8A8497]">No messages yet</span>
+                chat.lastMessage || <span className="italic text-[var(--muted-text)]">No messages yet</span>
               )}
             </p>
             {chat.unreadCount > 0 && (
-              <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[#13101A] flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[var(--ink)] flex items-center justify-center flex-shrink-0">
                 {chat.unreadCount}
               </span>
             )}

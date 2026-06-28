@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Plus, X, BarChart2, Archive, ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton } from "@/components/central"
-import { PlanSubTabStrip } from "./plan-tab"
+import { TabPageHeader, PageTitle, CentralButton, PlanSubTabStrip } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {

@@ -1,15 +1,16 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
+import { MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
-import { CentralButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
+import { RoleDescriptionEditor } from "./plan-tab"
+import { CentralButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton } from "@/components/central"
 import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -30,13 +31,37 @@ function fmtJournalDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
+// ── Pure SWR fetchers (no setState — side-effects run in useEffect on data) ────
+async function loadDevotionals(supabase: ReturnType<typeof createClient>, userId: string, ministryId: string): Promise<Devotional[]> {
+  const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
+  return (data as Devotional[]) ?? []
+}
+
+async function loadPrayers(supabase: ReturnType<typeof createClient>, userId: string, ministryId: string): Promise<Prayer[]> {
+  const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
+  return (data as Prayer[]) ?? []
+}
+
+async function loadVerses(supabase: ReturnType<typeof createClient>, userId: string, ministryId: string): Promise<Verse[]> {
+  const { data } = await supabase.from("verses").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
+  return (data as Verse[]) ?? []
+}
+
+async function loadMinistrySchools(supabase: ReturnType<typeof createClient>, ministryId: string): Promise<{ id: string; name: string; abbreviation: string }[]> {
+  const { data } = await supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", ministryId).order("sort_order")
+  return (data as { id: string; name: string; abbreviation: string }[]) ?? []
+}
+
 // ── Journal Devotionals Tab ───────────────────────────────────────────────────
 
 export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void }) {
   const supabase = createClient()
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const [entries, setEntries] = useState<Devotional[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading: loading, mutate } = useSWR(
+    ["devotionals", userId, ministryId],
+    () => loadDevotionals(supabase, userId, ministryId)
+  )
+  const entries = useMemo(() => data ?? [], [data])
   const [searchQuery, setSearchQuery] = useState("")
   const [showEditor, setShowEditor] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Devotional | null>(null)
@@ -46,16 +71,11 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
+  // Report count + entry dates to the parent whenever the cached list changes.
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const { data } = await supabase.from("devotionals").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
-      if (data) { setEntries(data); onCountChange?.(data.length, data.map((d: Devotional) => d.created_at)) }
-      setLoading(false)
-    }
-    load()
+    if (data) onCountChange?.(data.length, data.map((d) => d.created_at))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, ministryId])
+  }, [data])
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -70,18 +90,18 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-      if (!error && data) { setEntries(prev => { const updated = prev.map(e => e.id === editingEntry.id ? (data as Devotional) : e); onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
+      const { data: row, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+      if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === editingEntry.id ? (row as Devotional) : e), { revalidate: false })
     } else {
-      const { data, error } = await supabase.from("devotionals").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).select().single()
-      if (!error && data) { setEntries(prev => { const updated = [data as Devotional, ...prev]; onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
+      const { data: row, error } = await supabase.from("devotionals").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).select().single()
+      if (!error && row) mutate(curr => [row as Devotional, ...(curr ?? [])], { revalidate: false })
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("devotionals").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
-    if (!error) { setEntries(prev => { const updated = prev.filter(e => e.id !== id); onCountChange?.(updated.length, updated.map(d => d.created_at)); return updated }) }
+    if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
     setOpenMenuId(null)
   }
 
@@ -147,7 +167,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
       )}
 
       {loading ? (
-        <Spinner />
+        <JournalListSkeleton />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
@@ -204,8 +224,11 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
 
 export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number) => void }) {
   const supabase = createClient()
-  const [entries, setEntries] = useState<Prayer[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading: loading, mutate } = useSWR(
+    ["prayers", userId, ministryId],
+    () => loadPrayers(supabase, userId, ministryId)
+  )
+  const entries = useMemo(() => data ?? [], [data])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<PrayerStatus | "all">("all")
   const [showEditor, setShowEditor] = useState(false)
@@ -216,16 +239,11 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
 
+  // Report count to the parent whenever the cached list changes.
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const { data } = await supabase.from("prayers").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
-      if (data) { setEntries(data); onCountChange?.(data.length) }
-      setLoading(false)
-    }
-    load()
+    if (data) onCountChange?.(data.length)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, ministryId])
+  }, [data])
 
   const filtered = useMemo(() => {
     let base = entries
@@ -242,24 +260,24 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-      if (!error && data) { setEntries(prev => { const updated = prev.map(e => e.id === editingEntry.id ? (data as Prayer) : e); onCountChange?.(updated.length); return updated }) }
+      const { data: row, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+      if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === editingEntry.id ? (row as Prayer) : e), { revalidate: false })
     } else {
-      const { data, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
-      if (!error && data) { setEntries(prev => { const updated = [data as Prayer, ...prev]; onCountChange?.(updated.length); return updated }) }
+      const { data: row, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
+      if (!error && row) mutate(curr => [row as Prayer, ...(curr ?? [])], { revalidate: false })
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("prayers").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
-    if (!error) { setEntries(prev => { const updated = prev.filter(e => e.id !== id); onCountChange?.(updated.length); return updated }) }
+    if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
     setOpenMenuId(null)
   }
 
   async function updateStatus(id: string, status: PrayerStatus) {
-    const { data, error } = await supabase.from("prayers").update({ status }).eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-    if (!error && data) setEntries(prev => prev.map(e => e.id === id ? (data as Prayer) : e))
+    const { data: row, error } = await supabase.from("prayers").update({ status }).eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+    if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === id ? (row as Prayer) : e), { revalidate: false })
     setStatusMenuId(null)
   }
 
@@ -348,7 +366,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
       )}
 
       {loading ? (
-        <Spinner />
+        <JournalListSkeleton />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
@@ -405,8 +423,11 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
 
 export function JournalVersesTab({ userId, ministryId }: { userId: string; ministryId: string }) {
   const supabase = createClient()
-  const [entries, setEntries] = useState<Verse[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading: loading, mutate } = useSWR(
+    ["verses", userId, ministryId],
+    () => loadVerses(supabase, userId, ministryId)
+  )
+  const entries = useMemo(() => data ?? [], [data])
   const [searchQuery, setSearchQuery] = useState("")
   const [showEditor, setShowEditor] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Verse | null>(null)
@@ -414,17 +435,6 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const { data } = await supabase.from("verses").select("*").eq("user_id", userId).eq("ministry_id", ministryId).order("created_at", { ascending: false })
-      if (data) setEntries(data)
-      setLoading(false)
-    }
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, ministryId])
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -439,18 +449,18 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     if (!draft.reference.trim() || !draft.verse_text.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data, error } = await supabase.from("verses").update({ reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-      if (!error && data) setEntries(prev => prev.map(e => e.id === editingEntry.id ? (data as Verse) : e))
+      const { data: row, error } = await supabase.from("verses").update({ reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+      if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === editingEntry.id ? (row as Verse) : e), { revalidate: false })
     } else {
-      const { data, error } = await supabase.from("verses").insert({ user_id: userId, ministry_id: ministryId, reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).select().single()
-      if (!error && data) setEntries(prev => [data as Verse, ...prev])
+      const { data: row, error } = await supabase.from("verses").insert({ user_id: userId, ministry_id: ministryId, reference: draft.reference, verse_text: draft.verse_text, note: draft.note }).select().single()
+      if (!error && row) mutate(curr => [row as Verse, ...(curr ?? [])], { revalidate: false })
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("verses").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
-    if (!error) setEntries(prev => prev.filter(e => e.id !== id))
+    if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
     setOpenMenuId(null)
   }
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
@@ -481,7 +491,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
       )}
 
       {loading ? (
-        <Spinner />
+        <JournalListSkeleton />
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", paddingTop: 48 }}>
           <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
@@ -808,21 +818,17 @@ export function ProfileTab({
     favorite_book_of_bible: initialProfile.favorite_book_of_bible ?? "",
     prayer_request: initialProfile.prayer_request ?? "",
   })
-  const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
+  const { data: schoolData } = useSWR(
+    initialProfile.ministry_id ? ["ministry-schools", initialProfile.ministry_id] : null,
+    () => loadMinistrySchools(supabase, initialProfile.ministry_id!)
+  )
+  const schoolOptions = useMemo(() => schoolData ?? [], [schoolData])
   const [currentSchoolId, setCurrentSchoolId] = useState<string | null>(initialProfile.school_id ?? null)
-
-  useEffect(() => {
-    if (!initialProfile.ministry_id) return
-    supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", initialProfile.ministry_id).order("sort_order").then(({ data }) => {
-      if (data) setSchoolOptions(data as { id: string; name: string; abbreviation: string }[])
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProfile.ministry_id])
 
   async function handleSchoolChange(schoolId: string) {
     const newId = schoolId === "" ? null : schoolId
     setCurrentSchoolId(newId)
-    await supabase.from("profiles").update({ school_id: newId }).eq("id", userId)
+    await supabase.from("profiles").update({ school_id: newId }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
     setProfile(p => ({ ...p, school_id: newId }))
   }
 
@@ -867,12 +873,12 @@ export function ProfileTab({
   }, [draft, initialProfile.ministry_id, userId])
 
   async function handleToggleEntries(v: boolean) {
-    await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId)
+    await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
     setProfile(p => ({ ...p, show_journal_entries: v }))
   }
 
   async function handleToggleStreak(v: boolean) {
-    await supabase.from("profiles").update({ show_journal_streak: v }).eq("id", userId)
+    await supabase.from("profiles").update({ show_journal_streak: v }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
     setProfile(p => ({ ...p, show_journal_streak: v }))
   }
 

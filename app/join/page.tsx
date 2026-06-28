@@ -13,7 +13,7 @@ const SERIF = "var(--font-instrument-serif)"
 
 const mono: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
 }
 
 function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke?: number }) {
@@ -31,11 +31,11 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <span style={{
         width: 32, height: 32, borderRadius: 8,
-        background: isInk ? "#3E1540" : "rgba(251,248,242,0.10)",
+        background: isInk ? "var(--plum)" : "rgba(251,248,242,0.10)",
         color: "#FBF8F2", display: "grid", placeItems: "center",
         fontFamily: SERIF, fontSize: 15, flexShrink: 0,
       }}>C</span>
-      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "#13101A" : "#FBF8F2" }}>
+      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "var(--ink)" : "#FBF8F2" }}>
         Central
       </span>
     </div>
@@ -49,7 +49,7 @@ function ModalAction({ children, onClick, disabled }: {
   return (
     <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
       width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-      background: disabled ? "#E2DDCF" : "#2D0F2E",
+      background: disabled ? "var(--line-2)" : "var(--plum-2)",
       color: disabled ? "#A09A8C" : "#FBF8F2",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer",
@@ -287,14 +287,14 @@ function JoinContent() {
         }}>
           <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               Which school?
             </h2>
-            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
               This helps us organize groups and events by campus.
             </p>
             {schoolError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
                 {schoolError}
               </div>
             )}
@@ -304,15 +304,15 @@ function JoinContent() {
                 return (
                   <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{
                     padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                    border: `1px solid ${active ? "#2D0F2E" : "#E2DDCF"}`,
-                    background: active ? "#2D0F2E" : "#FBF8F2",
+                    border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
+                    background: active ? "var(--plum-2)" : "#FBF8F2",
                     transition: "all .12s ease",
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                   }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "#FBF8F2" : "#13101A" }}>
+                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "#FBF8F2" : "var(--ink)" }}>
                       {s.name}
                     </span>
-                    <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "#8A8497" }}>
+                    <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "var(--muted-text)" }}>
                       {s.abbreviation}
                     </span>
                   </button>
@@ -320,11 +320,11 @@ function JoinContent() {
               })}
               <button type="button" onClick={() => setSelectedSchoolId("other")} style={{
                 padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                border: `1px solid ${selectedSchoolId === "other" ? "#2D0F2E" : "#E2DDCF"}`,
-                background: selectedSchoolId === "other" ? "#2D0F2E" : "#FBF8F2",
+                border: `1px solid ${selectedSchoolId === "other" ? "var(--plum-2)" : "var(--line-2)"}`,
+                background: selectedSchoolId === "other" ? "var(--plum-2)" : "#FBF8F2",
                 transition: "all .12s ease",
               }}>
-                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "#FBF8F2" : "#13101A" }}>
+                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "#FBF8F2" : "var(--ink)" }}>
                   Other / Not a student
                 </span>
               </button>
@@ -333,7 +333,7 @@ function JoinContent() {
               {savingSchool ? "Saving…" : "Continue"}
             </ModalAction>
             <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }}
-              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Skip for now
             </button>
           </div>
@@ -349,14 +349,14 @@ function JoinContent() {
         }}>
           <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>Staff invite code</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
             </h2>
-            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
               Select your staff role to continue.
             </p>
             {staffRoleError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
                 {staffRoleError}
               </div>
             )}
@@ -370,12 +370,12 @@ function JoinContent() {
                 return (
                   <button key={value} type="button" onClick={() => setStaffRole(value)} style={{
                     padding: "14px 18px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                    border: `1px solid ${active ? "#2D0F2E" : "#E2DDCF"}`,
-                    background: active ? "#2D0F2E" : "#FBF8F2",
+                    border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
+                    background: active ? "var(--plum-2)" : "#FBF8F2",
                     transition: "all .12s ease",
                   }}>
-                    <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "#FBF8F2" : "#13101A" }}>{label}</div>
-                    <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "#8A8497", marginTop: 4 }}>{desc}</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "#FBF8F2" : "var(--ink)" }}>{label}</div>
+                    <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "var(--muted-text)", marginTop: 4 }}>{desc}</div>
                   </button>
                 )
               })}
@@ -384,7 +384,7 @@ function JoinContent() {
               {joiningStaff ? "Joining…" : `Join as ${staffRole || "…"}`}
             </ModalAction>
             <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
-              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Cancel
             </button>
           </div>
@@ -400,14 +400,14 @@ function JoinContent() {
         }}>
           <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "#13101A", margin: "6px 0", fontWeight: 400 }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               What&apos;s your gender?
             </h2>
-            <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
               Helps us place you in the right small group.
             </p>
             {genderError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "#3E1540", marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
                 {genderError}
               </div>
             )}
@@ -417,9 +417,9 @@ function JoinContent() {
                 return (
                   <button key={value} type="button" onClick={() => setGender(value)} style={{
                     flex: 1, padding: "10px 16px", borderRadius: 999,
-                    border: `1px solid ${active ? "#3E1540" : "#E2DDCF"}`,
-                    background: active ? "#2D0F2E" : "#FBF8F2",
-                    color: active ? "#FBF8F2" : "#5A5466",
+                    border: `1px solid ${active ? "var(--plum)" : "var(--line-2)"}`,
+                    background: active ? "var(--plum-2)" : "#FBF8F2",
+                    color: active ? "#FBF8F2" : "var(--body)",
                     fontSize: 14, fontWeight: active ? 500 : 400, cursor: "pointer",
                     transition: "all .12s ease", fontFamily: SANS,
                   }}>
@@ -432,7 +432,7 @@ function JoinContent() {
               {savingGender ? "Saving…" : "Continue"}
             </ModalAction>
             <button type="button" onClick={() => setPendingAction(null)}
-              style={{ width: "100%", background: "none", border: "none", color: "#8A8497", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+              style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Cancel
             </button>
           </div>
@@ -444,7 +444,7 @@ function JoinContent() {
         {/* ── Plum hero band ── */}
         <div style={{
           flexShrink: 0, position: "relative", overflow: "hidden", color: "#FBF8F2",
-          background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, #3E1540 55%, #2A0E2C 100%)",
+          background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, var(--plum) 55%, #2A0E2C 100%)",
           padding: "28px 0 32px",
         }}>
           <div aria-hidden style={{
@@ -466,18 +466,18 @@ function JoinContent() {
         </div>
 
         {/* ── Tab bar ── */}
-        <div style={{ borderBottom: "1px solid #E8E2D2", flexShrink: 0, background: "#FBF8F2" }}>
+        <div style={{ borderBottom: "1px solid var(--line)", flexShrink: 0, background: "#FBF8F2" }}>
           <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", padding: "0 24px" }}>
             {(["browse", "code"] as Tab[]).map((t) => (
               <button key={t} onClick={() => setTab(t)} style={{
                 paddingTop: 14, paddingBottom: 14, marginRight: 32,
                 fontSize: 14, fontFamily: SANS, background: "none",
-                color: tab === t ? "#2D0F2E" : "#8A8497",
+                color: tab === t ? "var(--plum-2)" : "var(--muted-text)",
                 fontWeight: tab === t ? 600 : 400,
-                borderBottom: tab === t ? "2px solid #2D0F2E" : "2px solid transparent",
+                borderBottom: tab === t ? "2px solid var(--plum-2)" : "2px solid transparent",
                 border: "none", borderBottomWidth: 2,
                 borderBottomStyle: "solid",
-                borderBottomColor: tab === t ? "#2D0F2E" : "transparent",
+                borderBottomColor: tab === t ? "var(--plum-2)" : "transparent",
                 marginBottom: -1, cursor: "pointer", transition: "color .15s",
               }}>
                 {t === "browse" ? "Find ministry" : "I have a code"}
@@ -495,27 +495,27 @@ function JoinContent() {
 
               {/* Search */}
               <div style={{ position: "relative", flexShrink: 0 }}>
-                <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "#8A8497", pointerEvents: "none" }}/>
+                <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "var(--muted-text)", pointerEvents: "none" }}/>
                 <input
                   type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by name or university…"
                   autoComplete="off"
                   style={{
                     width: "100%", paddingLeft: 42, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
-                    borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
-                    fontSize: 14, color: "#13101A", fontFamily: SANS, outline: "none",
+                    borderRadius: 12, border: "1px solid var(--line-2)", background: "#FBF8F2",
+                    fontSize: 14, color: "var(--ink)", fontFamily: SANS, outline: "none",
                     boxSizing: "border-box",
                   }}
                 />
               </div>
 
               {browseError && (
-                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>
                   {browseError}
                 </div>
               )}
               {confirmError && (
-                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500 }}>
+                <div style={{ flexShrink: 0, borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>
                   {confirmError}
                 </div>
               )}
@@ -527,16 +527,16 @@ function JoinContent() {
                 )}
                 {!browsing && ministries.length === 0 && !browseError && (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 999, background: "#F1ECDE", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                      <Search style={{ width: 20, height: 20, color: "#8A8497" }}/>
+                    <div style={{ width: 48, height: 48, borderRadius: 999, background: "var(--ivory)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                      <Search style={{ width: 20, height: 20, color: "var(--muted-text)" }}/>
                     </div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No ministries found</p>
-                    <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center" }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>No ministries found</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
                       {search ? "Try a different search." : "Your ministry might be private."}
                     </p>
                     {!search && (
                       <button type="button" onClick={() => setTab("code")} style={{
-                        fontSize: 13, color: "#2D0F2E", fontWeight: 600, marginTop: 8,
+                        fontSize: 13, color: "var(--plum-2)", fontWeight: 600, marginTop: 8,
                         background: "none", border: "none", cursor: "pointer",
                       }}>
                         Try an invite code instead →
@@ -554,7 +554,7 @@ function JoinContent() {
                         <button key={m.id} onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }} style={{
                           display: "flex", alignItems: "center", gap: 16, borderRadius: 14,
                           padding: "16px 18px", textAlign: "left", width: "100%", cursor: "pointer",
-                          border: `1px solid ${isSelected ? "#3E1540" : "#E2DDCF"}`,
+                          border: `1px solid ${isSelected ? "var(--plum)" : "var(--line-2)"}`,
                           background: isSelected ? "#F6F2E8" : "#FBF8F2",
                           transition: "all .12s ease",
                         }}>
@@ -563,15 +563,15 @@ function JoinContent() {
                             style={{ width: 44, height: 44, fontFamily: SERIF, fontSize: 17, fontWeight: 400 }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
-                            <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                            <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {m.university} · {SIZE_LABELS[m.size] ?? m.size}
                             </p>
                           </div>
                           {isMember && (
                             <span style={{
                               padding: "3px 10px", borderRadius: 999, flexShrink: 0,
-                              background: "#F1ECDE", color: "#3E1540", fontSize: 12, fontWeight: 500,
+                              background: "var(--ivory)", color: "var(--plum)", fontSize: 12, fontWeight: 500,
                             }}>Member</span>
                           )}
                           <Icon d="M9 18l6-6-6-6" size={16} stroke={1.5}/>
@@ -583,14 +583,14 @@ function JoinContent() {
               </div>
 
               {/* Bottom CTA */}
-              <div style={{ flexShrink: 0, paddingTop: 14, paddingBottom: 20, borderTop: "1px solid #E8E2D2" }}>
-                <p style={{ textAlign: "center", fontSize: 14, marginBottom: 12, color: "#5A5466" }}>
+              <div style={{ flexShrink: 0, paddingTop: 14, paddingBottom: 20, borderTop: "1px solid var(--line)" }}>
+                <p style={{ textAlign: "center", fontSize: 14, marginBottom: 12, color: "var(--body)" }}>
                   Starting a new ministry?{" "}
-                  <a href="/onboarding" style={{ fontWeight: 600, color: "#2D0F2E", textDecoration: "none" }}>Register here</a>
+                  <a href="/onboarding" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
                 </p>
                 <button onClick={handleBrowseJoin} disabled={!selected || confirming || !!switching} style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-                  background: (!selected || confirming || !!switching) ? "#E2DDCF" : "#2D0F2E",
+                  background: (!selected || confirming || !!switching) ? "var(--line-2)" : "var(--plum-2)",
                   color: (!selected || confirming || !!switching) ? "#A09A8C" : "#FBF8F2",
                   fontSize: 15, fontWeight: 500, fontFamily: SANS,
                   cursor: (!selected || confirming || !!switching) ? "not-allowed" : "pointer",
@@ -608,12 +608,12 @@ function JoinContent() {
               display: "flex", flexDirection: "column", alignItems: "center",
               overflowY: "auto", padding: "40px 24px 32px", gap: 20,
             }}>
-              <p style={{ fontSize: 13, color: "#8A8497", textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
                 Enter the invite code shared by your ministry leader.
               </p>
 
               {codeError && (
-                <div style={{ width: "100%", borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "#3E1540", fontWeight: 500, textAlign: "center" }}>
+                <div style={{ width: "100%", borderRadius: 12, background: "rgba(62,21,64,0.07)", padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500, textAlign: "center" }}>
                   {codeError}
                 </div>
               )}
@@ -626,21 +626,21 @@ function JoinContent() {
                   autoComplete="off" autoCapitalize="characters"
                   style={{
                     width: "100%", padding: "16px 0", textAlign: "center",
-                    borderRadius: 12, border: "1px solid #E2DDCF", background: "#FBF8F2",
-                    fontSize: 22, color: "#13101A",
+                    borderRadius: 12, border: "1px solid var(--line-2)", background: "#FBF8F2",
+                    fontSize: 22, color: "var(--ink)",
                     fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
                     letterSpacing: "0.18em", textTransform: "uppercase",
                     outline: "none", boxSizing: "border-box",
                   }}
                 />
-                <p style={{ fontSize: 11, color: "#8A8497", textAlign: "center", marginTop: 8 }}>
+                <p style={{ fontSize: 11, color: "var(--muted-text)", textAlign: "center", marginTop: 8 }}>
                   Codes are usually 6–8 characters
                 </p>
               </div>
 
               <button type="submit" disabled={joining || inviteCode.trim().length < 4} style={{
                 width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-                background: (joining || inviteCode.trim().length < 4) ? "#E2DDCF" : "#2D0F2E",
+                background: (joining || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
                 color: (joining || inviteCode.trim().length < 4) ? "#A09A8C" : "#FBF8F2",
                 fontSize: 15, fontWeight: 500, fontFamily: SANS,
                 cursor: (joining || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
@@ -650,15 +650,15 @@ function JoinContent() {
               </button>
 
               <button type="button" onClick={() => setTab("browse")} style={{
-                fontSize: 13, color: "#8A8497", background: "none", border: "none", cursor: "pointer", fontFamily: SANS,
+                fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: SANS,
               }}>
                 Don&apos;t have a code?{" "}
-                <span style={{ fontWeight: 600, color: "#2D0F2E" }}>Browse ministries</span>
+                <span style={{ fontWeight: 600, color: "var(--plum-2)" }}>Browse ministries</span>
               </button>
 
-              <p style={{ fontSize: 13, color: "#8A8497" }}>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>
                 Starting a new ministry?{" "}
-                <a href="/onboarding" style={{ fontWeight: 600, color: "#2D0F2E", textDecoration: "none" }}>Register here</a>
+                <a href="/onboarding" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
               </p>
             </form>
           )}

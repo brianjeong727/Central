@@ -1,13 +1,29 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import useSWR from "swr"
 import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
-import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip } from "@/components/central"
+import { EmptyState, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton } from "@/components/central"
 import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
+
+// Shared directory fetcher — both the desktop panel and the mobile list key on
+// ["directory-members", ministryId], so they dedupe to a single request and
+// share one cache entry (instant on tab revisit).
+async function loadDirectoryMembers(
+  supabase: ReturnType<typeof createClient>,
+  ministryId: string
+): Promise<DirectoryMember[]> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
+    .eq("ministry_id", ministryId)
+    .order("name")
+  return data ?? []
+}
 
 // ── DirectoryMemberListPanel — lives in the shell context panel on desktop ─────
 
@@ -25,28 +41,24 @@ export function DirectoryMemberListPanel({
   onSelect: (member: DirectoryMember) => void
 }) {
   const supabase = createClient()
-  const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
-  const [loading, setLoading] = useState(true)
+  const { data: membersData, isLoading: loading } = useSWR(
+    ["directory-members", ministryId],
+    () => loadDirectoryMembers(supabase, ministryId)
+  )
+  const members = membersData ?? []
 
+  // Auto-select on first successful load only (a ref guard keeps background
+  // revalidations from clobbering the user's current selection).
+  const didInitialSelect = useRef(false)
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
-        .eq("ministry_id", ministryId)
-        .order("name")
-      const list = data ?? []
-      setMembers(list)
-      // Restore from URL param, else select first
-      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
-      const toSelect = restored ?? list[0] ?? null
-      if (toSelect) onSelect(toSelect)
-      setLoading(false)
-    }
-    load()
+    if (!membersData || didInitialSelect.current) return
+    didInitialSelect.current = true
+    const restored = initialMemberId ? membersData.find((m) => m.id === initialMemberId) : null
+    const toSelect = restored ?? membersData[0] ?? null
+    if (toSelect) onSelect(toSelect)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [membersData])
 
   const filtered = members.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase())
@@ -76,7 +88,7 @@ export function DirectoryMemberListPanel({
       {/* Member list */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4"><Spinner /></div>
+          <div className="pt-2"><DirectoryListSkeleton /></div>
         ) : filtered.length === 0 ? (
           <div className="p-4">
             <EmptyState
@@ -151,27 +163,23 @@ export function DirectoryTab({
 }) {
   // Mobile-only state — desktop selection is driven by home-app via selectedMember prop
   const supabase = createClient()
-  const [mobileMembers, setMobileMembers] = useState<DirectoryMember[]>([])
   const [mobileSearch, setMobileSearch] = useState("")
-  const [mobileLoading, setMobileLoading] = useState(true)
   const [mobileSelected, setMobileSelected] = useState<DirectoryMember | null>(null)
+  const { data: mobileMembersData, isLoading: mobileLoading } = useSWR(
+    ["directory-members", ministryId],
+    () => loadDirectoryMembers(supabase, ministryId)
+  )
+  const mobileMembers = mobileMembersData ?? []
 
+  // Restore the deep-linked member once, on first load.
+  const didRestoreMobile = useRef(false)
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
-        .eq("ministry_id", ministryId)
-        .order("name")
-      const list = data ?? []
-      setMobileMembers(list)
-      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
-      setMobileSelected(restored ?? null)
-      setMobileLoading(false)
-    }
-    load()
+    if (!mobileMembersData || didRestoreMobile.current) return
+    didRestoreMobile.current = true
+    const restored = initialMemberId ? mobileMembersData.find((m) => m.id === initialMemberId) : null
+    setMobileSelected(restored ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [mobileMembersData])
 
   const mobileFiltered = mobileMembers.filter((m) =>
     m.name.toLowerCase().includes(mobileSearch.toLowerCase())
@@ -241,7 +249,7 @@ export function DirectoryTab({
         </div>
 
         {mobileLoading ? (
-          <div className="px-5"><Spinner /></div>
+          <div className="px-2"><DirectoryListSkeleton /></div>
         ) : mobileFiltered.length === 0 ? (
           <div className="px-5">
             <EmptyState
@@ -275,7 +283,7 @@ export function DirectoryTab({
                     <div className="flex items-center gap-2">
                       {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[#3E1540] border-transparent"}`}>
+                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[var(--plum)] border-transparent"}`}>
                           {member.role}
                         </span>
                       )}
@@ -525,15 +533,15 @@ export function MemberSheet({
       <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
 
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[#ECE8DE]">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[var(--line)]">
           <button
             onClick={onClose}
             className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
           >
-            <ArrowLeft className="w-4 h-4 text-[#5A5466]" />
+            <ArrowLeft className="w-4 h-4 text-[var(--body)]" />
           </button>
           <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[13px]" />
-          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-[#13101A] tracking-tight truncate">
+          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-[var(--ink)] tracking-tight truncate">
             {member.name}
           </h2>
         </div>
@@ -542,27 +550,27 @@ export function MemberSheet({
         <div className="flex-1 overflow-y-auto px-5 py-6">
           <div className="flex flex-col items-center mb-7">
             <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-bold text-2xl mb-4" />
-            <h1 className="text-[22px] font-bold text-[#13101A] tracking-tight mb-2">{member.name}</h1>
+            <h1 className="text-[22px] font-bold text-[var(--ink)] tracking-tight mb-2">{member.name}</h1>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (
-                <span className="text-[12px] text-[#8A8497]">Class of {member.graduation_year}</span>
+                <span className="text-[12px] text-[var(--muted-text)]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[#3E1540] text-white border-[#3E1540]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[#8A8497] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[#3E1540] border-transparent"}`}>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[var(--plum)] border-transparent"}`}>
                   {member.role}
                 </span>
               )}
               {isOwnProfile && (
-                <span className="text-[10px] bg-[#3E1540]/10 text-[#3E1540] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
+                <span className="text-[10px] bg-[#3E1540]/10 text-[var(--plum)] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
               )}
             </div>
-            <p className="mt-3 text-[12px] text-[#8A8497] text-center leading-relaxed max-w-[270px]">
+            <p className="mt-3 text-[12px] text-[var(--muted-text)] text-center leading-relaxed max-w-[270px]">
               Shared profile details are visible to members in this ministry.
             </p>
           </div>
 
           {(() => {
-            const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", margin: 0, marginBottom: 4 }
+            const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0, marginBottom: 4 }
             const aboutVal = member.bio || member.about_me
             const verseVal = member.favorite_verse || member.bible_verse
 
@@ -610,7 +618,7 @@ export function MemberSheet({
                       {section.fields.map((field, i) => (
                         <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid #E5E0D2" : "none" }}>
                           <p style={monoLabel}>{field.label}</p>
-                          <p style={{ fontSize: 14, color: field.italic ? "#3E1540" : "#13101A", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, fontStyle: field.italic ? "italic" : "normal", fontFamily: field.italic ? "var(--font-instrument-serif)" : "inherit" }}>{field.value}</p>
+                          <p style={{ fontSize: 14, color: field.italic ? "var(--plum)" : "var(--ink)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, fontStyle: field.italic ? "italic" : "normal", fontFamily: field.italic ? "var(--font-instrument-serif)" : "inherit" }}>{field.value}</p>
                         </div>
                       ))}
                     </div>
@@ -622,11 +630,11 @@ export function MemberSheet({
         </div>
 
         {!isOwnProfile && (
-          <div className="flex-shrink-0 bg-white border-t border-[#ECE8DE] px-5 py-4">
+          <div className="flex-shrink-0 bg-white border-t border-[var(--line)] px-5 py-4">
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[#3E1540] hover:bg-[#2D0F2E] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)]"
+              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)]"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>

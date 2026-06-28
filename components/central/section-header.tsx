@@ -1,12 +1,5 @@
 import { ReactNode, CSSProperties } from "react"
-
-const EYEBROW: CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  color: "var(--muted-text)",
-  textTransform: "uppercase",
-}
+import { EYEBROW_STYLE } from "@/app/home/components/shared"
 
 interface SectionHeaderProps {
   eyebrow: string
@@ -20,7 +13,7 @@ export function SectionHeader({ eyebrow, title, titleSize = 28, action, style }:
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", ...style }}>
       <div>
-        <div style={EYEBROW}>{eyebrow}</div>
+        <div style={EYEBROW_STYLE}>{eyebrow}</div>
         <h2
           style={{
             fontFamily: "var(--serif)",

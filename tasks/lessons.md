@@ -43,6 +43,7 @@ function setTabAndUrl(t: TabType) {
 - `?sgltab=` — SmallGroupLeadersTab tabs (home/schedule)
 - `?section=` — Profile section (spiritual-profile/journal)
 - `?member=` — Directory member
+- `?compose=` — Announcements compose/edit page (`new` = create, `{id}` = edit a specific announcement)
 - `?view=` — Plan tab sub-page overlay (settings)
 
 **Sidebar navigation must atomically clear `view` param:** `handleSidebarTabChange` clears `view=settings` and sets `tab` in one `router.replace` call. Two separate `replaceParam` calls race on `window.location.search` — the second overwrites the first's deletion.
@@ -146,3 +147,60 @@ Date: 2026-06-27
 `npm run build` validates types/compile, never **appearance**. CSS regressions (background-clip resets, z-index, overflow, wrong color) pass the build and still render broken — shipped a greeting headline where the plum role word rendered as a solid plum block, build green the whole time. For any visual change, render and LOOK before claiming it works. If the surface is auth-gated (e.g. `/home`), screenshot the exact CSS in an isolated HTML harness with headless Chrome: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --screenshot=out.png --window-size=W,H "file://harness.html"`.
 
 **Specific trap that caused it:** the `background` **shorthand** resets `background-clip` to `border-box`. When layering a `.x-plum` variant rule over a `.x` base that relies on `background-clip: text`, the variant's `background:` shorthand silently clobbers the clip — the variant MUST re-declare `-webkit-background-clip: text; background-clip: text; color: transparent`, or the gradient fills the box as a solid block.
+
+## Audit findings are SURFACE reads — verify actual values before unifying
+Date: 2026-06-26
+
+The explorer/enforcer audit flags duplicates and "matches" by pattern, but the read is shallow and was wrong repeatedly. Before unifying ANY "duplicate," read the actual values on both sides:
+- A1 "the same mono-label object copy-pasted 8×" was actually THREE families: `MONO_STYLE` (10px/0.06em), an eyebrow (11px/1.4px), and a scattered 11px/0.04–0.12em label family. Flattening them would have shrunk every eyebrow and changed tracking — a visual regression, not a dedup.
+- A3/A4 "getInitials/formatDate duplicated" were NOT duplicates: different output (whitespace/unicode handling; `"Jun 26, 2026"` vs `"Fri, Jun 26"`). Merging would change behavior.
+- A8 "inline hairline matches InsetHairline" — the component was 56px on ALL viewports; the inline was `md:mx-14` (responsive, 0 on mobile). A naive swap adds a 112px mobile inset.
+
+**Rule:** "looks identical" ≠ "is identical." For any consolidation, have the engineer read both definitions and confirm byte-equal behavior; if values genuinely differ, do NOT force-fit — report it. A half-done dedup that flattens real variation is worse than none.
+
+## Hex→token sweep recipe (zero-visual when token == literal)
+Date: 2026-06-26
+
+When a CSS var is DEFINED as the exact hex it replaces (verify in `app/globals.css`), swapping raw hex → `var(--token)` is provably zero-visual, so localhost sign-off is just "does it look identical?" Scripted two-pass regex, per file, case-insensitive:
+- Pass A (Tailwind arbitrary): `\[#HEX\](?!/)` → `[var(--token)]` — negative lookahead protects `/opacity`.
+- Pass B (inline-style/literal): `(?<!\[)#HEX\b` → `var(--token)` — lookbehind protects bracket leftovers; `\b` protects 8-digit alpha.
+
+**Always LEAVE:** Tailwind opacity-modified arbitrary hex (`bg-[#3E1540]/95` — `/opacity` does NOT compute on a `var()` color in Tailwind v4), `rgba(...)`, 8-digit alpha hex, `<meta theme-color>` / `themeColor` (browser chrome needs a literal), and any hex NOT in the token map. Verify with a symmetric diff (equal insertions/deletions = pure 1:1 swaps) and a final grep proving zero plain target hexes remain outside the intended exceptions. Off-token hexes that have no matching token (e.g. `#ECE8DE`) need an explicit snap decision, not a silent merge.
+
+## Performance: chat-list RPC, tab code-splitting, SWR caching
+Date: 2026-06-27
+
+- **`get_chat_previews` deliberately EXCLUDES archived groups** and returns no `archived` column. Do NOT reuse it for any list with an "Archived" section (e.g. `ChatListPanel`) — archived chats vanish. The sibling RPC `get_chat_list(p_user_id, p_ministry_id)` includes archived groups + a `group_archived` boolean. Both are `STABLE SECURITY DEFINER, search_path=public`, take user id + ministry id as args. Mirror the pattern; don't invent a new one.
+- **ChatListPanel N+1** fired `1 + 2N` queries per desktop mount; replaced with one `get_chat_list` RPC. The **mobile** `ChatsTab` loader (~line 3451) still has the same `Promise.all(groups.map(...))` N+1 — reuse `get_chat_list` there too in a later pass.
+- **Tabs are code-split:** `home-app.tsx` lazy-loads the 9 non-Home tabs via `next/dynamic(..., { ssr:false })` with skeleton `loading` fallbacks; only `HomeTab` is eager. New tabs follow the same pattern. Heavy libs imported inside a tab (e.g. `@emoji-mart/data`, ~2MB) must be lazy-loaded at point-of-use, not module-level.
+- **Skeletons live in `components/central/skeletons.tsx`** (`SkeletonBlock` + per-tab skeletons). Motion is the `.skeleton-pulse` opacity pulse in `globals.css` (calm, reduced-motion aware). Use instead of bare `<Spinner/>`.
+- **SWR cache (Phase 2a):** `SWRConfig` in home-app (`revalidateOnFocus:false, keepPreviousData:true, dedupingInterval:5000`). Home/Announcements/Directory tabs fetch via `useSWR` with ministry-scoped keys, so revisiting a tab paints from cache instantly. Writes use optimistic `mutate(asyncFn, { optimisticData, rollbackOnError, revalidate:false })`. Skeleton shows only on first load (`isLoading || !data`). Chats + Plan tabs are NOT yet converted (Phase 2b).
+- **`rsvps` table has NO `ministry_id` column** — scoping is via the RLS join to `announcements`. RSVP writes must NOT add `ministry_id` (would error). Convention #8's "ministry_id on all writes" applies only to tables that carry the column.
+
+## Multi-session / git hygiene — never run two Claude sessions in one working dir
+Date: 2026-06-27
+
+**Two Claude sessions in the SAME working directory corrupt each other.** A working tree has exactly one active branch; when session B runs `git checkout`, it yanks the branch out from under session A, so A's edits land on the wrong branch. Concurrent `npm run dev` (the `dev` script does `rm -rf .next`) and concurrent `git stash`/index ops then corrupt the Turbopack cache and leave stash-pop conflict markers (`<<<<<<< Updated upstream` / `>>>>>>> Stashed changes`) in source files. This actually happened and stranded a fix on the wrong branch.
+
+**Rules:**
+- One session per **git worktree** (separate dir, separate active branch, shared `.git`): `git worktree add ../central-<name> <branch>`. Run each session's dev server on a different port (`next dev -p 3001`). Use `EnterWorktree`/`ExitWorktree` to drive a session inside a worktree.
+- **Never let verification subagents run `git stash`** to diff against HEAD — concurrent stash/pop is a prime corruption source. Compare lint output by reading it, not by stashing.
+- Symptom of corruption: `Persisting failed: Unable to write SST file`, turbopack panics, missing `build-manifest.json`, or a persistent client-side exception that survives a `.next` clear. Recovery: kill ALL `next` processes, `rm -rf .next`, restart ONE server; your committed/pushed branches are the safe source of truth.
+
+## Don't run `next build` and `next dev` in the same worktree at once
+Date: 2026-06-27
+
+`npm run build` (next build) and `npm run dev` (next dev) BOTH write to the same `.next` directory. If a dev server is live in a worktree while verification/build cycles run `npm run build` in that SAME worktree, they corrupt each other's Turbopack persistent cache — symptom: `Failed to write page endpoint`, `Failed to restore task data (corrupted database or bug)`, missing `.sst` / `build-manifest.json`, Turbopack panics, and the dev server returns 500 even though `npm run build` passes standalone. The code is fine; only the cache is poisoned.
+
+**Rule:** while actively running engineer/tester build cycles in a worktree, keep that worktree's dev server STOPPED. Start the dev server only for a testing handoff, after the build cycles are done — and don't run `npm run build` again while it's up. Recovery if it happens: kill the dev server, `rm -rf .next`, restart. (Caused by the `git worktree move` era too: a moved `.next` carries stale absolute paths — always `rm -rf .next` after moving a worktree.)
+
+## Adding a dependency: update the lockfile the project ACTUALLY uses (pnpm here)
+Date: 2026-06-27
+
+This repo commits BOTH `package-lock.json` (npm) and `pnpm-lock.yaml` (pnpm), but **Vercel builds with `pnpm install --frozen-lockfile`**. When `swr` was added via `npm install --legacy-peer-deps`, only `package-lock.json` updated — `pnpm-lock.yaml` stayed stale. Local `npm run build` passed (npm had swr), but EVERY Vercel deploy failed at the install step in 4–7s with `ERR_PNPM_OUTDATED_LOCKFILE` (lockfile not up to date with package.json). The code was never the problem.
+
+**Rules:**
+- When adding/removing a dependency, run **`pnpm install`** (this project uses pnpm on Vercel) and commit the updated **`pnpm-lock.yaml`**. Don't add deps with npm here.
+- A fast Vercel failure (a few seconds, before compilation) is almost always the **install step** (lockfile/peer mismatch), NOT a code/type error. A passing local `npm run build` does NOT prove the Vercel install will succeed if the two package managers' lockfiles diverge.
+- Diagnose Vercel failures from the actual build log (`mcp__vercel__get_deployment_build_logs`, errorsOnly) before guessing.
+- To verify before pushing, run the exact thing Vercel runs: `pnpm install --frozen-lockfile` (exit 0 = good).

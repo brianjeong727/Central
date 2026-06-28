@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
@@ -39,11 +40,11 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip } from "@/components/central"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -175,17 +176,17 @@ const MINISTRY_FEATURES = [
 
 export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: string; desc: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-70">
+    <div className="bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-70">
       <div className="flex items-start gap-3">
-        <PlanLineIcon iconKey={icon} bg="#ffffff" fg="#3E1540" />
+        <PlanLineIcon iconKey={icon} bg="#ffffff" fg="var(--plum)" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[14px] font-semibold text-[#13101A]">{name}</p>
-            <span className="text-[10px] font-medium text-[#8A8497] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
+            <p className="text-[14px] font-semibold text-[var(--ink)]">{name}</p>
+            <span className="text-[10px] font-medium text-[var(--muted-text)] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
               Soon
             </span>
           </div>
-          <p className="text-[13px] text-[#5A5466] mt-0.5 leading-relaxed">{desc}</p>
+          <p className="text-[13px] text-[var(--body)] mt-0.5 leading-relaxed">{desc}</p>
         </div>
       </div>
     </div>
@@ -210,45 +211,45 @@ export function LinkForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[#8A8497]">Title</label>
+        <label className="text-[12px] font-medium text-[var(--muted-text)]">Title</label>
         <input
           value={form.title}
           onChange={e => setForm({ ...form, title: e.target.value })}
           placeholder="e.g. Officer Handbook"
-          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[#8A8497]">Description</label>
+        <label className="text-[12px] font-medium text-[var(--muted-text)]">Description</label>
         <input
           value={form.description}
           onChange={e => setForm({ ...form, description: e.target.value })}
           placeholder="Optional short description"
-          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[#8A8497]">URL</label>
+        <label className="text-[12px] font-medium text-[var(--muted-text)]">URL</label>
         <input
           value={form.url}
           onChange={e => setForm({ ...form, url: e.target.value })}
           placeholder="https://…"
           type="url"
-          className="w-full px-3 py-2.5 rounded-xl border border-[#ECE8DE] bg-white text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
         />
       </div>
       <div className="flex gap-2">
         <button
           onClick={onSave}
           disabled={saving || !form.title.trim() || !form.url.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
         >
           <Check className="w-3.5 h-3.5" />
           {saving ? "Saving…" : isNew ? "Add Link" : "Save"}
         </button>
         <button
           onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[#5A5466] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[var(--body)] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
         >
           <X className="w-3.5 h-3.5" />
           Cancel
@@ -383,7 +384,7 @@ export function StudentOrgRoleTabContent({
 
   const cardStyle: React.CSSProperties = {
     background: "#FBF8F2",
-    border: "1px solid #ECE8DE",
+    border: "1px solid var(--line)",
     borderRadius: 16,
     padding: "16px 20px",
     boxShadow: "0 1px 4px rgba(19,16,26,0.06)",
@@ -394,13 +395,13 @@ export function StudentOrgRoleTabContent({
       {/* Role Description */}
       <div className="mb-10">
         <div className="flex items-center justify-between mb-3">
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
             Role Description
           </span>
           {canWrite && !editingDesc && (
             <button
               onClick={() => { setDescDraft(description?.description ?? ""); setEditingDesc(true) }}
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
             >
               <Edit3 className="w-3.5 h-3.5" />
               Edit
@@ -418,14 +419,14 @@ export function StudentOrgRoleTabContent({
               <button
                 onClick={saveDescription}
                 disabled={savingDesc}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#3E1540] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[#2D0F2E] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" />
                 {savingDesc ? "Saving…" : "Save"}
               </button>
               <button
                 onClick={() => setEditingDesc(false)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[#5A5466] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[var(--body)] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
                 Cancel
@@ -448,13 +449,13 @@ export function StudentOrgRoleTabContent({
       {/* Relevant Links */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
             Relevant Links
           </span>
           {canWrite && !addingLink && editingLinkId === null && (
             <button
               onClick={() => { setLinkForm({ title: "", description: "", url: "" }); setEditingLinkId(null); setAddingLink(true) }}
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
             >
               <Plus className="w-3.5 h-3.5" />
               Add Link
@@ -470,7 +471,7 @@ export function StudentOrgRoleTabContent({
 
         {links.length === 0 && !addingLink ? (
           <div style={{ ...cardStyle, textAlign: "center", padding: "28px 20px" }}>
-            <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#8A8497", margin: 0 }}>
+            <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
               {canWrite ? "No links yet. Add one to get started." : "No links yet."}
             </p>
           </div>
@@ -489,16 +490,16 @@ export function StudentOrgRoleTabContent({
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ fontFamily: "var(--font-inter)", fontSize: 14, fontWeight: 600, color: "#3E1540", textDecoration: "underline", textUnderlineOffset: 2, wordBreak: "break-word" }}
+                        style={{ fontFamily: "var(--font-inter)", fontSize: 14, fontWeight: 600, color: "var(--plum)", textDecoration: "underline", textUnderlineOffset: 2, wordBreak: "break-word" }}
                       >
                         {link.title}
                       </a>
                       {link.description && (
-                        <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "#5A5466", margin: "3px 0 0", lineHeight: 1.55 }}>
+                        <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "var(--body)", margin: "3px 0 0", lineHeight: 1.55 }}>
                           {link.description}
                         </p>
                       )}
-                      <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "#8A8497", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {link.url}
                       </p>
                     </div>
@@ -509,14 +510,14 @@ export function StudentOrgRoleTabContent({
                           className="p-1.5 rounded-lg hover:bg-[#EFEAE0] transition-colors"
                           title="Edit link"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-[#8A8497]" />
+                          <Edit3 className="w-3.5 h-3.5 text-[var(--muted-text)]" />
                         </button>
                         <button
                           onClick={() => deleteLink(link.id)}
                           className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
                           title="Delete link"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-[#8A8497] hover:text-red-500" />
+                          <Trash2 className="w-3.5 h-3.5 text-[var(--muted-text)] hover:text-red-500" />
                         </button>
                       </div>
                     )}
@@ -535,7 +536,7 @@ const NOTE_COLORS = [
   "#000000", "#374151", "#6B7280",
   "#EF4444", "#F97316", "#EAB308",
   "#22C55E", "#3B82F6", "#8B5CF6",
-  "#EC4899", "#3E1540",
+  "#EC4899", "var(--plum)",
 ]
 
 export function TiptapToolbar({ editor }: { editor: Editor | null }) {
@@ -563,7 +564,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
         borderRadius: 5,
         border: "none",
         background: active ? "rgba(62,21,64,0.10)" : "transparent",
-        color: active ? "#3E1540" : "#5A5466",
+        color: active ? "var(--plum)" : "var(--body)",
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
@@ -575,7 +576,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
     </button>
   )
 
-  const div = <div style={{ width: 1, height: 14, background: "#ECE8DE", margin: "0 3px", flexShrink: 0 }} />
+  const div = <div style={{ width: 1, height: 14, background: "var(--line)", margin: "0 3px", flexShrink: 0 }} />
   const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
 
   return (
@@ -617,7 +618,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             gap: 2,
           }}
         >
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#5A5466", lineHeight: 1 }}>A</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--body)", lineHeight: 1 }}>A</span>
           <div style={{ width: 14, height: 2.5, borderRadius: 2, background: currentColor ?? "#374151" }} />
         </button>
         {showColors && (
@@ -627,7 +628,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             left: "50%",
             transform: "translateX(-50%)",
             background: "white",
-            border: "1px solid #ECE8DE",
+            border: "1px solid var(--line)",
             borderRadius: 8,
             boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
             padding: 8,
@@ -645,7 +646,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
                 style={{
                   width: 18, height: 18, borderRadius: 4,
                   background: c,
-                  border: currentColor === c ? "2px solid #3E1540" : "1.5px solid rgba(0,0,0,0.10)",
+                  border: currentColor === c ? "2px solid var(--plum)" : "1.5px solid rgba(0,0,0,0.10)",
                   cursor: "pointer", padding: 0,
                 }}
               />
@@ -656,8 +657,8 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
               onMouseDown={e => { e.preventDefault(); editor.chain().focus().unsetColor().run(); setShowColors(false) }}
               style={{
                 width: 18, height: 18, borderRadius: 4,
-                background: "white", border: "1.5px solid #ECE8DE",
-                cursor: "pointer", fontSize: 9, color: "#8A8497",
+                background: "white", border: "1.5px solid var(--line)",
+                cursor: "pointer", fontSize: 9, color: "var(--muted-text)",
                 display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
               }}
             >✕</button>
@@ -871,7 +872,7 @@ export function MeetingNoteEditor({
               />
             ))}
           </div>
-          <span style={{ fontSize: 12, color: "#8A8497" }}>
+          <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
             {activeUsers.length === 1
               ? `${activeUsers[0].userName.split(" ")[0]} is also editing`
               : `${activeUsers.length} others are editing`}
@@ -943,7 +944,7 @@ export function MeetingNoteCard({
         style={{
           background: "white",
           borderRadius: 12,
-          border: "1px solid #ECE8DE",
+          border: "1px solid var(--line)",
           padding: "13px 18px",
           cursor: "pointer",
           display: "flex",
@@ -954,10 +955,10 @@ export function MeetingNoteCard({
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {note.title || "(Untitled)"}
           </p>
-          <p style={{ fontSize: 12, color: "#8A8497", margin: "2px 0 0" }}>{noteDateLabel}</p>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0" }}>{noteDateLabel}</p>
         </div>
         <ChevronRight size={14} style={{ color: "#C4C4C4", flexShrink: 0 }} />
       </div>
@@ -965,7 +966,7 @@ export function MeetingNoteCard({
   }
 
   return (
-    <div style={{ background: "white", borderRadius: 16, border: "1px solid #ECE8DE", boxShadow: "0 2px 12px rgba(19,16,26,0.08)", overflow: "hidden" }}>
+    <div style={{ background: "white", borderRadius: 16, border: "1px solid var(--line)", boxShadow: "0 2px 12px rgba(19,16,26,0.08)", overflow: "hidden" }}>
       {/* Collapse strip */}
       <div
         onClick={onToggle}
@@ -979,7 +980,7 @@ export function MeetingNoteCard({
           background: "#FDFBF7",
         }}
       >
-        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#8A8497", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
           {noteDateLabel}
         </span>
         <ChevronDown size={14} style={{ color: "#C4C4C4" }} />
@@ -1004,7 +1005,7 @@ export function MeetingNoteCard({
             fontFamily: "var(--font-instrument-serif)",
             fontSize: 26,
             fontWeight: 400,
-            color: "#13101A",
+            color: "var(--ink)",
             letterSpacing: "-0.02em",
             lineHeight: 1.2,
             width: "100%",
@@ -1030,6 +1031,17 @@ export function MeetingNoteCard({
   )
 }
 
+// Pure SWR fetcher for the meeting-notes LIST (key: ["meeting-notes", teamId]).
+async function fetchMeetingNotes([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("meeting_notes")
+    .select("*")
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: false })
+  return (data ?? []) as MeetingNote[]
+}
+
 export function MeetingNotesSection({
   teamId,
   userId,
@@ -1044,29 +1056,23 @@ export function MeetingNotesSection({
   startNewTrigger?: number
 }) {
   const supabase = createClient()
-  const [notes, setNotes] = useState<MeetingNote[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: notesData, isLoading: loading, mutate: mutateNotes } = useSWR(
+    teamId ? (["meeting-notes", teamId] as const) : null,
+    fetchMeetingNotes,
+    { keepPreviousData: false },
+  )
+  const notes = useMemo(() => notesData ?? [], [notesData])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
 
+  // Clear expansion when switching teams.
+  useEffect(() => { setExpandedIds(new Set()) }, [teamId])
+  // Auto-expand the most recent note once the list resolves (only if nothing is expanded yet).
   useEffect(() => {
-    if (!teamId) return
-    setNotes([])
-    setExpandedIds(new Set())
-    setLoading(true)
-    supabase
-      .from("meeting_notes")
-      .select("*")
-      .eq("team_id", teamId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        const rows = (data ?? []) as MeetingNote[]
-        setNotes(rows)
-        if (rows.length > 0) setExpandedIds(new Set([rows[0].id]))
-        setLoading(false)
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId])
+    if (notesData && notesData.length > 0) {
+      setExpandedIds(prev => (prev.size === 0 ? new Set([notesData[0].id]) : prev))
+    }
+  }, [notesData])
 
   useEffect(() => {
     if (startNewTrigger) createNote()
@@ -1089,19 +1095,19 @@ export function MeetingNotesSection({
     setCreating(false)
     if (!error && data) {
       const newNote = data as MeetingNote
-      setNotes(prev => [newNote, ...prev])
       setExpandedIds(prev => new Set([newNote.id, ...prev]))
+      void mutateNotes(prev => [newNote, ...(prev ?? [])], { revalidate: false })
     }
   }
 
   async function saveTitle(id: string, title: string) {
     await supabase.from("meeting_notes").update({ title }).eq("id", id)
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, title } : n))
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, title } : n), { revalidate: false })
   }
 
   async function saveBody(id: string, body: string) {
     await supabase.from("meeting_notes").update({ body }).eq("id", id)
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, body } : n))
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, body } : n), { revalidate: false })
   }
 
   function toggleExpand(id: string) {
@@ -1117,9 +1123,9 @@ export function MeetingNotesSection({
     <div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
       ) : notes.length === 0 ? (
-        <div style={{ borderLeft: "1px solid #E8E2D2", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
+        <div style={{ borderLeft: "1px solid var(--line)", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", margin: 0 }}>
             {canWrite ? "No notes yet — start a new one." : "No notes have been created yet."}
           </p>
@@ -1142,6 +1148,40 @@ export function MeetingNotesSection({
       )}
     </div>
   )
+}
+
+// Stable empty Set reference so derived `plannedIds` keeps referential identity across renders.
+const EMPTY_ID_SET: Set<string> = new Set()
+
+// Shared, PURE SWR fetcher for calendar events + which events already have a plan.
+// Key: ["calendar-events", ministryId, teamId ?? "all"] — StudentOrgTeamHome and
+// MinistryCalendar share this key so the module cache dedupes them. Returns the
+// events, the planned-event id Set (drives the "has plan" badge — must NOT be a
+// fetcher side-effect), and tableReady (legacy "table missing" guard).
+// NOTE: returns the BROADER set including sub-events (matches MinistryCalendar's
+// original behavior). StudentOrgTeamHome locally filters out sub-events
+// (parent_event_id != null) to preserve its original exclude-sub-events behavior.
+async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [string, string, string]) {
+  const supabase = createClient()
+  let query = supabase
+    .from("calendar_events")
+    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+    .eq("ministry_id", ministryId)
+    .order("start_date", { ascending: true })
+  if (teamScope !== "all") {
+    query = query.or(`team_id.eq.${teamScope},team_id.is.null`)
+  }
+  const { data, error } = await query
+  const tableReady = !(error && error.message.includes("Could not find the table"))
+  const events = (tableReady ? (data ?? []) : []) as CalendarEvent[]
+
+  const { data: plans } = await supabase
+    .from("event_plans")
+    .select("calendar_event_id")
+    .eq("ministry_id", ministryId)
+  const plannedIds = new Set((plans ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))
+
+  return { events, plannedIds, tableReady }
 }
 
 // ── StudentOrgTeamHome ─────────────────────────────────────────────────────────
@@ -1190,11 +1230,17 @@ export function StudentOrgTeamHome({
   // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
   const displaySection = desktopSection ?? teamTab
 
-  // Calendar
-  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
-  const [plannedIds, setPlannedIds] = useState<Set<string>>(new Set())
+  // Calendar — SWR-cached list of events + planned-event ids (shared key with MinistryCalendar).
+  const { data: calData, isLoading: calLoading, mutate: mutateCal } = useSWR(
+    ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
+    fetchCalendarEventsAndPlans,
+    { keepPreviousData: false },
+  )
+  // Shared fetcher returns the broader set (incl. sub-events) for MinistryCalendar.
+  // StudentOrgTeamHome excludes sub-events locally to preserve its original behavior.
+  const calEvents = useMemo(() => (calData?.events ?? []).filter(e => e.parent_event_id == null), [calData])
+  const plannedIds = calData?.plannedIds ?? EMPTY_ID_SET
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [calLoading, setCalLoading] = useState(true)
 
   // Add / delete
   const [showAddModal, setShowAddModal] = useState(false)
@@ -1213,18 +1259,18 @@ export function StudentOrgTeamHome({
   // Notes tab — trigger createNote from header button
   const [notesTrigger, setNotesTrigger] = useState(0)
 
+  // Side-effect (was inside the fetcher): notify the parent of the current event list.
+  // Pass the sub-event-excluded list (calEvents) to keep parent consumers consistent
+  // with StudentOrgTeamHome's original filtered dataset.
   useEffect(() => {
-    if (!ministryId) return
-    setCalLoading(true)
-    const q = supabase.from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
-      .eq("ministry_id", ministryId).is("parent_event_id", null).order("start_date")
-    const run = teamId ? q.or(`team_id.eq.${teamId},team_id.is.null`) : q
-    run.then(({ data }) => { const evs = (data ?? []) as CalendarEvent[]; setCalEvents(evs); setCalLoading(false); onCalEventsChange?.(evs) })
-    supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
-      .then(({ data }) => setPlannedIds(new Set((data ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))))
+    if (calData) onCalEventsChange?.(calEvents)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, ministryId, refreshSignal])
+  }, [calData])
+  // External refresh trigger → revalidate the shared cache.
+  useEffect(() => {
+    if (refreshSignal) void mutateCal()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal])
 
   useEffect(() => {
     if (!teamId) return
@@ -1254,8 +1300,7 @@ export function StudentOrgTeamHome({
       await supabase.from("event_plans").delete().eq("id", plan.id)
     }
     await supabase.from("calendar_events").delete().eq("id", evId)
-    setCalEvents(prev => prev.filter(e => e.id !== evId))
-    setPlannedIds(prev => { const next = new Set(prev); next.delete(evId); return next })
+    void mutateCal()
     setDeleteConfirmId(null)
     setDeleting(false)
     if (planningEvent?.id === evId) onPlanningEventChange(null)
@@ -1263,7 +1308,7 @@ export function StudentOrgTeamHome({
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   if (planningEvent) {
@@ -1362,7 +1407,7 @@ export function StudentOrgTeamHome({
               <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
             )}
             {displaySection === "Resources" && userRosterRole && (
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
                 {userRosterRole}
               </span>
             )}
@@ -1393,7 +1438,7 @@ export function StudentOrgTeamHome({
           <div>
             <section>
               {calLoading ? (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+                <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
               ) : (
                 <MonthGrid
                   events={calEvents}
@@ -1403,8 +1448,8 @@ export function StudentOrgTeamHome({
                 />
               )}
 
-              <p style={{ marginTop: 10, fontSize: 12, color: "#8A8497", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "#3E1540" }} />
+              <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "var(--plum)" }} />
                 Click any event to open its plan — no modal in between.
               </p>
             </section>
@@ -1417,7 +1462,7 @@ export function StudentOrgTeamHome({
             {!isDesktopView && (
               <div style={{ marginBottom: 28 }}>
                 <p style={mono}>Meeting Notes</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Meeting Notes</h2>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Meeting Notes</h2>
               </div>
             )}
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} />
@@ -1432,12 +1477,12 @@ export function StudentOrgTeamHome({
               <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
                 <div>
                   <p style={mono}>Events & planning</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>Events</h2>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Events</h2>
                 </div>
                 {canEdit && (
                   <button
                     onClick={() => setShowAddModal(true)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
                   >
                     <Plus className="w-3.5 h-3.5" /> New Event
                   </button>
@@ -1445,7 +1490,7 @@ export function StudentOrgTeamHome({
               </div>
             )}
             {calEvents.length === 0 ? (
-              <div style={{ borderLeft: "2px solid #E8E2D2", paddingLeft: 20 }}>
+              <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Click &ldquo;New Event&rdquo; to get started.</p>
               </div>
             ) : (
@@ -1527,9 +1572,9 @@ export function StudentOrgTeamHome({
                 <div style={{ marginBottom: 20 }}>
                   <p style={mono}>Team resources</p>
                   <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "#13101A" }}>Resources</h2>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "var(--ink)" }}>Resources</h2>
                     {userRosterRole && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "#3E1540", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
                         {userRosterRole}
                       </span>
                     )}
@@ -1542,9 +1587,9 @@ export function StudentOrgTeamHome({
                       onClick={() => setResourcesRole(role)}
                       style={{
                         padding: "6px 14px", borderRadius: 9999, border: "1.5px solid",
-                        borderColor: activeResourcesRole === role ? "#3E1540" : "#E8E2D2",
-                        background: activeResourcesRole === role ? "#3E1540" : "transparent",
-                        color: activeResourcesRole === role ? "#F6F4EF" : "#5A5466",
+                        borderColor: activeResourcesRole === role ? "var(--plum)" : "var(--line)",
+                        background: activeResourcesRole === role ? "var(--plum)" : "transparent",
+                        color: activeResourcesRole === role ? "#F6F4EF" : "var(--body)",
                         fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)",
                         transition: "border-color 150ms, background-color 150ms, color 150ms",
                       }}
@@ -1588,10 +1633,7 @@ export function StudentOrgTeamHome({
         userId={userId}
         onClose={() => setShowAddModal(false)}
         onSaved={(newEv) => {
-          const sorted = [...calEvents, newEv].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
-          setCalEvents(sorted)
-          onCalEventsChange?.(sorted)
-          setPlannedIds(prev => new Set([...prev, newEv.id]))
+          void mutateCal()
           setShowAddModal(false)
           onPlanningEventChange(newEv)
         }}
@@ -1704,14 +1746,14 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
 
   const todayStr = new Date().toISOString().split("T")[0]
 
-  if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+  if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       {ROTATION_TYPES.map(({ type, label }) => (
         <div key={type}>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>{label}</p>
-          <div style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>{label}</p>
+          <div style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
             {upcomingSundays.map((weekDate, i) => {
               const assignment = getAssignment(type, weekDate)
               const key = `${type}::${weekDate}`
@@ -1720,14 +1762,14 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
               return (
                 <div key={weekDate} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderTop: i ? "1px solid #F0EBE0" : undefined, background: isToday ? "#F9F6FF" : undefined }}>
                   <div style={{ width: 96, flexShrink: 0 }}>
-                    <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "#3E1540" : "#5A5466" }}>{dateLabel}</p>
-                    {isToday && <p style={{ fontSize: 10.5, color: "#8A8497", marginTop: 1 }}>This week</p>}
+                    <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--plum)" : "var(--body)" }}>{dateLabel}</p>
+                    {isToday && <p style={{ fontSize: 10.5, color: "var(--muted-text)", marginTop: 1 }}>This week</p>}
                   </div>
                   <select
                     value={assignment?.assigned_to ?? ""}
                     disabled={saving === key}
                     onChange={e => handleAssign(type, weekDate, e.target.value || null)}
-                    style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "#13101A" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
+                    style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
                   >
                     <option value="">— Unassigned —</option>
                     {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
@@ -1853,7 +1895,7 @@ export function PlanTab({
     fontSize: "11px",
     letterSpacing: "0.04em",
     textTransform: "uppercase",
-    color: "#8A8497",
+    color: "var(--muted-text)",
   }
 
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
@@ -1893,13 +1935,13 @@ export function PlanTab({
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#3E1540" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="#3E1540" />
+            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
+            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "#13101A", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
         {isAdmin && (
-          <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[#3E1540] rounded-xl flex items-center justify-center hover:bg-[#2D0F2E] transition-colors">
+          <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
             <Plus className="w-4 h-4 text-[#F6F4EF]" />
           </button>
         )}
@@ -1907,7 +1949,7 @@ export function PlanTab({
 
       {/* Mobile title */}
       <div className="flex items-end justify-between px-5 mb-5 md:hidden">
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "#13101A", lineHeight: 1.05, margin: 0 }}>Plan</h1>
+        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Plan</h1>
       </div>
 
       {/* Edit planning event modal */}
@@ -1945,7 +1987,7 @@ export function PlanTab({
                 className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
                 title="Team settings"
               >
-                <Settings className="w-4 h-4 text-[#5A5466]" />
+                <Settings className="w-4 h-4 text-[var(--body)]" />
               </button>
             )}
           </TabPageHeader>
@@ -2012,7 +2054,7 @@ export function PlanTab({
                       style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "not-allowed", opacity: 0.45 }}
                     >
                       <Plus style={{ width: 13, height: 13 }} /> New team
-                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, background: "#ECE8DE", color: "#8A8497", letterSpacing: "0.5px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
+                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, background: "var(--line)", color: "var(--muted-text)", letterSpacing: "0.5px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
                     </button>
                   </div>
                 )}
@@ -2022,13 +2064,13 @@ export function PlanTab({
             /* EMPTY STATE — strictly 0 teams */
             <div className="px-14 py-7">
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "#8A8497", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginBottom: 12 }}>
                   {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
                 </div>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "#13101A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
                   {isAdmin ? "Create your first team." : "You're not on a team yet."}
                 </h2>
-                <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
+                <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
                   {isAdmin
                     ? "Teams keep your ministry organized — Praise, Small Groups, Student Org Board, and more."
                     : "Ask a leader to add you to a team."}
@@ -2036,7 +2078,7 @@ export function PlanTab({
                 {isAdmin && (
                   <button
                     onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                   >
                     <Plus style={{ width: 14, height: 14 }} /> Create a team
                   </button>
@@ -2199,9 +2241,9 @@ export function PlanTab({
               <div className="mb-8">
                 <PlanSectionHeader>Teams</PlanSectionHeader>
                 {allTeams.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-dashed border-[#ECE8DE] p-6 text-center">
+                  <div className="bg-white rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
                     <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet.</p>
-                    <p className="text-[13px] text-[#8A8497]">Tap + above to create your first team.</p>
+                    <p className="text-[13px] text-[var(--muted-text)]">Tap + above to create your first team.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -2209,12 +2251,12 @@ export function PlanTab({
                       <button
                         key={team.id}
                         onClick={() => openSettings(team)}
-                        className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
+                        className="w-full bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
                       >
-                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="#3E1540" fg="#F6F4EF" />
+                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="#F6F4EF" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-semibold text-[#13101A]">{team.name}</p>
-                          <p className="text-[12px] text-[#8A8497]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
+                          <p className="text-[14px] font-semibold text-[var(--ink)]">{team.name}</p>
+                          <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
                       </button>
@@ -2227,11 +2269,11 @@ export function PlanTab({
               <PlanSectionHeader>Tools</PlanSectionHeader>
               <div className="grid grid-cols-2 gap-2">
                 {[{ icon: "set", name: "Set" }, { icon: "sparkle", name: "Slides" }, { icon: "calendar", name: "Schedule" }, { icon: "book", name: "Bible Study" }].map((tool) => (
-                  <div key={tool.name} className="bg-white rounded-2xl border border-[#ECE8DE] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
-                    <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="#3E1540" size={36} />
+                  <div key={tool.name} className="bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
+                    <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="var(--plum)" size={36} />
                     <div>
-                      <p className="text-[13px] font-semibold text-[#13101A]">{tool.name}</p>
-                      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
+                      <p className="text-[13px] font-semibold text-[var(--ink)]">{tool.name}</p>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: "9px", color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
                     </div>
                   </div>
                 ))}
@@ -2273,53 +2315,6 @@ export function PlanTab({
   )
 }
 
-// ── PlanSubTabStrip ────────────────────────────────────────────────────────────
-// Single canonical tab strip used by every team page in the Plan tab.
-// Implements §4.2 exactly: underline only, no pills, no segmented backgrounds.
-export function PlanSubTabStrip({
-  tabs,
-  active,
-  onChange,
-}: {
-  tabs: readonly { key: string; label: string }[]
-  active: string
-  onChange: (key: string) => void
-}) {
-  return (
-    // Outer div: scroll container only — no border (replaced by soft hairline below)
-    <div style={{ overflowX: "auto", scrollbarWidth: "none" as const }}>
-      {/* Label row: 56px left inset on desktop, aligns with TabPageHeader's px-14 */}
-      <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            style={{
-              padding: "12px 0 14px",
-              fontSize: 15,
-              fontFamily: "var(--font-inter)",
-              fontWeight: active === key ? 600 : 400,
-              color: active === key ? "#2D0F2E" : "#8A8497",
-              border: "none",
-              borderBottom: active === key ? "2px solid #3E1540" : "2px solid transparent",
-              marginBottom: -1,
-              background: "none",
-              cursor: "pointer",
-              whiteSpace: "nowrap" as const,
-              outline: "none",
-              flexShrink: 0,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
-      <div className="md:mx-14" style={{ height: 1, background: "var(--line)", opacity: 0.65 }} />
-    </div>
-  )
-}
-
 // ── StudentOrgSectionNav ──────────────────────────────────────────────────────
 // Vertical sidebar nav for the Student Org Board workspace on desktop.
 // Renders in place of the flat team list in DesktopSidebar when SOB is active.
@@ -2338,7 +2333,7 @@ export function StudentOrgSectionNav({
   const [isPlanOpen, setIsPlanOpen] = useState(
     () => activeSection === "Events" || planningEvent !== null
   )
-  const PLUM = "#3E1540"
+  const PLUM = "var(--plum)"
   const FAINT = "var(--faint)"
   const LINE = "var(--line)"
 
@@ -2490,9 +2485,9 @@ export function worshipWeekDateLabel(dateStr: string) {
 
 export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "filled" | "confirmed"; onChange?: (s: string) => void }) {
   const cfg = {
-    draft:     { label: "Draft",     bg: "#F3F0F7", color: "#5A5466" },
-    filled:    { label: "Filled",    bg: "#F4F1E8", color: "#3E1540" },
-    confirmed: { label: "Confirmed", bg: "#EDE5F0", color: "#3E1540" },
+    draft:     { label: "Draft",     bg: "#F3F0F7", color: "var(--body)" },
+    filled:    { label: "Filled",    bg: "#F4F1E8", color: "var(--plum)" },
+    confirmed: { label: "Confirmed", bg: "#EDE5F0", color: "var(--plum)" },
   }[status]
   if (onChange) {
     return (
@@ -2580,7 +2575,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
   async function loadSchedule() {
     const gen = ++loadScheduleGenRef.current
     setScheduleLoading(true)
@@ -2969,7 +2964,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
             {canManageSchedule && !showAddWeek && (
               <button
                 onClick={() => setShowAddWeek(true)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add week
@@ -2979,12 +2974,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
           {/* Add week inline form */}
           {showAddWeek && (
-            <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New worship week</p>
+            <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New worship week</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date — Sundays only</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 148, overflowY: "auto", padding: "10px", background: "white", border: "1px solid #ECE8DE", borderRadius: 10 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date — Sundays only</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 148, overflowY: "auto", padding: "10px", background: "white", border: "1px solid var(--line)", borderRadius: 10 }}>
                     {getUpcomingSundays(26).map(({ date, label }) => {
                       const isSelected = newDate === date
                       const alreadyExists = weekDates.includes(date)
@@ -2995,9 +2990,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           onClick={() => { if (!alreadyExists) { setNewDate(date); setAddWeekError(null) } }}
                           style={{
                             padding: "5px 11px", borderRadius: 20,
-                            border: isSelected ? "1.5px solid #3E1540" : "1px solid #E2DDCF",
-                            background: isSelected ? "#3E1540" : alreadyExists ? "#F4F1EA" : "white",
-                            color: isSelected ? "#F6F4EF" : alreadyExists ? "#C5C0CC" : "#13101A",
+                            border: isSelected ? "1.5px solid var(--plum)" : "1px solid var(--line-2)",
+                            background: isSelected ? "var(--plum)" : alreadyExists ? "#F4F1EA" : "white",
+                            color: isSelected ? "#F6F4EF" : alreadyExists ? "#C5C0CC" : "var(--ink)",
                             fontSize: 12, fontWeight: isSelected ? 600 : 400,
                             cursor: alreadyExists ? "default" : "pointer",
                             fontFamily: "inherit",
@@ -3014,22 +3009,22 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "#DC2626" : "#5A5466", marginBottom: 4 }}>
-                    Leader <span style={{ color: newLeaderError ? "#DC2626" : "#8A8497", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "#DC2626" : "var(--body)", marginBottom: 4 }}>
+                    Leader <span style={{ color: newLeaderError ? "#DC2626" : "var(--muted-text)", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
                   </label>
                   <select value={newLeaderId} onChange={e => { setNewLeaderId(e.target.value); setNewLeaderError(false) }}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "#ECE8DE"}`, background: "#FBF8F2", fontSize: 14, color: newLeaderId ? "#13101A" : "#8A8497", outline: "none" }}>
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "var(--line)"}`, background: "#FBF8F2", fontSize: 14, color: newLeaderId ? "var(--ink)" : "var(--muted-text)", outline: "none" }}>
                     <option value="">Select Worship Leader…</option>
                     {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={handleAddWeek} disabled={!newDate || addingWeek}
-                    style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
+                    style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
                     {addingWeek ? "Adding…" : "Add"}
                   </button>
                   <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); setAddWeekError(null) }}
-                    style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                    style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                     Cancel
                   </button>
                 </div>
@@ -3039,11 +3034,11 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
           {/* Weeks list */}
           {scheduleLoading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
           ) : visibleWeeks.length === 0 ? (
-            <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
-              <p style={{ fontSize: 13, color: "#8A8497" }}>{canManageSchedule ? "Add one to get started." : "Check back later or set your availability."}</p>
+            <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No weeks scheduled yet.</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>{canManageSchedule ? "Add one to get started." : "Check back later or set your availability."}</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3057,11 +3052,11 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                 )
                 const isHighlighted = highlightWeek === week.week_date
                 return (
-                  <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "#FBF8F2", border: isHighlighted ? "2px solid #3E1540" : "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+                  <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "#FBF8F2", border: isHighlighted ? "2px solid var(--plum)" : "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
 
                     {/* ── Date / status / delete row ── */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2, margin: 0 }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2, margin: 0 }}>
                         {worshipWeekDateLabel(week.week_date)}
                       </p>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -3079,7 +3074,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* ── Auto-archive date (president only) ── */}
                     {canManage && (
                       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 20px", borderBottom: "1px solid #EFE9DA" }}>
-                        <span style={{ fontSize: 12, color: "#8A8497", fontFamily: "var(--font-inter)", flexShrink: 0 }}>Auto-archive</span>
+                        <span style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", flexShrink: 0 }}>Auto-archive</span>
                         <input
                           type="date"
                           value={week.auto_archive_date ?? ""}
@@ -3088,7 +3083,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                             setWeeks(prev => prev.map(w => w.id === week.id ? { ...w, auto_archive_date: val || null } : w))
                             await supabase.from("worship_weeks").update({ auto_archive_date: val || null }).eq("id", week.id)
                           }}
-                          style={{ fontSize: 12, color: "#5A5466", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                          style={{ fontSize: 12, color: "var(--body)", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-inter)" }}
                         />
                       </div>
                     )}
@@ -3096,9 +3091,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* ── Confirm delete ── */}
                     {confirmDeleteWeekId === week.id && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #EFE9DA" }}>
-                        <span style={{ fontSize: 13, color: "#5A5466" }}>Delete this week?</span>
+                        <span style={{ fontSize: 13, color: "var(--body)" }}>Delete this week?</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                          <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                          <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
                           <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
                         </div>
                       </div>
@@ -3109,12 +3104,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                       <span style={{ ...monoStyle, color: !week.leader_id ? "#DC2626" : undefined, flexShrink: 0, width: 80 }}>Leader</span>
                       {canManageSchedule ? (
                         <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
-                          style={{ flex: 1, fontSize: 14, color: week.leader_id ? "#13101A" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
+                          style={{ flex: 1, fontSize: 14, color: week.leader_id ? "var(--ink)" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
                           <option value="">— required —</option>
                           {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                         </select>
                       ) : (
-                        <span style={{ fontSize: 14, color: week.leader_name ? "#13101A" : "#DC2626", flex: 1 }}>
+                        <span style={{ fontSize: 14, color: week.leader_name ? "var(--ink)" : "#DC2626", flex: 1 }}>
                           {week.leader_name ?? "Not assigned"}
                         </span>
                       )}
@@ -3123,13 +3118,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* ── Member roster rows ── */}
                     {week.roles.length === 0 && !(canManageSchedule || isLeader) && (
                       <div style={{ padding: "13px 20px", borderTop: "1px solid #EFE9DA" }}>
-                        <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>No members assigned yet.</p>
+                        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members assigned yet.</p>
                       </div>
                     )}
                     {week.roles.map(role => (
                       <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52, borderTop: "1px solid #EFE9DA" }}>
                         <span style={{ ...monoStyle, flexShrink: 0, width: 80 }}>{role.role_name}</span>
-                        <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                        <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                         {(canManageSchedule || isLeader) && (
                           <button onClick={() => handleRemoveMember(role.id)}
                             style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>
@@ -3147,7 +3142,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           display: "block", width: "100%", padding: "14px 20px",
                           borderTop: "1px solid #EFE9DA", borderRight: "none", borderBottom: "none", borderLeft: "none",
                           background: "transparent", cursor: "pointer", textAlign: "left" as const,
-                          fontSize: 14, color: "#5A5466",
+                          fontSize: 14, color: "var(--body)",
                         }}
                       >
                         + Add member
@@ -3163,13 +3158,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                               onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
                               onFocus={() => setAddMemberFocused(true)}
                               onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
-                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
                             {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
-                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                                 {filteredMembers.map(m => (
                                   <button key={m.user_id}
                                     onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
-                                    style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                    style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addMemberUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
                                     {m.name}
                                   </button>
                                 ))}
@@ -3177,16 +3172,16 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                             )}
                           </div>
                           <select value={addMemberRole} onChange={e => setAddMemberRole(e.target.value)}
-                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, color: "#13101A", outline: "none" }}>
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, color: "var(--ink)", outline: "none" }}>
                             {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                           <div style={{ display: "flex", gap: 6 }}>
                             <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
-                              style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
+                              style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
                               {addingMember ? "Adding…" : "Add"}
                             </button>
                             <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
-                              style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                              style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                               Cancel
                             </button>
                           </div>
@@ -3205,9 +3200,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
       {subTab === "setlist" && (
         <div>
           {weeks.length === 0 ? (
-            <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No weeks scheduled yet.</p>
-              <p style={{ fontSize: 13, color: "#8A8497" }}>Add a week in the Schedule tab first.</p>
+            <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No weeks scheduled yet.</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add a week in the Schedule tab first.</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3215,14 +3210,14 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                 const songs = [...(songsByWeek[week.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
                 const isUploadingThis = uploadingChartWeek === week.id
                 return (
-                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
+                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
                     {/* Card header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid #E2DDCF" : "none" }}>
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid var(--line-2)" : "none" }}>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2 }}>
                         {worshipWeekDateLabel(week.week_date)}
                       </p>
                       {canManage && (
-                        <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isUploadingThis ? "not-allowed" : "pointer", opacity: isUploadingThis ? 0.6 : 1 }}>
+                        <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isUploadingThis ? "not-allowed" : "pointer", opacity: isUploadingThis ? 0.6 : 1 }}>
                           <Plus className="w-3.5 h-3.5" />
                           {isUploadingThis ? "Uploading…" : "Upload Chart"}
                           <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={isUploadingThis}
@@ -3252,7 +3247,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                               {/* Title */}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 {isOcr ? (
-                                  <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading chart…</span>
+                                  <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading chart…</span>
                                 ) : isEditingTitle || needsTitle ? (
                                   <input
                                     autoFocus={isEditingTitle || (needsTitle && !needsKey)}
@@ -3262,12 +3257,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                     onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
                                     onBlur={handleSaveInlineEdit}
                                     onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", background: "transparent", padding: "2px 0", borderBottom: "1px solid #E2DDCF" }}
+                                    style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", background: "transparent", padding: "2px 0", borderBottom: "1px solid var(--line-2)" }}
                                   />
                                 ) : (
                                   <button
                                     onClick={() => song.chart_url ? setViewingChart(song) : setEditingSong({ songId: song.id, field: "title", value: song.title })}
-                                    style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, lineHeight: 1.2 }}
+                                    style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, lineHeight: 1.2 }}
                                   >
                                     {song.title}
                                   </button>
@@ -3286,12 +3281,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                       onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                       onBlur={handleSaveInlineEdit}
                                       onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
+                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
                                     />
                                   ) : (
                                     <button
                                       onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
+                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
                                     >
                                       {song.key || "—"}
                                     </button>
@@ -3303,9 +3298,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                               {canManage && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "up")} disabled={idx === 0}
-                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#E5E0D2" : "#8A8497", fontSize: 13, lineHeight: 1 }}>↑</button>
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↑</button>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "down")} disabled={idx === songs.length - 1}
-                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "#E5E0D2" : "#8A8497", fontSize: 13, lineHeight: 1 }}>↓</button>
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↓</button>
                                   <button onClick={() => handleDeleteSong(week.id, song.id)}
                                     style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center" }}>
                                     <Trash2 className="w-3 h-3" />
@@ -3318,7 +3313,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         {isUploadingThis && (
                           <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #EFE9DA" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>—</span>
-                            <span style={{ fontSize: 13, color: "#8A8497" }}>Parsing chart…</span>
+                            <span style={{ fontSize: 13, color: "var(--muted-text)" }}>Parsing chart…</span>
                           </div>
                         )}
                       </div>
@@ -3335,25 +3330,25 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
       {subTab === "availability" && (
         <div>
           {availLoading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
           ) : (
             <>
               {/* My availability */}
               <div style={{ marginBottom: 32 }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>My availability</p>
+                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", marginBottom: 14 }}>My availability</p>
                 {weeks.length === 0 ? (
-                  <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
-                    <p style={{ fontSize: 13, color: "#8A8497" }}>No weeks scheduled this month. Check the Schedule tab.</p>
+                  <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No weeks scheduled this month. Check the Schedule tab.</p>
                   </div>
                 ) : (
-                  <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflow: "hidden" }}>
+                  <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
                     {weeks.map((week, i) => {
                       const date = week.week_date
                       const avail = myAvailability[date]
                       const isSaving = savingAvail === date
                       return (
-                        <div key={week.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weeks.length - 1 ? "1px solid #E2DDCF" : "none", flexWrap: "wrap" as const }}>
-                          <p style={{ fontSize: 14, color: "#13101A", flexShrink: 0 }}>{worshipWeekDateLabel(date)}</p>
+                        <div key={week.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 18px", borderBottom: i < weeks.length - 1 ? "1px solid var(--line-2)" : "none", flexWrap: "wrap" as const }}>
+                          <p style={{ fontSize: 14, color: "var(--ink)", flexShrink: 0 }}>{worshipWeekDateLabel(date)}</p>
                           <div style={{ display: "flex", gap: 6, opacity: isSaving ? 0.5 : 1, pointerEvents: isSaving ? "none" : "auto" }}>
                             {(["available", "busy", "unsure"] as AvailStatus[]).map(s => {
                               const active = avail === s
@@ -3366,9 +3361,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                 <button key={s} onClick={() => handleSetAvailability(date, s)}
                                   style={{
                                     padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                                    border: `1px solid ${active ? cfg.activeBorder : "#E8E2D2"}`,
+                                    border: `1px solid ${active ? cfg.activeBorder : "var(--line)"}`,
                                     background: active ? cfg.activeBg : "transparent",
-                                    color: active ? cfg.activeColor : "#8A8497",
+                                    color: active ? cfg.activeColor : "var(--muted-text)",
                                     cursor: "pointer", transition: "all 0.15s",
                                   }}>
                                   {cfg.label}
@@ -3386,14 +3381,14 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
               {/* Team availability — visible to all members */}
               {weeks.length > 0 && teamMembers.length > 0 && (
                 <div>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", marginBottom: 14 }}>Team availability</p>
-                  <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, overflowX: "auto" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", marginBottom: 14 }}>Team availability</p>
+                  <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
-                        <tr style={{ borderBottom: "1px solid #E2DDCF" }}>
-                          <th style={{ textAlign: "left", padding: "10px 16px", color: "#8A8497", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
+                        <tr style={{ borderBottom: "1px solid var(--line-2)" }}>
+                          <th style={{ textAlign: "left", padding: "10px 16px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
                           {weeks.map(w => (
-                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "#8A8497", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
+                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
                               {new Date(w.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </th>
                           ))}
@@ -3401,8 +3396,8 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                       </thead>
                       <tbody>
                         {teamMembers.map((member, i) => (
-                          <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid #E2DDCF" : "none" }}>
-                            <td style={{ padding: "10px 16px", color: "#13101A", fontWeight: 500, whiteSpace: "nowrap" as const }}>{member.name}</td>
+                          <tr key={member.user_id} style={{ borderBottom: i < teamMembers.length - 1 ? "1px solid var(--line-2)" : "none" }}>
+                            <td style={{ padding: "10px 16px", color: "var(--ink)", fontWeight: 500, whiteSpace: "nowrap" as const }}>{member.name}</td>
                             {weeks.map(w => {
                               const a = allAvailability[member.user_id]?.[w.week_date]
                               return (
@@ -3438,7 +3433,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
 function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   const [events, setEvents] = useState<{ id: string; week_date: string; roles: WorshipRoleRow[] }[]>([])
   const [teamMembers, setTeamMembers] = useState<{ user_id: string; name: string }[]>([])
@@ -3628,7 +3623,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
     } finally { setUploadingEventId(null) }
   }
 
-  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
 
   const filteredForRole = teamMembers.filter(m =>
     !addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase())
@@ -3645,12 +3640,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
         <p style={monoStyle}>Events · {events.length}</p>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowMembers(!showMembers)}
-            style={{ padding: "6px 14px", background: showMembers ? "#3E1540" : "transparent", color: showMembers ? "#F6F4EF" : "#5A5466", border: "1px solid #E2DDCF", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+            style={{ padding: "6px 14px", background: showMembers ? "var(--plum)" : "transparent", color: showMembers ? "#F6F4EF" : "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
             Members
           </button>
           {canManage && !showAddEvent && (
             <button onClick={() => setShowAddEvent(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
               <Plus className="w-3.5 h-3.5" /> Add event
             </button>
           )}
@@ -3659,12 +3654,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Members panel */}
       {showMembers && (
-        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 24 }}>
           <p style={{ ...monoStyle, marginBottom: 14 }}>Team members</p>
-          {teamMembers.length === 0 && <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 12 }}>No members yet.</p>}
+          {teamMembers.length === 0 && <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>No members yet.</p>}
           {teamMembers.map(m => (
             <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #EFE9DA" }}>
-              <span style={{ fontSize: 14, color: "#13101A" }}>{m.name}</span>
+              <span style={{ fontSize: 14, color: "var(--ink)" }}>{m.name}</span>
               {canManage && m.user_id !== userId && (
                 <button onClick={() => handleRemoveTeamMember(m.user_id)} style={{ fontSize: 12, color: "#C4C4C4", background: "none", border: "none", cursor: "pointer" }}>✕</button>
               )}
@@ -3676,12 +3671,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 onChange={e => { setAddMemberSearch(e.target.value); setAddMemberId("") }}
                 onFocus={() => setAddMemberFocused(true)}
                 onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
               {addMemberFocused && filteredForAdd.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                   {filteredForAdd.map(m => (
                     <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddMemberId(m.id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
-                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addMemberId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addMemberId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
                       {m.name}
                     </button>
                   ))}
@@ -3689,7 +3684,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
               )}
               {addMemberId && (
                 <button onClick={handleAddTeamMember} disabled={addingMember}
-                  style={{ marginTop: 8, padding: "8px 16px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
+                  style={{ marginTop: 8, padding: "8px 16px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
                   {addingMember ? "Adding…" : "Add"}
                 </button>
               )}
@@ -3700,21 +3695,21 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Add event form */}
       {showAddEvent && (
-        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New event</p>
+        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New event</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date</label>
               <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
-                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none" }} />
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
               </button>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate("") }}
-                style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                 Cancel
               </button>
             </div>
@@ -3724,9 +3719,9 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Events list */}
       {events.length === 0 && !showAddEvent ? (
-        <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No events yet.</p>
-          <p style={{ fontSize: 13, color: "#8A8497" }}>Add an event to get started.</p>
+        <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No events yet.</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add an event to get started.</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3736,10 +3731,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             const assignedIds = new Set(event.roles.map(r => r.user_id))
             const availableMembers = teamMembers.filter(m => !assignedIds.has(m.user_id) && (!addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase())))
             return (
-              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
                 {/* Date header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)" }}>
                     {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </p>
                   {canManage && (
@@ -3753,7 +3748,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 {event.roles.map(role => (
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
-                    <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                    <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                     {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
                   </div>
                 ))}
@@ -3761,7 +3756,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 {/* Add role row */}
                 {canManage && !isAddRoleTarget && (
                   <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
-                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "#5A5466" }}>
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
                     + Add person
                   </button>
                 )}
@@ -3772,12 +3767,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         <input type="text" placeholder="Search member…" value={addRoleSearch}
                           onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
-                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableMembers.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                             {availableMembers.map(m => (
                               <button key={m.user_id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.user_id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
-                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addRoleUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
                                 {m.name}
                               </button>
                             ))}
@@ -3785,20 +3780,20 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         )}
                       </div>
                       <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
-                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }}>
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }}>
                         {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                       {addRoleValue === "Other" && (
                         <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
-                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }} />
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
                           {addingRole ? "Adding…" : "Add"}
                         </button>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
-                          style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                          style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                           Cancel
                         </button>
                       </div>
@@ -3811,7 +3806,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
                         <Plus className="w-3 h-3" />
                         {uploadingEventId === event.id ? "Uploading…" : "Chart"}
                         <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
@@ -3831,15 +3826,15 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
                             <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              {isOcr ? <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
+                              {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
                                   placeholder="Song title…" onChange={e => setEditingSong({ songId: song.id, field: "title", value: e.target.value })}
                                   onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
                                   onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", background: "transparent", borderBottom: "1px solid #E2DDCF" }} />
+                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", background: "transparent", borderBottom: "1px solid var(--line-2)" }} />
                               ) : (
                                 <button onClick={() => setEditingSong({ songId: song.id, field: "title", value: song.title })}
-                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
                                   {song.title}
                                 </button>
                               )}
@@ -3851,10 +3846,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -3884,7 +3879,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
 function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   const [events, setEvents] = useState<{ id: string; week_date: string; event_name: string | null; roles: WorshipRoleRow[] }[]>([])
   const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
@@ -4041,7 +4036,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
     setSongsByEvent(prev => ({ ...prev, [eventId]: (prev[eventId] ?? []).filter(s => s.id !== songId) }))
   }
 
-  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
 
   const filteredForRole = allMinistryMembers.filter(m => !addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase()))
 
@@ -4051,33 +4046,33 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
         <p style={monoStyle}>Events · {events.length}</p>
         {canManage && !showAddEvent && (
           <button onClick={() => setShowAddEvent(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
             <Plus className="w-3.5 h-3.5" /> Add event
           </button>
         )}
       </div>
 
       {showAddEvent && (
-        <div style={{ background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", marginBottom: 14 }}>New event</p>
+        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New event</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Event name</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Event name</label>
               <input type="text" placeholder="e.g. Welcome Week Praise Night" value={newEventName} onChange={e => setNewEventName(e.target.value)}
-                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box" as const }} />
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#5A5466", marginBottom: 4 }}>Date</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date</label>
               <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
-                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #ECE8DE", background: "white", fontSize: 14, color: "#13101A", outline: "none" }} />
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "#3E1540", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
               </button>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate(""); setNewEventName("") }}
-                style={{ padding: "10px 16px", background: "transparent", color: "#8A8497", borderRadius: 10, fontSize: 13, border: "1px solid #ECE8DE", cursor: "pointer" }}>
+                style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                 Cancel
               </button>
             </div>
@@ -4086,9 +4081,9 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
       )}
 
       {events.length === 0 && !showAddEvent ? (
-        <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", marginBottom: 6 }}>No events yet.</p>
-          <p style={{ fontSize: 13, color: "#8A8497" }}>Add an event to get started.</p>
+        <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No events yet.</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add an event to get started.</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -4098,11 +4093,11 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
             const assignedIds = new Set(event.roles.map(r => r.user_id))
             const availableForRole = filteredForRole.filter(m => !assignedIds.has(m.id))
             return (
-              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden" }}>
+              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
                   <div>
-                    {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", lineHeight: 1.2 }}>{event.event_name}</p>}
-                    <p style={{ fontSize: 13, color: event.event_name ? "#8A8497" : "#13101A", fontFamily: event.event_name ? "var(--font-inter)" : "var(--font-instrument-serif)", ...(event.event_name ? {} : { fontSize: 17 }) }}>
+                    {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2 }}>{event.event_name}</p>}
+                    <p style={{ fontSize: 13, color: event.event_name ? "var(--muted-text)" : "var(--ink)", fontFamily: event.event_name ? "var(--font-inter)" : "var(--font-instrument-serif)", ...(event.event_name ? {} : { fontSize: 17 }) }}>
                       {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </p>
                   </div>
@@ -4116,14 +4111,14 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                 {event.roles.map(role => (
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
-                    <span style={{ fontSize: 14, color: "#13101A", flex: 1 }}>{role.user_name}</span>
+                    <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                     {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
                   </div>
                 ))}
 
                 {canManage && !isAddRoleTarget && (
                   <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
-                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "#5A5466" }}>
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
                     + Add person
                   </button>
                 )}
@@ -4134,12 +4129,12 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         <input type="text" placeholder="Search member…" value={addRoleSearch}
                           onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
-                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableForRole.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid #E2DDCF", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                             {availableForRole.map(m => (
                               <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
-                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "#13101A", background: addRoleUserId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
+                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
                                 {m.name}
                               </button>
                             ))}
@@ -4147,20 +4142,20 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         )}
                       </div>
                       <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
-                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }}>
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }}>
                         {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                       {addRoleValue === "Other" && (
                         <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
-                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "white", fontSize: 13, outline: "none" }} />
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
                           {addingRole ? "Adding…" : "Add"}
                         </button>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
-                          style={{ padding: "8px 12px", background: "transparent", color: "#8A8497", borderRadius: 8, fontSize: 12, border: "1px solid #E2DDCF", cursor: "pointer" }}>
+                          style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                           Cancel
                         </button>
                       </div>
@@ -4172,7 +4167,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
                         <Plus className="w-3 h-3" />
                         {uploadingEventId === event.id ? "Uploading…" : "Chart"}
                         <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
@@ -4192,15 +4187,15 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
                             <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              {isOcr ? <span style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
+                              {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
                                   placeholder="Song title…" onChange={e => setEditingSong({ songId: song.id, field: "title", value: e.target.value })}
                                   onFocus={() => { if (!isEditingTitle) setEditingSong({ songId: song.id, field: "title", value: "" }) }}
                                   onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", background: "transparent", borderBottom: "1px solid #E2DDCF" }} />
+                                  style={{ width: "100%", border: "none", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", background: "transparent", borderBottom: "1px solid var(--line-2)" }} />
                               ) : (
                                 <button onClick={() => setEditingSong({ songId: song.id, field: "title", value: song.title })}
-                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                                  style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", textAlign: "left", padding: 0, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
                                   {song.title}
                                 </button>
                               )}
@@ -4212,10 +4207,10 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -4245,7 +4240,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
 
 function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: string }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   type TeamInfo = { id: string; name: string; team_type: string }
   type EventWithMeta = { id: string; week_date: string; event_name: string | null; team_id: string; teamName: string; teamType: string }
@@ -4323,7 +4318,7 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
 
   function handleExportSlides(songs: WorshipSong[]) {
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#3E1540;page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:#F6F4EF;text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plum);page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:#F6F4EF;text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
     const blob = new Blob([html], { type: "text/html" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a"); a.href = url; a.download = "worship-slides.html"
@@ -4381,23 +4376,23 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
     const label = event.event_name ?? (showTeamName ? event.teamName : event.teamName)
     const dateStr = new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
     return (
-      <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+      <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: songs.length > 0 ? "1px solid #EFE9DA" : "none" }}>
           <div>
-            {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "#13101A" }}>{event.event_name}</p>}
-            {showTeamName && !event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "#13101A" }}>{event.teamName}</p>}
-            <p style={{ fontSize: 15, color: event.event_name || showTeamName ? "#8A8497" : "#13101A", marginTop: event.event_name || showTeamName ? 1 : 0, fontFamily: "var(--font-instrument-serif)" }}>{dateStr}</p>
+            {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.event_name}</p>}
+            {showTeamName && !event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.teamName}</p>}
+            <p style={{ fontSize: 15, color: event.event_name || showTeamName ? "var(--muted-text)" : "var(--ink)", marginTop: event.event_name || showTeamName ? 1 : 0, fontFamily: "var(--font-instrument-serif)" }}>{dateStr}</p>
           </div>
           {songs.length > 0 && (
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => slidesDeck && slidesEventLabel === label ? setSlidesOverlayOpen(true) : handleGenerateSlides(songs, label)}
                 disabled={slidesGenerating}
-                style={{ padding: "6px 14px", background: "#3E1540", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
+                style={{ padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
                 {slidesGenerating && slidesEventLabel === label ? "…" : "Slides"}
               </button>
               <button onClick={() => handleExportSlides(songs)}
-                style={{ padding: "6px 12px", background: "transparent", color: "#3E1540", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid #3E1540", cursor: "pointer" }}>
+                style={{ padding: "6px 12px", background: "transparent", color: "var(--plum)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid var(--plum)", cursor: "pointer" }}>
                 Export
               </button>
             </div>
@@ -4406,8 +4401,8 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
         {songs.map((song, i) => (
           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
             <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "#13101A", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
-            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 700, color: "#2D0F2E", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
+            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
           </div>
         ))}
         {songs.length === 0 && <p style={{ fontSize: 13, color: "#C4C4C4", padding: "12px 18px" }}>No songs in set.</p>}
@@ -4415,7 +4410,7 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
     )
   }
 
-  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
 
   return (
     <div>
@@ -4423,7 +4418,7 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
       {slidesOverlayOpen && slidesDeck && (() => {
         const slide = slidesDeck[slidesActiveIndex]
         return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#3E1540", display: "flex", flexDirection: "column" }}>
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--plum)", display: "flex", flexDirection: "column" }}>
             <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
             <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#F6F4EF" }}>
               <X className="w-5 h-5" />
@@ -4456,8 +4451,8 @@ function TechTeamTab({ ministryId, userId }: { ministryId: string; userId: strin
       <div style={{ marginBottom: 36 }}>
         <p style={{ ...monoStyle, marginBottom: 16 }}>Sunday Service</p>
         {sundayEvents.length === 0 ? (
-          <div style={{ background: "#FBF8F2", border: "1.5px dashed #E2DDCF", borderRadius: 12, padding: "28px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 13, color: "#8A8497" }}>No Sunday sets yet.</p>
+          <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 12, padding: "28px 20px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No Sunday sets yet.</p>
           </div>
         ) : sundayEvents.map(e => renderEventCard(e, false))}
       </div>
@@ -4602,13 +4597,13 @@ function SetListPdfViewer({
     setEditingField(null)
   }
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497" }
+  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#13101A", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--ink)", display: "flex", flexDirection: "column" }}>
       {/* Toolbar */}
       <div style={{ background: "#1E1825", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", paddingTop: 52, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <button onClick={onClose} style={{ padding: 6, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", display: "flex", alignItems: "center", flexShrink: 0 }}>
+        <button onClick={onClose} style={{ padding: 6, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", display: "flex", alignItems: "center", flexShrink: 0 }}>
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -4624,7 +4619,7 @@ function SetListPdfViewer({
           ) : (
             <button onClick={canManage ? () => { setEditingField("title"); setEditValue(song.title) } : undefined}
               style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#F6F4EF", padding: 0, textAlign: "left", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" }}>
-              {song.title || <span style={{ color: "#5A5466" }}>Untitled</span>}
+              {song.title || <span style={{ color: "var(--body)" }}>Untitled</span>}
             </button>
           )}
           {editingField === "key" ? (
@@ -4638,7 +4633,7 @@ function SetListPdfViewer({
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("key"); setEditValue(song.key) } : undefined}
-              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", ...monoStyle, color: song.key ? "#3E1540" : "#5A5466", padding: 0 }}>
+              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", ...monoStyle, color: song.key ? "var(--plum)" : "var(--body)", padding: 0 }}>
               {song.key || "NO KEY"}
             </button>
           )}
@@ -4646,12 +4641,12 @@ function SetListPdfViewer({
         {numPages > 1 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", opacity: currentPage === 1 ? 0.4 : 1, display: "flex" }}>
+              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", opacity: currentPage === 1 ? 0.4 : 1, display: "flex" }}>
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span style={{ fontSize: 12, color: "#8A8497", minWidth: 36, textAlign: "center" as const }}>{currentPage}/{numPages}</span>
+            <span style={{ fontSize: 12, color: "var(--muted-text)", minWidth: 36, textAlign: "center" as const }}>{currentPage}/{numPages}</span>
             <button onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage === numPages}
-              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#8A8497", opacity: currentPage === numPages ? 0.4 : 1, display: "flex" }}>
+              style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", opacity: currentPage === numPages ? 0.4 : 1, display: "flex" }}>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -4659,12 +4654,12 @@ function SetListPdfViewer({
       </div>
 
       {/* PDF + annotation area */}
-      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", padding: 16, background: "#13101A" }}
+      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", padding: 16, background: "var(--ink)" }}
         onClick={handlePdfAreaClick}>
         {loading ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497", fontSize: 14 }}>Loading…</div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
         ) : !song.chart_url ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497", fontSize: 14 }}>No chart uploaded for this song.</div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)", fontSize: 14 }}>No chart uploaded for this song.</div>
         ) : (
           <div style={{ position: "relative", display: "inline-block" }}>
             <canvas ref={canvasRef} style={{ display: "block", borderRadius: 6, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }} />
@@ -4678,7 +4673,7 @@ function SetListPdfViewer({
                   position: "absolute", left: `${ann.x}%`, top: `${ann.y}%`,
                   transform: "translate(-50%, -50%)",
                   background: ann.color, borderRadius: 6, padding: "4px 8px",
-                  fontSize: 11, fontWeight: 600, color: "#13101A",
+                  fontSize: 11, fontWeight: 600, color: "var(--ink)",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
                   maxWidth: 160, wordBreak: "break-word" as const,
                   cursor: canManage ? "pointer" : "default",
@@ -4704,15 +4699,15 @@ function SetListPdfViewer({
                   onChange={e => setPendingText(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleSaveAnnotation(); if (e.key === "Escape") setPendingAnnotation(null) }}
                   placeholder="Add note…"
-                  style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "#13101A", marginBottom: 8, boxSizing: "border-box" as const }}
+                  style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "var(--ink)", marginBottom: 8, boxSizing: "border-box" as const }}
                 />
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={handleSaveAnnotation} disabled={savingAnnotation || !pendingText.trim()}
-                    style={{ flex: 1, padding: "5px 8px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
+                    style={{ flex: 1, padding: "5px 8px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
                     Save
                   </button>
                   <button onClick={() => setPendingAnnotation(null)}
-                    style={{ padding: "5px 8px", background: "#F0EDE8", color: "#5A5466", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
+                    style={{ padding: "5px 8px", background: "#F0EDE8", color: "var(--body)", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
                     Cancel
                   </button>
                 </div>
@@ -4725,7 +4720,7 @@ function SetListPdfViewer({
       {/* Hint bar */}
       {canManage && !loading && song.chart_url && (
         <div style={{ padding: "10px 16px", background: "#1E1825", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, textAlign: "center" }}>
-          <p style={{ fontSize: 11, color: "#5A5466" }}>Tap anywhere on the chart to add a note · tap a note to delete it</p>
+          <p style={{ fontSize: 11, color: "var(--body)" }}>Tap anywhere on the chart to add a note · tap a note to delete it</p>
         </div>
       )}
     </div>
@@ -4735,11 +4730,11 @@ function SetListPdfViewer({
 // ── MinistryCalendar ──────────────────────────────────────────────────────────
 
 const CATEGORY_CONFIG = {
-  welcoming: { label: "Welcoming", dot: "#3E1540", bg: "#EDE5F0", text: "#3E1540" },
-  retreat:   { label: "Retreat",   dot: "#5A5466", bg: "#F4F1E8", text: "#3E1540" },
-  social:    { label: "Social",    dot: "#8A8497", bg: "#FBF8F2", text: "#5A5466" },
-  service:   { label: "Service",   dot: "#3E1540", bg: "#F0EDE8", text: "#3E1540" },
-  regular:   { label: "Regular",   dot: "#8A8497", bg: "#F3F0F7", text: "#5A5466" },
+  welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
+  retreat:   { label: "Retreat",   dot: "var(--body)", bg: "#F4F1E8", text: "var(--plum)" },
+  social:    { label: "Social",    dot: "var(--muted-text)", bg: "#FBF8F2", text: "var(--body)" },
+  service:   { label: "Service",   dot: "var(--plum)", bg: "#F0EDE8", text: "var(--plum)" },
+  regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "#F3F0F7", text: "var(--body)" },
 } as const
 
 type EventTypeConfig = {
@@ -4752,7 +4747,7 @@ type EventTypeConfig = {
 
 const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
   welcome_week: {
-    label: "Welcome Week", icon: "🎉", dot: "#3E1540", bg: "#EDE5F0", text: "#3E1540",
+    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)",
     budgetCategory: "welcoming_week", canHaveSubEvents: true,
     description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
     defaultPhases: [
@@ -4871,7 +4866,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: ["teams"],
   },
   retreat: {
-    label: "Retreat", icon: "⛺", dot: "#5A5466", bg: "#F4F1E8", text: "#3E1540",
+    label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "#F4F1E8", text: "var(--plum)",
     budgetCategory: "retreat", canHaveSubEvents: false,
     description: "Overnight or weekend retreat. Retreat leaders run the program; CCSF handles logistics support. Women's: October · Men's: February · EM: March.",
     defaultPhases: [
@@ -4944,7 +4939,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: [],
   },
   social: {
-    label: "Social", icon: "🎊", dot: "#8A8497", bg: "#FBF8F2", text: "#5A5466",
+    label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "#FBF8F2", text: "var(--body)",
     budgetCategory: null, canHaveSubEvents: false,
     description: "Informal social events — Church Picnic, game nights, IM sports, community volunteering (Wilkinsburg Food Pantry), or any hangout.",
     defaultPhases: [
@@ -4958,7 +4953,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: [],
   },
   ministry: {
-    label: "Ministry Event", icon: "🙏", dot: "#3E1540", bg: "#F3F0F7", text: "#5A5466",
+    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "#F3F0F7", text: "var(--body)",
     budgetCategory: null, canHaveSubEvents: false,
     description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
     defaultPhases: [
@@ -5022,23 +5017,23 @@ export function MonthGrid({
           onClick={() => onMonthChange(new Date(year, month - 1, 1))}
           style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
-          <ChevronLeft className="w-4 h-4 text-[#5A5466]" />
+          <ChevronLeft className="w-4 h-4 text-[var(--body)]" />
         </button>
-        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A", fontWeight: 400, minWidth: 180, textAlign: "center" }}>
+        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", fontWeight: 400, minWidth: 180, textAlign: "center" }}>
           {monthLabel}
         </span>
         <button
           onClick={() => onMonthChange(new Date(year, month + 1, 1))}
           style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
-          <ChevronRight className="w-4 h-4 text-[#5A5466]" />
+          <ChevronRight className="w-4 h-4 text-[var(--body)]" />
         </button>
       </div>
 
       {/* Week header */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase", color: "#8A8497", textAlign: "center", paddingBottom: 4 }}>
+          <div key={d} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted-text)", textAlign: "center", paddingBottom: 4 }}>
             {d}
           </div>
         ))}
@@ -5069,7 +5064,7 @@ export function MonthGrid({
                     textAlign: "right",
                     fontSize: 12,
                     fontWeight: isToday(day) ? 700 : 400,
-                    color: isToday(day) ? "#3E1540" : "#5A5466",
+                    color: isToday(day) ? "var(--plum)" : "var(--body)",
                     marginBottom: 2,
                     paddingRight: 2,
                   }}>
@@ -5093,7 +5088,7 @@ export function MonthGrid({
                             borderLeft: `3px solid ${cfg.dot}`,
                             borderRadius: 2,
                             fontSize: 11,
-                            color: "#13101A",
+                            color: "var(--ink)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
@@ -5106,7 +5101,7 @@ export function MonthGrid({
                       )
                     })}
                     {overflow > 0 && (
-                      <span style={{ fontSize: 10, color: "#8A8497", paddingLeft: 4 }}>+{overflow} more</span>
+                      <span style={{ fontSize: 10, color: "var(--muted-text)", paddingLeft: 4 }}>+{overflow} more</span>
                     )}
                   </div>
                 </>
@@ -5138,7 +5133,7 @@ export function TimelineView({
 
   if (monthKeys.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "40px 0", color: "#8A8497", fontSize: 14 }}>
+      <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>
         No events yet.
       </div>
     )
@@ -5151,7 +5146,7 @@ export function TimelineView({
         const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
         return (
           <div key={key}>
-            <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", marginBottom: 8 }}>
+            <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 8 }}>
               {monthLabel}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -5185,13 +5180,13 @@ export function TimelineView({
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, flexShrink: 0, marginTop: 5 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: "#13101A" }}>{ev.title}</span>
+                        <span style={{ fontWeight: 500, fontSize: 14, color: "var(--ink)" }}>{ev.title}</span>
                         <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "1px 7px", borderRadius: 9999 }}>
                           {cfg.label}
                         </span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>{dateStr}</div>
-                      {ev.location && <div style={{ fontSize: 12, color: "#8A8497", marginTop: 1 }}>{ev.location}</div>}
+                      <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{dateStr}</div>
+                      {ev.location && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{ev.location}</div>}
                     </div>
                   </button>
                 )
@@ -5243,24 +5238,24 @@ export function EventDetailPopover({
             {cfg.label}
           </span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-            <X className="w-4 h-4 text-[#8A8497]" />
+            <X className="w-4 h-4 text-[var(--muted-text)]" />
           </button>
         </div>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 24, fontWeight: 400, color: "#13101A", margin: "0 0 8px" }}>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 24, fontWeight: 400, color: "var(--ink)", margin: "0 0 8px" }}>
           {event.title}
         </h2>
-        <p style={{ fontSize: 13, color: "#8A8497", margin: "0 0 6px" }}>{dateStr}</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 6px" }}>{dateStr}</p>
         {event.location && (
-          <p style={{ fontSize: 13, color: "#5A5466", margin: "0 0 12px" }}>📍 {event.location}</p>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>📍 {event.location}</p>
         )}
         {event.description && (
-          <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 16px" }}>{event.description}</p>
+          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 16px" }}>{event.description}</p>
         )}
         <button
           onClick={() => onPlan(event)}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            background: "#3E1540", color: "#F6F4EF",
+            background: "var(--plum)", color: "#F6F4EF",
             border: "none", borderRadius: 8, padding: "8px 16px",
             cursor: "pointer", fontSize: 13, fontWeight: 500,
             marginBottom: 8, width: "100%", justifyContent: "center"
@@ -5271,7 +5266,7 @@ export function EventDetailPopover({
         {(canEdit || event.created_by === userId) && (
           <button
             onClick={() => onDelete(event.id)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #ECE8DE", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#C0392B" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#C0392B" }}
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete event
@@ -5467,12 +5462,12 @@ export function AddEventModal({
 
   const inputStyle: React.CSSProperties = {
     width: "100%", background: "#FBF8F2", border: "1px solid #E5E0D2", borderRadius: 8,
-    padding: "8px 12px", fontSize: 14, color: "#13101A", outline: "none", boxSizing: "border-box",
+    padding: "8px 12px", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box",
   }
 
   const labelStyle: React.CSSProperties = {
     fontSize: 11, fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4, display: "block",
+    letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4, display: "block",
   }
 
   return (
@@ -5480,11 +5475,11 @@ export function AddEventModal({
       <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", padding: "48px 24px 60px" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "#13101A", margin: 0 }}>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
             {isEditing ? "Edit Event" : parentEventId ? "Add Sub-event" : "New Event"}
           </h2>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-            <X className="w-5 h-5 text-[#8A8497]" />
+            <X className="w-5 h-5 text-[var(--muted-text)]" />
           </button>
         </div>
 
@@ -5503,22 +5498,22 @@ export function AddEventModal({
                       onClick={() => setEventType(t)}
                       style={{
                         padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                        border: selected ? `2px solid ${tcfg.dot}` : "2px solid #E8E2D2",
+                        border: selected ? `2px solid ${tcfg.dot}` : "2px solid var(--line)",
                         background: selected ? tcfg.bg : "#FBF8F2",
                         transition: "border-color 0.15s, background 0.15s",
                       }}
                     >
                       <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? tcfg.text : "#13101A" }}>{tcfg.label}</div>
-                      <div style={{ fontSize: 11, color: "#8A8497", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? tcfg.text : "var(--ink)" }}>{tcfg.label}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
                     </button>
                   )
                 })}
               </div>
               {/* Pre-seed preview */}
               {(cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-                <div style={{ marginTop: 12, padding: "12px 14px", background: "#F5F1E8", borderRadius: 10, fontSize: 12, color: "#5A5466" }}>
-                  <span style={{ fontWeight: 600, color: "#3E1540" }}>Pre-seeded: </span>
+                <div style={{ marginTop: 12, padding: "12px 14px", background: "#F5F1E8", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
+                  <span style={{ fontWeight: 600, color: "var(--plum)" }}>Pre-seeded: </span>
                   {cfg.defaultRoles.map(r => r.name).join(", ")}
                   {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
                   {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks across {cfg.defaultPhases.length} phases
@@ -5547,8 +5542,8 @@ export function AddEventModal({
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} style={{ width: 16, height: 16, accentColor: "#3E1540", cursor: "pointer" }} />
-            <label htmlFor="allDay" style={{ fontSize: 14, color: "#5A5466", cursor: "pointer" }}>All day</label>
+            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
+            <label htmlFor="allDay" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer" }}>All day</label>
           </div>
 
           {/* Dates + times */}
@@ -5575,11 +5570,11 @@ export function AddEventModal({
 
           {/* Actions */}
           {isEditing && onDelete && (
-            <div style={{ borderTop: "1px solid #E8E2D2", paddingTop: 18, marginTop: 8 }}>
+            <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 8 }}>
               {deleteConfirm ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 13, color: "#9F3030", flex: 1 }}>This will permanently delete the event and all its planning data.</span>
-                  <button onClick={() => setDeleteConfirm(false)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "transparent", fontSize: 13, cursor: "pointer", color: "#5A5466" }}>Cancel</button>
+                  <button onClick={() => setDeleteConfirm(false)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "transparent", fontSize: 13, cursor: "pointer", color: "var(--body)" }}>Cancel</button>
                   <button onClick={handleDelete} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
                     {deleting ? "Deleting…" : "Delete forever"}
                   </button>
@@ -5596,10 +5591,10 @@ export function AddEventModal({
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "#5A5466", cursor: "pointer" }}>
+            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#3E1540", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--plum)", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
               {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
             </button>
           </div>
@@ -5624,52 +5619,23 @@ export function MinistryCalendar({
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [plannedEventIds, setPlannedEventIds] = useState<Set<string>>(new Set())
+  // SWR-cached events + planned-event ids (shared key with StudentOrgTeamHome).
+  const { data: calData, isLoading: loading, mutate: mutateCal } = useSWR(
+    ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
+    fetchCalendarEventsAndPlans,
+    { keepPreviousData: false },
+  )
+  const events = useMemo(() => calData?.events ?? [], [calData])
+  const plannedEventIds = calData?.plannedIds ?? EMPTY_ID_SET
+  const tableReady = calData?.tableReady ?? true
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [tableReady, setTableReady] = useState(true)
   const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
 
-  useEffect(() => {
-    async function fetchEvents() {
-      setLoading(true)
-      let query = supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
-        .eq("ministry_id", ministryId)
-        .order("start_date", { ascending: true })
-
-      if (teamId) {
-        query = query.or(`team_id.eq.${teamId},team_id.is.null`)
-      }
-
-      const { data, error } = await query
-      if (error && error.message.includes("Could not find the table")) {
-        setTableReady(false)
-      } else {
-        setEvents((data ?? []) as CalendarEvent[])
-      }
-
-      // Also fetch which events already have a plan
-      const { data: plans } = await supabase
-        .from("event_plans")
-        .select("calendar_event_id")
-        .eq("ministry_id", ministryId)
-      if (plans) {
-        setPlannedEventIds(new Set(plans.map((p: { calendar_event_id: string }) => p.calendar_event_id)))
-      }
-
-      setLoading(false)
-    }
-    fetchEvents()
-  }, [ministryId, teamId])
-
   async function handleDelete(id: string) {
-    setEvents((prev) => prev.filter((ev) => ev.id !== id))
     await supabase.from("calendar_events").delete().eq("id", id)
+    void mutateCal()
   }
 
   // Event planning view — replaces the calendar while an event is open.
@@ -5686,7 +5652,7 @@ export function MinistryCalendar({
         <div className="px-14" style={{ paddingTop: 24 }}>
           <button
             onClick={() => setPlanningEvent(null)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#5A5466", fontSize: 13, padding: "0 0 16px" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--body)", fontSize: 13, padding: "0 0 16px" }}
           >
             ← Back to calendar
           </button>
@@ -5721,10 +5687,10 @@ export function MinistryCalendar({
     return (
       <div className="px-14 py-7">
         <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", marginBottom: 8 }}>Ministry Calendar</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", marginBottom: 8 }}>Ministry Calendar</p>
         <div style={{ background: "#FBF8F2", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
-          <p style={{ fontSize: 13, color: "#5A5466", marginBottom: 4 }}>Calendar database table not set up yet.</p>
-          <p style={{ fontSize: 12, color: "#8A8497" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
+          <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 4 }}>Calendar database table not set up yet.</p>
+          <p style={{ fontSize: 12, color: "var(--muted-text)" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
         </div>
         </div>
       </div>
@@ -5736,10 +5702,10 @@ export function MinistryCalendar({
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 6 }}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Upcoming
           </p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "#13101A", margin: 0, letterSpacing: "-0.01em" }}>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
             {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </h2>
         </div>
@@ -5751,7 +5717,7 @@ export function MinistryCalendar({
               style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
                 background: view === "month" ? "#FBF8F2" : "transparent",
-                border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "#13101A" : "#8A8497",
+                border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "month" ? 500 : 400,
                 boxShadow: view === "month" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
               }}
@@ -5763,7 +5729,7 @@ export function MinistryCalendar({
               style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
                 background: view === "list" ? "#FBF8F2" : "transparent",
-                border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "#13101A" : "#8A8497",
+                border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "list" ? 500 : 400,
                 boxShadow: view === "list" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
               }}
@@ -5774,7 +5740,7 @@ export function MinistryCalendar({
           {canEdit && (
             <button
               onClick={() => setShowAdd(true)}
-              style={{ display: "flex", alignItems: "center", gap: 4, background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+              style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
             >
               <Plus className="w-3 h-3" /> Add event
             </button>
@@ -5786,7 +5752,7 @@ export function MinistryCalendar({
         {/* Calendar — left */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: "32px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+            <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
           ) : view === "month" ? (
             <MonthGrid
               events={events}
@@ -5801,7 +5767,7 @@ export function MinistryCalendar({
 
         {/* Events panel — right */}
         <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid #E5E0D2", paddingLeft: 20 }}>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8A8497", margin: "0 0 10px" }}>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>
             Events · {events.length || 3}
           </p>
 
@@ -5817,9 +5783,9 @@ export function MinistryCalendar({
                 <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: "#8A8497", paddingLeft: 14 }}>{item.date}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{item.date}</span>
                   <span style={{ marginLeft: 14, display: "inline-block", fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px", width: "fit-content" }}>
                     Needs planning
                   </span>
@@ -5835,9 +5801,9 @@ export function MinistryCalendar({
                 <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: "#8A8497", paddingLeft: 14 }}>{dateStr}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{dateStr}</span>
                   <div style={{ paddingLeft: 14, display: "flex", alignItems: "center", gap: 6 }}>
                     {isPlanned ? (
                       <span style={{ fontSize: 10, fontWeight: 500, color: "#14532D", background: "#DCFCE7", borderRadius: 9999, padding: "2px 8px" }}>Planned ✓</span>
@@ -5846,8 +5812,8 @@ export function MinistryCalendar({
                     )}
                     <button
                       onClick={() => setPlanningEvent(ev)}
-                      style={{ fontSize: 11, color: "#3E1540", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, textDecoration: "underline", textDecorationColor: "transparent" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "#3E1540")}
+                      style={{ fontSize: 11, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, textDecoration: "underline", textDecorationColor: "transparent" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "var(--plum)")}
                       onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
                     >
                       {isPlanned ? "View plan" : "Plan →"}
@@ -5877,8 +5843,8 @@ export function MinistryCalendar({
           teamId={teamId}
           userId={userId}
           onClose={() => setShowAdd(false)}
-          onSaved={(ev) => {
-            setEvents((prev) => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+          onSaved={() => {
+            void mutateCal()
             setShowAdd(false)
           }}
         />
@@ -6301,9 +6267,9 @@ export function EventPlanWorkspace({
       ]
 
   const statusColors: Record<string, { bg: string; text: string; border: string }> = {
-    planning: { bg: "#F4F1E8", text: "#5A5466", border: "#E2DDCF" },
+    planning: { bg: "#F4F1E8", text: "var(--body)", border: "var(--line-2)" },
     active:   { bg: "#EEF4F1", text: "#2D5445", border: "#BFD9CF" },
-    complete: { bg: "#EDE5F0", text: "#3E1540", border: "#C9B3CC" },
+    complete: { bg: "#EDE5F0", text: "var(--plum)", border: "#C9B3CC" },
   }
 
   const inputStyle: React.CSSProperties = {
@@ -6312,7 +6278,7 @@ export function EventPlanWorkspace({
     borderRadius: 8,
     padding: "8px 12px",
     fontSize: 13,
-    color: "#13101A",
+    color: "var(--ink)",
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
@@ -6324,7 +6290,7 @@ export function EventPlanWorkspace({
     borderRadius: 8,
     padding: "8px 12px",
     fontSize: 13,
-    color: "#13101A",
+    color: "var(--ink)",
     outline: "none",
     cursor: "pointer",
   }
@@ -6341,13 +6307,13 @@ export function EventPlanWorkspace({
     fontFamily: "var(--font-instrument-serif)",
     fontSize: 20,
     fontWeight: 400,
-    color: "#13101A",
+    color: "var(--ink)",
     margin: "0 0 16px",
   }
 
   const chipStyle: React.CSSProperties = {
     background: "#EFEAE0",
-    color: "#5A5466",
+    color: "var(--body)",
     borderRadius: 999,
     padding: "2px 8px",
     fontSize: 12,
@@ -6375,8 +6341,8 @@ export function EventPlanWorkspace({
               style={{
                 padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
                 background: on ? sc.bg : "#FBF8F2",
-                color: on ? sc.text : "#5A5466",
-                border: on ? `1px solid ${sc.border}` : "1px solid #E2DDCF",
+                color: on ? sc.text : "var(--body)",
+                border: on ? `1px solid ${sc.border}` : "1px solid var(--line-2)",
                 transition: "all 0.15s",
               }}
             >
@@ -6398,7 +6364,7 @@ export function EventPlanWorkspace({
       {/* Content */}
       <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 80 }}>
         {loading ? (
-          <div style={{ textAlign: "center", padding: "48px 0", color: "#8A8497", fontSize: 13 }}>Loading…</div>
+          <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
         ) : (
           <>
             {/* ── Overview ── */}
@@ -6406,31 +6372,31 @@ export function EventPlanWorkspace({
               <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start" }} className="max-md:!block">
                 {/* Left: planning details */}
                 <section>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 0 }}>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 0 }}>
                     Event Brief
                   </p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>
                     Planning Details
                   </h2>
                   {calendarEvent.description && (
-                    <p style={{ fontSize: 15, color: "#5A5466", lineHeight: 1.7, marginTop: 16, maxWidth: 540 }}>
+                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, marginTop: 16, maxWidth: 540 }}>
                       {calendarEvent.description}
                     </p>
                   )}
                   <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "120px 1fr", rowGap: 14, columnGap: 24, fontSize: 14 }}>
-                    <span style={{ color: "#8A8497" }}>When</span>
-                    <span style={{ color: "#13101A" }}>{dateStr}</span>
+                    <span style={{ color: "var(--muted-text)" }}>When</span>
+                    <span style={{ color: "var(--ink)" }}>{dateStr}</span>
                     {calendarEvent.location && (
                       <>
-                        <span style={{ color: "#8A8497" }}>Where</span>
-                        <span style={{ color: "#13101A" }}>{calendarEvent.location}</span>
+                        <span style={{ color: "var(--muted-text)" }}>Where</span>
+                        <span style={{ color: "var(--ink)" }}>{calendarEvent.location}</span>
                       </>
                     )}
                   </div>
 
                   {/* Planning notes */}
                   <div style={{ marginTop: 28 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", marginBottom: 10 }}>Planning Notes</p>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Planning Notes</p>
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
@@ -6438,10 +6404,10 @@ export function EventPlanWorkspace({
                         onBlur={handleSaveOverview}
                         placeholder="Add context, key decisions, or reminders for this event…"
                         rows={4}
-                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid #E8E2D2", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                       />
                     ) : overviewNotes ? (
-                      <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
+                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
                     ) : (
                       <p style={{ fontSize: 14, color: "#A09A8C", fontStyle: "italic" }}>No planning notes yet.</p>
                     )}
@@ -6451,8 +6417,8 @@ export function EventPlanWorkspace({
                 {/* Right: stat cards */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
                   {/* Expected Turnout */}
-                  <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Expected Turnout</p>
+                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Expected Turnout</p>
                     {canEdit ? (
                       <input
                         type="number"
@@ -6460,22 +6426,22 @@ export function EventPlanWorkspace({
                         onChange={(e) => setTurnout(e.target.value)}
                         onBlur={handleSaveOverview}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
                     )}
-                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>guests</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>guests</p>
                     {rsvpCount !== null && (
-                      <p style={{ fontSize: 12, color: "#5A5466", marginTop: 6, paddingTop: 6, borderTop: "1px solid #E8E2D2" }}>
-                        <span style={{ fontWeight: 600, color: "#3E1540" }}>{rsvpCount}</span> RSVPed via announcement
+                      <p style={{ fontSize: 12, color: "var(--body)", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--line)" }}>
+                        <span style={{ fontWeight: 600, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
                   </div>
                   {/* Budget */}
-                  <div style={{ padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>Budget</p>
+                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
                     </div>
                     {canEditBudget ? (
@@ -6485,23 +6451,23 @@ export function EventPlanWorkspace({
                         onChange={(e) => setBudget(e.target.value)}
                         onBlur={handleSaveOverview}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "#13101A", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
                     )}
-                    <p style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>allocated for this event</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>allocated for this event</p>
                     {typeCfg.budgetCategory && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E8E2D2" }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#8A8497", margin: 0 }}>
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
                           Ministry Allocation · {calendarEvent.title}
                         </p>
                         {ministryBudget ? (
                           <>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", marginTop: 6 }}>
+                            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
                               ${ministryBudget.total.toFixed(2)} total
                             </p>
-                            <p style={{ fontSize: 12, color: "#5A5466", marginTop: 2 }}>
+                            <p style={{ fontSize: 12, color: "var(--body)", marginTop: 2 }}>
                               {Object.entries(ministryBudget.byFund)
                                 .map(([fund, amt]) => `${fund.charAt(0).toUpperCase() + fund.slice(1)} $${amt.toFixed(2)}`)
                                 .join(" · ")}
@@ -6522,20 +6488,20 @@ export function EventPlanWorkspace({
                     const pct = total > 0 ? Math.round((done / total) * 100) : 0
                     const onTrack = total === 0 || pct >= 50
                     return (
-                      <div style={{ padding: 22, background: "#F1ECDE", borderColor: "#E2DDCF", border: "1px solid #E2DDCF", borderRadius: 14 }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Readiness</p>
+                      <div style={{ padding: 22, background: "var(--ivory)", borderColor: "var(--line-2)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
+                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Readiness</p>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 99, background: onTrack ? "#7FA67F" : "#D4855C", flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "#13101A" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
                         </div>
                         {total > 0 && (
                           <>
                             <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
                               {Array.from({ length: Math.min(total, 4) }).map((_, i) => (
-                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "#3E1540" : "#E2DDCF" }} />
+                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "var(--plum)" : "var(--line-2)" }} />
                               ))}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "#5A5466" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "var(--body)" }}>
                               <span>{done} of {total} done</span>
                               <span>{pct}%</span>
                             </div>
@@ -6553,10 +6519,10 @@ export function EventPlanWorkspace({
               <div>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
                   <div>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>To Prepare</p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Checklist</h2>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>To Prepare</p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Checklist</h2>
                   </div>
-                  <span style={{ fontSize: 13, color: "#8A8497" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
+                  <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
                 </div>
 
                 {/* Phase-grouped task list */}
@@ -6576,15 +6542,15 @@ export function EventPlanWorkspace({
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497", fontWeight: 600 }}>{phase.label}</span>
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{phase.label}</span>
                         {phaseTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "#5A5466" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
+                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "var(--body)" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
                             {phaseIncomplete > 0 ? `${phaseIncomplete} remaining` : "All done"}
                           </span>
                         )}
                         <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
                       </button>
-                      <div style={{ borderTop: "1px solid #E8E2D2" }} />
+                      <div style={{ borderTop: "1px solid var(--line)" }} />
 
                       {!isCollapsed && (
                         <>
@@ -6595,16 +6561,16 @@ export function EventPlanWorkspace({
                             <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
                               <button
                                 onClick={() => handleToggleTask(task)}
-                                style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "#3E1540" : "#C4C0B0"), background: task.completed ? "#3E1540" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                                style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
                               >
                                 {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
                               </button>
-                              <span style={{ flex: 1, fontSize: 14, color: task.completed ? "#A09A8C" : "#13101A", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+                              <span style={{ flex: 1, fontSize: 14, color: task.completed ? "#A09A8C" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
                               {task.assigned_name && (
-                                <span style={{ padding: "4px 10px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E8E2D2", fontSize: 12, color: "#2D0F2E", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
+                                <span style={{ padding: "4px 10px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
                               )}
                               {task.due_date && (
-                                <span style={{ fontSize: 12, color: "#8A8497", whiteSpace: "nowrap" }}>
+                                <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                                   {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                 </span>
                               )}
@@ -6619,7 +6585,7 @@ export function EventPlanWorkspace({
                                     </button>
                                     <button
                                       onClick={() => setConfirmDeleteTaskId(null)}
-                                      style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                                      style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
                                     >
                                       Cancel
                                     </button>
@@ -6642,7 +6608,7 @@ export function EventPlanWorkspace({
                                 onChange={(e) => { setNewTaskPhase(phase.key); setNewTaskTitle(e.target.value) }}
                                 onFocus={() => setNewTaskPhase(phase.key)}
                                 placeholder={`Add to ${phase.label}…`}
-                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A" }}
+                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
                                 onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskPhase === phase.key) handleAddTask(phase.key) }}
                               />
                               {phase.key === newTaskPhase && newTaskTitle.trim() && (
@@ -6650,7 +6616,7 @@ export function EventPlanWorkspace({
                                   <select
                                     value={newTaskAssignee}
                                     onChange={(e) => setNewTaskAssignee(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                                   >
                                     <option value="">Unassigned</option>
                                     {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -6659,12 +6625,12 @@ export function EventPlanWorkspace({
                                     type="date"
                                     value={newTaskDue}
                                     onChange={(e) => setNewTaskDue(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
                                   <button
                                     onClick={() => handleAddTask(phase.key)}
                                     disabled={addingTask}
-                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
+                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
                                   >
                                     Add
                                   </button>
@@ -6685,15 +6651,15 @@ export function EventPlanWorkspace({
               <div>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                   <div>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>{"Who's Responsible"}</p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Roles &amp; Leads</h2>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{"Who's Responsible"}</p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Roles &amp; Leads</h2>
                   </div>
                   {canEdit && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {planningGroupId ? (
                         <button
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
                         >
                           <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
                         </button>
@@ -6702,7 +6668,7 @@ export function EventPlanWorkspace({
                           onClick={handleCreatePlanningChat}
                           disabled={creatingPlanChat || roles.filter(r => r.assigned_to).length === 0}
                           title={roles.filter(r => r.assigned_to).length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: creatingPlanChat ? "not-allowed" : "pointer", fontWeight: 500, opacity: roles.filter(r => r.assigned_to).length === 0 ? 0.4 : 1 }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: creatingPlanChat ? "not-allowed" : "pointer", fontWeight: 500, opacity: roles.filter(r => r.assigned_to).length === 0 ? 0.4 : 1 }}
                         >
                           <MessageCircle style={{ width: 13, height: 13 }} />
                           {creatingPlanChat ? "Creating…" : "Create planning chat"}
@@ -6710,7 +6676,7 @@ export function EventPlanWorkspace({
                       )}
                       <button
                         onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
-                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
+                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
                       >
                         + Add role
                       </button>
@@ -6725,7 +6691,7 @@ export function EventPlanWorkspace({
                     <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "8px 0" }}>No roles defined yet.</p>
                   )}
                   {roles.map((role, i) => (
-                    <div key={role.id} style={{ borderBottom: i === roles.length - 1 ? "none" : "1px solid #E8E2D2" }}>
+                    <div key={role.id} style={{ borderBottom: i === roles.length - 1 ? "none" : "1px solid var(--line)" }}>
                       {editingRoleId === role.id ? (
                         <div style={{ padding: "18px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -6737,20 +6703,20 @@ export function EventPlanWorkspace({
                           </div>
                           <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#2D0F2E", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
-                            <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "#5A5466", cursor: "pointer" }}>Cancel</button>
+                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
+                            <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 220px", alignItems: "center", gap: 18, padding: "18px 4px" }}>
-                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: -0.2 }}>{role.role_name}</div>
-                          <div style={{ fontSize: 13, color: "#5A5466", lineHeight: 1.5 }}>
+                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{role.role_name}</div>
+                          <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
                             {role.notes || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>Add a note for whoever takes this on</span>}
                           </div>
                           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                             {role.assigned_name ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "#F1ECDE", border: "1px solid #E2DDCF" }}>
-                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "#3E1540", color: "#FBF8F2", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)" }}>
+                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
                                   {role.assigned_name.split(" ").map((s: string) => s[0]).join("")}
                                 </span>
                                 <span style={{ fontSize: 13 }}>{role.assigned_name}</span>
@@ -6758,11 +6724,11 @@ export function EventPlanWorkspace({
                             ) : (
                               <button
                                 onClick={() => canEdit ? (setEditingRoleId(role.id), setEditRoleName(role.role_name), setEditRoleAssignee(""), setEditRoleNotes(role.notes ?? "")) : undefined}
-                                style={{ padding: "8px 14px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "transparent", color: "#8A8497", fontSize: 13, fontFamily: "var(--font-inter)", cursor: canEdit ? "pointer" : "default" }}
+                                style={{ padding: "8px 14px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "transparent", color: "var(--muted-text)", fontSize: 13, fontFamily: "var(--font-inter)", cursor: canEdit ? "pointer" : "default" }}
                               >+ Assign someone</button>
                             )}
                             {canEdit && role.assigned_name && (
-                              <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#8A8497" }}>
+                              <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--muted-text)" }}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                               </button>
                             )}
@@ -6784,18 +6750,18 @@ export function EventPlanWorkspace({
                         value={newRoleName}
                         onChange={(e) => setNewRoleName(e.target.value)}
                         placeholder="Role name…"
-                        style={{ flex: "0 0 160px", background: "none", border: "none", outline: "none", fontSize: 15, color: "#13101A", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+                        style={{ flex: "0 0 160px", background: "none", border: "none", outline: "none", fontSize: 15, color: "var(--ink)", fontFamily: "var(--font-inter)", fontWeight: 500 }}
                       />
                       <input
                         value={newRoleNotes}
                         onChange={(e) => setNewRoleNotes(e.target.value)}
                         placeholder="Add a note…"
-                        style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "#5A5466", fontFamily: "var(--font-inter)" }}
+                        style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--body)", fontFamily: "var(--font-inter)" }}
                       />
                       <select
                         value={newRoleAssignee}
                         onChange={(e) => setNewRoleAssignee(e.target.value)}
-                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                       >
                         <option value="">Unassigned</option>
                         {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -6803,7 +6769,7 @@ export function EventPlanWorkspace({
                       <button
                         onClick={handleAddRole}
                         disabled={addingRole || !newRoleName.trim()}
-                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
+                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
                       >
                         Add
                       </button>
@@ -6818,11 +6784,11 @@ export function EventPlanWorkspace({
               <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 36, alignItems: "start" }} className="max-md:!block">
                 {/* Left: institutional memory notes */}
                 <section>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>
+                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>
                     Institutional Memory — Never Deleted
                   </p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Transition Notes</h2>
-                  <p style={{ fontSize: 14, color: "#5A5466", marginTop: 12, maxWidth: 480, lineHeight: 1.6 }}>
+                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transition Notes</h2>
+                  <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 480, lineHeight: 1.6 }}>
                     Wisdom from past leaders. Add what you learned so the next class doesn&apos;t have to find it the hard way.
                   </p>
 
@@ -6831,10 +6797,10 @@ export function EventPlanWorkspace({
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No notes yet. Be the first to leave wisdom for future leaders.</p>
                     )}
                     {notes.map((note) => (
-                      <article key={note.id} style={{ position: "relative", paddingLeft: 22, borderLeft: "2px solid #3E1540" }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 19, lineHeight: 1.45, color: "#13101A" }}>&ldquo;{note.content}&rdquo;</p>
-                        <p style={{ marginTop: 10, fontSize: 13, color: "#8A8497" }}>
-                          <span style={{ color: "#2D0F2E", fontWeight: 500 }}>{note.created_by_name ?? "Someone"}</span>
+                      <article key={note.id} style={{ position: "relative", paddingLeft: 22, borderLeft: "2px solid var(--plum)" }}>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 19, lineHeight: 1.45, color: "var(--ink)" }}>&ldquo;{note.content}&rdquo;</p>
+                        <p style={{ marginTop: 10, fontSize: 13, color: "var(--muted-text)" }}>
+                          <span style={{ color: "var(--plum-2)", fontWeight: 500 }}>{note.created_by_name ?? "Someone"}</span>
                           {" · "}{new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                         </p>
                       </article>
@@ -6844,21 +6810,21 @@ export function EventPlanWorkspace({
 
                 {/* Right: leave a note */}
                 <aside className="max-md:mt-6">
-                  <div style={{ padding: 22, background: "#F1ECDE", border: "1px solid #E2DDCF", borderRadius: 14 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Leave a Note</p>
+                  <div style={{ padding: 22, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Leave a Note</p>
                     <textarea
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
                       placeholder="What should the next leader know before this event?"
                       rows={5}
-                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#13101A", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
                     />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-                      <span style={{ fontSize: 12, color: "#8A8497" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
+                      <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
                       <button
                         onClick={handleAddNote}
                         disabled={addingNote || !newNote.trim()}
-                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
+                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
                       >
                         {addingNote ? "Adding…" : "Add to record"}
                       </button>
@@ -6971,7 +6937,7 @@ function SubEventsTab({
   if (planningChild) {
     return (
       <div>
-        <button onClick={() => setPlanningChild(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#5A5466", fontSize: 13, padding: "0 0 16px", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => setPlanningChild(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--body)", fontSize: 13, padding: "0 0 16px", display: "flex", alignItems: "center", gap: 6 }}>
           ← Back to {parentEvent.title}
         </button>
         <EventPlanWorkspace
@@ -6990,17 +6956,17 @@ function SubEventsTab({
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Welcome Week</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Sub-events</h2>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Welcome Week</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Sub-events</h2>
         </div>
         {canEdit && (
-          <button onClick={() => setShowAdd(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+          <button onClick={() => setShowAdd(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
             + Add sub-event
           </button>
         )}
       </div>
 
-      {loading && <p style={{ color: "#8A8497", fontSize: 13 }}>Loading…</p>}
+      {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
       {!loading && subEvents.length === 0 && (
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No sub-events yet. Add the individual events that make up Welcome Week.</p>
       )}
@@ -7013,14 +6979,14 @@ function SubEventsTab({
             <button
               key={ev.id}
               onClick={() => setPlanningChild(ev)}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid #E8E2D2", borderRadius: 12, background: "#FBF8F2", cursor: "pointer", textAlign: "left", width: "100%" }}
+              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "#FBF8F2", cursor: "pointer", textAlign: "left", width: "100%" }}
             >
               <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 500, color: "#13101A", margin: 0 }}>{ev.title}</p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{d}{ev.location ? ` · ${ev.location}` : ""}</p>
+                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{ev.title}</p>
+                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>{d}{ev.location ? ` · ${ev.location}` : ""}</p>
               </div>
-              <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "#3E1540" : ev.status === "active" ? "#2D5445" : "#5A5466" }}>
+              <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "var(--plum)" : ev.status === "active" ? "#2D5445" : "var(--body)" }}>
                 {ev.status.charAt(0).toUpperCase() + ev.status.slice(1)}
               </span>
               <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>
@@ -7122,17 +7088,17 @@ function NewFolksTab({
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Follow Up</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>New Folks</h2>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Follow Up</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>New Folks</h2>
         </div>
-        <span style={{ fontSize: 13, color: "#8A8497" }}>{folks.length} people tracked</span>
+        <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{folks.length} people tracked</span>
       </div>
 
-      {loading && <p style={{ color: "#8A8497", fontSize: 13 }}>Loading…</p>}
+      {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
 
       {/* Table header */}
       {folks.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "0 4px 8px", borderBottom: "1px solid #E8E2D2" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["Name", "Contact", "Notes", "Assigned DGL", ""].map(h => (
             <span key={h} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
           ))}
@@ -7145,14 +7111,14 @@ function NewFolksTab({
         )}
         {folks.map(folk => (
           <div key={folk.id} style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
-            <span style={{ fontSize: 14, color: "#13101A", fontWeight: 500 }}>{folk.name}</span>
-            <span style={{ fontSize: 13, color: "#5A5466" }}>{folk.contact ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
-            <span style={{ fontSize: 13, color: "#5A5466" }}>{folk.notes ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+            <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{folk.name}</span>
+            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.contact ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.notes ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
             <select
               value={folk.assigned_dgl_id ?? ""}
               onChange={(e) => canEdit && handleAssignDGL(folk.id, e.target.value)}
               disabled={!canEdit}
-              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: folk.assigned_dgl_id ? "#2D0F2E" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
+              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: folk.assigned_dgl_id ? "var(--plum-2)" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
             >
               <option value="">Unassigned</option>
               {dgls.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -7167,10 +7133,10 @@ function NewFolksTab({
       {/* Add row */}
       {canEdit && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A" }} />
-          <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466" }} />
-          <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466" }} />
-          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }} />
+          <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
+          <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
+          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
         </div>
       )}
     </div>
@@ -7216,11 +7182,11 @@ function ActsTab({
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Performance Order</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Acts Lineup</h2>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Performance Order</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Acts Lineup</h2>
         </div>
         {canEdit && (
-          <button onClick={addAct} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add act</button>
+          <button onClick={addAct} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add act</button>
         )}
       </div>
 
@@ -7229,7 +7195,7 @@ function ActsTab({
       )}
 
       {acts.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid #E8E2D2" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
             <span key={i} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
           ))}
@@ -7241,21 +7207,21 @@ function ActsTab({
           <div key={act.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#A09A8C", textAlign: "center" }}>{idx + 1}</span>
             {canEdit ? (
-              <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", width: "100%" }} />
+              <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
             ) : (
-              <span style={{ fontSize: 14, color: "#13101A" }}>{act.performer || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+              <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
             )}
             {canEdit ? (
-              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>
+              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
                 {["Music", "Spoken Word", "Comedy", "Dance", "Other"].map(t => <option key={t}>{t}</option>)}
               </select>
-            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.type}</span>}
+            ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.type}</span>}
             {canEdit ? (
-              <input value={act.duration} onChange={e => updateAct(act.id, "duration", e.target.value)} placeholder="8 min" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
-            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.duration || "—"}</span>}
+              <input value={act.duration} onChange={e => updateAct(act.id, "duration", e.target.value)} placeholder="8 min" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+            ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.duration || "—"}</span>}
             {canEdit ? (
-              <input value={act.sound_check} onChange={e => updateAct(act.id, "sound_check", e.target.value)} placeholder="5:30 PM" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
-            ) : <span style={{ fontSize: 12, color: "#5A5466" }}>{act.sound_check || "—"}</span>}
+              <input value={act.sound_check} onChange={e => updateAct(act.id, "sound_check", e.target.value)} placeholder="5:30 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+            ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.sound_check || "—"}</span>}
             {canEdit ? (
               <button onClick={() => deleteAct(act.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
             ) : <span />}
@@ -7307,24 +7273,24 @@ function TeamsTab({
   }
 
   const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
-    <div style={{ flex: 1, padding: 22, border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+    <div style={{ flex: 1, padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
       {canEdit ? (
-        <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
+        <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
       ) : (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: -0.3, marginBottom: 14 }}>{team.name}</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, marginBottom: 14 }}>{team.name}</p>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {team.members.map(uid => {
           const m = members.find(m => m.id === uid)
           return (
-            <div key={uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "#F1ECDE", borderRadius: 8 }}>
-              <span style={{ fontSize: 13, color: "#2D0F2E" }}>{m?.name ?? uid}</span>
+            <div key={uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "var(--ivory)", borderRadius: 8 }}>
+              <span style={{ fontSize: 13, color: "var(--plum-2)" }}>{m?.name ?? uid}</span>
               {canEdit && <button onClick={() => removeMember(teamKey, uid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3 h-3" /></button>}
             </div>
           )
         })}
         {canEdit && (
-          <select onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "#8A8497", fontSize: 12, cursor: "pointer", marginTop: 4 }}>
+          <select onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", marginTop: 4 }}>
             <option value="">+ Add member…</option>
             {members.filter(m => !teamsData.teamA.members.includes(m.id) && !teamsData.teamB.members.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
@@ -7336,8 +7302,8 @@ function TeamsTab({
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Turkey Bowl</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Teams</h2>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Turkey Bowl</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Teams</h2>
       </div>
 
       <div style={{ display: "flex", gap: 20, marginBottom: 24 }} className="max-md:!flex-col">
@@ -7346,14 +7312,14 @@ function TeamsTab({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ fontSize: 14, color: "#5A5466", whiteSpace: "nowrap" }}>Commissioner:</span>
+        <span style={{ fontSize: 14, color: "var(--body)", whiteSpace: "nowrap" }}>Commissioner:</span>
         {canEdit ? (
-          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, cursor: "pointer" }}>
+          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         ) : (
-          <span style={{ fontSize: 14, color: "#2D0F2E" }}>{members.find(m => m.id === teamsData.commissioner)?.name ?? "—"}</span>
+          <span style={{ fontSize: 14, color: "var(--plum-2)" }}>{members.find(m => m.id === teamsData.commissioner)?.name ?? "—"}</span>
         )}
       </div>
     </div>
@@ -7418,16 +7384,16 @@ function TransportTab({
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Retreat Logistics</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Transport</h2>
+          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Retreat Logistics</p>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transport</h2>
         </div>
-        {canEdit && <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>}
+        {canEdit && <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>}
       </div>
 
       <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
-        <div style={{ padding: "10px 18px", background: "#F1ECDE", borderRadius: 10 }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: "#13101A", fontFamily: "var(--font-instrument-serif)" }}>{totalRiders}</span>
-          <span style={{ fontSize: 13, color: "#8A8497", marginLeft: 6 }}>confirmed / {totalSeats} seats</span>
+        <div style={{ padding: "10px 18px", background: "var(--ivory)", borderRadius: 10 }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--font-instrument-serif)" }}>{totalRiders}</span>
+          <span style={{ fontSize: 13, color: "var(--muted-text)", marginLeft: 6 }}>confirmed / {totalSeats} seats</span>
         </div>
       </div>
 
@@ -7440,39 +7406,39 @@ function TransportTab({
           const driver = members.find(m => m.id === car.driver_id)
           const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
           return (
-            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2" }}>
+            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 {canEdit ? (
-                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#2D0F2E", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
                     <option value="">Driver…</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 ) : (
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#2D0F2E" }}>{driver?.name ?? "No driver"}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
                 )}
                 {canEdit ? (
-                  <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "6px 10px" }} />
+                  <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "6px 10px" }} />
                 ) : (
-                  <span style={{ fontSize: 13, color: "#5A5466" }}>{car.vehicle || "—"}</span>
+                  <span style={{ fontSize: 13, color: "var(--body)" }}>{car.vehicle || "—"}</span>
                 )}
                 {canEdit && (
-                  <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, padding: "6px 8px", textAlign: "center" }} />
+                  <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, padding: "6px 8px", textAlign: "center" }} />
                 )}
-                <span style={{ fontSize: 12, color: "#8A8497" }}>{car.rider_ids.length}/{car.seats} seats</span>
+                <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{car.rider_ids.length}/{car.seats} seats</span>
                 {canEdit && <button onClick={() => save(cars.filter(c => c.id !== car.id))} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#C4C4C4" }}><X className="w-3.5 h-3.5" /></button>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {car.rider_ids.map(rid => {
                   const m = members.find(m => m.id === rid)
                   return (
-                    <span key={rid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "#F1ECDE", borderRadius: 999, fontSize: 12, color: "#2D0F2E" }}>
+                    <span key={rid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "var(--ivory)", borderRadius: 999, fontSize: 12, color: "var(--plum-2)" }}>
                       {m?.name ?? rid}
                       {canEdit && <button onClick={() => removeRider(car.id, rid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#A09A8C", padding: 0, lineHeight: 1 }}>×</button>}
                     </span>
                   )
                 })}
                 {canEdit && car.rider_ids.length < car.seats && (
-                  <select onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ padding: "4px 10px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "#8A8497", fontSize: 12, cursor: "pointer" }}>
+                  <select onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ padding: "4px 10px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer" }}>
                     <option value="">+ Add rider…</option>
                     {availableRiders.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
@@ -7535,8 +7501,8 @@ function ProgramTab({
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497" }}>Retreat Schedule</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "#13101A", fontWeight: 400 }}>Program</h2>
+        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Retreat Schedule</p>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Program</h2>
       </div>
 
       {days.map((day, dayIdx) => {
@@ -7545,14 +7511,14 @@ function ProgramTab({
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#5A5466", fontWeight: 600 }}>
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
-                <button onClick={() => addSession(dayIdx)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #3E1540", color: "#3E1540", background: "transparent", fontSize: 12, cursor: "pointer" }}>+ Add session</button>
+                <button onClick={() => addSession(dayIdx)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 12, cursor: "pointer" }}>+ Add session</button>
               )}
             </div>
-            <div style={{ borderTop: "1px solid #E8E2D2" }} />
+            <div style={{ borderTop: "1px solid var(--line)" }} />
 
             {daySessions.length === 0 && (
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "12px 4px" }}>No sessions yet.</p>
@@ -7561,22 +7527,22 @@ function ProgramTab({
             {daySessions.map(session => (
               <div key={session.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
                 {canEdit ? (
-                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid #E2DDCF", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "#5A5466", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
                 ) : (
-                  <span style={{ fontSize: 13, color: "#8A8497", fontWeight: 500 }}>{session.time || "—"}</span>
+                  <span style={{ fontSize: 13, color: "var(--muted-text)", fontWeight: 500 }}>{session.time || "—"}</span>
                 )}
                 {canEdit ? (
-                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "#13101A", width: "100%" }} />
+                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
                 ) : (
-                  <span style={{ fontSize: 14, color: "#13101A" }}>{session.title || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+                  <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
                 )}
                 {canEdit ? (
-                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid #E2DDCF", background: "#FBF8F2", color: "#5A5466", fontSize: 12, cursor: "pointer" }}>
+                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
                     <option value="">No leader</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 ) : (
-                  <span style={{ fontSize: 12, color: "#5A5466" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
+                  <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
                 )}
                 {canEdit ? (
                   <button onClick={() => deleteSession(session.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
@@ -7623,7 +7589,7 @@ function GroupsTab({
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   async function loadSessions() {
@@ -7699,7 +7665,7 @@ function GroupsTab({
     <div>
       {loading ? (
         <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
-          <Loader2 style={{ width: 24, height: 24, color: "#8A8497" }} className="animate-spin" />
+          <Loader2 style={{ width: 24, height: 24, color: "var(--muted-text)" }} className="animate-spin" />
         </div>
       ) : sessions.length === 0 ? (
         <button
@@ -7712,12 +7678,12 @@ function GroupsTab({
             display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
           }}
         >
-          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed #C4C0B0", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8497" }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed #C4C0B0", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
             <Plus style={{ width: 20, height: 20 }} />
           </div>
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 15, color: "#5A5466", fontWeight: 500, margin: 0 }}>Generate your first group set</p>
-            <p style={{ fontSize: 13, color: "#8A8497", margin: "4px 0 0" }}>Split your ministry into balanced small groups.</p>
+            <p style={{ fontSize: 15, color: "var(--body)", fontWeight: 500, margin: 0 }}>Generate your first group set</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>Split your ministry into balanced small groups.</p>
           </div>
         </button>
       ) : (
@@ -7725,22 +7691,22 @@ function GroupsTab({
           {sessions.map(session => (
             <div
               key={session.id}
-              style={{ background: "#FBF8F2", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "#E8E2D2"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
+              style={{ background: "#FBF8F2", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "#13101A", margin: 0 }}>{session.name}</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", margin: "4px 0 0" }}>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{session.name}</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "4px 0 0" }}>
                     {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     {session.config.smallGroupMode === true && (
-                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "#F0EDE8", fontSize: 10, fontWeight: 600, color: "#5A5466", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
+                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "#F0EDE8", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
                     )}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <button
                     onClick={() => setViewSession(session)}
-                    style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                    style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                   >
                     View
                   </button>
@@ -7748,7 +7714,7 @@ function GroupsTab({
                     <button
                       onClick={() => setConfirmDeleteId(session.id)}
                       disabled={deletingId === session.id}
-                      style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
                     >
                       {deletingId === session.id ? "Deleting…" : "Delete"}
                     </button>
@@ -7762,13 +7728,13 @@ function GroupsTab({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#9F3030", margin: 0 }}>Delete this grouping?</p>
                     {session.config.smallGroupMode === true && (
-                      <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
+                      <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
                       onClick={() => setConfirmDeleteId(null)}
-                      style={{ padding: "6px 14px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Cancel
                     </button>
@@ -7808,7 +7774,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   useEffect(() => {
@@ -7864,49 +7830,49 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <button
           onClick={onBack}
-          style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466", flexShrink: 0 }}
+          style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)", flexShrink: 0 }}
         >
           <ArrowLeft style={{ width: 14, height: 14 }} />
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={mono}>Saved grouping</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, margin: "2px 0 0", letterSpacing: "-0.01em", color: "#13101A" }}>{session.name}</h2>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, margin: "2px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>{session.name}</h2>
         </div>
         <button
           onClick={exportCSV}
-          style={{ padding: "8px 16px", border: "1px solid #E2DDCF", borderRadius: 8, background: "transparent", color: "#5A5466", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}
+          style={{ padding: "8px 16px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}
         >
           <Download style={{ width: 13, height: 13 }} />
           Export CSV
         </button>
       </div>
-      <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 24 }}>
+      <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 24 }}>
         {groups.length} groups · {totalPeople} people · Created {new Date(session.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
       </p>
 
       {loading ? (
         <div style={{ padding: "40px 0", display: "flex", justifyContent: "center" }}>
-          <Loader2 style={{ width: 22, height: 22, color: "#8A8497" }} className="animate-spin" />
+          <Loader2 style={{ width: 22, height: 22, color: "var(--muted-text)" }} className="animate-spin" />
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {groups.map(g => (
-            <div key={g.id} style={{ background: "#FBF8F2", border: "1px solid #E8E2D2", borderRadius: 14, padding: "18px 20px" }}>
+            <div key={g.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>{g.name}</p>
-                <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{g.name}</p>
+                <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {g.members.map(m => (
                   <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 7, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#FBF8F2" }}>
                         {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
-                      <p style={{ fontSize: 11, color: "#8A8497", margin: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                      <p style={{ fontSize: 11, color: "var(--muted-text)", margin: 0 }}>
                         {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}{m.graduation_year && m.role ? " · " : ""}{m.role}
                       </p>
                     </div>
@@ -7976,7 +7942,7 @@ function GroupGeneratorWizard({
 
   const mono: React.CSSProperties = {
     fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#8A8497",
+    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   // Load announcements + forms on mount
@@ -8347,23 +8313,23 @@ function GroupGeneratorWizard({
       style={{ left: 0 }}
     >
       {/* Header */}
-      <div style={{ padding: "20px 32px 0", borderBottom: "1px solid #E8E2D2", flexShrink: 0 }}>
+      <div style={{ padding: "20px 32px 0", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
               onClick={step === 1 ? onClose : () => setStep(s => (s - 1) as 1 | 2 | 3)}
-              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466" }}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)" }}
             >
               <ArrowLeft style={{ width: 14, height: 14 }} />
             </button>
             <div>
               <p style={mono}>Step {step} of {STEPS.length}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, margin: "2px 0 0", color: "#13101A", letterSpacing: "-0.01em" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, margin: "2px 0 0", color: "var(--ink)", letterSpacing: "-0.01em" }}>
                 {STEPS[stepIdx]}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5A5466" }}>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)" }}>
             <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
@@ -8373,15 +8339,15 @@ function GroupGeneratorWizard({
             <div key={s} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{
                 width: 22, height: 22, borderRadius: 999,
-                background: i < stepIdx ? "#3E1540" : i === stepIdx ? "#13101A" : "transparent",
-                border: i > stepIdx ? "1px solid #E2DDCF" : "none",
+                background: i < stepIdx ? "var(--plum)" : i === stepIdx ? "var(--ink)" : "transparent",
+                border: i > stepIdx ? "1px solid var(--line-2)" : "none",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, color: i <= stepIdx ? "#FBF8F2" : "#8A8497", fontWeight: 600,
+                fontSize: 10, color: i <= stepIdx ? "#FBF8F2" : "var(--muted-text)", fontWeight: 600,
               }}>
                 {i < stepIdx ? <Check style={{ width: 10, height: 10 }} /> : i + 1}
               </div>
-              <span style={{ fontSize: 12, color: i === stepIdx ? "#13101A" : "#8A8497", fontWeight: i === stepIdx ? 500 : 400 }}>{s}</span>
-              {i < STEPS.length - 1 && <div style={{ width: 20, height: 1, background: "#E8E2D2", margin: "0 4px" }} />}
+              <span style={{ fontSize: 12, color: i === stepIdx ? "var(--ink)" : "var(--muted-text)", fontWeight: i === stepIdx ? 500 : 400 }}>{s}</span>
+              {i < STEPS.length - 1 && <div style={{ width: 20, height: 1, background: "var(--line)", margin: "0 4px" }} />}
             </div>
           ))}
         </div>
@@ -8393,7 +8359,7 @@ function GroupGeneratorWizard({
         {/* ── Step 1: Pick pool ── */}
         {step === 1 && (
           <div style={{ maxWidth: 560 }}>
-            <p style={{ fontSize: 14, color: "#5A5466", marginBottom: 24 }}>
+            <p style={{ fontSize: 14, color: "var(--body)", marginBottom: 24 }}>
               Choose who to draw from. The algorithm will run on this set of people.
             </p>
 
@@ -8408,22 +8374,22 @@ function GroupGeneratorWizard({
                   onClick={() => { setSourceType(opt.value); setSourceId("") }}
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 18px",
-                    border: sourceType === opt.value ? "1px solid #3E1540" : "1px solid #E2DDCF",
+                    border: sourceType === opt.value ? "1px solid var(--plum)" : "1px solid var(--line-2)",
                     borderRadius: 12, background: sourceType === opt.value ? "#F6F2E8" : "#FBF8F2",
                     cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    boxShadow: sourceType === opt.value ? "inset 0 0 0 1px #3E1540" : "none",
+                    boxShadow: sourceType === opt.value ? "inset 0 0 0 1px var(--plum)" : "none",
                   }}
                 >
                   <div style={{
                     width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginTop: 2,
-                    border: "2px solid " + (sourceType === opt.value ? "#3E1540" : "#C4C0B0"),
+                    border: "2px solid " + (sourceType === opt.value ? "var(--plum)" : "#C4C0B0"),
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    {sourceType === opt.value && <div style={{ width: 8, height: 8, borderRadius: 999, background: "#3E1540" }} />}
+                    {sourceType === opt.value && <div style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
                   </div>
                   <div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>{opt.label}</p>
-                    <p style={{ fontSize: 12, color: "#5A5466", margin: "3px 0 0" }}>{opt.desc}</p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{opt.label}</p>
+                    <p style={{ fontSize: 12, color: "var(--body)", margin: "3px 0 0" }}>{opt.desc}</p>
                   </div>
                 </button>
               ))}
@@ -8434,12 +8400,12 @@ function GroupGeneratorWizard({
               <div style={{ marginTop: 16 }}>
                 <label style={{ ...mono, display: "block", marginBottom: 6 }}>Select event</label>
                 {announcements.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>No announcements with RSVPs found.</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>No announcements with RSVPs found.</p>
                 ) : (
                   <select
                     value={sourceId}
                     onChange={e => setSourceId(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit" }}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
                   >
                     <option value="">Choose an announcement…</option>
                     {announcements.map(a => (
@@ -8454,12 +8420,12 @@ function GroupGeneratorWizard({
               <div style={{ marginTop: 16 }}>
                 <label style={{ ...mono, display: "block", marginBottom: 6 }}>Select form</label>
                 {forms.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#8A8497", fontStyle: "italic" }}>No forms with responses found.</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>No forms with responses found.</p>
                 ) : (
                   <select
                     value={sourceId}
                     onChange={e => setSourceId(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit" }}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
                   >
                     <option value="">Choose a form…</option>
                     {forms.map(f => (
@@ -8471,15 +8437,15 @@ function GroupGeneratorWizard({
             )}
 
             {/* Pool count preview */}
-            <div style={{ marginTop: 20, padding: "14px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10 }}>
+            <div style={{ marginTop: 20, padding: "14px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10 }}>
               {countLoading ? (
-                <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Counting…</p>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Counting…</p>
               ) : poolCount !== null ? (
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>
                   {poolCount === 0 ? "No people in this pool" : `${poolCount} ${poolCount === 1 ? "person" : "people"} in this pool`}
                 </p>
               ) : (
-                <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>Select a source above to see the pool size.</p>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Select a source above to see the pool size.</p>
               )}
             </div>
           </div>
@@ -8499,10 +8465,10 @@ function GroupGeneratorWizard({
                     max={poolCount ?? 100}
                     value={numGroups}
                     onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: 80, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", fontFamily: "inherit" }}
+                    style={{ width: 80, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "var(--ink)", fontFamily: "inherit" }}
                   />
                   {estGroupSize !== null && (
-                    <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>
                       ~{estGroupSize} {estGroupSize === 1 ? "person" : "people"} per group
                     </p>
                   )}
@@ -8512,16 +8478,16 @@ function GroupGeneratorWizard({
 
             {/* SG mode DGL count display */}
             {smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0 && (
-              <div style={{ marginBottom: 28, padding: "14px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 10 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", margin: "0 0 3px" }}>
+              <div style={{ marginBottom: 28, padding: "14px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: "0 0 3px" }}>
                   {sgDGLs.length} group{sgDGLs.length !== 1 ? "s" : ""} — one per DGL on the {semester} roster
                 </p>
-                <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>Gender matching is applied automatically.</p>
+                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: 0 }}>Gender matching is applied automatically.</p>
               </div>
             )}
 
             {/* Divider */}
-            <div style={{ height: 1, background: "#E8E2D2", margin: "0 0 24px" }} />
+            <div style={{ height: 1, background: "var(--line)", margin: "0 0 24px" }} />
 
             {/* Diversity toggles */}
             <p style={{ ...mono, marginBottom: 16 }}>Diversity settings</p>
@@ -8560,17 +8526,17 @@ function GroupGeneratorWizard({
 
             {/* CSV upload — only for non-DGL small group mode */}
             {smallGroupMode && !(sglRosterConfirmed && sgDGLs.length > 0) && (
-              <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid #E8E2D2", borderRadius: 12 }}>
+              <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 12 }}>
                 <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
-                <p style={{ fontSize: 12, color: "#5A5466", margin: "0 0 10px" }}>
-                  Format: <code style={{ fontFamily: "ui-monospace,monospace", background: "#ECE8DE", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
+                <p style={{ fontSize: 12, color: "var(--body)", margin: "0 0 10px" }}>
+                  Format: <code style={{ fontFamily: "ui-monospace,monospace", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
                 </p>
                 <textarea
                   value={prevCSVText}
                   onChange={e => setPrevCSVText(e.target.value)}
                   placeholder={"Name,Group\nJane Smith,Group 1\nJohn Doe,Group 2"}
                   rows={6}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2DDCF", borderRadius: 8, background: "#FBF8F2", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "#13101A", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "#FBF8F2", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
             )}
@@ -8579,7 +8545,7 @@ function GroupGeneratorWizard({
             {!(smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0) && (
               <>
                 {/* Divider */}
-                <div style={{ height: 1, background: "#E8E2D2", margin: "24px 0" }} />
+                <div style={{ height: 1, background: "var(--line)", margin: "24px 0" }} />
                 <p style={{ ...mono, marginBottom: 12 }}>Group naming</p>
                 <div style={{ display: "flex", gap: 10 }}>
                   {([
@@ -8591,9 +8557,9 @@ function GroupGeneratorWizard({
                       onClick={() => setNaming(opt.value)}
                       style={{
                         padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-                        border: "1px solid " + (naming === opt.value ? "#3E1540" : "#E2DDCF"),
-                        background: naming === opt.value ? "#3E1540" : "transparent",
-                        color: naming === opt.value ? "#FBF8F2" : "#5A5466",
+                        border: "1px solid " + (naming === opt.value ? "var(--plum)" : "var(--line-2)"),
+                        background: naming === opt.value ? "var(--plum)" : "transparent",
+                        color: naming === opt.value ? "#FBF8F2" : "var(--body)",
                         cursor: "pointer", fontFamily: "inherit",
                       }}
                     >
@@ -8623,15 +8589,15 @@ function GroupGeneratorWizard({
                 value={sessionName}
                 onChange={e => setSessionName(e.target.value)}
                 placeholder="e.g. Fall Retreat Groups 2026"
-                style={{ width: "100%", maxWidth: 440, padding: "10px 14px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "#13101A", fontFamily: "inherit", boxSizing: "border-box" }}
+                style={{ width: "100%", maxWidth: 440, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit", boxSizing: "border-box" }}
               />
             </div>
 
             {/* Success message after SG confirm */}
             {sgConfirmResult && (
               <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
-                <p style={{ fontSize: 13, color: "#3E1540", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
-                <button onClick={onSaved} style={{ fontSize: 12, color: "#3E1540", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 600 }}>Done →</button>
+                <p style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
+                <button onClick={onSaved} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 600 }}>Done →</button>
               </div>
             )}
 
@@ -8645,7 +8611,7 @@ function GroupGeneratorWizard({
             {/* SG mode groups */}
             {sgGroups.length > 0 ? (
               <>
-                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 20 }}>
                   {sgGroups.length} groups · {sgGroups.reduce((s, g) => s + g.members.length, 0)} members. Drag within same gender to adjust.
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
@@ -8657,7 +8623,7 @@ function GroupGeneratorWizard({
                       onDrop={() => handleDrop(gIdx)}
                       style={{
                         background: "#FBF8F2",
-                        border: "1px solid " + (dragOver === gIdx ? "#3E1540" : g.leader_gender === "male" ? "#B8D4F0" : g.leader_gender === "female" ? "#F0B8D4" : "#E8E2D2"),
+                        border: "1px solid " + (dragOver === gIdx ? "var(--plum)" : g.leader_gender === "male" ? "#B8D4F0" : g.leader_gender === "female" ? "#F0B8D4" : "var(--line)"),
                         borderRadius: 14, padding: "16px 18px", minHeight: 80,
                         transition: "border-color 0.1s",
                       }}
@@ -8665,16 +8631,16 @@ function GroupGeneratorWizard({
                       {/* Leader header */}
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                           <span style={{
                             fontSize: 10, padding: "2px 8px", borderRadius: 999, fontWeight: 500,
                             background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "#F0EDE8",
-                            color: g.leader_gender === "male" ? "#2D5FA3" : g.leader_gender === "female" ? "#A32D5F" : "#8A8497",
+                            color: g.leader_gender === "male" ? "#2D5FA3" : g.leader_gender === "female" ? "#A32D5F" : "var(--muted-text)",
                           }}>
                             {g.leader_gender === "male" ? "Brothers" : g.leader_gender === "female" ? "Sisters" : "Group"}
                           </span>
                         </div>
-                        <p style={{ fontSize: 11, color: "#8A8497", margin: "2px 0 0" }}>DGL: {g.leader_name} · {g.members.length} members</p>
+                        <p style={{ fontSize: 11, color: "var(--muted-text)", margin: "2px 0 0" }}>DGL: {g.leader_name} · {g.members.length} members</p>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {g.members.map((m, mIdx) => (
@@ -8685,20 +8651,20 @@ function GroupGeneratorWizard({
                             onDragEnd={() => { setDragSource(null); setDragOver(null) }}
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                              border: "1px solid #E8E2D2", borderRadius: 8,
+                              border: "1px solid var(--line)", borderRadius: 8,
                               background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
-                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                               <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                               </span>
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
-                              <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
+                              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                              <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>
                                 {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
                                 {m.graduation_year && m.role ? " · " : ""}
                                 {m.role}
@@ -8713,7 +8679,7 @@ function GroupGeneratorWizard({
               </>
             ) : (
               <>
-                <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 20 }}>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 20 }}>
                   {groups.length} groups · {groups.reduce((s, g) => s + g.members.length, 0)} people. Drag members between groups to adjust.
                 </p>
 
@@ -8726,14 +8692,14 @@ function GroupGeneratorWizard({
                       onDragLeave={() => setDragOver(null)}
                       onDrop={() => handleDrop(gIdx)}
                       style={{
-                        background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "#3E1540" : "#E8E2D2"),
+                        background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "var(--plum)" : "var(--line)"),
                         borderRadius: 14, padding: "16px 18px", minHeight: 80,
                         transition: "border-color 0.1s",
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <p style={{ fontSize: 13, fontWeight: 700, color: "#13101A", margin: 0 }}>{g.name}</p>
-                        <span style={{ fontSize: 11, color: "#8A8497" }}>{g.members.length}</span>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", margin: 0 }}>{g.name}</p>
+                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {g.members.map((m, mIdx) => (
@@ -8744,19 +8710,19 @@ function GroupGeneratorWizard({
                             onDragEnd={() => { setDragSource(null); setDragOver(null) }}
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                              border: "1px solid #E8E2D2", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
-                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#3E1540", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                               <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                               </span>
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, fontWeight: 500, color: "#13101A", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
-                              <p style={{ fontSize: 10, color: "#8A8497", margin: 0 }}>
+                              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                              <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>
                                 {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
                                 {m.graduation_year && m.role ? " · " : ""}
                                 {m.role}
@@ -8775,8 +8741,8 @@ function GroupGeneratorWizard({
       </div>
 
       {/* Footer */}
-      <div style={{ borderTop: "1px solid #E8E2D2", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: "#FBF8F2" }}>
-        <p style={{ fontSize: 12, color: "#8A8497", margin: 0 }}>
+      <div style={{ borderTop: "1px solid var(--line)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: "#FBF8F2" }}>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", margin: 0 }}>
           {step === 1 && (poolCount != null ? `${poolCount} people in pool` : "")}
           {step === 2 && "You can adjust individual assignments in the next step."}
           {step === 3 && !sgConfirmResult && "Changes are not saved until you click below."}
@@ -8785,7 +8751,7 @@ function GroupGeneratorWizard({
           {step === 3 && !sgConfirmResult && (
             <button
               onClick={() => { setStep(2); setGroups([]); setSgGroups([]) }}
-              style={{ padding: "10px 18px", border: "1px solid #E2DDCF", borderRadius: 10, background: "transparent", color: "#5A5466", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
+              style={{ padding: "10px 18px", border: "1px solid var(--line-2)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}
             >
               <Shuffle style={{ width: 13, height: 13 }} />
               Regenerate
@@ -8796,7 +8762,7 @@ function GroupGeneratorWizard({
               onClick={step === 1 ? () => setStep(2) : handleGenerate}
               disabled={(step === 1 && !step1Ready) || generating}
               style={{
-                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2",
+                padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2",
                 borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
                 cursor: generating || (step === 1 && !step1Ready) ? "not-allowed" : "pointer",
                 opacity: (step === 1 && !step1Ready) ? 0.5 : 1,
@@ -8812,7 +8778,7 @@ function GroupGeneratorWizard({
               onClick={handleSave}
               disabled={saving || confirmingSG || !sessionName.trim()}
               style={{
-                padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2",
+                padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2",
                 borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
                 cursor: saving || confirmingSG || !sessionName.trim() ? "not-allowed" : "pointer",
                 opacity: !sessionName.trim() ? 0.5 : 1,
@@ -8846,7 +8812,7 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
         onClick={() => !disabled && onChange(!checked)}
         style={{
           width: 36, height: 20, borderRadius: 999, flexShrink: 0,
-          background: checked ? "#3E1540" : "#D6D0C0",
+          background: checked ? "var(--plum)" : "#D6D0C0",
           border: "none", cursor: disabled ? "not-allowed" : "pointer", position: "relative", transition: "background 0.15s", marginTop: 2,
         }}
       >
@@ -8857,8 +8823,8 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
         }} />
       </button>
       <div>
-        <p style={{ fontSize: 14, fontWeight: 500, color: "#13101A", margin: 0 }}>{label}</p>
-        <p style={{ fontSize: 12, color: "#8A8497", margin: "3px 0 0" }}>{disabled && tooltip ? tooltip : desc}</p>
+        <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>{disabled && tooltip ? tooltip : desc}</p>
       </div>
     </div>
   )
@@ -9030,15 +8996,15 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   return (
     <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[var(--line)] bg-[#FBF8F2]">
         <button
           onClick={step === "preset" ? onClose : () => setStep(step === "members" ? "customize" : "preset")}
-          className="flex items-center gap-1.5 text-[13px] text-[#8A8497] hover:text-[#3E1540] transition-colors"
+          className="flex items-center gap-1.5 text-[13px] text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           {step === "preset" ? "Cancel" : "Back"}
         </button>
-        <span className="text-[14px] font-semibold text-[#13101A]">
+        <span className="text-[14px] font-semibold text-[var(--ink)]">
           {step === "preset" ? "New Team" : step === "customize" ? "Customize" : "Add Members"}
         </span>
         <div className="w-14 flex justify-end">
@@ -9046,13 +9012,13 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             <button
               onClick={() => setStep("members")}
               disabled={!canAdvance}
-              className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30"
+              className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30"
             >
               Next
             </button>
           )}
           {step === "members" && (
-            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))} className="text-[13px] font-semibold text-[#3E1540] disabled:opacity-30">
+            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))} className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30">
               {saving ? "Saving…" : "Create"}
             </button>
           )}
@@ -9061,24 +9027,24 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
       <div className="flex-1 overflow-y-auto px-5 py-5 md:px-10 md:py-8 md:max-w-[900px] md:mx-auto md:w-full">
         {error && (
-          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium mb-4">{error}</div>
+          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium mb-4">{error}</div>
         )}
 
         {/* Desktop: serif hero + stepper */}
         <div className="hidden md:block mb-8">
-          <p className="text-[11px] tracking-[0.14em] uppercase text-[#8A8497] mb-2">Step {stepIndex + 1} of {STEPS.length}</p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, lineHeight: 1, color: "#13101A", fontWeight: 400, marginBottom: 8 }}>
+          <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--muted-text)] mb-2">Step {stepIndex + 1} of {STEPS.length}</p>
+          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, lineHeight: 1, color: "var(--ink)", fontWeight: 400, marginBottom: 8 }}>
             {step === "preset" && "Pick the shape it should take."}
             {step === "customize" && "Tune the details."}
             {step === "members" && "Bring people in."}
           </h1>
           {step === "preset" && (
-            <p style={{ fontSize: 14, color: "#5A5466", maxWidth: 560, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 560, lineHeight: 1.6 }}>
               Start from a preset that fits your ministry. You can rename it, add or remove roles, and adjust permissions — nothing here is locked in.
             </p>
           )}
           {step === "members" && (
-            <p style={{ fontSize: 14, color: "#5A5466" }}>Add members now, or skip and invite later.</p>
+            <p style={{ fontSize: 14, color: "var(--body)" }}>Add members now, or skip and invite later.</p>
           )}
           {/* Stepper */}
           <div style={{ display: "flex", gap: 28, marginTop: 22 }}>
@@ -9086,14 +9052,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
               <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, opacity: i === stepIndex ? 1 : 0.45 }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: 999,
-                  background: i < stepIndex ? "#3E1540" : i === stepIndex ? "#13101A" : "transparent",
-                  border: i > stepIndex ? "1px solid #ECE8DE" : "none",
+                  background: i < stepIndex ? "var(--plum)" : i === stepIndex ? "var(--ink)" : "transparent",
+                  border: i > stepIndex ? "1px solid var(--line)" : "none",
                   color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 11,
                 }}>
                   {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
                 </div>
-                <span style={{ fontSize: 13, color: "#13101A" }}>{s}</span>
+                <span style={{ fontSize: 13, color: "var(--ink)" }}>{s}</span>
               </div>
             ))}
           </div>
@@ -9103,7 +9069,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
         {step === "preset" && (
           <div>
             {/* Mobile intro */}
-            <p className="md:hidden text-[13px] text-[#8A8497] mb-3">Start with a preset or build from scratch.</p>
+            <p className="md:hidden text-[13px] text-[var(--muted-text)] mb-3">Start with a preset or build from scratch.</p>
 
             {/* Desktop: 2-col grid; mobile: stack */}
             <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -9112,15 +9078,15 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 return disabled ? (
                   <div
                     key={preset.id}
-                    className="w-full rounded-2xl border border-[#ECE8DE] p-4 text-left md:p-5"
+                    className="w-full rounded-2xl border border-[var(--line)] p-4 text-left md:p-5"
                     style={{ background: "#F8F6F2", opacity: 0.6, cursor: "not-allowed" }}
                   >
                     <div className="flex items-start gap-3 mb-2">
                       <span className="text-[22px] mt-0.5 grayscale">{preset.icon}</span>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[#8A8497] leading-tight">{preset.name}</p>
-                          <span className="text-[10px] font-semibold tracking-wide uppercase bg-[#ECE8DE] text-[#8A8497] px-2 py-0.5 rounded-full">Coming soon</span>
+                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
+                          <span className="text-[10px] font-semibold tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
                         </div>
                         <p className="text-[12px] text-[#C4C0B0] mt-1">{preset.description}</p>
                       </div>
@@ -9130,21 +9096,21 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 <button
                   key={preset.id}
                   onClick={() => applyPreset(preset)}
-                  className="w-full bg-white rounded-2xl border border-[#ECE8DE] p-4 text-left hover:border-[#3E1540]/40 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)] md:p-5"
+                  className="w-full bg-white rounded-2xl border border-[var(--line)] p-4 text-left hover:border-[#3E1540]/40 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)] md:p-5"
                   style={{ boxShadow: "none" }}
                 >
                   <div className="flex items-start gap-3 mb-2">
                     <span className="text-[22px] mt-0.5">{preset.icon}</span>
                     <div className="flex-1">
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[#13101A] leading-tight">{preset.name}</p>
-                      <p className="text-[12px] text-[#8A8497] mt-1">{preset.description}</p>
+                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--ink)] leading-tight">{preset.name}</p>
+                      <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
                     </div>
                   </div>
-                  <div className="mt-3 pt-3 border-t border-[#ECE8DE]">
-                    <p className="text-[10px] tracking-[0.12em] uppercase text-[#8A8497] mb-2">Roles · {preset.roles.length}</p>
+                  <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                    <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--muted-text)] mb-2">Roles · {preset.roles.length}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {preset.roles.map((r) => (
-                        <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                        <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
                           {r.name}
                         </span>
                       ))}
@@ -9156,8 +9122,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             </div>
 
             {/* Desktop: footer nav */}
-            <div className="hidden md:flex justify-end mt-8 pt-6 border-t border-[#ECE8DE]">
-              <p className="text-[12px] text-[#8A8497] flex-1 self-center">You can change everything later.</p>
+            <div className="hidden md:flex justify-end mt-8 pt-6 border-t border-[var(--line)]">
+              <p className="text-[12px] text-[var(--muted-text)] flex-1 self-center">You can change everything later.</p>
             </div>
           </div>
         )}
@@ -9167,47 +9133,47 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
           <div className="flex flex-col gap-5">
             <div className="flex gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">Icon</label>
+                <label className="text-[12px] font-medium text-[var(--body)]">Icon</label>
                 <input
                   type="text"
                   value={teamIcon}
                   onChange={(e) => setTeamIcon(e.target.value.slice(-2) || "👥")}
-                  className="w-14 h-12 text-center text-[20px] rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                  className="w-14 h-12 text-center text-[20px] rounded-xl border border-[var(--line)] bg-[#FBF8F2] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                 />
               </div>
               <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[#5A5466]">Team name</label>
+                <label className="text-[12px] font-medium text-[var(--body)]">Team name</label>
                 <input
                   type="text"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   placeholder="e.g. Praise Team"
-                  className="w-full h-12 px-4 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                  className="w-full h-12 px-4 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-medium text-[#5A5466]">Description (optional)</label>
+              <label className="text-[12px] font-medium text-[var(--body)]">Description (optional)</label>
               <input
                 type="text"
                 value={teamDesc}
                 onChange={(e) => setTeamDesc(e.target.value)}
                 placeholder="What does this team do?"
-                className="w-full px-4 py-3 rounded-xl border border-[#ECE8DE] bg-[#FBF8F2] text-[14px] text-[#13101A] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                className="w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="text-[12px] font-medium text-[#5A5466]">Roles</label>
-                <button onClick={addRole} className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 transition-opacity">
+                <label className="text-[12px] font-medium text-[var(--body)]">Roles</label>
+                <button onClick={addRole} className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity">
                   + Add role
                 </button>
               </div>
               <div className="flex flex-col gap-2">
                 {roles.map((role, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl border border-[#ECE8DE] overflow-hidden">
+                  <div key={idx} className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden">
                     <div
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer"
                       onClick={() => setEditingRoleIdx(editingRoleIdx === idx ? null : idx)}
@@ -9218,20 +9184,20 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                         onChange={(e) => { e.stopPropagation(); updateRoleName(idx, e.target.value) }}
                         onClick={(e) => e.stopPropagation()}
                         placeholder="Role name"
-                        className="flex-1 text-[14px] font-semibold text-[#13101A] bg-transparent focus:outline-none placeholder:text-[#C4C4C4] placeholder:font-normal"
+                        className="flex-1 text-[14px] font-semibold text-[var(--ink)] bg-transparent focus:outline-none placeholder:text-[#C4C4C4] placeholder:font-normal"
                       />
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[11px] text-[#8A8497]">{role.permissions.length} perms</span>
+                        <span className="text-[11px] text-[var(--muted-text)]">{role.permissions.length} perms</span>
                         <ChevronDown className={`w-3.5 h-3.5 text-[#C4C4C4] transition-transform ${editingRoleIdx === idx ? "rotate-180" : ""}`} />
                         {roles.length > 1 && (
                           <button onClick={(e) => { e.stopPropagation(); removeRole(idx) }}>
-                            <X className="w-3.5 h-3.5 text-[#C4C4C4] hover:text-[#3E1540] transition-colors" />
+                            <X className="w-3.5 h-3.5 text-[#C4C4C4] hover:text-[var(--plum)] transition-colors" />
                           </button>
                         )}
                       </div>
                     </div>
                     {editingRoleIdx === idx && (
-                      <div className="border-t border-[#ECE8DE] px-4 py-3">
+                      <div className="border-t border-[var(--line)] px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           {ALL_PERMISSIONS.map((perm) => {
                             const active = role.permissions.includes(perm)
@@ -9241,8 +9207,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                                 onClick={() => toggleRolePermission(idx, perm)}
                                 className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
                                   active
-                                    ? "bg-[#3E1540] border-[#3E1540] text-[#F6F4EF]"
-                                    : "bg-[#FBF8F2] border-[#ECE8DE] text-[#5A5466] hover:border-[#3E1540]/30"
+                                    ? "bg-[var(--plum)] border-[var(--plum)] text-[#F6F4EF]"
+                                    : "bg-[#FBF8F2] border-[var(--line)] text-[var(--body)] hover:border-[#3E1540]/30"
                                 }`}
                               >
                                 {PERMISSION_LABELS[perm]}
@@ -9262,21 +9228,21 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
         {/* Step 3: Members */}
         {step === "members" && (
           <div className="flex flex-col gap-4">
-            <p className="text-[13px] text-[#8A8497]">Select {coPresidency ? "two co-presidents" : "a president"}, then add other members.</p>
+            <p className="text-[13px] text-[var(--muted-text)]">Select {coPresidency ? "two co-presidents" : "a president"}, then add other members.</p>
 
             {/* ── Required: President picker ── */}
             {presidentRoleIdx >= 0 && (
               <div className="rounded-xl border-2 border-[#3E1540]/25 bg-[#F8F5FF] p-3 flex flex-col gap-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-[#3E1540] uppercase tracking-wider">{roles[presidentRoleIdx].name}</span>
+                  <span className="text-[11px] font-semibold text-[var(--plum)] uppercase tracking-wider">{roles[presidentRoleIdx].name}</span>
                   <span className="text-[10px] font-medium text-[#EF4444] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">Required</span>
                   <div className="ml-auto flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
-                      className="flex items-center gap-1.5 text-[11px] text-[#5A5466] hover:text-[#3E1540] transition-colors"
+                      className="flex items-center gap-1.5 text-[11px] text-[var(--body)] hover:text-[var(--plum)] transition-colors"
                     >
-                      <span className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${coPresidency ? "bg-[#3E1540] border-[#3E1540]" : "border-[#C4C4C4]"}`}>
+                      <span className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${coPresidency ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"}`}>
                         {coPresidency && <Check className="w-2.5 h-2.5 text-white" />}
                       </span>
                       Co-presidency
@@ -9285,7 +9251,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 </div>
                 {/* First president */}
                 {presidentPick ? (
-                  <div className="flex items-center gap-3 bg-[#3E1540] rounded-lg px-3 py-2.5">
+                  <div className="flex items-center gap-3 bg-[var(--plum)] rounded-lg px-3 py-2.5">
                     <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
                       {ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}
                     </span>
@@ -9297,7 +9263,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                   <select
                     value=""
                     onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
-                    className="w-full bg-white border border-[#ECE8DE] rounded-lg px-3 py-2.5 text-[13px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                    className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                   >
                     <option value="" disabled>Select a person…</option>
                     {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
@@ -9308,7 +9274,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 {/* Second president (co-presidency only) */}
                 {coPresidency && (
                   presidentPick2 ? (
-                    <div className="flex items-center gap-3 bg-[#3E1540] rounded-lg px-3 py-2.5">
+                    <div className="flex items-center gap-3 bg-[var(--plum)] rounded-lg px-3 py-2.5">
                       <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
                         {ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}
                       </span>
@@ -9320,7 +9286,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                     <select
                       value=""
                       onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
-                      className="w-full bg-white border border-[#ECE8DE] rounded-lg px-3 py-2.5 text-[13px] text-[#13101A] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                      className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
                     >
                       <option value="" disabled>Select second person…</option>
                       {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
@@ -9333,14 +9299,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             )}
 
             {/* Creator row — always added with non-president role */}
-            <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[#ECE8DE] p-3">
-              <div className="w-5 h-5 rounded-md bg-[#3E1540] border-[#3E1540] border-2 flex items-center justify-center flex-shrink-0">
+            <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[var(--line)] p-3">
+              <div className="w-5 h-5 rounded-md bg-[var(--plum)] border-[var(--plum)] border-2 flex items-center justify-center flex-shrink-0">
                 <Check className="w-3 h-3 text-white" />
               </div>
-              <span className="flex-1 text-[14px] font-medium text-[#13101A]">
-                {userName} <span className="text-[#8A8497] font-normal">(you)</span>
+              <span className="flex-1 text-[14px] font-medium text-[var(--ink)]">
+                {userName} <span className="text-[var(--muted-text)] font-normal">(you)</span>
               </span>
-              <span className="text-[12px] text-[#5A5466] font-medium">
+              <span className="text-[12px] text-[var(--body)] font-medium">
                 {roles[defaultMemberRoleIdx]?.name ?? roles[0]?.name}
               </span>
             </div>
@@ -9352,12 +9318,12 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[#ECE8DE] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[var(--line)] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               {filteredMembers.length === 0 && (
-                <p className="text-[13px] text-[#8A8497] text-center py-6">No other members to add.</p>
+                <p className="text-[13px] text-[var(--muted-text)] text-center py-6">No other members to add.</p>
               )}
               {filteredMembers.map((member) => {
                 const sel = selectedMembers.find((m) => m.userId === member.id)
@@ -9365,21 +9331,21 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                   .map((r, i) => ({ ...r, i }))
                   .filter(({ name }) => !name.toLowerCase().includes("president"))
                 return (
-                  <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[#ECE8DE] p-3">
+                  <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[var(--line)] p-3">
                     <button
                       onClick={() => toggleMemberSelection(member.id)}
                       className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                        sel ? "bg-[#3E1540] border-[#3E1540]" : "border-[#C4C4C4]"
+                        sel ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"
                       }`}
                     >
                       {sel && <Check className="w-3 h-3 text-white" />}
                     </button>
-                    <span className="flex-1 text-[14px] font-medium text-[#13101A]">{member.name}</span>
+                    <span className="flex-1 text-[14px] font-medium text-[var(--ink)]">{member.name}</span>
                     {sel && assignableRoles.length > 1 && (
                       <select
                         value={sel.roleIdx}
                         onChange={(e) => updateMemberRole(member.id, Number(e.target.value))}
-                        className="text-[12px] text-[#5A5466] bg-[#FBF8F2] border border-[#ECE8DE] rounded-lg px-2 py-1 focus:outline-none"
+                        className="text-[12px] text-[var(--body)] bg-[#FBF8F2] border border-[var(--line)] rounded-lg px-2 py-1 focus:outline-none"
                       >
                         {assignableRoles.map(({ name, i }) => (
                           <option key={i} value={i}>{name || `Role ${i + 1}`}</option>
@@ -9387,7 +9353,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                       </select>
                     )}
                     {sel && assignableRoles.length <= 1 && (
-                      <span className="text-[12px] text-[#8A8497]">{assignableRoles[0]?.name ?? roles[0].name}</span>
+                      <span className="text-[12px] text-[var(--muted-text)]">{assignableRoles[0]?.name ?? roles[0].name}</span>
                     )}
                   </div>
                 )
@@ -9401,6 +9367,32 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 }
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
+
+// Pure SWR fetcher for a team's settings: its roles + members (key: ["team-settings", teamId]).
+async function fetchTeamSettings([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const [{ data: rolesData }, { data: membersData }] = await Promise.all([
+    supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", teamId),
+    supabase
+      .from("team_members")
+      .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
+      .eq("team_id", teamId),
+  ])
+  type RawMember = {
+    user_id: string
+    role_id: string
+    joined_at: string
+    profiles: { name: string } | { name: string }[] | null
+    team_roles: { name: string } | { name: string }[] | null
+  }
+  const roles: TeamRole[] = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
+  const members: TeamMemberDisplay[] = (membersData ?? []).map((m: RawMember) => {
+    const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+    const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+  })
+  return { roles, members }
+}
 
 export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged, onOpenChat }: {
   team: Team
@@ -9470,37 +9462,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [renamingRoleId, setRenamingRoleId] = useState<string | null>(null)
   const [renamingRoleValue, setRenamingRoleValue] = useState("")
 
+  // Initial roles + members are SWR-cached (key shared on revisit). Because this overlay
+  // mutates roles/members optimistically in many places, the SWR data is mirrored into the
+  // existing local state via a populate effect rather than consumed directly.
+  const { data: tsData, mutate: mutateTeamSettings } = useSWR(
+    ["team-settings", team.id] as const,
+    fetchTeamSettings,
+  )
   useEffect(() => {
-    async function load() {
-      const [{ data: rolesData }, { data: membersData }] = await Promise.all([
-        supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", team.id),
-        supabase
-          .from("team_members")
-          .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
-          .eq("team_id", team.id),
-      ])
-      type RawMember = {
-        user_id: string
-        role_id: string
-        joined_at: string
-        profiles: { name: string } | { name: string }[] | null
-        team_roles: { name: string } | { name: string }[] | null
-      }
-      const parsedRoles = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
-      setRoles(parsedRoles)
-      setSavedPerms(Object.fromEntries(parsedRoles.map(r => [r.id, r.permissions])))
-      setMembers(
-        (membersData ?? []).map((m: RawMember) => {
-          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-          return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
-        })
-      )
-      setLoading(false)
-    }
-    load()
+    if (!tsData) return
+    setRoles(tsData.roles)
+    setSavedPerms(Object.fromEntries(tsData.roles.map(r => [r.id, r.permissions])))
+    setMembers(tsData.members)
+    setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [team.id])
+  }, [tsData])
 
   useEffect(() => {
     if (!showAddMember) return
@@ -9554,19 +9530,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       await elevateToLeader(Array.from(selectedIds), ministryId)
     }
 
-    // Reload members locally and return to settings — do NOT call onChanged() which closes settings
-    const { data: membersData } = await supabase
-      .from("team_members")
-      .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
-      .eq("team_id", team.id)
-    type RawMember = { user_id: string; role_id: string; joined_at: string; profiles: { name: string } | { name: string }[] | null; team_roles: { name: string } | { name: string }[] | null }
-    setMembers(
-      (membersData ?? []).map((m: RawMember) => {
-        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-        const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-        return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
-      })
-    )
+    // Revalidate the cached settings (re-populates members via the SWR effect) and return to
+    // settings — do NOT call onChanged() which closes settings.
+    await mutateTeamSettings()
     setShowAddMember(false)
     setSelectedIds(new Set())
     setMemberRoles({})
@@ -9577,6 +9543,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+    // Keep the ["team-settings", team.id] SWR cache fresh so the removed member can't
+    // briefly reappear via the populate effect on reopen. Optimistically drop them from
+    // the cached payload (no revalidation needed — the DB delete already succeeded).
+    mutateTeamSettings(
+      (cur) => cur ? { ...cur, members: cur.members.filter((m) => m.user_id !== memberId) } : cur,
+      { revalidate: false },
+    )
     setConfirmRemoveId(null)
   }
 
@@ -9750,7 +9723,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       {/* Default role picker */}
       {roles.length > 0 && (
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase" as const, letterSpacing: "1.4px", marginBottom: 6 }}>Default role</p>
+          <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>Default role</p>
           <p style={{ fontSize: 12, color: "#A09A8C", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
@@ -9759,9 +9732,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                 onClick={() => setDefaultRoleId(r.id)}
                 style={{
                   padding: "7px 14px", borderRadius: 999, fontSize: 13,
-                  border: `1px solid ${defaultRoleId === r.id ? "#2D0F2E" : "#E2DDCF"}`,
-                  background: defaultRoleId === r.id ? "#2D0F2E" : "#FBF8F2",
-                  color: defaultRoleId === r.id ? "#FBF8F2" : "#5A5466",
+                  border: `1px solid ${defaultRoleId === r.id ? "var(--plum-2)" : "var(--line-2)"}`,
+                  background: defaultRoleId === r.id ? "var(--plum-2)" : "#FBF8F2",
+                  color: defaultRoleId === r.id ? "#FBF8F2" : "var(--body)",
                   cursor: "pointer", transition: "all 0.12s",
                 }}
               >
@@ -9774,13 +9747,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
       {/* Search bar */}
       <div style={{ position: "relative" }}>
-        <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "#8A8497", pointerEvents: "none" }} />
+        <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: "var(--muted-text)", pointerEvents: "none" }} />
         <input
           type="text"
           value={addSearch}
           onChange={(e) => setAddSearch(e.target.value)}
           placeholder="Search members…"
-          style={{ width: "100%", padding: "12px 14px 12px 44px", border: "1px solid #E2DDCF", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "#13101A", outline: "none", boxSizing: "border-box" as const }}
+          style={{ width: "100%", padding: "12px 14px 12px 44px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }}
         />
       </div>
 
@@ -9788,7 +9761,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       <div>
         {filteredAdd.length === 0 ? (
           <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "32px 24px", textAlign: "center" as const }}>
-            <p style={{ fontSize: 13, color: "#8A8497", margin: 0 }}>No members to add.</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members to add.</p>
           </div>
         ) : (
           <div>
@@ -9817,14 +9790,14 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                     padding: selected && roles.length > 1 ? "12px 0" : "14px 0",
                     borderTop: "none", borderLeft: "none", borderRight: "none",
                     borderBottom: isLast ? "none" : "1px solid #EFE9DA",
-                    background: selected ? "#F1ECDE" : "transparent",
+                    background: selected ? "var(--ivory)" : "transparent",
                     cursor: "pointer", textAlign: "left" as const,
                     transition: "background 0.12s",
                   }}
                 >
                   <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-semibold" />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 14, color: "#13101A", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
+                    <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
                     {selected && roles.length > 1 ? (
                       <select
                         value={memberRoles[member.id] ?? defaultRoleId}
@@ -9836,7 +9809,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         style={{
                           marginTop: 5, fontSize: 12, padding: "4px 8px",
                           border: "1px solid #C9C0B0", borderRadius: 6,
-                          background: "#FBF8F2", color: "#13101A", cursor: "pointer",
+                          background: "#FBF8F2", color: "var(--ink)", cursor: "pointer",
                           outline: "none", maxWidth: "100%",
                         }}
                       >
@@ -9845,12 +9818,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         ))}
                       </select>
                     ) : (
-                      member.email && <p style={{ fontSize: 12, color: "#8A8497", marginTop: 2, marginBottom: 0 }}>{member.email}</p>
+                      member.email && <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2, marginBottom: 0 }}>{member.email}</p>
                     )}
                   </div>
                   {selected && (
                     <div style={{
-                      width: 20, height: 20, borderRadius: 5, background: "#3E1540", flexShrink: 0,
+                      width: 20, height: 20, borderRadius: 5, background: "var(--plum)", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <Check style={{ width: 11, height: 11, color: "#FBF8F2" }} />
@@ -9869,19 +9842,19 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
 
       {/* ── Mobile header ── */}
-      <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[#ECE8DE] bg-[#FBF8F2]">
+      <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[var(--line)] bg-[#FBF8F2]">
         <button
           onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : confirmDelete ? () => setConfirmDelete(false) : onClose}
-          className="size-9 bg-white border border-[#ECE8DE] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+          className="size-9 bg-white border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
         >
-          <ArrowLeft className="w-4 h-4 text-[#13101A]" />
+          <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
         </button>
         <div className="flex items-center gap-2">
           {!showAddMember && (confirmDelete
             ? <span className="text-[18px]">⚠️</span>
-            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="#3E1540" fg="#FBF8F2" />
+            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="var(--plum)" fg="#FBF8F2" />
           )}
-          <span className="text-[14px] font-semibold text-[#13101A]">
+          <span className="text-[14px] font-semibold text-[var(--ink)]">
             {showAddMember ? "Add Member" : confirmDelete ? "Delete team?" : team.name}
           </span>
         </div>
@@ -9895,12 +9868,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                 Delete
               </button>
             ) : savedMsg ? (
-              <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
+              <span style={{ fontSize: 13, color: "var(--body)" }}>{savedMsg}</span>
             ) : hasChanges ? (
               <button
                 onClick={handleSaveChanges}
                 disabled={savingPerms}
-                style={{ height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
+                style={{ height: 34, padding: "0 14px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
               >
                 {savingPerms ? "Saving…" : "Save"}
               </button>
@@ -9911,7 +9884,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                     <button
                       onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
                       className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[13px] font-semibold text-white"
-                      style={{ background: "#2D0F2E", border: "none", cursor: "pointer" }}
+                      style={{ background: "var(--plum-2)", border: "none", cursor: "pointer" }}
                     >
                       <MessageCircle className="w-3.5 h-3.5" /> Open chat
                     </button>
@@ -9922,13 +9895,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                       className="size-9 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors"
                       style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
                     >
-                      <MessageCircle className="w-4 h-4 text-[#8A8497]" />
+                      <MessageCircle className="w-4 h-4 text-[var(--muted-text)]" />
                     </button>
                   )
                 )}
                 {canDelete && (
                   <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4 text-[#8A8497]" />
+                    <Trash2 className="w-4 h-4 text-[var(--muted-text)]" />
                   </button>
                 )}
               </div>
@@ -9951,35 +9924,35 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {showAddMember ? (
             <>
-              <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#8A8497", fontSize: 13, cursor: "pointer" }}>
+              <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
                 <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
               </button>
-              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }}>
+              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer", color: "var(--body)" }}>
                 <X style={{ width: 15, height: 15 }} />
               </button>
             </>
           ) : confirmDelete ? (
             <>
-              <button onClick={() => setConfirmDelete(false)} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setConfirmDelete(false)} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
               <button onClick={handleDeleteTeam} style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete team</button>
             </>
           ) : savedMsg ? (
-            <span style={{ fontSize: 13, color: "#5A5466" }}>{savedMsg}</span>
+            <span style={{ fontSize: 13, color: "var(--body)" }}>{savedMsg}</span>
           ) : hasChanges ? (
             <>
-              <button onClick={handleDiscardChanges} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid #ECE8DE", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: "pointer" }}>Discard</button>
-              <button onClick={handleSaveChanges} disabled={savingPerms} style={{ height: 34, padding: "0 20px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}>
+              <button onClick={handleDiscardChanges} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Discard</button>
+              <button onClick={handleSaveChanges} disabled={savingPerms} style={{ height: 34, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}>
                 {savingPerms ? "Saving…" : "Save changes"}
               </button>
             </>
           ) : (
             <>
               {canCreateGroupChat && (chatCreated ? (
-                <button onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                <button onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                   <MessageCircle style={{ width: 13, height: 13 }} /> Open chat
                 </button>
               ) : (
-                <button onClick={handleCreateGroupChat} disabled={creatingChat} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid #E8E2D2", borderRadius: 8, color: "#5A5466", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}>
+                <button onClick={handleCreateGroupChat} disabled={creatingChat} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}>
                   <MessageCircle style={{ width: 13, height: 13 }} /> {creatingChat ? "Creating…" : "Group chat"}
                 </button>
               ))}
@@ -9988,7 +9961,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   <Trash2 style={{ width: 13, height: 13 }} /> Delete team
                 </button>
               )}
-              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid #ECE8DE", borderRadius: 8, cursor: "pointer", color: "#5A5466" }} title="Close settings">
+              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer", color: "var(--body)" }} title="Close settings">
                 <X style={{ width: 15, height: 15 }} />
               </button>
             </>
@@ -9998,7 +9971,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
       <div className="flex-1 overflow-y-auto">
         {error && (
-          <div className="mx-5 mt-4 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[#3E1540] font-medium">{error}</div>
+          <div className="mx-5 mt-4 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">{error}</div>
         )}
 
         {/* ── Mobile content ── */}
@@ -10011,21 +9984,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                     <PlanSectionHeader>Roles</PlanSectionHeader>
                     <div className="flex flex-col gap-2">
                       {roles.length === 0 && (
-                        <p className="text-[13px] text-[#8A8497] text-center py-4">No roles defined.</p>
+                        <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No roles defined.</p>
                       )}
                       {roles.map((role) => (
-                        <div key={role.id} className="bg-white rounded-2xl border border-[#ECE8DE] p-4">
-                          <p className="text-[14px] font-semibold text-[#13101A] mb-2">{role.name}</p>
+                        <div key={role.id} className="bg-white rounded-2xl border border-[var(--line)] p-4">
+                          <p className="text-[14px] font-semibold text-[var(--ink)] mb-2">{role.name}</p>
                           {role.permissions.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {role.permissions.map((p) => (
-                                <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[#ECE8DE] text-[#5A5466] px-2 py-0.5 rounded-full">
+                                <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
                                   {PERMISSION_LABELS[p] ?? p}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[12px] text-[#8A8497]">No permissions assigned</p>
+                            <p className="text-[12px] text-[var(--muted-text)]">No permissions assigned</p>
                           )}
                         </div>
                       ))}
@@ -10034,51 +10007,51 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3 flex-1 mr-3">
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "#13101A", letterSpacing: "-0.01em" }}>Members</span>
-                        <div className="flex-1 h-px bg-[#ECE8DE]" />
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>Members</span>
+                        <div className="flex-1 h-px bg-[var(--line)]" />
                       </div>
                       {(isAdmin || isPresident) && (
-                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[#3E1540] hover:opacity-70 flex-shrink-0">
+                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 flex-shrink-0">
                           + Add
                         </button>
                       )}
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      {members.length === 0 && <p className="text-[13px] text-[#8A8497] text-center py-4">No one&apos;s here yet.</p>}
+                      {members.length === 0 && <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No one&apos;s here yet.</p>}
                       {members.map((m, i) => {
                         const isConfirming = confirmRemoveId === m.user_id
                         const isRevealed = mobileRevealMemberId === m.user_id
                         return (
-                          <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[#ECE8DE] p-3"
+                          <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3"
                             style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
                             onClick={() => { if ((isAdmin || isPresident) && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-[14px] font-medium text-[#13101A] truncate">{m.name}</p>
+                              <p className="text-[14px] font-medium text-[var(--ink)] truncate">{m.name}</p>
                               {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
                                 <select
                                   value={m.role_id}
                                   onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
                                   onClick={e => e.stopPropagation()}
-                                  style={{ fontSize: 12, color: "#5A5466", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
+                                  style={{ fontSize: 12, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
                                 >
                                   {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                               ) : (
-                                <p className="text-[12px] text-[#8A8497]">{m.role_name}</p>
+                                <p className="text-[12px] text-[var(--muted-text)]">{m.role_name}</p>
                               )}
                             </div>
                             {(isAdmin || isPresident) && m.user_id !== userId && (
                               isConfirming ? (
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
                                   <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
-                                  <button onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
+                                  <button onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                                 </div>
                               ) : (
                                 <button
                                   onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.user_id); setMobileRevealMemberId(null) }}
-                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "#8A8497", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
                                 >
                                   <X style={{ width: 14, height: 14 }} />
                                 </button>
@@ -10103,9 +10076,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
               <>
                 {/* Hero strip */}
                 <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="#3E1540" fg="#F6F4EF" />
+                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="var(--plum)" fg="#F6F4EF" />
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 4 }}>Team settings</p>
+                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>Team settings</p>
                     {editingTeamName ? (
                       <input
                         autoFocus
@@ -10113,7 +10086,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         onChange={e => setTeamNameDraft(e.target.value)}
                         onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
                         onBlur={handleRenameTeam}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0 }}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0 }}
                       />
                     ) : (
                       <div
@@ -10121,25 +10094,25 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         style={{ cursor: canManageTeam ? "text" : "default" }}
                         onClick={canManageTeam ? () => { setTeamNameDraft(localTeamName); setEditingTeamName(true) } : undefined}
                       >
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1 }}>{localTeamName}</p>
-                        {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0, marginTop: 6 }} />}
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1 }}>{localTeamName}</p>
+                        {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 6 }} />}
                       </div>
                     )}
-                    <p style={{ color: "#5A5466", fontSize: 14, marginTop: 6 }}>
+                    <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>
                       {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
                     </p>
                   </div>
                 </div>
 
                 {/* Roles & permissions */}
-                <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497", marginBottom: 12 }}>Roles & permissions</p>
-                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+                <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Roles & permissions</p>
+                <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
                   {roles.length === 0 ? (
-                    <p style={{ padding: "24px", textAlign: "center", color: "#8A8497", fontSize: 13 }}>No roles defined.</p>
+                    <p style={{ padding: "24px", textAlign: "center", color: "var(--muted-text)", fontSize: 13 }}>No roles defined.</p>
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "260px 1fr" }}>
                       {/* Role left nav */}
-                      <div style={{ borderRight: "1px solid #ECE8DE", background: "#FBF8F2" }}>
+                      <div style={{ borderRight: "1px solid var(--line)", background: "#FBF8F2" }}>
                         {roles.map((role, i) => {
                           const roleCount = members.filter(m => m.role_id === role.id).length
                           const isRoleConfirming = confirmDeleteRoleId === role.id
@@ -10153,8 +10126,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                               onMouseLeave={() => setHoveredRoleId(null)}
                               style={{
                                 padding: "16px 20px",
-                                borderBottom: i < roles.length - 1 ? "1px solid #ECE8DE" : "none",
-                                borderLeft: isPendingDelete ? "2px solid #9F3030" : (activeRole === i ? "2px solid #3E1540" : "2px solid transparent"),
+                                borderBottom: i < roles.length - 1 ? "1px solid var(--line)" : "none",
+                                borderLeft: isPendingDelete ? "2px solid #9F3030" : (activeRole === i ? "2px solid var(--plum)" : "2px solid transparent"),
                                 background: isPendingDelete ? "#FDF0F0" : (isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "white" : "transparent")),
                                 cursor: isRoleConfirming ? "default" : "pointer",
                                 transition: "background 0.1s",
@@ -10163,13 +10136,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                                  <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPendingDelete ? "#9F3030" : "#13101A", textDecoration: isPendingDelete ? "line-through" : "none" }}>{role.name}</span>
+                                  <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPendingDelete ? "#9F3030" : "var(--ink)", textDecoration: isPendingDelete ? "line-through" : "none" }}>{role.name}</span>
                                   {isDraft && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#2F7A3E", background: "#E8F5EB", border: "1px solid #C2E0C8", borderRadius: 4, padding: "1px 5px" }}>NEW</span>}
                                   {isPendingDelete && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   {!isRoleConfirming && (
-                                    <span style={{ fontSize: 11.5, color: "#8A8497" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                    <span style={{ fontSize: 11.5, color: "var(--muted-text)" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
                                   )}
                                   {canManageTeam && (
                                     isRoleConfirming ? (
@@ -10178,7 +10151,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                           <span style={{ fontSize: 11, color: "#9F3030", maxWidth: 100 }}>{roleDeleteError}</span>
                                           <button
                                             onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null); setRoleDeleteError(null) }}
-                                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497", flexShrink: 0 }}
+                                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)", flexShrink: 0 }}
                                           >
                                             <X style={{ width: 12, height: 12 }} />
                                           </button>
@@ -10193,7 +10166,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                           </button>
                                           <button
                                             onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null) }}
-                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}
+                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}
                                           >
                                             <X className="w-4 h-4" />
                                           </button>
@@ -10202,7 +10175,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                     ) : (
                                       <button
                                         onClick={e => { e.stopPropagation(); isPendingDelete ? handleDeleteRole(role.id) : setConfirmDeleteRoleId(role.id) }}
-                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: isPendingDelete ? "#9F3030" : "#8A8497", opacity: (hoveredRoleId === role.id || isPendingDelete) ? 1 : 0, transition: "opacity 0.15s", pointerEvents: (hoveredRoleId === role.id || isPendingDelete) ? "auto" : "none" }}
+                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: isPendingDelete ? "#9F3030" : "var(--muted-text)", opacity: (hoveredRoleId === role.id || isPendingDelete) ? 1 : 0, transition: "opacity 0.15s", pointerEvents: (hoveredRoleId === role.id || isPendingDelete) ? "auto" : "none" }}
                                       >
                                         <X style={{ width: 14, height: 14 }} />
                                       </button>
@@ -10215,7 +10188,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         })}
                         {canManageTeam && (
                           addingRole ? (
-                            <div style={{ padding: "10px 20px", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}>
+                            <div style={{ padding: "10px 20px", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}>
                               <input
                                 autoFocus
                                 value={newRoleName}
@@ -10223,13 +10196,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                 onKeyDown={e => { if (e.key === "Enter") handleAddRole(); if (e.key === "Escape") { setAddingRole(false); setNewRoleName("") } }}
                                 onBlur={() => { if (!newRoleName.trim()) { setAddingRole(false); setNewRoleName("") } }}
                                 placeholder="Role name"
-                                style={{ width: "100%", fontSize: 14, background: "transparent", border: "none", borderBottom: "1px solid #3E1540", outline: "none", padding: "2px 0", color: "#13101A" }}
+                                style={{ width: "100%", fontSize: 14, background: "transparent", border: "none", borderBottom: "1px solid var(--plum)", outline: "none", padding: "2px 0", color: "var(--ink)" }}
                               />
                             </div>
                           ) : (
                             <div
                               onClick={() => { setAddingRole(true); setNewRoleName("") }}
-                              style={{ padding: "13px 20px", color: "#3E1540", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid #ECE8DE" : "none" }}
+                              style={{ padding: "13px 20px", color: "var(--plum)", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}
                             >
                               <Plus style={{ width: 14, height: 14 }} /> Add role
                             </div>
@@ -10249,7 +10222,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                   onChange={e => setRenamingRoleValue(e.target.value)}
                                   onKeyDown={e => { if (e.key === "Enter") handleRenameRole(roles[activeRole].id); if (e.key === "Escape") setRenamingRoleId(null) }}
                                   onBlur={() => handleRenameRole(roles[activeRole].id)}
-                                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A", background: "transparent", border: "none", borderBottom: "1px solid #E2DDCF", outline: "none", padding: 0 }}
+                                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0 }}
                                 />
                               ) : (
                                 <div
@@ -10257,11 +10230,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                   style={{ cursor: canManageTeam ? "text" : "default" }}
                                   onClick={canManageTeam ? () => { setRenamingRoleId(roles[activeRole].id); setRenamingRoleValue(roles[activeRole].name) } : undefined}
                                 >
-                                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "#13101A" }}>{roles[activeRole].name}</p>
-                                  {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "#8A8497", flexShrink: 0 }} />}
+                                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)" }}>{roles[activeRole].name}</p>
+                                  {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                                 </div>
                               )}
-                              <p style={{ fontSize: 12.5, color: "#8A8497", marginTop: 2 }}>
+                              <p style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>
                                 {roles[activeRole].permissions.filter(p => visiblePerms.includes(p)).length} of {visiblePerms.length} permissions enabled
                               </p>
                             </div>
@@ -10272,10 +10245,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                                   <div
                                     key={perm}
                                     onClick={() => togglePermission(perm)}
-                                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: pi < visiblePerms.length - 1 ? "1px solid #ECE8DE" : "none", cursor: canManageTeam ? "pointer" : "default" }}
+                                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: pi < visiblePerms.length - 1 ? "1px solid var(--line)" : "none", cursor: canManageTeam ? "pointer" : "default" }}
                                   >
-                                    <p style={{ flex: 1, fontSize: 14, color: "#13101A", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
-                                    <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "#3E1540" : "#ECE8DE", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+                                    <p style={{ flex: 1, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
+                                    <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--line)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
                                       <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
                                     </div>
                                   </div>
@@ -10291,25 +10264,25 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
                 {/* Members roster */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8A8497" }}>Members</p>
+                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Members</p>
                   {(isAdmin || isPresident) && (
                     <button
                       onClick={() => setShowAddMember(true)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "#3E1540", border: "none", borderRadius: 8, color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "var(--plum)", border: "none", borderRadius: 8, color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                     >
                       + Add member
                     </button>
                   )}
                 </div>
-                <div style={{ background: "white", border: "1px solid #ECE8DE", borderRadius: 16, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px", padding: "10px 22px", borderBottom: "1px solid #ECE8DE", color: "#8A8497", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px", padding: "10px 22px", borderBottom: "1px solid var(--line)", color: "var(--muted-text)", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
                     <span />
                     <span>Name</span>
                     <span>Role</span>
                     <span />
                   </div>
                   {members.length === 0 && (
-                    <p style={{ padding: "24px", textAlign: "center", color: "#8A8497", fontSize: 13 }}>No one&apos;s here yet.</p>
+                    <p style={{ padding: "24px", textAlign: "center", color: "var(--muted-text)", fontSize: 13 }}>No one&apos;s here yet.</p>
                   )}
                   {members.map((m, i) => {
                     const isConfirming = confirmRemoveId === m.user_id
@@ -10322,35 +10295,35 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                         style={{
                           display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px",
                           alignItems: "center", padding: "13px 22px",
-                          borderBottom: i < members.length - 1 ? "1px solid #ECE8DE" : "none",
+                          borderBottom: i < members.length - 1 ? "1px solid var(--line)" : "none",
                           background: isConfirming ? "#FDF0F0" : "transparent",
                           transition: "background 0.1s",
                         }}
                       >
                         <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
-                        <span style={{ fontSize: 13.5, color: "#13101A", fontWeight: 500 }}>{m.name}</span>
+                        <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{m.name}</span>
                         {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
                           <select
                             value={m.role_id}
                             onChange={e => handleChangeRole(m.user_id, e.target.value)}
-                            style={{ fontSize: 13, color: "#5A5466", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
+                            style={{ fontSize: 13, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
                           >
                             {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                           </select>
                         ) : (
-                          <span style={{ fontSize: 13, color: "#5A5466" }}>{m.role_name}</span>
+                          <span style={{ fontSize: 13, color: "var(--body)" }}>{m.role_name}</span>
                         )}
                         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                           {(isAdmin || isPresident) && m.user_id !== userId && (
                             isConfirming ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                                 <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
-                                <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#8A8497" }}><X className="w-4 h-4" /></button>
+                                <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                               </div>
                             ) : (
                               <button
                                 onClick={() => setConfirmRemoveId(m.user_id)}
-                                style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
                               >
                                 <X style={{ width: 14, height: 14 }} />
                               </button>
@@ -10366,11 +10339,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
           </div>
         ) : (
           <div className="hidden md:block px-10 py-8">
-            <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 400, color: "#8A8497", textTransform: "uppercase", letterSpacing: "1.4px", marginBottom: 6 }}>
+            <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>
               TEAM SETTINGS · {team.name.toUpperCase()}
             </p>
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "#13101A", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
-            <p style={{ fontSize: 15, color: "#5A5466", marginBottom: 32 }}>Select people from your ministry and assign them a role on this team.</p>
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
+            <p style={{ fontSize: 15, color: "var(--body)", marginBottom: 32 }}>Select people from your ministry and assign them a role on this team.</p>
             {addMemberForm}
           </div>
         )}
@@ -10378,17 +10351,17 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
       {/* Sticky action footer — add members */}
       {showAddMember && selectedIds.size > 0 && (
-        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid #E8E2D2" }}
+        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid var(--line)" }}
           className="px-5 md:px-10 py-4 pb-8 md:pb-5"
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <p style={{ fontSize: 14, color: "#5A5466", margin: 0 }}>
-              <span style={{ fontWeight: 600, color: "#13101A" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
+            <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
             </p>
             <button
               onClick={handleAddMembers}
               disabled={saving}
-              style={{ padding: "10px 22px", background: "#2D0F2E", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
+              style={{ padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
             >
               {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
             </button>
@@ -10431,7 +10404,7 @@ const WIZARD_MONO = {
   fontSize: 11,
   letterSpacing: "0.12em",
   textTransform: "uppercase" as const,
-  color: "#8A8497",
+  color: "var(--muted-text)",
 }
 
 export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPraiseTeamMember, onClose, onCreated }: {
@@ -10570,16 +10543,16 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
       style={{ background: "rgba(20,16,26,0.32)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="animate-dialog-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid #E2DDCF", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+      <div className="animate-dialog-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
 
         {/* Modal header */}
         <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {step > 1 ? (
-            <button onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#5A5466", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+            <button onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
               <ArrowLeft style={{ width: 14, height: 14 }} /> Back
             </button>
           ) : <span />}
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
@@ -10587,14 +10560,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
         <div style={{ padding: "12px 32px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <div>
             <div style={WIZARD_MONO}>NEW TEAM</div>
-            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 34, margin: "6px 0 0", letterSpacing: "-0.4px", color: "#13101A", fontWeight: 400, lineHeight: 1.1 }}>
+            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 34, margin: "6px 0 0", letterSpacing: "-0.4px", color: "var(--ink)", fontWeight: 400, lineHeight: 1.1 }}>
               {stepTitles[step]}
             </h2>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
             <span style={{ ...WIZARD_MONO, fontSize: 10, letterSpacing: "0.08em" }}>STEP {step} OF 3</span>
             <div style={{ display: "flex", gap: 4 }}>
-              {[1, 2, 3].map(i => <span key={i} style={{ width: 22, height: 3, borderRadius: 99, background: i <= step ? "#3E1540" : "#E2DDCF" }} />)}
+              {[1, 2, 3].map(i => <span key={i} style={{ width: 22, height: 3, borderRadius: 99, background: i <= step ? "var(--plum)" : "var(--line-2)" }} />)}
             </div>
           </div>
         </div>
@@ -10616,7 +10589,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   return (
                     <div key={p.id} style={{
                       display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
-                      border: "1px solid #E8E2D2", background: "#F8F6F2",
+                      border: "1px solid var(--line)", background: "#F8F6F2",
                       opacity: 0.55, cursor: "not-allowed",
                     }}>
                       <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: "#EDE9E0", color: "#A09A8C", display: "grid", placeItems: "center" }}>
@@ -10624,8 +10597,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#8A8497" }}>{p.label}</span>
-                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#ECE8DE", color: "#8A8497", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--muted-text)" }}>{p.label}</span>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--line)", color: "var(--muted-text)", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
                         </span>
                         <span style={{ display: "block", fontSize: 12.5, color: "#C4C0B0", marginTop: 3 }}>{p.desc}</span>
                       </span>
@@ -10636,22 +10609,22 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
                     display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
                     textAlign: "left" as const, width: "100%", cursor: "pointer", fontFamily: "inherit",
-                    border: "1px solid " + (on ? "#3E1540" : "#E8E2D2"),
+                    border: "1px solid " + (on ? "var(--plum)" : "var(--line)"),
                     background: on ? "#F6F2E8" : "#FBF8F2",
-                    boxShadow: on ? "inset 0 0 0 1px #3E1540" : "none",
+                    boxShadow: on ? "inset 0 0 0 1px var(--plum)" : "none",
                     transition: "border-color 0.1s, background 0.1s",
                   }}>
-                    <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: on ? "#3E1540" : "#F1ECDE", color: on ? "#FBF8F2" : "#3E1540", display: "grid", placeItems: "center" }}>
+                    <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: on ? "var(--plum)" : "var(--ivory)", color: on ? "#FBF8F2" : "var(--plum)", display: "grid", placeItems: "center" }}>
                       {iconOpt && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconOpt.d}/></svg>}
                     </span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "#13101A" }}>{p.label}</span>
-                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#F1ECDE", color: "#8A8497", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 500 }}>{roleCount} roles</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.label}</span>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--muted-text)", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 500 }}>{roleCount} roles</span>
                       </span>
-                      <span style={{ display: "block", fontSize: 12.5, color: "#5A5466", marginTop: 3 }}>{p.desc}</span>
+                      <span style={{ display: "block", fontSize: 12.5, color: "var(--body)", marginTop: 3 }}>{p.desc}</span>
                     </span>
-                    <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid " + (on ? "#3E1540" : "#C4C0B0"), background: on ? "#3E1540" : "transparent", display: "grid", placeItems: "center" }}>
+                    <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid " + (on ? "var(--plum)" : "#C4C0B0"), background: on ? "var(--plum)" : "transparent", display: "grid", placeItems: "center" }}>
                       {on && <span style={{ width: 7, height: 7, borderRadius: 99, background: "#FBF8F2" }} />}
                     </span>
                   </button>
@@ -10664,14 +10637,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
           {step === 2 && (
             <>
               {/* Live preview tile */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#F6F2E8", marginBottom: 28 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" />
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid var(--line)", borderRadius: 14, background: "#F6F2E8", marginBottom: 28 }}>
+                <PlanLineIcon iconKey={iconKey} size={52} bg="var(--plum)" fg="#FBF8F2" />
                 <div>
                   <div style={WIZARD_MONO}>PREVIEW</div>
-                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", marginTop: 4, letterSpacing: "-0.2px", fontWeight: 400, lineHeight: 1.1 }}>
+                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", marginTop: 4, letterSpacing: "-0.2px", fontWeight: 400, lineHeight: 1.1 }}>
                     {name || selectedDisplay?.label || "Your Team"}
                   </div>
-                  <div style={{ fontSize: 12, color: "#8A8497", marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 3 }}>
                     {roles.length} role{roles.length !== 1 ? "s" : ""} · You will be {topRoleName}
                   </div>
                 </div>
@@ -10687,8 +10660,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   placeholder={selectedDisplay?.label ?? "e.g. Media Team"}
                   style={{
                     width: "100%", padding: "11px 14px", marginTop: 8,
-                    border: "1px solid " + (error ? "#9F3030" : "#E2DDCF"), borderRadius: 10,
-                    background: "#FBF8F2", fontSize: 15, fontFamily: "inherit", color: "#13101A",
+                    border: "1px solid " + (error ? "#9F3030" : "var(--line-2)"), borderRadius: 10,
+                    background: "#FBF8F2", fontSize: 15, fontFamily: "inherit", color: "var(--ink)",
                     outline: "none", boxSizing: "border-box" as const,
                   }}
                 />
@@ -10701,9 +10674,9 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   {WIZARD_ICON_OPTIONS.map(opt => (
                     <button key={opt.key} onClick={() => setIconKey(opt.key)} style={{
                       aspectRatio: "1", borderRadius: 10, cursor: "pointer", padding: 8,
-                      border: "1px solid " + (iconKey === opt.key ? "#3E1540" : "#E2DDCF"),
-                      background: iconKey === opt.key ? "#3E1540" : "#FBF8F2",
-                      color: iconKey === opt.key ? "#FBF8F2" : "#5A5466",
+                      border: "1px solid " + (iconKey === opt.key ? "var(--plum)" : "var(--line-2)"),
+                      background: iconKey === opt.key ? "var(--plum)" : "#FBF8F2",
+                      color: iconKey === opt.key ? "#FBF8F2" : "var(--body)",
                       boxShadow: iconKey === opt.key ? "0 0 0 3px #F6F2E8 inset" : "none",
                       display: "grid", placeItems: "center",
                       transition: "border-color 0.1s, background 0.1s",
@@ -10714,7 +10687,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                     </button>
                   ))}
                 </div>
-                <p style={{ fontSize: 11.5, color: "#8A8497", marginTop: 8 }}>One small, monochromatic mark — keeps the sidebar legible.</p>
+                <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8 }}>One small, monochromatic mark — keeps the sidebar legible.</p>
               </div>
             </>
           )}
@@ -10723,15 +10696,15 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
           {step === 3 && (
             <>
               {/* Identity summary */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid #E8E2D2", borderRadius: 14, background: "#FBF8F2", marginBottom: 24 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="#3E1540" fg="#FBF8F2" />
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", marginBottom: 24 }}>
+                <PlanLineIcon iconKey={iconKey} size={52} bg="var(--plum)" fg="#FBF8F2" />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "#13101A", letterSpacing: "-0.2px", fontWeight: 400 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>
+                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.2px", fontWeight: 400 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>
                     {selectedDisplay ? `Based on ${selectedDisplay.label}` : "Custom"} · {roles.length} role{roles.length !== 1 ? "s" : ""}
                   </div>
                 </div>
-                <button onClick={() => setStep(2)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => setStep(2)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
                   <Edit3 style={{ width: 13, height: 13 }} /> Edit
                 </button>
               </div>
@@ -10740,27 +10713,27 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
               {presidentRoleIdx >= 0 && (
                 <div style={{ border: "2px solid rgba(62,21,64,0.2)", borderRadius: 14, background: "#F8F5FF", padding: "16px 18px", marginBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <span style={{ ...WIZARD_MONO, color: "#3E1540" }}>{roles[presidentRoleIdx].name}</span>
+                    <span style={{ ...WIZARD_MONO, color: "var(--plum)" }}>{roles[presidentRoleIdx].name}</span>
                     <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#FEE2E2", color: "#9F3030", border: "1px solid #FECACA", fontWeight: 600, letterSpacing: "0.3px", textTransform: "uppercase" as const }}>Required</span>
                     <div style={{ marginLeft: "auto" }}>
                       <button
                         type="button"
                         onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
-                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#5A5466", fontFamily: "inherit", padding: 0 }}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--body)", fontFamily: "inherit", padding: 0 }}
                       >
-                        <span style={{ width: 14, height: 14, borderRadius: 3, border: `1px solid ${coPresidency ? "#3E1540" : "#C4C4C4"}`, background: coPresidency ? "#3E1540" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
+                        <span style={{ width: 14, height: 14, borderRadius: 3, border: `1px solid ${coPresidency ? "var(--plum)" : "#C4C4C4"}`, background: coPresidency ? "var(--plum)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
                           {coPresidency && <Check style={{ width: 9, height: 9, color: "#fff" }} />}
                         </span>
                         Co-presidency
                       </button>
                     </div>
                   </div>
-                  <p style={{ fontSize: 12, color: "#5A5466", marginBottom: 10, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 10, lineHeight: 1.5 }}>
                     You will remain in your ministry role. Pick who holds this position from your ministry.
                   </p>
                   {/* First president */}
                   {presidentPick ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#3E1540", borderRadius: 10, padding: "10px 14px", marginBottom: coPresidency ? 8 : 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--plum)", borderRadius: 10, padding: "10px 14px", marginBottom: coPresidency ? 8 : 0 }}>
                       <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}</span>
                       <button onClick={() => setPresidentPick(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
                         <X style={{ width: 14, height: 14 }} />
@@ -10770,7 +10743,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                     <select
                       value=""
                       onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
-                      style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "#fff", fontSize: 13, color: "#13101A", fontFamily: "inherit", marginBottom: coPresidency ? 8 : 0 }}
+                      style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit", marginBottom: coPresidency ? 8 : 0 }}
                     >
                       <option value="" disabled>Select a person…</option>
                       {ministryMembers.filter(m => m.id !== presidentPick2).map(m => (
@@ -10781,7 +10754,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                   {/* Second president (co-presidency) */}
                   {coPresidency && (
                     presidentPick2 ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#3E1540", borderRadius: 10, padding: "10px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--plum)", borderRadius: 10, padding: "10px 14px" }}>
                         <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}</span>
                         <button onClick={() => setPresidentPick2(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
                           <X style={{ width: 14, height: 14 }} />
@@ -10791,7 +10764,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                       <select
                         value=""
                         onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E2DDCF", background: "#fff", fontSize: 13, color: "#13101A", fontFamily: "inherit" }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit" }}
                       >
                         <option value="" disabled>Select second person…</option>
                         {ministryMembers.filter(m => m.id !== presidentPick).map(m => (
@@ -10807,14 +10780,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={WIZARD_MONO}>ROLES · {roles.length}</div>
                 {selectedPresetId === "custom" && (
-                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])} style={{ background: "none", border: "none", color: "#3E1540", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])} style={{ background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                     <Plus style={{ width: 13, height: 13 }} /> Add role
                   </button>
                 )}
               </div>
 
               {selectedPresetId === "custom" && roles.length === 0 && (
-                <button onClick={() => setRoles([{ name: "New Role", permissions: [] }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "#8A8497", fontFamily: "inherit" }}>
+                <button onClick={() => setRoles([{ name: "New Role", permissions: [] }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-text)", fontFamily: "inherit" }}>
                   <Plus style={{ width: 13, height: 13 }} /> Add first role
                 </button>
               )}
@@ -10826,17 +10799,17 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                       <input
                         value={role.name}
                         onChange={e => setRoles(prev => prev.map((r, i) => i === ri ? { ...r, name: e.target.value } : r))}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "#13101A", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
                       />
                     ) : (
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#13101A" }}>{role.name}</span>
+                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)" }}>{role.name}</span>
                     )}
-                    {ri === defaultMemberRoleIdx && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#2D0F2E", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
-                    {ri === presidentRoleIdx && presidentRoleIdx !== defaultMemberRoleIdx && presidentPick && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#3E1540", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>{ministryMembers.find(m => m.id === presidentPick)?.name?.split(" ")[0] ?? "Selected"}</span>}
+                    {ri === defaultMemberRoleIdx && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--plum-2)", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
+                    {ri === presidentRoleIdx && presidentRoleIdx !== defaultMemberRoleIdx && presidentPick && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>{ministryMembers.find(m => m.id === presidentPick)?.name?.split(" ")[0] ?? "Selected"}</span>}
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 12, color: "#8A8497" }}>{role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}</span>
                     {selectedPresetId === "custom" && (
-                      <button onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))} style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: "#8A8497", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                      <button onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))} style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: "var(--muted-text)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                         <X style={{ width: 13, height: 13 }} />
                       </button>
                     )}
@@ -10847,9 +10820,9 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
                       return (
                         <button key={perm} onClick={() => toggleRolePermission(ri, perm)} style={{
                           padding: "5px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                          border: "1px solid " + (active ? "#C8C0D8" : "#E8E2D2"),
-                          background: active ? "#F1ECDE" : "#FBF8F2",
-                          color: active ? "#2D0F2E" : "#A09A8C",
+                          border: "1px solid " + (active ? "#C8C0D8" : "var(--line)"),
+                          background: active ? "var(--ivory)" : "#FBF8F2",
+                          color: active ? "var(--plum-2)" : "#A09A8C",
                           transition: "all 0.1s",
                         }}>
                           {PERMISSION_LABELS[perm] ?? perm}
@@ -10866,14 +10839,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "16px 28px 22px", borderTop: "1px solid #E8E2D2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2" }}>
+        <div style={{ padding: "16px 28px 22px", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2" }}>
           {step === 1 && (
             <>
-              <span style={{ fontSize: 12, color: "#8A8497" }}>Templates pre-fill icon, roles, and permissions. You can change anything next.</span>
+              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Templates pre-fill icon, roles, and permissions. You can change anything next.</span>
               <button
                 disabled={!selectedPresetId}
                 onClick={() => { if (selectedPresetId) { applyPreset(selectedPresetId); setStep(2) } }}
-                style={{ padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, cursor: selectedPresetId ? "pointer" : "not-allowed", opacity: selectedPresetId ? 1 : 0.45 }}
+                style={{ padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, cursor: selectedPresetId ? "pointer" : "not-allowed", opacity: selectedPresetId ? 1 : 0.45 }}
               >
                 Continue <ChevronRight style={{ width: 14, height: 14 }} />
               </button>
@@ -10881,12 +10854,12 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
           )}
           {step === 2 && (
             <>
-              <span style={{ fontSize: 12, color: "#8A8497" }}>
-                Based on <span style={{ color: "#2D0F2E", fontWeight: 500 }}>{selectedDisplay?.label ?? "custom"}</span>
+              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                Based on <span style={{ color: "var(--plum-2)", fontWeight: 500 }}>{selectedDisplay?.label ?? "custom"}</span>
               </span>
               <button
                 onClick={() => { if (!name.trim()) { setError("Team name is required."); return }; setError(null); setStep(3) }}
-                style={{ padding: "11px 22px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+                style={{ padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
               >
                 Continue <ChevronRight style={{ width: 14, height: 14 }} />
               </button>
@@ -10894,11 +10867,11 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
           )}
           {step === 3 && (
             <>
-              <span style={{ fontSize: 12, color: "#8A8497" }}>You can edit roles & permissions any time from team settings.</span>
+              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>You can edit roles & permissions any time from team settings.</span>
               <button
                 onClick={handleCreate}
                 disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))}
-                style={{ padding: "11px 24px", background: "#2D0F2E", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                style={{ padding: "11px 24px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
               >
                 {saving ? "Creating…" : <><Check style={{ width: 14, height: 14 }} /> Create team</>}
               </button>
@@ -10953,9 +10926,9 @@ function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string;
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
       <div>
-        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8A8497", textTransform: "uppercase" as const }}>{eyebrow}</div>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "#13101A", margin: "4px 0 0", letterSpacing: "-0.015em", lineHeight: 1.15 }}>{title}</h2>
-        {sub && <div style={{ fontSize: 13, color: "#5A5466", marginTop: 3 }}>{sub}</div>}
+        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{eyebrow}</div>
+        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", margin: "4px 0 0", letterSpacing: "-0.015em", lineHeight: 1.15 }}>{title}</h2>
+        {sub && <div style={{ fontSize: 13, color: "var(--body)", marginTop: 3 }}>{sub}</div>}
       </div>
       {right && <div style={{ flexShrink: 0, marginTop: 4 }}>{right}</div>}
     </div>
@@ -11575,7 +11548,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("keep")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Keep roster
                 </button>
@@ -11594,8 +11567,8 @@ function SmallGroupLeadersTab({
           <section>
             <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
-                <p className="text-[13px] text-[#8A8497]">Your schedule hasn&apos;t been published yet.</p>
+              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                <p className="text-[13px] text-[var(--muted-text)]">Your schedule hasn&apos;t been published yet.</p>
               </div>
             ) : (() => {
               const todayStr = new Date().toISOString().split("T")[0]
@@ -11607,7 +11580,7 @@ function SmallGroupLeadersTab({
               }
               const firstUpcomingIdx = myUpcoming.findIndex(a => getDateStr(a) >= todayStr)
               return (
-                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {myUpcoming.map((a, i) => {
                     const sunday = new Date(a.week_date + "T12:00:00")
                     const d = new Date(sunday)
@@ -11630,24 +11603,24 @@ function SmallGroupLeadersTab({
                         className="flex items-center gap-4 px-5 py-4"
                         style={{
                           borderTop: i === 0 ? "none" : "1px solid #EFE9DA",
-                          borderLeft: isNext ? "3px solid #3E1540" : "3px solid transparent",
+                          borderLeft: isNext ? "3px solid var(--plum)" : "3px solid transparent",
                           background: isNext ? "#F6F2E8" : "transparent",
                           opacity: isPast ? 0.4 : 1,
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "#E8E2D2"}` }}>
-                          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const }}>{dow}</span>
-                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "#3E1540" : "#2D0F2E", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
+                          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
+                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "#8A8497" : "#13101A", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
-                          <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase" as const, marginTop: 3 }}>
+                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
+                          <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginTop: 3 }}>
                             {subLabel}
                           </p>
                         </div>
                         {isNext && (
-                          <span style={{ fontSize: 10, fontWeight: 600, color: "#3E1540", background: "#EDE5F5", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--plum)", background: "#EDE5F5", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
                         )}
                       </div>
                     )
@@ -11671,7 +11644,7 @@ function SmallGroupLeadersTab({
                 right={rosterStatus?.confirmed && !rosterAddMode && !editingRoster ? (
                   <button
                     onClick={() => { setPendingRosterIds(new Set(rosterMembers.map(m => m.user_id))); setEditingRoster(true) }}
-                    style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
                   >
                     Edit
                   </button>
@@ -11691,22 +11664,22 @@ function SmallGroupLeadersTab({
                   className="w-full mt-4"
                   style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 14, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
                 >
-                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">No roster yet</p>
-                  <p className="text-[13px] text-[#8A8497] mb-3">Add DGLs to the {semesterLabel} roster.</p>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#3E1540" }}>+ Add DGLs</span>
+                  <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No roster yet</p>
+                  <p className="text-[13px] text-[var(--muted-text)] mb-3">Add DGLs to the {semesterLabel} roster.</p>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plum)" }}>+ Add DGLs</span>
                 </button>
               )}
 
               {/* Add / Edit mode — member picker */}
               {(rosterAddMode || editingRoster) && (
-                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   <div className="px-4 pt-4 pb-3 border-b border-[#EFE9DA]">
                     <input
                       type="text"
                       placeholder="Search members…"
                       value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
-                      style={{ width: "100%", border: "1px solid #E2DDCF", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2" }}
+                      style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2" }}
                     />
                   </div>
                   <div style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -11721,11 +11694,9 @@ function SmallGroupLeadersTab({
                             className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}
                             style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
                           >
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
-                              {getInitials(m.name)}
-                            </div>
-                            <p className="flex-1 text-[13px] text-[#13101A]">{m.name}</p>
-                            {selected && <Check style={{ width: 14, height: 14, color: "#3E1540" }} />}
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-semibold" />
+                            <p className="flex-1 text-[13px] text-[var(--ink)]">{m.name}</p>
+                            {selected && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                           </div>
                         )
                       })}
@@ -11733,14 +11704,14 @@ function SmallGroupLeadersTab({
                   <div className="flex gap-2 px-4 py-3 border-t border-[#EFE9DA]">
                     <button
                       onClick={() => { setRosterAddMode(false); setEditingRoster(false); setPendingRosterIds(new Set()); setMemberSearch("") }}
-                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleConfirmRoster}
                       disabled={confirmingRoster || pendingRosterIds.size === 0}
-                      style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
+                      style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
                     >
                       {confirmingRoster ? "Confirming…" : `Confirm (${pendingRosterIds.size})`}
                     </button>
@@ -11750,13 +11721,11 @@ function SmallGroupLeadersTab({
 
               {/* Confirmed roster list */}
               {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
-                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>
-                        {getInitials(m.name)}
-                      </div>
-                      <p className="flex-1 text-[14px] text-[#13101A]">{m.name}</p>
+                      <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                      <p className="flex-1 text-[14px] text-[var(--ink)]">{m.name}</p>
                     </div>
                   ))}
                 </div>
@@ -11784,18 +11753,18 @@ function SmallGroupLeadersTab({
                   right={isEditing ? (
                     <button
                       onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#5A5466", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
                     >Cancel</button>
                   ) : (
                     <button
                       onClick={() => { setEditingGroupId(group.id); setEditError(null) }}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2DDCF", background: "transparent", color: "#3E1540", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--plum)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
                     >Edit</button>
                   )}
                 />
-                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   {members.length === 0 && !pendingAddMemberIds.size ? (
-                    <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
+                    <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                   ) : (
                     <>
                       {members.map((m, i) => {
@@ -11804,21 +11773,21 @@ function SmallGroupLeadersTab({
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
-                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[#13101A]"}`}>{m.name}</p>
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
-                                <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
+                                <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
                               ) : isConfirming ? (
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
-                                  <button onClick={() => setConfirmRemoveSgMemberId(null)} style={{ fontSize: 11, fontWeight: 500, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Keep</button>
+                                  <button onClick={() => setConfirmRemoveSgMemberId(null)} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Keep</button>
                                 </div>
                               ) : (
                                 <button onClick={() => setConfirmRemoveSgMemberId(m.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
                               )
                             ) : (
-                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid #E2DDCF", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 600, color: mealDone ? "#3E1540" : "#8A8497", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
+                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 600, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
                                 {mealDone ? "Meal ✓" : "Meal"}
                               </button>
                             )}
@@ -11830,9 +11799,9 @@ function SmallGroupLeadersTab({
                         if (!person) return null
                         return (
                           <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[#EFE9DA]" style={{ background: "rgba(62,21,64,0.03)" }}>
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(person.name)}</div>
-                            <p className="flex-1 text-[14px] text-[#13101A]">{person.name}</p>
-                            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#3E1540", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
+                            <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                            <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
+                            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
                             <button onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
                           </div>
                         )
@@ -11843,21 +11812,21 @@ function SmallGroupLeadersTab({
                     <div className="border-t border-[#EFE9DA]">
                       {showSgAddPicker ? (
                         <div className="p-3">
-                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid #E2DDCF", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2", marginBottom: 6 }} />
-                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid #E8E2D2", background: "#FBF8F2" }}>
+                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2", marginBottom: 6 }} />
+                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "#FBF8F2" }}>
                             {addableMembers.length === 0 ? (
-                              <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "#8A8497" }}>No members to add</p></div>
+                              <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "var(--muted-text)" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
                               <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}>
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(p.name)}</div>
-                                <p style={{ fontSize: 13, color: "#13101A" }}>{p.name}</p>
+                                <MonogramChip initials={getInitials(p.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                                <p style={{ fontSize: 13, color: "var(--ink)" }}>{p.name}</p>
                               </div>
                             ))}
                           </div>
-                          <button onClick={() => { setShowSgAddPicker(false); setSgAddPickerSearch("") }} style={{ marginTop: 6, fontSize: 12, color: "#8A8497", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
+                          <button onClick={() => { setShowSgAddPicker(false); setSgAddPickerSearch("") }} style={{ marginTop: 6, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
                         </div>
                       ) : (
-                        <button onClick={() => setShowSgAddPicker(true)} style={{ width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", color: "#3E1540", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)" }}>
+                        <button onClick={() => setShowSgAddPicker(true)} style={{ width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", color: "var(--plum)", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-inter)" }}>
                           <Plus style={{ width: 13, height: 13 }} /> Add member
                         </button>
                       )}
@@ -11868,24 +11837,24 @@ function SmallGroupLeadersTab({
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
                     {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>{editError}</div>}
-                    <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
+                    <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
+                      <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
                     </div>
                   </div>
                 )}
 
                 {pairedGroup && (
                   <div className="mt-3">
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
-                    <div className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
+                    <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                       {pairedMs.length === 0 ? (
-                        <div className="px-4 py-5 text-center"><p className="text-[13px] text-[#8A8497]">No members yet.</p></div>
+                        <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0" style={{ background: "var(--plum)", color: "var(--cream)" }}>{getInitials(m.name)}</div>
-                          <p className="text-[14px] text-[#13101A]">{m.name}</p>
+                          <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                          <p className="text-[14px] text-[var(--ink)]">{m.name}</p>
                         </div>
                       ))}
                     </div>
@@ -11911,11 +11880,11 @@ function SmallGroupLeadersTab({
           {/* Semester selector — president/admin only */}
           {isPresident && (
             <div className="flex items-center gap-3">
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#8A8497", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Semester</p>
+              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Semester</p>
               <select
                 value={semester}
                 onChange={e => setSemester(e.target.value)}
-                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #E2DDCF", borderRadius: 9, background: "#FBF8F2", color: "#13101A", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "#FBF8F2", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
               >
                 {getSemesterOptions().map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -11929,9 +11898,9 @@ function SmallGroupLeadersTab({
             <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
-                <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster not confirmed</p>
-                <p className="text-[13px] text-[#8A8497]">
+              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster not confirmed</p>
+                <p className="text-[13px] text-[var(--muted-text)]">
                   The president needs to confirm the DGL roster before availability can be set.
                 </p>
               </div>
@@ -11955,21 +11924,21 @@ function SmallGroupLeadersTab({
                 : scheduleRosterMembers.filter(m => m.user_id === userId)
               return (
                 <>
-                  <p className="text-[12px] text-[#8A8497] mb-3 mt-3">
-                    Check dates when you&apos;re <span className="font-semibold text-[#3E1540]">not available</span>. Changes save automatically.
+                  <p className="text-[12px] text-[var(--muted-text)] mb-3 mt-3">
+                    Check dates when you&apos;re <span className="font-semibold text-[var(--plum)]">not available</span>. Changes save automatically.
                   </p>
-                  <div className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                  <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                     <div className="overflow-x-auto">
                       <table style={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: nameColW + semesterDates.length * datColW }}>
                         <thead>
                           {/* Month eyebrow row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid #E8E2D2" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid var(--line)" }} />
                             {monthGroups.map(group => (
                               <th
                                 key={group.label}
                                 colSpan={group.dates.length}
-                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "#8A8497", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid #E8E2D2", borderLeft: "1px solid #E8E2D2", background: "#F6F2E8", textAlign: "left", whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)", background: "#F6F2E8", textAlign: "left", whiteSpace: "nowrap" }}
                               >
                                 {group.label}
                               </th>
@@ -11977,14 +11946,14 @@ function SmallGroupLeadersTab({
                           </tr>
                           {/* Date header row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid #E8E2D2", borderRight: "1px solid #E8E2D2" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid var(--line)", borderRight: "1px solid var(--line)" }} />
                             {semesterDates.map(({ date, slot }) => {
                               const [, m, d] = date.split("-")
                               const isPast = date < today
                               return (
-                                <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid #E8E2D2", textAlign: "center" }}>
-                                  <div style={{ fontSize: 9, fontWeight: 700, color: isPast ? "#C5C0CC" : "#5A5466", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
-                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "#8A8497" }}>{parseInt(m)}/{parseInt(d)}</div>
+                                <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid var(--line)", textAlign: "center" }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: isPast ? "#C5C0CC" : "var(--body)", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "var(--muted-text)" }}>{parseInt(m)}/{parseInt(d)}</div>
                                 </th>
                               )
                             })}
@@ -11993,7 +11962,7 @@ function SmallGroupLeadersTab({
                         <tbody>
                           {displayMembers.map((member, i) => (
                             <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #EFE9DA" : undefined }}>
-                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FBF8F2", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "#5A5466", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid #E8E2D2" }}>
+                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FBF8F2", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "var(--body)", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid var(--line)" }}>
                                 {member.name.split(" ")[0]}
                               </td>
                               {semesterDates.map(({ date, slot }) => {
@@ -12009,13 +11978,13 @@ function SmallGroupLeadersTab({
                                       <button
                                         onClick={() => toggleBusy(date, slot)}
                                         disabled={isSavingThis}
-                                        style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "#3E1540" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                                        style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "var(--plum)" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                                       >
                                         {isBusy && <X style={{ width: 10, height: 10, color: "#F6F4EF" }} />}
                                       </button>
                                     ) : (
-                                      <div style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #ECE8DE", background: isBusy ? (isPast ? "#D4CEDF" : "#ECE8DE") : "transparent", opacity: isPast ? 0.5 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                                        {isBusy && <X style={{ width: 10, height: 10, color: "#8A8497" }} />}
+                                      <div style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid var(--line)", background: isBusy ? (isPast ? "#D4CEDF" : "var(--line)") : "transparent", opacity: isPast ? 0.5 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                        {isBusy && <X style={{ width: 10, height: 10, color: "var(--muted-text)" }} />}
                                       </div>
                                     )}
                                   </td>
@@ -12027,7 +11996,7 @@ function SmallGroupLeadersTab({
                       </table>
                     </div>
                   </div>
-                  <p className="text-[11px] text-[#8A8497] mt-2">Checked = unavailable. Changes save automatically.</p>
+                  <p className="text-[11px] text-[var(--muted-text)] mt-2">Checked = unavailable. Changes save automatically.</p>
                   {/* Done button — non-president DGLs only */}
                   {!isPresident && (
                     <div className="mt-4 flex items-center gap-3">
@@ -12038,7 +12007,7 @@ function SmallGroupLeadersTab({
                       ) : (
                         <button
                           onClick={handleMarkReady}
-                          style={{ padding: "9px 18px", background: "#2D0F2E", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ padding: "9px 18px", background: "var(--plum-2)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                         >
                           Done filling out →
                         </button>
@@ -12055,8 +12024,8 @@ function SmallGroupLeadersTab({
             <div>
               <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
-                  <p className="text-[13px] text-[#8A8497]">The rotation hasn&apos;t been published yet.</p>
+                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                  <p className="text-[13px] text-[var(--muted-text)]">The rotation hasn&apos;t been published yet.</p>
                 </div>
               ) : (
                 <div className="mt-4">
@@ -12079,13 +12048,13 @@ function SmallGroupLeadersTab({
                   <div className="flex items-center gap-2">
                     {(rotationPhase === "saved" || rotationPhase === "published") && (
                       <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "#F4F1E8", color: "#3E1540", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "#F4F1E8", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
                           {rotationPhase === "published" ? "Published" : "Draft"}
                         </span>
-                        <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                        <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                           <Shuffle style={{ width: 11, height: 11 }} /> Re-generate
                         </button>
-                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "#3E1540", color: rotationPhase === "published" ? "#3E1540" : "#F6F4EF", border: rotationPhase === "published" ? "1px solid #3E1540" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
+                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "var(--plum)", color: rotationPhase === "published" ? "var(--plum)" : "#F6F4EF", border: rotationPhase === "published" ? "1px solid var(--plum)" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
                           {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
                         </button>
                       </>
@@ -12096,9 +12065,9 @@ function SmallGroupLeadersTab({
 
               {/* DGL readiness summary */}
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
-                <div className="mt-4 rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                   <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497", textTransform: "uppercase", margin: 0 }}>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
                     </p>
                   </div>
@@ -12106,7 +12075,7 @@ function SmallGroupLeadersTab({
                     {scheduleRosterMembers.map(m => {
                       const ready = memberReadiness.get(m.user_id) ?? false
                       return (
-                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "rgba(46,125,50,0.08)" : "#F4F1E8", border: `1px solid ${ready ? "rgba(46,125,50,0.2)" : "#E8E2D2"}`, color: ready ? "#2E7D32" : "#8A8497", fontWeight: ready ? 500 : 400 }}>
+                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "rgba(46,125,50,0.08)" : "#F4F1E8", border: `1px solid ${ready ? "rgba(46,125,50,0.2)" : "var(--line)"}`, color: ready ? "#2E7D32" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>
                           {ready && <Check style={{ width: 10, height: 10 }} />}
                           {m.name.split(" ")[0]}
                           {!ready && <span style={{ fontSize: 10, opacity: 0.6 }}>…</span>}
@@ -12118,9 +12087,9 @@ function SmallGroupLeadersTab({
               )}
 
               {!rosterConfirmedForSchedule ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
-                  <p className="text-[14px] font-semibold text-[#13101A] mb-1">Roster required</p>
-                  <p className="text-[13px] text-[#8A8497]">
+                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                  <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster required</p>
+                  <p className="text-[13px] text-[var(--muted-text)]">
                     Confirm the DGL roster on the Home tab first to generate a rotation.
                   </p>
                 </div>
@@ -12133,12 +12102,12 @@ function SmallGroupLeadersTab({
                   )}
 
                   {rotationPhase === "idle" && (
-                    <div className="mt-4 rounded-[14px] border border-dashed border-[#E8E2D2] p-6 text-center" style={{ background: "#FBF8F2" }}>
-                      <p className="text-[14px] font-semibold text-[#13101A] mb-1">No rotation yet</p>
-                      <p className="text-[13px] text-[#8A8497] mb-5">
+                    <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                      <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No rotation yet</p>
+                      <p className="text-[13px] text-[var(--muted-text)] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
                       </p>
-                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </button>
                     </div>
@@ -12160,15 +12129,15 @@ function SmallGroupLeadersTab({
                           const weekDates = [...new Set(rows.map(r => r.week_date))].sort()
                           const isOpen = openRotMonths.has(month)
                           return (
-                            <div key={month} className="rounded-[14px] border border-[#E8E2D2] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                            <div key={month} className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
                               <button
                                 onClick={() => setOpenRotMonths(prev => { const n = new Set(prev); isOpen ? n.delete(month) : n.add(month); return n })}
                                 className="w-full flex items-center gap-3 px-5 py-4 text-left"
                                 style={{ background: isOpen ? "#F6F2E8" : "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                               >
-                                <ChevronDown style={{ width: 15, height: 15, color: "#5A5466", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#13101A", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
-                                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "#8A8497" }}>{weekDates.length} WEEKS</span>
+                                <ChevronDown style={{ width: 15, height: 15, color: "var(--body)", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
+                                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
                               </button>
                               {isOpen && (
                                 <div style={{ borderTop: "1px solid #EFE9DA" }}>
@@ -12226,11 +12195,11 @@ function SmallGroupLeadersTab({
                       <div className="flex items-center justify-between mt-4">
                         <button
                           onClick={() => { setProposedAssignments([]); setFlagged([]); setRotationPhase(existingAssignments.length === 0 ? "idle" : existingAssignments.some(r => r.published) ? "published" : "saved") }}
-                          style={{ padding: "9px 18px", background: "transparent", color: "#5A5466", border: "1px solid #E2DDCF", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
+                          style={{ padding: "9px 18px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
                         >
                           Discard
                         </button>
-                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
                           {isSaving ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</> : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
                         </button>
                       </div>
@@ -12280,6 +12249,17 @@ type BSSheet = {
 type BSAnnotation = { page: number; x: number; y: number; text: string }
 type BSProgress = { user_id: string; name: string; progress_note: string | null }
 
+// Pure SWR fetcher for the Bible-study sheet LIST (key: ["bible-study-sheets", teamId]).
+async function fetchBibleStudySheets([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("bible_study_sheets")
+    .select("*")
+    .eq("team_id", teamId)
+    .order("sort_order", { ascending: true })
+  return (data ?? []) as BSSheet[]
+}
+
 function BibleStudySubTab({
   teamId, ministryId, userId, isPastor, isPresident, onOpenChat,
 }: {
@@ -12292,11 +12272,15 @@ function BibleStudySubTab({
 }) {
   const supabase = createClient()
 
-  // Sheet list + selection
-  const [sheets, setSheets] = useState<BSSheet[]>([])
+  // Sheet list (SWR-cached) + selection
+  const { data: sheetsData, isLoading: loadingSheets, mutate: mutateSheets } = useSWR(
+    teamId ? (["bible-study-sheets", teamId] as const) : null,
+    fetchBibleStudySheets,
+    { keepPreviousData: false },
+  )
+  const sheets = useMemo(() => sheetsData ?? [], [sheetsData])
   const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<BSSheet | null>(null)
-  const [loadingSheets, setLoadingSheets] = useState(true)
   const [loadingSheet, setLoadingSheet] = useState(false)
 
   // Create form
@@ -12346,28 +12330,21 @@ function BibleStudySubTab({
   const [sharing, setSharing] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
 
-  // Load sheet list once on mount; load team progress independently
-  useEffect(() => { void loadSheets() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Load team progress independently (sheet list is SWR-cached above)
   useEffect(() => { void loadTeamProgress() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Side-effect (was inside loadSheets): auto-select the most recent sheet once the list resolves.
+  useEffect(() => {
+    if (sheetsData && sheetsData.length > 0 && !selectedSheetId) {
+      setSelectedSheetId(sheetsData[sheetsData.length - 1].id)
+    }
+  }, [sheetsData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load individual sheet whenever selection changes
   useEffect(() => {
     if (selectedSheetId) void loadSheetById(selectedSheetId)
     else { setSheet(null) }
   }, [selectedSheetId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadSheets() {
-    setLoadingSheets(true)
-    const { data } = await supabase
-      .from("bible_study_sheets")
-      .select("*")
-      .eq("team_id", teamId)
-      .order("sort_order", { ascending: true })
-    const list = (data ?? []) as BSSheet[]
-    setSheets(list)
-    if (list.length > 0 && !selectedSheetId) setSelectedSheetId(list[list.length - 1].id)
-    setLoadingSheets(false)
-  }
 
   async function loadSheetById(id: string) {
     setLoadingSheet(true)
@@ -12476,7 +12453,7 @@ function BibleStudySubTab({
     setCreating(false)
     setNewTitle("")
     setNewDocUrl("")
-    await loadSheets()
+    await mutateSheets()
     if (inserted) setSelectedSheetId(inserted.id)
     setSaving(false)
   }
@@ -12536,7 +12513,7 @@ function BibleStudySubTab({
     await supabase.from("bible_study_sheets").update({ title: renameValue.trim() }).eq("id", id)
     setSavingRename(false)
     setRenamingId(null)
-    await loadSheets()
+    await mutateSheets()
   }
 
   async function handleDelete(id: string) {
@@ -12545,11 +12522,12 @@ function BibleStudySubTab({
     setDeletingId(null)
     setConfirmingDeleteId(null)
     const nextSheets = sheets.filter(s => s.id !== id)
-    setSheets(nextSheets)
     if (selectedSheetId === id) {
       setSelectedSheetId(nextSheets.length > 0 ? nextSheets[nextSheets.length - 1].id : null)
     }
     setSheet(null)
+    // Optimistically drop the deleted sheet, then revalidate.
+    void mutateSheets(nextSheets, { revalidate: true })
   }
 
   async function handleShare() {
@@ -12590,7 +12568,7 @@ function BibleStudySubTab({
   }
 
   if (loadingSheets) {
-    return <div style={{ display: "flex", justifyContent: "center", paddingTop: 48 }}><Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" /></div>
+    return <div style={{ display: "flex", justifyContent: "center", paddingTop: 48 }}><Loader2 className="w-5 h-5 animate-spin text-[var(--muted-text)]" /></div>
   }
 
   return (
@@ -12600,29 +12578,27 @@ function BibleStudySubTab({
       {progress.length > 0 && (
         <div>
           <PlanSectionHeader>Where We Left Off</PlanSectionHeader>
-          <div style={{ background: "white", borderRadius: 14, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+          <div style={{ background: "white", borderRadius: 14, border: "1px solid var(--line)", overflow: "hidden" }}>
             {progress.map((p, i) => {
               const isMe = p.user_id === userId
               const isLast = i === progress.length - 1
               return (
                 <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--plum)", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                      {getInitials(p.name)}
-                    </div>
+                    <MonogramChip initials={getInitials(p.name)} style={{ width: 28, height: 28, fontSize: 11, fontWeight: 600 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, color: "#13101A", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
+                      <p style={{ fontSize: 13, color: "var(--ink)", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
                       {p.progress_note && !isMe && (
-                        <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{p.progress_note}</p>
+                        <p style={{ fontSize: 12, color: "var(--body)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{p.progress_note}</p>
                       )}
                       {isMe && !editingNote && p.progress_note && (
-                        <p style={{ fontSize: 12, color: "#5A5466", marginTop: 1 }}>{p.progress_note}</p>
+                        <p style={{ fontSize: 12, color: "var(--body)", marginTop: 1 }}>{p.progress_note}</p>
                       )}
                     </div>
                     {!isPastor && isMe && !editingNote && (
                       <button
                         onClick={() => setEditingNote(true)}
-                        style={{ fontSize: 11, color: "#3E1540", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
+                        style={{ fontSize: 11, color: "var(--plum)", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
                       >
                         {p.progress_note ? "Edit" : "Add note"}
                       </button>
@@ -12639,19 +12615,19 @@ function BibleStudySubTab({
                         onChange={e => setMyNote(e.target.value)}
                         placeholder="e.g. Finished through the intro questions"
                         maxLength={120}
-                        style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "#13101A", width: "100%", boxSizing: "border-box" as const }}
+                        style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "var(--ink)", width: "100%", boxSizing: "border-box" as const }}
                       />
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
                           onClick={() => void saveProgressNote(myNote)}
                           disabled={savingProgressNote}
-                          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "#3E1540", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
+                          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "var(--plum)", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
                         >
                           {savingProgressNote ? "Saving…" : "Save"}
                         </button>
                         <button
                           onClick={() => { setEditingNote(false); setMyNote(progress.find(r => r.user_id === userId)?.progress_note ?? "") }}
-                          style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "#5A5466", cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "var(--body)", cursor: "pointer", fontFamily: "inherit" }}
                         >
                           Cancel
                         </button>
@@ -12674,18 +12650,18 @@ function BibleStudySubTab({
           return (
             <div key={s.id} style={{ flexShrink: 0, position: "relative" as const }}>
               {isRenaming ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1.5px solid #3E1540", borderRadius: 20, background: "#FBF8F2" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1.5px solid var(--plum)", borderRadius: 20, background: "#FBF8F2" }}>
                   <input
                     autoFocus
                     value={renameValue}
                     onChange={e => setRenameValue(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") void handleRename(s.id); if (e.key === "Escape") setRenamingId(null) }}
-                    style={{ fontSize: 13, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", color: "#13101A", width: 120 }}
+                    style={{ fontSize: 13, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", color: "var(--ink)", width: 120 }}
                   />
                   <button onClick={() => void handleRename(s.id)} disabled={savingRename} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#2E7D32", display: "flex" }}>
                     <Check style={{ width: 13, height: 13 }} />
                   </button>
-                  <button onClick={() => setRenamingId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", display: "flex" }}>
+                  <button onClick={() => setRenamingId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", display: "flex" }}>
                     <X style={{ width: 13, height: 13 }} />
                   </button>
                 </div>
@@ -12695,7 +12671,7 @@ function BibleStudySubTab({
                   <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#9F3030", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>
                     {deletingId === s.id ? "…" : "Yes"}
                   </button>
-                  <button onClick={() => setConfirmingDeleteId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#8A8497", display: "flex" }}>
+                  <button onClick={() => setConfirmingDeleteId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", display: "flex" }}>
                     <X style={{ width: 12, height: 12 }} />
                   </button>
                 </div>
@@ -12706,9 +12682,9 @@ function BibleStudySubTab({
                     style={{
                       padding: "6px 14px", borderRadius: 20, fontSize: 13,
                       fontWeight: isActive ? 600 : 400,
-                      border: isActive ? "1.5px solid #3E1540" : "1.5px solid #E8E2D2",
-                      background: isActive ? "#3E1540" : "transparent",
-                      color: isActive ? "#F6F4EF" : "#5A5466",
+                      border: isActive ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
+                      background: isActive ? "var(--plum)" : "transparent",
+                      color: isActive ? "#F6F4EF" : "var(--body)",
                       cursor: "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit",
                     }}
                   >
@@ -12719,7 +12695,7 @@ function BibleStudySubTab({
                       <button
                         onClick={() => { setRenamingId(s.id); setRenameValue(s.title) }}
                         title="Rename"
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "#8A8497", display: "flex", flexShrink: 0 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "var(--muted-text)", display: "flex", flexShrink: 0 }}
                       >
                         <Pencil style={{ width: 12, height: 12 }} />
                       </button>
@@ -12740,7 +12716,7 @@ function BibleStudySubTab({
         {isPastor && !creating && (
           <button
             onClick={() => setCreating(true)}
-            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 13, border: "1.5px dashed #C4B8CC", background: "transparent", color: "#8A8497", cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit" }}
+            style={{ padding: "5px 12px", borderRadius: 20, fontSize: 13, border: "1.5px dashed #C4B8CC", background: "transparent", color: "var(--muted-text)", cursor: "pointer", whiteSpace: "nowrap" as const, flexShrink: 0, fontFamily: "inherit" }}
           >
             + New chapter
           </button>
@@ -12749,28 +12725,28 @@ function BibleStudySubTab({
 
       {/* Create form */}
       {creating && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid #E8E2D2", padding: "20px" }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 12 }}>New chapter</p>
+        <div style={{ background: "white", borderRadius: 16, border: "1px solid var(--line)", padding: "20px" }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>New chapter</p>
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="Chapter name (e.g. Romans 1)"
-            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
           <input
             type="url"
             value={newDocUrl}
             onChange={e => setNewDocUrl(e.target.value)}
             placeholder="https://docs.google.com/document/d/..."
-            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
-          <p style={{ fontSize: 11, color: "#8A8497", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
+          <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
           {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
+            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => { setCreating(false); setCreateError(null); setNewTitle(""); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => { setCreating(false); setCreateError(null); setNewTitle(""); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
               Cancel
             </button>
           </div>
@@ -12779,10 +12755,10 @@ function BibleStudySubTab({
 
       {/* Empty state (no chapters yet) */}
       {sheets.length === 0 && !creating && (
-        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed #E8E2D2", padding: "32px 24px", textAlign: "center" as const }}>
+        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
           <FileText style={{ width: 32, height: 32, color: "#C4C0B0", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>No chapters yet</p>
-          <p style={{ fontSize: 13, color: "#8A8497", marginBottom: isPastor ? 16 : 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: isPastor ? 16 : 0 }}>
             {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
           </p>
         </div>
@@ -12790,7 +12766,7 @@ function BibleStudySubTab({
 
       {/* Sheet content */}
       {loadingSheet && (
-        <div style={{ display: "flex", justifyContent: "center", paddingTop: 32 }}><Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" /></div>
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 32 }}><Loader2 className="w-5 h-5 animate-spin text-[var(--muted-text)]" /></div>
       )}
       {sheet && !loadingSheet && (
         <>
@@ -12810,7 +12786,7 @@ function BibleStudySubTab({
               href={sheet.google_doc_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#3E1540", fontWeight: 600, textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}
             >
               <ExternalLink style={{ width: 12, height: 12 }} />
               Open doc
@@ -12819,7 +12795,7 @@ function BibleStudySubTab({
 
           {/* DRAFT: iframe preview */}
           {sheet.status === "draft" && (
-            <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", overflow: "hidden" }}>
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
               <iframe
                 src={sheet.google_doc_url.replace(/\/edit.*$/, "") + "/preview"}
                 style={{ width: "100%", height: 600, border: "none", display: "block" }}
@@ -12833,13 +12809,13 @@ function BibleStudySubTab({
             <div>
               {renderingPdf && (
                 <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
-                  <Loader2 className="w-5 h-5 animate-spin text-[#8A8497]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[var(--muted-text)]" />
                 </div>
               )}
               {!renderingPdf && pdfPages.length === 0 && sheet.pdf_url && (
-                <div style={{ background: "white", borderRadius: 12, border: "1px solid #E8E2D2", padding: 20, textAlign: "center" as const }}>
-                  <p style={{ fontSize: 13, color: "#8A8497", marginBottom: 12 }}>PDF preview unavailable.</p>
-                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#3E1540", fontWeight: 600, textDecoration: "none" }}>
+                <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--line)", padding: 20, textAlign: "center" as const }}>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>PDF preview unavailable.</p>
+                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}>
                     Download PDF →
                   </a>
                 </div>
@@ -12858,7 +12834,7 @@ function BibleStudySubTab({
                   <canvas
                     width={srcCanvas.width}
                     height={srcCanvas.height}
-                    style={{ display: "block", width: "100%", borderRadius: pi === 0 ? "12px 12px 0 0" : pi === pdfPages.length - 1 ? "0 0 12px 12px" : "0", border: "1px solid #E8E2D2" }}
+                    style={{ display: "block", width: "100%", borderRadius: pi === 0 ? "12px 12px 0 0" : pi === pdfPages.length - 1 ? "0 0 12px 12px" : "0", border: "1px solid var(--line)" }}
                     ref={el => { if (el) el.getContext("2d")?.drawImage(srcCanvas, 0, 0) }}
                   />
                   {annotations.filter(a => a.page === pi).map((ann, ai) => {
@@ -12870,7 +12846,7 @@ function BibleStudySubTab({
                         style={{
                           position: "absolute", left: `${ann.x * 100}%`, top: `${ann.y * 100}%`,
                           transform: "translate(-50%, -50%)", width: 22, height: 22, borderRadius: "50%",
-                          background: "#3E1540", border: "2px solid #F6F4EF", cursor: "pointer", zIndex: 10,
+                          background: "var(--plum)", border: "2px solid #F6F4EF", cursor: "pointer", zIndex: 10,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: 10, fontWeight: 700, color: "#F6F4EF",
                           boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
@@ -12883,7 +12859,7 @@ function BibleStudySubTab({
                         {hoveredAnnotation === gIdx && (
                           <div style={{
                             position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
-                            background: "#13101A", color: "#F6F4EF", fontSize: 11, padding: "4px 8px", borderRadius: 6,
+                            background: "var(--ink)", color: "#F6F4EF", fontSize: 11, padding: "4px 8px", borderRadius: 6,
                             whiteSpace: "nowrap" as const, maxWidth: 200, zIndex: 20, pointerEvents: "none" as const,
                           }}>
                             {ann.text}
@@ -12896,7 +12872,7 @@ function BibleStudySubTab({
                 </div>
               ))}
               {pdfPages.length > 0 && (
-                <p style={{ fontSize: 11, color: "#8A8497", textAlign: "center" as const, marginTop: 4 }}>
+                <p style={{ fontSize: 11, color: "var(--muted-text)", textAlign: "center" as const, marginTop: 4 }}>
                   Click anywhere on the PDF to add a personal annotation. Annotations are private to you.
                 </p>
               )}
@@ -12905,21 +12881,21 @@ function BibleStudySubTab({
 
           {/* Pending annotation input */}
           {pendingAnnotation !== null && (
-            <div style={{ background: "white", borderRadius: 14, border: "1.5px solid #E8E2D2", padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", marginBottom: 8 }}>Add annotation</p>
+            <div style={{ background: "white", borderRadius: 14, border: "1.5px solid var(--line)", padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
               <textarea
                 autoFocus
                 value={annotationText}
                 onChange={e => setAnnotationText(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleAddAnnotation() } }}
                 placeholder="Type your note…"
-                style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 8, fontFamily: "inherit", color: "#13101A", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+                style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
               />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
+                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
                   {savingAnnotation ? "Saving…" : "Save note"}
                 </button>
-                <button onClick={() => { setPendingAnnotation(null); setAnnotationText("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={() => { setPendingAnnotation(null); setAnnotationText("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                   Cancel
                 </button>
               </div>
@@ -12930,21 +12906,21 @@ function BibleStudySubTab({
           <div>
             <PlanSectionHeader>
               {isPastor ? "Your Notes to DGLs" : "Pastor Notes"}
-              {savingNote && <span style={{ fontSize: 11, color: "#8A8497", marginLeft: 8, fontWeight: 400 }}>Saving…</span>}
+              {savingNote && <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: 8, fontWeight: 400 }}>Saving…</span>}
             </PlanSectionHeader>
             {isPastor ? (
               <textarea
                 value={noteDraft}
                 onChange={e => handleNoteChange(e.target.value)}
                 placeholder="Add notes for the DGLs…"
-                style={{ width: "100%", resize: "vertical" as const, minHeight: 100, padding: "10px 12px", fontSize: 13, border: "1.5px solid #E8E2D2", borderRadius: 10, fontFamily: "inherit", color: "#13101A", background: "white", outline: "none", boxSizing: "border-box" as const }}
+                style={{ width: "100%", resize: "vertical" as const, minHeight: 100, padding: "10px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 10, fontFamily: "inherit", color: "var(--ink)", background: "white", outline: "none", boxSizing: "border-box" as const }}
               />
             ) : sheet.pastor_notes ? (
-              <div style={{ padding: "12px 16px", background: "#F4F1E8", borderRadius: 10, border: "1px solid #E8E2D2", fontSize: 13, color: "#13101A", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
+              <div style={{ padding: "12px 16px", background: "#F4F1E8", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
                 {sheet.pastor_notes}
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: "#8A8497" }}>No notes added yet.</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No notes added yet.</p>
             )}
           </div>
 
@@ -12954,14 +12930,14 @@ function BibleStudySubTab({
               {!finalizeConfirm ? (
                 <button
                   onClick={() => setFinalizeConfirm(true)}
-                  style={{ padding: "10px 24px", background: "#2D0F2E", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "10px 24px", background: "var(--plum-2)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Finalize &amp; Export PDF →
                 </button>
               ) : (
-                <div style={{ padding: "14px 16px", background: "#FBF8F2", border: "1.5px solid #E8E2D2", borderRadius: 12 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#13101A", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
-                  <p style={{ fontSize: 12, color: "#8A8497", marginBottom: 10 }}>
+                <div style={{ padding: "14px 16px", background: "#FBF8F2", border: "1.5px solid var(--line)", borderRadius: 12 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 10 }}>
                     The Google Doc will be exported to PDF and locked for annotation. Ensure the doc is publicly viewable.
                   </p>
                   {finalizeError && (
@@ -12971,10 +12947,10 @@ function BibleStudySubTab({
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "#3E1540", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                       {finalizing ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Exporting…</> : "Confirm"}
                     </button>
-                    <button onClick={() => { setFinalizeConfirm(false); setFinalizeError(null) }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#5A5466", border: "1.5px solid #E8E2D2", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button onClick={() => { setFinalizeConfirm(false); setFinalizeError(null) }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                       Cancel
                     </button>
                   </div>
@@ -12995,7 +12971,7 @@ function BibleStudySubTab({
                 <button
                   onClick={handleShare}
                   disabled={sharing}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "transparent", color: "#3E1540", border: "1.5px solid #3E1540", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: sharing ? "not-allowed" : "pointer", opacity: sharing ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "transparent", color: "var(--plum)", border: "1.5px solid var(--plum)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: sharing ? "not-allowed" : "pointer", opacity: sharing ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   <Share2 style={{ width: 13, height: 13 }} />
                   {sharing ? "Sharing…" : "Share to group chat"}
@@ -13032,7 +13008,7 @@ function DGLAssignmentTable({
   const weeks = [...byWeek.keys()].sort()
 
   if (weeks.length === 0) return (
-    <p className="text-[13px] text-[#8A8497] text-center py-6">No assignments generated.</p>
+    <p className="text-[13px] text-[var(--muted-text)] text-center py-6">No assignments generated.</p>
   )
 
   return (
@@ -13043,9 +13019,9 @@ function DGLAssignmentTable({
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[#E8E2D2]"}`} style={{ background: "#FBF8F2" }}>
+          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "#FBF8F2" }}>
             <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#EFE9DA]"}`} style={hasFlagged ? {} : { background: "#F6F2E8" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "#5A5466" }}>{dateStr}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                   Needs Review
@@ -13061,11 +13037,11 @@ function DGLAssignmentTable({
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
                 <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#EFE9DA]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "#8A8497", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
                   {isFriday ? (
-                    <span style={{ fontSize: 13, fontWeight: 500, color: fridayRows.length > 0 ? "#13101A" : "#F87171" }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: fridayRows.length > 0 ? "var(--ink)" : "#F87171" }}>
                       {fridayRows.length > 0 ? fridayRows.map(r => r.user_name.split(" ")[0]).join(" + ") : "Unassigned"}
                     </span>
                   ) : isEditing && rosterMembers && rosterMembers.length > 0 ? (
@@ -13078,7 +13054,7 @@ function DGLAssignmentTable({
                         setEditingCell(null)
                       }}
                       onBlur={() => setEditingCell(null)}
-                      style={{ fontSize: 13, border: "1.5px solid #D4CEDF", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "white", color: "#13101A", maxWidth: 160 }}
+                      style={{ fontSize: 13, border: "1.5px solid #D4CEDF", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "white", color: "var(--ink)", maxWidth: 160 }}
                     >
                       <option value="" disabled>Select…</option>
                       {rosterMembers.map(m => (
@@ -13094,12 +13070,12 @@ function DGLAssignmentTable({
                       onClick={() => onSwap ? setEditingCell({ weekDate: wd, slot }) : undefined}
                     >
                       {r ? (
-                        <span style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>{r.user_name}</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{r.user_name}</span>
                       ) : (
                         <span style={{ fontSize: 13, color: "#F87171", fontWeight: 500 }}>Unassigned</span>
                       )}
                       {onSwap && isHovered && (
-                        <Pencil style={{ width: 11, height: 11, color: "#8A8497", flexShrink: 0 }} />
+                        <Pencil style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} />
                       )}
                     </div>
                   )}

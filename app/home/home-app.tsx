@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { SWRConfig } from "swr"
+import dynamic from "next/dynamic"
 import { MessageCircle } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
@@ -16,19 +18,36 @@ import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
 
 // Tabs
+// HomeTab stays eager — it's the default landing tab. Every other tab (and the
+// extra overlay/sidebar symbols home-app references from those tab files) is
+// code-split via next/dynamic so its JS only ships when that tab/overlay opens.
+// ssr:false is safe: tabs render conditionally on the client. Each dynamic gets
+// the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
-import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
-import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
-import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionNav } from "./tabs/plan-tab"
+import { Spinner } from "./components/shared"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, GivingTabSkeleton, ProfileTabSkeleton } from "@/components/central"
 import type { CalendarEvent } from "./types"
-import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
-import { GivingTab } from "./tabs/giving-tab"
-import { ProfileTab } from "./tabs/profile-tab"
-import { SettingsTab } from "./tabs/settings-tab"
-import { FormsTab } from "./tabs/forms-tab"
-import { CongregationTab } from "./tabs/congregation-tab"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
+
+const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
+const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
+
+const ChatsTab = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatsTab), { loading: () => <Spinner />, ssr: false })
+const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScreen), { loading: () => <Spinner />, ssr: false })
+const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
+
+const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
+const QuickCreateTeamModal = dynamic(() => import("./tabs/plan-tab").then(m => m.QuickCreateTeamModal), { loading: () => <Spinner />, ssr: false })
+const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
+const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
+
+const DirectoryTab = dynamic(() => import("./tabs/directory-tab").then(m => m.DirectoryTab), { loading: () => <DirectoryTabSkeleton />, ssr: false })
+const GivingTab = dynamic(() => import("./tabs/giving-tab").then(m => m.GivingTab), { loading: () => <GivingTabSkeleton />, ssr: false })
+const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.ProfileTab), { loading: () => <ProfileTabSkeleton />, ssr: false })
+const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.SettingsTab), { loading: () => <Spinner />, ssr: false })
+const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
+const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded }: HomeAppProps) {
   const supabase = createClient()
@@ -371,17 +390,34 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId, userId])
 
-  // Initial load + reload after closing a chat
+  // Initial load + reload after closing a chat.
+  // recentChats is SSR-seeded from initialRecentChats, so skip the redundant
+  // refetch on the very first mount (chatRefreshKey === 0). After a chat closes
+  // chatRefreshKey increments (>0) and this effect still refetches — the ref is
+  // already true by then, so subsequent runs proceed normally.
+  const didInitRecentChats = useRef(false)
   useEffect(() => {
+    if (!didInitRecentChats.current) { didInitRecentChats.current = true; return }
     loadRecentChats()
   }, [loadRecentChats, chatRefreshKey])
 
+  // userTeams is SSR-seeded from initialUserTeams → skip the mount refetch.
+  // loadAllTeams is admin-only and NOT SSR-seeded → it must still fire on mount,
+  // so it lives in its own unguarded effect.
+  const didInitUserTeams = useRef(false)
   useEffect(() => {
+    if (!didInitUserTeams.current) { didInitUserTeams.current = true; return }
     loadUserTeams()
-    loadAllTeams()
-  }, [loadUserTeams, loadAllTeams])
+  }, [loadUserTeams])
 
   useEffect(() => {
+    loadAllTeams()
+  }, [loadAllTeams])
+
+  // activeQuestion/hasResponded are SSR-seeded → skip the mount refetch.
+  const didInitActiveQuestion = useRef(false)
+  useEffect(() => {
+    if (!didInitActiveQuestion.current) { didInitActiveQuestion.current = true; return }
     loadActiveQuestion()
   }, [loadActiveQuestion])
 
@@ -502,6 +538,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
+    <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
     <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]">
 
       {/* Desktop sidebar — hidden on mobile */}
@@ -844,9 +881,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {showGradPrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>
           <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "36px 32px", maxWidth: 400, width: "100%", boxShadow: "0 24px 80px rgba(19,16,26,0.18)" }}>
-            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "#8A8497", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
-            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "#13101A", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
-            <p style={{ fontSize: 14, color: "#5A5466", lineHeight: 1.6, margin: "0 0 28px" }}>
+            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
+            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 28px" }}>
               You&apos;ve reached your graduation year. Would you like to stay in {ministryName} or remove yourself from the ministry?
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -856,7 +893,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   sessionStorage.setItem(key, "1")
                   setShowGradPrompt(false)
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "#2D0F2E", color: "#FBF8F2", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
               >
                 Stay in {ministryName}
               </button>
@@ -867,7 +904,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   await selfLeaveMinistry()
                   window.location.replace("/join")
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid #E2DDCF", background: "transparent", color: "#9F3030", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: gradPromptLoading ? "not-allowed" : "pointer", opacity: gradPromptLoading ? 0.6 : 1 }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid var(--line-2)", background: "transparent", color: "#9F3030", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: gradPromptLoading ? "not-allowed" : "pointer", opacity: gradPromptLoading ? 0.6 : 1 }}
               >
                 {gradPromptLoading ? "Leaving…" : "Leave ministry"}
               </button>
@@ -876,5 +913,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         </div>
       )}
     </div>
+    </SWRConfig>
   )
 }

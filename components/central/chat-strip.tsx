@@ -2,14 +2,8 @@
 
 import { CSSProperties } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
-
-const EYEBROW: CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 11,
-  letterSpacing: "1.4px",
-  color: "var(--muted-text)",
-  textTransform: "uppercase",
-}
+import { EYEBROW_STYLE } from "@/app/home/components/shared"
+import { MonogramChip } from "./MonogramChip"
 
 interface ChatStripProps {
   chats: ChatPreview[]
@@ -24,7 +18,7 @@ export function ChatStrip({ chats, totalUnread, onOpenChat, onSeeAll, style }: C
     <div style={style}>
       {/* Strip header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-6)" }}>
-        <div style={EYEBROW}>
+        <div style={EYEBROW_STYLE}>
           Your chats{totalUnread > 0 ? ` · ${totalUnread} unread` : ""}
         </div>
         <button
@@ -96,22 +90,10 @@ function StripCard({ chat, index, onOpen }: {
       onMouseLeave={e => (e.currentTarget.style.background = "var(--cream-3)")}
     >
       {/* Serif monogram */}
-      <div style={{
-        width: 36,
-        height: 36,
-        borderRadius: 999,
-        flexShrink: 0,
-        background: "var(--plum)",
-        display: "grid",
-        placeItems: "center",
-        overflow: "hidden",
-        fontSize: 16,
-        fontWeight: 400,
-        fontFamily: "var(--serif)",
-        color: "var(--cream)",
-      }}>
-        {chat.groupName.charAt(0)}
-      </div>
+      <MonogramChip
+        initials={chat.groupName.charAt(0)}
+        style={{ width: 36, height: 36, fontSize: 16, fontWeight: 400, fontFamily: "var(--serif)" }}
+      />
 
       {/* Text content */}
       <div style={{ flex: 1, minWidth: 0 }}>
