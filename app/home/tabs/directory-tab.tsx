@@ -1,13 +1,29 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import useSWR from "swr"
 import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
-import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip } from "@/components/central"
+import { EmptyState, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton } from "@/components/central"
 import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
+
+// Shared directory fetcher — both the desktop panel and the mobile list key on
+// ["directory-members", ministryId], so they dedupe to a single request and
+// share one cache entry (instant on tab revisit).
+async function loadDirectoryMembers(
+  supabase: ReturnType<typeof createClient>,
+  ministryId: string
+): Promise<DirectoryMember[]> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
+    .eq("ministry_id", ministryId)
+    .order("name")
+  return data ?? []
+}
 
 // ── DirectoryMemberListPanel — lives in the shell context panel on desktop ─────
 
@@ -25,28 +41,24 @@ export function DirectoryMemberListPanel({
   onSelect: (member: DirectoryMember) => void
 }) {
   const supabase = createClient()
-  const [members, setMembers] = useState<DirectoryMember[]>([])
   const [search, setSearch] = useState("")
-  const [loading, setLoading] = useState(true)
+  const { data: membersData, isLoading: loading } = useSWR(
+    ["directory-members", ministryId],
+    () => loadDirectoryMembers(supabase, ministryId)
+  )
+  const members = membersData ?? []
 
+  // Auto-select on first successful load only (a ref guard keeps background
+  // revalidations from clobbering the user's current selection).
+  const didInitialSelect = useRef(false)
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
-        .eq("ministry_id", ministryId)
-        .order("name")
-      const list = data ?? []
-      setMembers(list)
-      // Restore from URL param, else select first
-      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
-      const toSelect = restored ?? list[0] ?? null
-      if (toSelect) onSelect(toSelect)
-      setLoading(false)
-    }
-    load()
+    if (!membersData || didInitialSelect.current) return
+    didInitialSelect.current = true
+    const restored = initialMemberId ? membersData.find((m) => m.id === initialMemberId) : null
+    const toSelect = restored ?? membersData[0] ?? null
+    if (toSelect) onSelect(toSelect)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [membersData])
 
   const filtered = members.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase())
@@ -76,7 +88,7 @@ export function DirectoryMemberListPanel({
       {/* Member list */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4"><Spinner /></div>
+          <div className="pt-2"><DirectoryListSkeleton /></div>
         ) : filtered.length === 0 ? (
           <div className="p-4">
             <EmptyState
@@ -151,27 +163,23 @@ export function DirectoryTab({
 }) {
   // Mobile-only state — desktop selection is driven by home-app via selectedMember prop
   const supabase = createClient()
-  const [mobileMembers, setMobileMembers] = useState<DirectoryMember[]>([])
   const [mobileSearch, setMobileSearch] = useState("")
-  const [mobileLoading, setMobileLoading] = useState(true)
   const [mobileSelected, setMobileSelected] = useState<DirectoryMember | null>(null)
+  const { data: mobileMembersData, isLoading: mobileLoading } = useSWR(
+    ["directory-members", ministryId],
+    () => loadDirectoryMembers(supabase, ministryId)
+  )
+  const mobileMembers = mobileMembersData ?? []
 
+  // Restore the deep-linked member once, on first load.
+  const didRestoreMobile = useRef(false)
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
-        .eq("ministry_id", ministryId)
-        .order("name")
-      const list = data ?? []
-      setMobileMembers(list)
-      const restored = initialMemberId ? list.find((m) => m.id === initialMemberId) : null
-      setMobileSelected(restored ?? null)
-      setMobileLoading(false)
-    }
-    load()
+    if (!mobileMembersData || didRestoreMobile.current) return
+    didRestoreMobile.current = true
+    const restored = initialMemberId ? mobileMembersData.find((m) => m.id === initialMemberId) : null
+    setMobileSelected(restored ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [mobileMembersData])
 
   const mobileFiltered = mobileMembers.filter((m) =>
     m.name.toLowerCase().includes(mobileSearch.toLowerCase())
@@ -241,7 +249,7 @@ export function DirectoryTab({
         </div>
 
         {mobileLoading ? (
-          <div className="px-5"><Spinner /></div>
+          <div className="px-2"><DirectoryListSkeleton /></div>
         ) : mobileFiltered.length === 0 ? (
           <div className="px-5">
             <EmptyState

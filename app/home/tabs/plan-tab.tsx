@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
@@ -1030,6 +1031,17 @@ export function MeetingNoteCard({
   )
 }
 
+// Pure SWR fetcher for the meeting-notes LIST (key: ["meeting-notes", teamId]).
+async function fetchMeetingNotes([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("meeting_notes")
+    .select("*")
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: false })
+  return (data ?? []) as MeetingNote[]
+}
+
 export function MeetingNotesSection({
   teamId,
   userId,
@@ -1044,29 +1056,23 @@ export function MeetingNotesSection({
   startNewTrigger?: number
 }) {
   const supabase = createClient()
-  const [notes, setNotes] = useState<MeetingNote[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: notesData, isLoading: loading, mutate: mutateNotes } = useSWR(
+    teamId ? (["meeting-notes", teamId] as const) : null,
+    fetchMeetingNotes,
+    { keepPreviousData: false },
+  )
+  const notes = useMemo(() => notesData ?? [], [notesData])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
 
+  // Clear expansion when switching teams.
+  useEffect(() => { setExpandedIds(new Set()) }, [teamId])
+  // Auto-expand the most recent note once the list resolves (only if nothing is expanded yet).
   useEffect(() => {
-    if (!teamId) return
-    setNotes([])
-    setExpandedIds(new Set())
-    setLoading(true)
-    supabase
-      .from("meeting_notes")
-      .select("*")
-      .eq("team_id", teamId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        const rows = (data ?? []) as MeetingNote[]
-        setNotes(rows)
-        if (rows.length > 0) setExpandedIds(new Set([rows[0].id]))
-        setLoading(false)
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId])
+    if (notesData && notesData.length > 0) {
+      setExpandedIds(prev => (prev.size === 0 ? new Set([notesData[0].id]) : prev))
+    }
+  }, [notesData])
 
   useEffect(() => {
     if (startNewTrigger) createNote()
@@ -1089,19 +1095,19 @@ export function MeetingNotesSection({
     setCreating(false)
     if (!error && data) {
       const newNote = data as MeetingNote
-      setNotes(prev => [newNote, ...prev])
       setExpandedIds(prev => new Set([newNote.id, ...prev]))
+      void mutateNotes(prev => [newNote, ...(prev ?? [])], { revalidate: false })
     }
   }
 
   async function saveTitle(id: string, title: string) {
     await supabase.from("meeting_notes").update({ title }).eq("id", id)
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, title } : n))
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, title } : n), { revalidate: false })
   }
 
   async function saveBody(id: string, body: string) {
     await supabase.from("meeting_notes").update({ body }).eq("id", id)
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, body } : n))
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, body } : n), { revalidate: false })
   }
 
   function toggleExpand(id: string) {
@@ -1142,6 +1148,40 @@ export function MeetingNotesSection({
       )}
     </div>
   )
+}
+
+// Stable empty Set reference so derived `plannedIds` keeps referential identity across renders.
+const EMPTY_ID_SET: Set<string> = new Set()
+
+// Shared, PURE SWR fetcher for calendar events + which events already have a plan.
+// Key: ["calendar-events", ministryId, teamId ?? "all"] — StudentOrgTeamHome and
+// MinistryCalendar share this key so the module cache dedupes them. Returns the
+// events, the planned-event id Set (drives the "has plan" badge — must NOT be a
+// fetcher side-effect), and tableReady (legacy "table missing" guard).
+// NOTE: returns the BROADER set including sub-events (matches MinistryCalendar's
+// original behavior). StudentOrgTeamHome locally filters out sub-events
+// (parent_event_id != null) to preserve its original exclude-sub-events behavior.
+async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [string, string, string]) {
+  const supabase = createClient()
+  let query = supabase
+    .from("calendar_events")
+    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+    .eq("ministry_id", ministryId)
+    .order("start_date", { ascending: true })
+  if (teamScope !== "all") {
+    query = query.or(`team_id.eq.${teamScope},team_id.is.null`)
+  }
+  const { data, error } = await query
+  const tableReady = !(error && error.message.includes("Could not find the table"))
+  const events = (tableReady ? (data ?? []) : []) as CalendarEvent[]
+
+  const { data: plans } = await supabase
+    .from("event_plans")
+    .select("calendar_event_id")
+    .eq("ministry_id", ministryId)
+  const plannedIds = new Set((plans ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))
+
+  return { events, plannedIds, tableReady }
 }
 
 // ── StudentOrgTeamHome ─────────────────────────────────────────────────────────
@@ -1190,11 +1230,17 @@ export function StudentOrgTeamHome({
   // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
   const displaySection = desktopSection ?? teamTab
 
-  // Calendar
-  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([])
-  const [plannedIds, setPlannedIds] = useState<Set<string>>(new Set())
+  // Calendar — SWR-cached list of events + planned-event ids (shared key with MinistryCalendar).
+  const { data: calData, isLoading: calLoading, mutate: mutateCal } = useSWR(
+    ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
+    fetchCalendarEventsAndPlans,
+    { keepPreviousData: false },
+  )
+  // Shared fetcher returns the broader set (incl. sub-events) for MinistryCalendar.
+  // StudentOrgTeamHome excludes sub-events locally to preserve its original behavior.
+  const calEvents = useMemo(() => (calData?.events ?? []).filter(e => e.parent_event_id == null), [calData])
+  const plannedIds = calData?.plannedIds ?? EMPTY_ID_SET
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [calLoading, setCalLoading] = useState(true)
 
   // Add / delete
   const [showAddModal, setShowAddModal] = useState(false)
@@ -1213,18 +1259,18 @@ export function StudentOrgTeamHome({
   // Notes tab — trigger createNote from header button
   const [notesTrigger, setNotesTrigger] = useState(0)
 
+  // Side-effect (was inside the fetcher): notify the parent of the current event list.
+  // Pass the sub-event-excluded list (calEvents) to keep parent consumers consistent
+  // with StudentOrgTeamHome's original filtered dataset.
   useEffect(() => {
-    if (!ministryId) return
-    setCalLoading(true)
-    const q = supabase.from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
-      .eq("ministry_id", ministryId).is("parent_event_id", null).order("start_date")
-    const run = teamId ? q.or(`team_id.eq.${teamId},team_id.is.null`) : q
-    run.then(({ data }) => { const evs = (data ?? []) as CalendarEvent[]; setCalEvents(evs); setCalLoading(false); onCalEventsChange?.(evs) })
-    supabase.from("event_plans").select("calendar_event_id").eq("ministry_id", ministryId)
-      .then(({ data }) => setPlannedIds(new Set((data ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))))
+    if (calData) onCalEventsChange?.(calEvents)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, ministryId, refreshSignal])
+  }, [calData])
+  // External refresh trigger → revalidate the shared cache.
+  useEffect(() => {
+    if (refreshSignal) void mutateCal()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal])
 
   useEffect(() => {
     if (!teamId) return
@@ -1254,8 +1300,7 @@ export function StudentOrgTeamHome({
       await supabase.from("event_plans").delete().eq("id", plan.id)
     }
     await supabase.from("calendar_events").delete().eq("id", evId)
-    setCalEvents(prev => prev.filter(e => e.id !== evId))
-    setPlannedIds(prev => { const next = new Set(prev); next.delete(evId); return next })
+    void mutateCal()
     setDeleteConfirmId(null)
     setDeleting(false)
     if (planningEvent?.id === evId) onPlanningEventChange(null)
@@ -1588,10 +1633,7 @@ export function StudentOrgTeamHome({
         userId={userId}
         onClose={() => setShowAddModal(false)}
         onSaved={(newEv) => {
-          const sorted = [...calEvents, newEv].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
-          setCalEvents(sorted)
-          onCalEventsChange?.(sorted)
-          setPlannedIds(prev => new Set([...prev, newEv.id]))
+          void mutateCal()
           setShowAddModal(false)
           onPlanningEventChange(newEv)
         }}
@@ -5577,52 +5619,23 @@ export function MinistryCalendar({
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [plannedEventIds, setPlannedEventIds] = useState<Set<string>>(new Set())
+  // SWR-cached events + planned-event ids (shared key with StudentOrgTeamHome).
+  const { data: calData, isLoading: loading, mutate: mutateCal } = useSWR(
+    ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
+    fetchCalendarEventsAndPlans,
+    { keepPreviousData: false },
+  )
+  const events = useMemo(() => calData?.events ?? [], [calData])
+  const plannedEventIds = calData?.plannedIds ?? EMPTY_ID_SET
+  const tableReady = calData?.tableReady ?? true
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [tableReady, setTableReady] = useState(true)
   const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
 
-  useEffect(() => {
-    async function fetchEvents() {
-      setLoading(true)
-      let query = supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
-        .eq("ministry_id", ministryId)
-        .order("start_date", { ascending: true })
-
-      if (teamId) {
-        query = query.or(`team_id.eq.${teamId},team_id.is.null`)
-      }
-
-      const { data, error } = await query
-      if (error && error.message.includes("Could not find the table")) {
-        setTableReady(false)
-      } else {
-        setEvents((data ?? []) as CalendarEvent[])
-      }
-
-      // Also fetch which events already have a plan
-      const { data: plans } = await supabase
-        .from("event_plans")
-        .select("calendar_event_id")
-        .eq("ministry_id", ministryId)
-      if (plans) {
-        setPlannedEventIds(new Set(plans.map((p: { calendar_event_id: string }) => p.calendar_event_id)))
-      }
-
-      setLoading(false)
-    }
-    fetchEvents()
-  }, [ministryId, teamId])
-
   async function handleDelete(id: string) {
-    setEvents((prev) => prev.filter((ev) => ev.id !== id))
     await supabase.from("calendar_events").delete().eq("id", id)
+    void mutateCal()
   }
 
   // Event planning view — replaces the calendar while an event is open.
@@ -5830,8 +5843,8 @@ export function MinistryCalendar({
           teamId={teamId}
           userId={userId}
           onClose={() => setShowAdd(false)}
-          onSaved={(ev) => {
-            setEvents((prev) => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+          onSaved={() => {
+            void mutateCal()
             setShowAdd(false)
           }}
         />
@@ -9355,6 +9368,32 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
 
+// Pure SWR fetcher for a team's settings: its roles + members (key: ["team-settings", teamId]).
+async function fetchTeamSettings([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const [{ data: rolesData }, { data: membersData }] = await Promise.all([
+    supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", teamId),
+    supabase
+      .from("team_members")
+      .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
+      .eq("team_id", teamId),
+  ])
+  type RawMember = {
+    user_id: string
+    role_id: string
+    joined_at: string
+    profiles: { name: string } | { name: string }[] | null
+    team_roles: { name: string } | { name: string }[] | null
+  }
+  const roles: TeamRole[] = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
+  const members: TeamMemberDisplay[] = (membersData ?? []).map((m: RawMember) => {
+    const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+    const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
+    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+  })
+  return { roles, members }
+}
+
 export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged, onOpenChat }: {
   team: Team
   userId: string
@@ -9423,37 +9462,21 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   const [renamingRoleId, setRenamingRoleId] = useState<string | null>(null)
   const [renamingRoleValue, setRenamingRoleValue] = useState("")
 
+  // Initial roles + members are SWR-cached (key shared on revisit). Because this overlay
+  // mutates roles/members optimistically in many places, the SWR data is mirrored into the
+  // existing local state via a populate effect rather than consumed directly.
+  const { data: tsData, mutate: mutateTeamSettings } = useSWR(
+    ["team-settings", team.id] as const,
+    fetchTeamSettings,
+  )
   useEffect(() => {
-    async function load() {
-      const [{ data: rolesData }, { data: membersData }] = await Promise.all([
-        supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", team.id),
-        supabase
-          .from("team_members")
-          .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
-          .eq("team_id", team.id),
-      ])
-      type RawMember = {
-        user_id: string
-        role_id: string
-        joined_at: string
-        profiles: { name: string } | { name: string }[] | null
-        team_roles: { name: string } | { name: string }[] | null
-      }
-      const parsedRoles = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
-      setRoles(parsedRoles)
-      setSavedPerms(Object.fromEntries(parsedRoles.map(r => [r.id, r.permissions])))
-      setMembers(
-        (membersData ?? []).map((m: RawMember) => {
-          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-          return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
-        })
-      )
-      setLoading(false)
-    }
-    load()
+    if (!tsData) return
+    setRoles(tsData.roles)
+    setSavedPerms(Object.fromEntries(tsData.roles.map(r => [r.id, r.permissions])))
+    setMembers(tsData.members)
+    setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [team.id])
+  }, [tsData])
 
   useEffect(() => {
     if (!showAddMember) return
@@ -9507,19 +9530,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
       await elevateToLeader(Array.from(selectedIds), ministryId)
     }
 
-    // Reload members locally and return to settings — do NOT call onChanged() which closes settings
-    const { data: membersData } = await supabase
-      .from("team_members")
-      .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
-      .eq("team_id", team.id)
-    type RawMember = { user_id: string; role_id: string; joined_at: string; profiles: { name: string } | { name: string }[] | null; team_roles: { name: string } | { name: string }[] | null }
-    setMembers(
-      (membersData ?? []).map((m: RawMember) => {
-        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-        const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-        return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
-      })
-    )
+    // Revalidate the cached settings (re-populates members via the SWR effect) and return to
+    // settings — do NOT call onChanged() which closes settings.
+    await mutateTeamSettings()
     setShowAddMember(false)
     setSelectedIds(new Set())
     setMemberRoles({})
@@ -9530,6 +9543,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
+    // Keep the ["team-settings", team.id] SWR cache fresh so the removed member can't
+    // briefly reappear via the populate effect on reopen. Optimistically drop them from
+    // the cached payload (no revalidation needed — the DB delete already succeeded).
+    mutateTeamSettings(
+      (cur) => cur ? { ...cur, members: cur.members.filter((m) => m.user_id !== memberId) } : cur,
+      { revalidate: false },
+    )
     setConfirmRemoveId(null)
   }
 
@@ -12229,6 +12249,17 @@ type BSSheet = {
 type BSAnnotation = { page: number; x: number; y: number; text: string }
 type BSProgress = { user_id: string; name: string; progress_note: string | null }
 
+// Pure SWR fetcher for the Bible-study sheet LIST (key: ["bible-study-sheets", teamId]).
+async function fetchBibleStudySheets([, teamId]: readonly [string, string]) {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("bible_study_sheets")
+    .select("*")
+    .eq("team_id", teamId)
+    .order("sort_order", { ascending: true })
+  return (data ?? []) as BSSheet[]
+}
+
 function BibleStudySubTab({
   teamId, ministryId, userId, isPastor, isPresident, onOpenChat,
 }: {
@@ -12241,11 +12272,15 @@ function BibleStudySubTab({
 }) {
   const supabase = createClient()
 
-  // Sheet list + selection
-  const [sheets, setSheets] = useState<BSSheet[]>([])
+  // Sheet list (SWR-cached) + selection
+  const { data: sheetsData, isLoading: loadingSheets, mutate: mutateSheets } = useSWR(
+    teamId ? (["bible-study-sheets", teamId] as const) : null,
+    fetchBibleStudySheets,
+    { keepPreviousData: false },
+  )
+  const sheets = useMemo(() => sheetsData ?? [], [sheetsData])
   const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<BSSheet | null>(null)
-  const [loadingSheets, setLoadingSheets] = useState(true)
   const [loadingSheet, setLoadingSheet] = useState(false)
 
   // Create form
@@ -12295,28 +12330,21 @@ function BibleStudySubTab({
   const [sharing, setSharing] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
 
-  // Load sheet list once on mount; load team progress independently
-  useEffect(() => { void loadSheets() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Load team progress independently (sheet list is SWR-cached above)
   useEffect(() => { void loadTeamProgress() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Side-effect (was inside loadSheets): auto-select the most recent sheet once the list resolves.
+  useEffect(() => {
+    if (sheetsData && sheetsData.length > 0 && !selectedSheetId) {
+      setSelectedSheetId(sheetsData[sheetsData.length - 1].id)
+    }
+  }, [sheetsData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load individual sheet whenever selection changes
   useEffect(() => {
     if (selectedSheetId) void loadSheetById(selectedSheetId)
     else { setSheet(null) }
   }, [selectedSheetId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadSheets() {
-    setLoadingSheets(true)
-    const { data } = await supabase
-      .from("bible_study_sheets")
-      .select("*")
-      .eq("team_id", teamId)
-      .order("sort_order", { ascending: true })
-    const list = (data ?? []) as BSSheet[]
-    setSheets(list)
-    if (list.length > 0 && !selectedSheetId) setSelectedSheetId(list[list.length - 1].id)
-    setLoadingSheets(false)
-  }
 
   async function loadSheetById(id: string) {
     setLoadingSheet(true)
@@ -12425,7 +12453,7 @@ function BibleStudySubTab({
     setCreating(false)
     setNewTitle("")
     setNewDocUrl("")
-    await loadSheets()
+    await mutateSheets()
     if (inserted) setSelectedSheetId(inserted.id)
     setSaving(false)
   }
@@ -12485,7 +12513,7 @@ function BibleStudySubTab({
     await supabase.from("bible_study_sheets").update({ title: renameValue.trim() }).eq("id", id)
     setSavingRename(false)
     setRenamingId(null)
-    await loadSheets()
+    await mutateSheets()
   }
 
   async function handleDelete(id: string) {
@@ -12494,11 +12522,12 @@ function BibleStudySubTab({
     setDeletingId(null)
     setConfirmingDeleteId(null)
     const nextSheets = sheets.filter(s => s.id !== id)
-    setSheets(nextSheets)
     if (selectedSheetId === id) {
       setSelectedSheetId(nextSheets.length > 0 ? nextSheets[nextSheets.length - 1].id : null)
     }
     setSheet(null)
+    // Optimistically drop the deleted sheet, then revalidate.
+    void mutateSheets(nextSheets, { revalidate: true })
   }
 
   async function handleShare() {

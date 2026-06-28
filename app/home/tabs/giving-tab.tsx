@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
+import useSWR from "swr"
 import { createClient } from "@/lib/supabase"
 import {
   Pencil, Check, Copy, ExternalLink, Plus, ChevronDown, X,
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
   FileText, ImageIcon,
 } from "lucide-react"
-import { Spinner, EYEBROW_STYLE } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
+import { EYEBROW_STYLE } from "../components/shared"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, FinanceListSkeleton, GivingGiveSkeleton } from "@/components/central"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
@@ -29,7 +30,79 @@ function currentFiscalYear(): string {
   return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 import type { Receipt as ReceiptType, ReceiptLimit } from "@/app/actions/receipts"
-import type { ReimbursementForm, ItemizedExpense, BudgetEntry } from "@/app/actions/reimbursements"
+import type { ReimbursementForm, ItemizedExpense } from "@/app/actions/reimbursements"
+
+// Stable empty map so derived `dglNames` keeps a constant identity between renders.
+const EMPTY_DGL_MAP: Map<string, string> = new Map()
+
+// ── Pure SWR fetchers (no setState — side-effects run in useEffect on data) ────
+interface FinanceOverview {
+  zelleInfo: string | null
+  limits: ReceiptLimit[]
+  calEventCategories: string[]
+  customCategories: { id: string; name: string }[]
+}
+
+async function loadFinanceOverview(
+  supabase: ReturnType<typeof createClient>,
+  ministryId: string,
+): Promise<FinanceOverview> {
+  const [givingRes, limitsRes, eventsRes, customCatRes] = await Promise.all([
+    supabase.from("ministry_giving").select("zelle_info").eq("ministry_id", ministryId).maybeSingle(),
+    getReceiptLimits(ministryId),
+    supabase.from("calendar_events").select("title").eq("ministry_id", ministryId).order("start_date"),
+    getBudgetCategories(ministryId),
+  ])
+  // Dedupe calendar event titles (exclude "DG Dinner" — it's already permanent)
+  const seen = new Set<string>(["DG Dinner"])
+  const uniqueTitles: string[] = []
+  for (const e of ((eventsRes.data ?? []) as { title: string }[])) {
+    if (!seen.has(e.title)) { seen.add(e.title); uniqueTitles.push(e.title) }
+  }
+  return {
+    zelleInfo: givingRes.data?.zelle_info ?? null,
+    limits: limitsRes.data,
+    calEventCategories: uniqueTitles,
+    customCategories: customCatRes.data.map(c => ({ id: c.id, name: c.name })),
+  }
+}
+
+interface ReimbursementsData {
+  dgForms: ReimbursementForm[]
+  otherForms: ReimbursementForm[]
+  savedSignature: string | null
+  dglNames: Map<string, string>
+}
+
+async function loadReimbursementsData(
+  supabase: ReturnType<typeof createClient>,
+  ministryId: string,
+): Promise<ReimbursementsData> {
+  const [dgRes, otherRes, sigRes] = await Promise.all([
+    getDGDinnerForms(ministryId),
+    getOtherForms(ministryId),
+    getUserSavedSignature(),
+  ])
+  const allForms = [...dgRes.data, ...otherRes.data]
+  const dglNames = new Map<string, string>()
+  const allDglIds = Array.from(new Set(allForms.flatMap(f => f.assigned_dgl_ids)))
+  if (allDglIds.length > 0) {
+    const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", allDglIds)
+    for (const p of (profiles ?? []) as { id: string; name: string }[]) dglNames.set(p.id, p.name)
+  }
+  return { dgForms: dgRes.data, otherForms: otherRes.data, savedSignature: sigRes, dglNames }
+}
+
+async function loadAllocation(
+  ministryId: string,
+  fiscalYear: string,
+): Promise<{ allocations: BudgetAllocation[]; actuals: CategoryActual[] }> {
+  const [{ data: allocs }, { data: acts }] = await Promise.all([
+    getBudgetAllocations(ministryId, fiscalYear),
+    getCategoryActuals(ministryId, fiscalYear),
+  ])
+  return { allocations: allocs, actuals: acts }
+}
 
 interface Props {
   ministryId: string
@@ -765,9 +838,30 @@ function ReimbursementCard({
 export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isTreasurer, isDGL, activeSection, onSectionChange }: Props) {
   const supabase = createClient()
 
+  const canAccessReimbursements = isDGL || isTreasurer || isAdmin
+  const canAccessBudget = isTreasurer || isAdmin
+
+  // ── Finance overview (zelle + receipt limits + category sources) via SWR ──────
+  const { data: overview, isLoading: loading, mutate: mutateOverview } = useSWR(
+    ["finance-overview", ministryId],
+    () => loadFinanceOverview(supabase, ministryId)
+  )
+  const zelleInfo = overview?.zelleInfo ?? null
+  const limits = overview?.limits ?? []
+  const calEventCategories = overview?.calEventCategories ?? []
+  const customCategories = overview?.customCategories ?? []
+
+  // ── Reimbursements (DG + other forms, DGL names, saved signature) via SWR ─────
+  const { data: reimburseData, isLoading: reimburseLoading, mutate: mutateReimburse } = useSWR(
+    canAccessReimbursements && activeSection === "reimbursements" ? ["reimbursements", ministryId, userId] : null,
+    () => loadReimbursementsData(supabase, ministryId)
+  )
+  const dgForms = reimburseData?.dgForms ?? []
+  const otherForms = reimburseData?.otherForms ?? []
+  const savedSignature = reimburseData?.savedSignature ?? null
+  const dglNames = reimburseData?.dglNames ?? EMPTY_DGL_MAP
+
   // Give section
-  const [zelleInfo, setZelleInfo] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
@@ -775,20 +869,10 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   const [zelleFallback, setZelleFallback] = useState(false)
   const [amount, setAmount] = useState("50")
 
-  // Reimbursements
-  const [dgForms, setDgForms] = useState<ReimbursementForm[]>([])
-  const [otherForms, setOtherForms] = useState<ReimbursementForm[]>([])
-  const [reimburseLoading, setReimburseLoading] = useState(false)
-  const [dglNames, setDglNames] = useState<Map<string, string>>(new Map())
-  const [savedSignature, setSavedSignature] = useState<string | null>(null)
+  // Reimbursements — receipt cache stays local (per-form lazy fetch)
   const [receiptCache, setReceiptCache] = useState<Map<string, ReceiptData | null>>(new Map())
-  const [limits, setLimits] = useState<ReceiptLimit[]>([])
   const [creatingOther, setCreatingOther] = useState(false)
   const [showSubmitReceiptModal, setShowSubmitReceiptModal] = useState(false)
-
-  // Dynamic categories (DG Dinner permanent + calendar events + custom)
-  const [calEventCategories, setCalEventCategories] = useState<string[]>([])
-  const [customCategories, setCustomCategories] = useState<{ id: string; name: string }[]>([])
 
   const dynamicCategories: DynamicCategory[] = [
     DG_DINNER_CATEGORY,
@@ -800,17 +884,20 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     const trimmed = name.trim()
     if (!trimmed || dynamicCategories.some(c => c.label.toLowerCase() === trimmed.toLowerCase())) return
     const { data, error } = await addBudgetCategory(ministryId, trimmed, userId)
-    if (!error && data) setCustomCategories(prev => [...prev, { id: data.id, name: data.name }])
+    if (!error && data) mutateOverview(curr => curr ? { ...curr, customCategories: [...curr.customCategories, { id: data.id, name: data.name }] } : curr, { revalidate: false })
   }
 
   async function handleDeleteCategory(categoryName: string) {
     await deleteBudgetCategory(ministryId, categoryName)
-    setCustomCategories(prev => prev.filter(c => c.name !== categoryName))
+    mutateOverview(curr => curr ? { ...curr, customCategories: curr.customCategories.filter(c => c.name !== categoryName) } : curr, { revalidate: false })
   }
 
-  // Budget
-  const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([])
-  const [budgetLoading, setBudgetLoading] = useState(false)
+  // ── Budget ledger entries via SWR (loaded only on the budget section) ─────────
+  const { data: budgetData, isLoading: budgetLoading, mutate: mutateBudget } = useSWR(
+    canAccessBudget && activeSection === "budget" ? ["budget-entries", ministryId] : null,
+    () => getBudgetEntries(ministryId).then(r => r.data)
+  )
+  const budgetEntries = budgetData ?? []
   const [showAddEntry, setShowAddEntry] = useState(false)
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0])
   const [entryCategory, setEntryCategory] = useState("DG Dinner")
@@ -819,76 +906,14 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   const [addingEntry, setAddingEntry] = useState(false)
   const [budgetExporting, setBudgetExporting] = useState(false)
 
-  const canAccessReimbursements = isDGL || isTreasurer || isAdmin
-  const canAccessBudget = isTreasurer || isAdmin
   const dgDinnerLimit = limits.find(l => l.category === "dg_dinner" && l.fund === "church")?.max_amount ?? null
-
-  useEffect(() => {
-    async function load() {
-      const [givingRes, limitsRes, eventsRes, customCatRes] = await Promise.all([
-        supabase.from("ministry_giving").select("zelle_info").eq("ministry_id", ministryId).maybeSingle(),
-        getReceiptLimits(ministryId),
-        supabase.from("calendar_events").select("title").eq("ministry_id", ministryId).order("start_date"),
-        getBudgetCategories(ministryId),
-      ])
-      setZelleInfo(givingRes.data?.zelle_info ?? null)
-      setLimits(limitsRes.data)
-      // Dedupe calendar event titles (exclude "DG Dinner" — it's already permanent)
-      const seen = new Set<string>(["DG Dinner"])
-      const uniqueTitles: string[] = []
-      for (const e of ((eventsRes.data ?? []) as { title: string }[])) {
-        if (!seen.has(e.title)) { seen.add(e.title); uniqueTitles.push(e.title) }
-      }
-      setCalEventCategories(uniqueTitles)
-      setCustomCategories(customCatRes.data.map(c => ({ id: c.id, name: c.name })))
-      setLoading(false)
-    }
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ministryId])
-
-  const loadReimbursements = useCallback(async () => {
-    setReimburseLoading(true)
-    const [dgRes, otherRes, sigRes] = await Promise.all([
-      getDGDinnerForms(ministryId),
-      getOtherForms(ministryId),
-      getUserSavedSignature(),
-    ])
-    const allForms = [...dgRes.data, ...otherRes.data]
-    setDgForms(dgRes.data)
-    setOtherForms(otherRes.data)
-    setSavedSignature(sigRes)
-
-    // Resolve all DGL names
-    const allDglIds = Array.from(new Set(allForms.flatMap(f => f.assigned_dgl_ids)))
-    if (allDglIds.length > 0) {
-      const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", allDglIds)
-      const nameMap = new Map<string, string>()
-      for (const p of (profiles ?? []) as { id: string; name: string }[]) nameMap.set(p.id, p.name)
-      setDglNames(nameMap)
-    }
-    setReimburseLoading(false)
-  }, [ministryId, supabase])
-
-  useEffect(() => {
-    if (activeSection === "reimbursements") loadReimbursements()
-    else if (activeSection === "budget") loadBudget()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSection])
-
-  async function loadBudget() {
-    setBudgetLoading(true)
-    const { data } = await getBudgetEntries(ministryId)
-    setBudgetEntries(data)
-    setBudgetLoading(false)
-  }
 
   async function handleSave() {
     if (!isAdmin) return
     const val = editValue.trim(); if (!val) return
     setSaving(true)
     const { error } = await supabase.from("ministry_giving").upsert({ ministry_id: ministryId, zelle_info: val, updated_by: userId, updated_at: new Date().toISOString() }, { onConflict: "ministry_id" })
-    if (!error) { setZelleInfo(val); setEditing(false) }
+    if (!error) { mutateOverview(curr => curr ? { ...curr, zelleInfo: val } : curr, { revalidate: false }); setEditing(false) }
     setSaving(false)
   }
 
@@ -912,7 +937,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
   async function handleCreateOtherForm() {
     setCreatingOther(true)
     const { data } = await createOtherForm({ ministryId, expensePurpose: "" })
-    if (data) setOtherForms(prev => [data, ...prev])
+    if (data) mutateReimburse(curr => curr ? { ...curr, otherForms: [data, ...curr.otherForms] } : curr, { revalidate: false })
     setCreatingOther(false)
   }
 
@@ -920,7 +945,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
     const amt = parseFloat(entryAmount); if (!amt || amt <= 0) return
     setAddingEntry(true)
     const { data } = await addBudgetEntry({ ministryId, category: entryCategory, description: entryDescription.trim(), amount: amt, entryDate })
-    if (data) setBudgetEntries(prev => [data, ...prev])
+    if (data) mutateBudget(curr => [data, ...(curr ?? [])], { revalidate: false })
     setEntryDate(new Date().toISOString().split("T")[0]); setEntryCategory("other"); setEntryDescription(""); setEntryAmount("")
     setShowAddEntry(false); setAddingEntry(false)
   }
@@ -1019,7 +1044,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
           </div>
         )}
 
-        {loading ? <Spinner /> : (
+        {loading ? <GivingGiveSkeleton /> : (
           <>
             {/* ── Give ── */}
             {activeSection === "give" && (
@@ -1106,7 +1131,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                     </div>
                   </div>
 
-                  {reimburseLoading ? <Spinner /> : dgForms.length === 0 ? (
+                  {reimburseLoading ? <FinanceListSkeleton /> : dgForms.length === 0 ? (
                     <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
                       <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No DG dinner forms yet</div>
                       <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Forms are auto-created when the DGL rotation is published.</div>
@@ -1143,7 +1168,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                                     dgDinnerLimit={dgDinnerLimit}
                                     savedSignature={savedSignature}
                                     receiptCache={receiptCache}
-                                    onFormUpdate={updated => setDgForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                                    onFormUpdate={updated => mutateReimburse(curr => curr ? { ...curr, dgForms: curr.dgForms.map(f => f.id === updated.id ? updated : f) } : curr, { revalidate: false })}
                                     onReceiptCached={handleReceiptCached}
                                     inline
                                   />
@@ -1195,7 +1220,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                               dgDinnerLimit={null}
                               savedSignature={savedSignature}
                               receiptCache={receiptCache}
-                              onFormUpdate={updated => setOtherForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
+                              onFormUpdate={updated => mutateReimburse(curr => curr ? { ...curr, otherForms: curr.otherForms.map(f => f.id === updated.id ? updated : f) } : curr, { revalidate: false })}
                               onReceiptCached={handleReceiptCached}
                               inline
                             />
@@ -1271,7 +1296,7 @@ export function GivingTab({ ministryId, userId, userName, userRole, isAdmin, isT
                   </div>
                 )}
 
-                {budgetLoading ? <Spinner /> : budgetEntries.length === 0 ? (
+                {budgetLoading ? <FinanceListSkeleton /> : budgetEntries.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted-text)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12 }}>
                     <DollarSign size={24} style={{ margin: "0 auto 10px", opacity: 0.4 }} />
                     <p style={{ fontSize: 14 }}>No budget entries yet</p>
@@ -1347,9 +1372,16 @@ function AllocationSection({
 }) {
   const canEdit = isTreasurer || isAdmin
   const [fiscalYear, setFiscalYear] = useState<string>(currentFiscalYear)
-  const [allocations, setAllocations] = useState<BudgetAllocation[]>([])
-  const [actuals, setActuals] = useState<CategoryActual[]>([])
-  const [loading, setLoading] = useState(true)
+  // Allocations + actuals via SWR (keyed on fiscal year so switching years refetches/caches)
+  const { data: allocData, isLoading: loading, mutate: mutateAlloc } = useSWR(
+    ["fund-allocation", ministryId, fiscalYear],
+    () => loadAllocation(ministryId, fiscalYear)
+  )
+  const allocations = allocData?.allocations ?? []
+  const actuals = allocData?.actuals ?? []
+  // Local optimistic write to the cached allocations list.
+  const setAllocations = (updater: (prev: BudgetAllocation[]) => BudgetAllocation[]) =>
+    mutateAlloc(curr => curr ? { ...curr, allocations: updater(curr.allocations) } : curr, { revalidate: false })
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
   const [savingCell, setSavingCell] = useState<string | null>(null)
 
@@ -1372,20 +1404,6 @@ function AllocationSection({
     .filter(c => !categories.some(d => d.value === c))
     .map(c => ({ value: c, label: c, isPermanent: false }))
   const allCategories = [...categories, ...orphanedCategories]
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const [{ data: allocs }, { data: acts }] = await Promise.all([
-        getBudgetAllocations(ministryId, fiscalYear),
-        getCategoryActuals(ministryId, fiscalYear),
-      ])
-      setAllocations(allocs)
-      setActuals(acts)
-      setLoading(false)
-    }
-    load()
-  }, [ministryId, fiscalYear])
 
   // Build lookup: category → fund → amount
   function getAllocAmount(category: string, fund: string): number {
@@ -1501,7 +1519,7 @@ function AllocationSection({
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
+        <FinanceListSkeleton />
       ) : (
         <>
           {/* Summary stat cards */}
