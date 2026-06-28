@@ -92,7 +92,7 @@ export function ReceiptsWorkspace({
 
       {/* Mobile team selector — desktop selects teams from the sidebar */}
       {teams.length > 0 && (
-        <div className="md:hidden" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
+        <div className="flex md:hidden" style={{ gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
           {teams.map(t => {
             const isActive = t.id === activeReceiptsTeamId
             return (
