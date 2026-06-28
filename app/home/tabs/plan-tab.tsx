@@ -9208,9 +9208,9 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
   return (
-    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
+    <AnimateIn className="fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto md:left-[var(--shell-offset)] md:right-0 md:max-w-none md:mx-0 md:bg-[var(--cream)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 border-b border-[var(--line)] bg-[#FBF8F2]">
+      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-14 border-b border-[var(--line)] bg-[#FBF8F2] md:bg-[var(--cream)]">
         <button
           onClick={step === "preset" ? onClose : () => setStep(step === "members" ? "customize" : "preset")}
           className="flex items-center gap-1.5 text-[13px] text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
@@ -10209,7 +10209,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   )
 
   return (
-    <AnimateIn className="fixed inset-0 z-[70] bg-[#FBF8F2] max-w-[390px] mx-auto flex flex-col md:left-[var(--shell-offset)] md:max-w-none">
+    <AnimateIn className="fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto md:left-[var(--shell-offset)] md:right-0 md:max-w-none md:mx-0 md:bg-[var(--cream)]">
 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[var(--line)] bg-[#FBF8F2]">
@@ -10281,7 +10281,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       </div>
 
       {/* ── Desktop settings header ── */}
-      <div className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
+      <div className="hidden md:flex h-12 px-14 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
         <div className="flex items-center gap-1.5 text-[12px]" style={{ flex: 1 }}>
           <span style={{ color: "var(--muted-text)" }}>Central</span>
           <span style={{ color: "var(--line-2)" }}>/</span>
@@ -10463,7 +10463,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
         {/* ── Desktop content ── */}
         {!showAddMember ? (
-          <div className="hidden md:block px-10 py-8">
+          <div className="hidden md:block px-14 py-8">
             {loading ? <Spinner /> : (
               <>
                 {/* Hero strip */}
@@ -10754,7 +10754,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             )}
           </div>
         ) : (
-          <div className="hidden md:block px-10 py-8">
+          <div className="hidden md:block px-14 py-8">
             <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>
               TEAM SETTINGS · {team.name.toUpperCase()}
             </p>
@@ -10767,8 +10767,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
       {/* Sticky action footer — add members */}
       {showAddMember && selectedIds.size > 0 && (
-        <div style={{ flexShrink: 0, background: "#FBF8F2", borderTop: "1px solid var(--line)" }}
-          className="px-5 md:px-10 py-4 pb-8 md:pb-5"
+        <div style={{ flexShrink: 0, borderTop: "1px solid var(--line)" }}
+          className="px-5 md:px-14 py-4 pb-8 md:pb-5 bg-[#FBF8F2] md:bg-[var(--cream)]"
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
