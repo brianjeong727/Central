@@ -139,6 +139,15 @@ The `dev` script is `rm -rf .next && next dev`. If a second `npm run dev` starts
 
 **Rule:** Keep exactly one `next dev` running. Don't run `npm run build` while it's up. Recovery: `pkill -9 -f next-server; pkill -9 -f "next dev"; lsof -ti:3000 | xargs kill -9; rm -rf .next node_modules/.cache; npm run dev`. Verify one logical server before testing.
 
+**Verification gap (2026-06-27):** Re-hit this by running `npm run build` in a worktree whose `next dev` was live on the same `.next` — every route then 500s. It reached the user because the health check curled `/home`, which **307-redirects to `/login` before rendering**, so a render-time 500 is invisible. Always verify against a route that returns **200 by actually rendering** (`/`, `/login`) — a 307 proves nothing. A global Stop hook now enforces this automatically: `~/.claude/hooks/check-dev-500.sh` scans listening dev ports (3000–3005) for a 500 on `/` before Claude finishes and blocks the handoff if one is found.
+
+## Visual changes — a passing build is not verification
+Date: 2026-06-27
+
+`npm run build` validates types/compile, never **appearance**. CSS regressions (background-clip resets, z-index, overflow, wrong color) pass the build and still render broken — shipped a greeting headline where the plum role word rendered as a solid plum block, build green the whole time. For any visual change, render and LOOK before claiming it works. If the surface is auth-gated (e.g. `/home`), screenshot the exact CSS in an isolated HTML harness with headless Chrome: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --screenshot=out.png --window-size=W,H "file://harness.html"`.
+
+**Specific trap that caused it:** the `background` **shorthand** resets `background-clip` to `border-box`. When layering a `.x-plum` variant rule over a `.x` base that relies on `background-clip: text`, the variant's `background:` shorthand silently clobbers the clip — the variant MUST re-declare `-webkit-background-clip: text; background-clip: text; color: transparent`, or the gradient fills the box as a solid block.
+
 ## Audit findings are SURFACE reads — verify actual values before unifying
 Date: 2026-06-26
 

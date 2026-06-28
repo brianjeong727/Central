@@ -115,7 +115,16 @@ export function HomeTab({
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
   const greetingPrefix = hour < 12 ? "Good morning, " : hour < 17 ? "Good afternoon, " : hour < 21 ? "Good evening, " : "Good night, "
-  const greetingNode = <>{greetingPrefix}<span style={{ color: "var(--plum)" }}>{roleLabel}</span> {firstName}</>
+  // Living-accent greeting (Dir 3): each segment is its own sheen span so the slow
+  // light-sheen drifts per-word; the plum role keeps its plum gradient. Static fill
+  // under prefers-reduced-motion (see .greeting-sheen in globals.css).
+  const greetingNode = (
+    <>
+      <span className="greeting-sheen">{greetingPrefix}</span>
+      <span className="greeting-sheen greeting-sheen-plum">{roleLabel}</span>
+      <span className="greeting-sheen">{" " + firstName}</span>
+    </>
+  )
 
 
   async function loadHomeData(): Promise<HomeData> {
@@ -538,7 +547,7 @@ export function HomeTab({
 
             {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement.
                 "Featured" section eyebrow is the constant frame element above every state. */}
-            <HeroSectionLabel offsetForArrows={slides.length > 1} />
+            <HeroSectionLabel offsetForArrows={slides.length > 1} breathe />
             {slides.length > 0 ? (
               <HomeHeroCarousel
                 slides={slides}
