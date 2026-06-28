@@ -345,7 +345,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
       if (!t || !r) return []
       const rawType = t.team_type ?? 'standard'
-      const teamType: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
+      const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency }]
     })
     setUserTeams(teams)
@@ -376,7 +376,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null }
     setAllTeams((data as RawTeam[]).map((t) => {
       const rawType = t.team_type ?? 'standard'
-      const team_type: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
+      const team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       const rawAccess = t.admin_access ?? 'view'
       const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
       return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, member_count: countMap[t.id] ?? 0 }

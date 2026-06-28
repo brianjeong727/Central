@@ -44,6 +44,7 @@ import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
+import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -104,6 +105,17 @@ const TEAM_PRESETS = [
       { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
       { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
       { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
+    ],
+  },
+  {
+    id: "finance",
+    name: "Finance Team",
+    icon: "💰",
+    description: "Budget, allocation, and reimbursements",
+    teamType: "finance" as const,
+    roles: [
+      { name: "Treasurer", is_president: true, permissions: ["can_view_finances"] },
+      { name: "Finance Team", permissions: ["can_view_finances"] },
     ],
   },
   {
@@ -1764,6 +1776,7 @@ export function PlanTab({
   const supabase = createClient()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
+  const [financeSection, setFinanceSection] = useState<FinanceSection>("reimbursements")
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
 
@@ -1884,7 +1897,19 @@ export function PlanTab({
   const govWrite = activeTeamAccess === "gov-write"
   const govView = activeTeamAccess === "gov-view"
 
-  const isStudentOrgBoard = /\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
+  // Finance is an exact team_type — checked before the perm-based detectors below
+  // (a finance team carries can_view_finances, which would otherwise trip isStudentOrgBoard).
+  const isFinanceTeam = activeTeamFull?.team_type === 'finance'
+  // Finance write = member with can_view_finances OR governance-write. Read-only under gov-view.
+  const financeCanEdit = activeTeamPerms.includes("can_view_finances") || govWrite
+  const financeCanAccess = financeCanEdit || govView
+  const financeStripTabs: { key: string; label: string }[] = [
+    { key: "reimbursements", label: "Reimbursements" },
+    { key: "budget", label: "Budget" },
+    { key: "allocation", label: "Allocation" },
+  ]
+
+  const isStudentOrgBoard = !isFinanceTeam && (/\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p)))
   const studentOrgRole = (isStudentOrgBoard ? activeUserTeam?.roleName : undefined) ?? ""
   const canEditStudentOrg = activeTeamPerms.includes("can_plan_events") || govWrite
 
@@ -2140,6 +2165,27 @@ export function PlanTab({
               </div>
             </div>
           )
+        ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
+          <>
+            <PlanSubTabStrip
+              tabs={financeStripTabs}
+              active={financeSection}
+              onChange={k => setFinanceSection(k as FinanceSection)}
+            />
+            <div className="px-5 md:px-14 py-7">
+              <FinanceWorkspace
+                ministryId={ministryId}
+                userId={userId}
+                userName={userName}
+                userRole={activeUserTeam?.roleName ?? ""}
+                section={financeSection}
+                onSectionChange={setFinanceSection}
+                canEditBudget={financeCanEdit}
+                canAccessReimbursements={financeCanEdit}
+                readOnly={govView}
+              />
+            </div>
+          </>
         ) : isDgPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
@@ -2239,7 +2285,28 @@ export function PlanTab({
             </span>
           </div>
         )}
-        {isDgPraiseTeam && activeTeamId ? (
+        {isFinanceTeam && activeTeamId && financeCanAccess ? (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <PlanSubTabStrip
+                tabs={financeStripTabs}
+                active={financeSection}
+                onChange={k => setFinanceSection(k as FinanceSection)}
+              />
+            </div>
+            <FinanceWorkspace
+              ministryId={ministryId}
+              userId={userId}
+              userName={userName}
+              userRole={activeUserTeam?.roleName ?? ""}
+              section={financeSection}
+              onSectionChange={setFinanceSection}
+              canEditBudget={financeCanEdit}
+              canAccessReimbursements={financeCanEdit}
+              readOnly={govView}
+            />
+          </div>
+        ) : isDgPraiseTeam && activeTeamId ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -8936,7 +9003,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 }) {
   const supabase = createClient()
   const [step, setStep] = useState<CreateStep>("preset")
-  const [selectedTeamType, setSelectedTeamType] = useState<'standard' | 'dg_praise' | 'one_time'>('standard')
+  const [selectedTeamType, setSelectedTeamType] = useState<'standard' | 'dg_praise' | 'one_time' | 'finance'>('standard')
   const [teamName, setTeamName] = useState("")
   const [teamIcon, setTeamIcon] = useState("👥")
   const [teamDesc, setTeamDesc] = useState("")
@@ -8978,7 +9045,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     setTeamIcon(preset.icon)
     setTeamDesc(preset.description)
     setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions], is_president: "is_president" in r ? !!r.is_president : false })))
-    setSelectedTeamType((preset as { teamType?: 'standard' | 'dg_praise' | 'one_time' }).teamType ?? 'standard')
+    setSelectedTeamType((preset as { teamType?: 'standard' | 'dg_praise' | 'one_time' | 'finance' }).teamType ?? 'standard')
     setStep("customize")
   }
 
@@ -10673,11 +10740,13 @@ const WIZARD_ICON_OPTIONS = [
   { key: "globe",    d: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" },
   { key: "sparkle",  d: "M12 3v6M12 15v6M3 12h6M15 12h6M6.4 6.4l3.2 3.2M14.4 14.4l3.2 3.2M6.4 17.6l3.2-3.2M14.4 9.6l3.2-3.2" },
   { key: "clipboard",d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" },
+  { key: "dollar",   d: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
 ]
 
 // Step 1 preset display data (icon keys, no emojis)
 const WIZARD_PRESETS_DISPLAY = [
   { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false, comingSoon: false },
+  { id: "finance",   iconKey: "dollar",   label: "Finance Team",        desc: "Budget, allocation, and reimbursements.",                 restricted: false, comingSoon: false },
   { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false, comingSoon: false },
   { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false, comingSoon: true  },
   { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false, comingSoon: true  },

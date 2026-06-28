@@ -322,7 +322,7 @@ export interface UserTeam {
   teamName: string
   teamIcon: string | null
   teamDescription: string | null
-  teamType: 'standard' | 'dg_praise' | 'one_time'
+  teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance'
   roleId: string
   roleName: string
   permissions: string[]
@@ -337,7 +337,7 @@ export interface Team {
   description: string | null
   created_by: string
   member_count: number
-  team_type: 'standard' | 'dg_praise' | 'one_time'
+  team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance'
   allow_co_presidency: boolean
   // Per-team admin governance matrix: what governing admins get on this team.
   admin_access: 'none' | 'view' | 'write'
