@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { RoleDescriptionEditor, PlanSubTabStrip } from "./plan-tab"
-import { CentralButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
+import { CentralButton, IconButton, InsetHairline, TabPageHeader, PageTitle } from "@/components/central"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
 const JOURNAL_TABS = [
@@ -41,8 +41,8 @@ function JournalEditorShell({ eyebrow, onCancel, onSave, saving, canSave, saveLa
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 24 }}>
         <p style={{ ...MONO_STYLE, margin: 0 }}>{eyebrow}</p>
         <div style={{ display: "flex", gap: 8 }}>
-          <CentralButton variant="secondary" onClick={onCancel} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-          <CentralButton onClick={onSave} disabled={saving || !canSave} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : saveLabel}</CentralButton>
+          <CentralButton variant="secondary" size="sm" onClick={onCancel}>Cancel</CentralButton>
+          <CentralButton size="sm" onClick={onSave} disabled={saving || !canSave}>{saving ? "Saving…" : saveLabel}</CentralButton>
         </div>
       </div>
       {children}
@@ -163,7 +163,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New entry
         </CentralButton>
       </div>
@@ -194,10 +194,10 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -311,7 +311,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New prayer
         </CentralButton>
       </div>
@@ -342,10 +342,10 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -448,7 +448,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />Add verse
         </CentralButton>
       </div>
@@ -480,10 +480,10 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -592,9 +592,9 @@ export function JournalSection({
       {/* Settings gear + stats bar */}
       <div style={{ position: "relative", paddingTop: 4 }}>
         <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
-          <button onClick={() => setShowSettingsMenu(v => !v)} style={{ width: 28, height: 28, borderRadius: 7, background: showSettingsMenu ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
+          <IconButton active={showSettingsMenu} onClick={() => setShowSettingsMenu(v => !v)}>
             <Settings size={14} />
-          </button>
+          </IconButton>
           {showSettingsMenu && (
             <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
               <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
@@ -1052,7 +1052,7 @@ export function ProfileTab({
               <CentralButton onClick={saveEdit} disabled={saving} style={{ fontSize: 13 }}><Check size={12} />{saving ? "Saving…" : "Save"}</CentralButton>
             </div>
           ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Edit3 size={13} />Edit profile</CentralButton>
+            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Pencil size={13} />Edit profile</CentralButton>
           )}
         </div>
 
@@ -1085,7 +1085,7 @@ export function ProfileTab({
               <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
             </div>
           ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Edit3 size={13} />Edit profile</CentralButton>
+            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
           )}
         </TabPageHeader>
 
