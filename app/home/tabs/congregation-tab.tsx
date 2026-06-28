@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { Plus, X, BarChart2, Archive, ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner } from "../components/shared"
+import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
+import { TabPageHeader, PageTitle, CentralButton, PlanSubTabStrip } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -20,6 +21,12 @@ interface ArchivedQuestion extends CongregationQuestion {
 
 type View = "ask" | "responses" | "archive"
 
+const VIEW_TABS = [
+  { key: "ask", label: "Ask" },
+  { key: "responses", label: "Responses" },
+  { key: "archive", label: "Archive" },
+] as const
+
 const TYPE_LABELS: Record<string, string> = {
   poll: "Poll",
   scale: "1–5 Scale",
@@ -32,6 +39,20 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
   scale: "Members rate on a scale of 1 to 5",
   open: "Members share a short written response",
   prayer: "Members share anonymous prayer requests",
+}
+
+// Shared input chrome (textarea + poll option inputs) — §4.4 standard input.
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: "var(--r-input)",
+  border: "1px solid var(--line-2)",
+  background: "var(--cream)",
+  fontSize: 14,
+  color: "var(--ink)",
+  fontFamily: "var(--sans)",
+  boxSizing: "border-box",
+  outline: "none",
 }
 
 export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
@@ -202,7 +223,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{opt}</span>
                   <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{count} · {pct}%</span>
                 </div>
-                <div style={{ height: 6, borderRadius: 999, background: "#E5E0D2", overflow: "hidden" }}>
+                <div style={{ height: 6, borderRadius: 999, background: "var(--line)", overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${pct}%`, background: "var(--plum)", borderRadius: 999, transition: "width 0.4s ease" }} />
                 </div>
               </div>
@@ -218,12 +239,12 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
       const dist = [1, 2, 3, 4, 5].map(n => ({ n, count: scores.filter(s => s === n).length }))
       return (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 40, fontWeight: 700, color: "var(--plum)", fontFamily: "var(--font-instrument-serif)", lineHeight: 1 }}>{avg}</div>
+          <div style={{ fontSize: 40, fontWeight: 400, color: "var(--plum-2)", fontFamily: "var(--serif)", letterSpacing: "-0.5px", lineHeight: 1 }}>{avg}</div>
           <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 12 }}>average out of 5</div>
           <div style={{ display: "flex", gap: 6 }}>
             {dist.map(({ n, count }) => (
               <div key={n} style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: 16, marginBottom: 4 }}>{n}</div>
+                <div style={{ fontSize: 16, marginBottom: 4, color: "var(--body)" }}>{n}</div>
                 <div style={{ height: Math.max(4, count * 10), background: "var(--plum)", borderRadius: 4, opacity: count > 0 ? 1 : 0.12, minHeight: 4, transition: "height 0.4s" }} />
                 <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 3 }}>{count}</div>
               </div>
@@ -239,63 +260,40 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     return (
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         {texts.map((t, i) => (
-          <div key={i} style={{ padding: "10px 12px", borderRadius: 8, background: "#F4F1E8", border: "1px solid #E5E0D2", fontSize: 13, color: "var(--ink)", lineHeight: 1.5 }}>{t}</div>
+          <div key={i} style={{ padding: "10px 12px", borderRadius: "var(--r-chip)", background: "var(--cream-2)", border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.5 }}>{t}</div>
         ))}
       </div>
     )
   }
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "11px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-    color: "var(--muted-text)",
-  }
-
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: "6px 14px",
-    borderRadius: 999,
-    fontSize: 13,
-    fontWeight: active ? 600 : 400,
-    background: active ? "var(--plum)" : "transparent",
-    color: active ? "#F6F4EF" : "var(--muted-text)",
-    border: "none",
-    cursor: "pointer",
-    transition: "background 0.15s, color 0.15s",
-  })
-
   return (
     <div className="pb-28 md:pb-0">
       {/* Mobile header */}
-      <div className="md:hidden px-5 pt-14 pb-5">
-        <p style={monoStyle}>Congregation</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>
-          {view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"}
+      <div className="md:hidden px-5 pt-14 pb-3">
+        <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
+          Congregation
         </h1>
         <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
-          {view === "ask" ? "Send a question to your congregation." : view === "responses" ? "Anonymous responses from your congregation." : "Past questions and their results."}
+          Ask your congregation — responses are anonymous.
         </p>
       </div>
 
       {/* Desktop header */}
-      <div className="hidden md:block px-14 pt-11 pb-8 border-b border-[#E5E0D2]">
-        <p style={monoStyle}>Congregation</p>
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 52, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>
-          {view === "ask" ? "Ask" : view === "responses" ? "Responses" : "Archive"}
-        </h1>
-        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>
-          {view === "ask" ? "Send a question to your congregation — responses are anonymous." : view === "responses" ? "Anonymous responses from your congregation." : "Past questions and their results."}
-        </p>
+      <TabPageHeader>
+        <PageTitle title="Congregation" compact />
+      </TabPageHeader>
+
+      {/* Desktop sub-tabs — sibling of the header, no horizontal padding (§4.2) */}
+      <div className="hidden md:block">
+        <PlanSubTabStrip tabs={VIEW_TABS} active={view} onChange={k => setView(k as View)} />
       </div>
 
-      <div className="px-5 md:px-14 pt-6 md:pt-8" style={{ maxWidth: 740 }}>
+      <div className="px-5 md:px-14 pt-5 md:pt-7" style={{ maxWidth: 760 }}>
 
-        {/* View switcher */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 24, padding: "4px", background: "#F4F1E8", borderRadius: 999, width: "fit-content" }}>
-          <button style={tabStyle(view === "ask")} onClick={() => setView("ask")}>Ask</button>
-          <button style={tabStyle(view === "responses")} onClick={() => setView("responses")}>Responses</button>
-          <button style={tabStyle(view === "archive")} onClick={() => setView("archive")}>Archive</button>
+        {/* Mobile sub-tabs */}
+        <div className="md:hidden" style={{ marginBottom: 20 }}>
+          <PlanSubTabStrip tabs={VIEW_TABS} active={view} onChange={k => setView(k as View)} />
         </div>
 
         {/* ── ASK VIEW ── */}
@@ -305,30 +303,32 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
             {loadingActive ? (
               <Spinner />
             ) : activeQuestion ? (
-              <div style={{ padding: "16px", borderRadius: 12, background: "rgba(62,21,64,0.06)", border: "1.5px solid rgba(62,21,64,0.15)", marginBottom: 24 }}>
+              <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--ivory)", border: "1px solid var(--line-2)", marginBottom: 24 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <span style={{ ...monoStyle, color: "var(--plum)", marginBottom: 6, display: "block" }}>Active · {TYPE_LABELS[activeQuestion.question_type]}</span>
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", lineHeight: 1.4 }}>{activeQuestion.question_text}</p>
+                    <span style={{ ...MONO_STYLE, color: "var(--plum)", marginBottom: 6, display: "block" }}>Active · {TYPE_LABELS[activeQuestion.question_type]}</span>
+                    <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4 }}>{activeQuestion.question_text}</p>
                     <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6 }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
                   </div>
-                  <button
+                  <CentralButton
+                    variant="destructive"
                     onClick={handleClose}
                     disabled={closing}
-                    style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 8, background: "transparent", border: "1px solid #E5E0D2", color: "#9D2D2D", cursor: "pointer", flexShrink: 0 }}
+                    style={{ flexShrink: 0, padding: "6px 12px", fontSize: 12 }}
                   >
                     {closing ? "Closing…" : "Close question"}
-                  </button>
+                  </CentralButton>
                 </div>
-                <button
+                <CentralButton
+                  variant="ghost"
                   onClick={() => setView("responses")}
-                  style={{ marginTop: 12, fontSize: 12, color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}
+                  style={{ marginTop: 12, color: "var(--plum)", fontWeight: 500 }}
                 >
                   <BarChart2 className="w-3.5 h-3.5" /> View responses
-                </button>
+                </CentralButton>
               </div>
             ) : (
-              <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F4F1E8", border: "1px dashed #C4C4C4", marginBottom: 24, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
+              <div style={{ padding: "14px 16px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: "1px dashed var(--dashed)", marginBottom: 24, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
                 No active question. Send one below.
               </div>
             )}
@@ -336,42 +336,46 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
             {/* Create form */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <label style={{ ...monoStyle, display: "block", marginBottom: 6 }}>Your question</label>
+                <label style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Your question</label>
                 <textarea
                   value={questionText}
                   onChange={e => setQuestionText(e.target.value)}
                   placeholder="What's on your heart this week?"
                   rows={3}
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+                  style={{ ...inputStyle, resize: "vertical" }}
                 />
               </div>
 
               <div>
-                <label style={{ ...monoStyle, display: "block", marginBottom: 8 }}>Response type</label>
+                <label style={{ ...MONO_STYLE, display: "block", marginBottom: 8 }}>Response type</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {(["poll", "scale", "open", "prayer"] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setQuestionType(t)}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: `1.5px solid ${questionType === t ? "var(--plum)" : "#E5E0D2"}`,
-                        background: questionType === t ? "rgba(62,21,64,0.06)" : "#FBF8F2",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 2 }}>{TYPE_LABELS[t]}</div>
-                      <div style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.3 }}>{TYPE_DESCRIPTIONS[t]}</div>
-                    </button>
-                  ))}
+                  {(["poll", "scale", "open", "prayer"] as const).map((t) => {
+                    const selected = questionType === t
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setQuestionType(t)}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: "var(--r-input)",
+                          border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
+                          background: selected ? "var(--ivory)" : "var(--cream)",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out)",
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", marginBottom: 2 }}>{TYPE_LABELS[t]}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.3 }}>{TYPE_DESCRIPTIONS[t]}</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
               {questionType === "poll" && (
                 <div>
-                  <label style={{ ...monoStyle, display: "block", marginBottom: 8 }}>Poll options</label>
+                  <label style={{ ...MONO_STYLE, display: "block", marginBottom: 8 }}>Poll options</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {pollOptions.map((opt, i) => (
                       <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -383,50 +387,41 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                             setPollOptions(updated)
                           }}
                           placeholder={`Option ${i + 1}`}
-                          style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1.5px solid #E5E0D2", background: "#FBF8F2", fontSize: 13, color: "var(--ink)", fontFamily: "var(--font-inter)", outline: "none" }}
+                          style={{ ...inputStyle, padding: "8px 12px", fontSize: 13 }}
                         />
                         {pollOptions.length > 2 && (
                           <button
                             onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))}
-                            style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: "1px solid #E5E0D2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                            aria-label="Remove option"
+                            style={{ width: 30, height: 30, borderRadius: "var(--r-chip)", background: "transparent", border: "1px solid var(--line-2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--muted-text)" }}
                           >
-                            <X className="w-3.5 h-3.5 text-[var(--muted-text)]" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     ))}
                     {pollOptions.length < 5 && (
-                      <button
+                      <CentralButton
+                        variant="ghost"
                         onClick={() => setPollOptions(prev => [...prev, ""])}
-                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
+                        style={{ color: "var(--plum)", fontWeight: 500, padding: "4px 0" }}
                       >
                         <Plus className="w-3.5 h-3.5" /> Add option
-                      </button>
+                      </CentralButton>
                     )}
                   </div>
                 </div>
               )}
 
-              {error && <p style={{ fontSize: 12, color: "#B91C1C" }}>{error}</p>}
+              {error && <p style={{ fontSize: 12, color: "var(--danger)" }}>{error}</p>}
 
-              <button
+              <CentralButton
                 onClick={handleSend}
                 disabled={submitting || !questionText.trim()}
-                style={{
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  background: submitting || !questionText.trim() ? "#C4C4C4" : "var(--plum)",
-                  color: "#F6F4EF",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: submitting || !questionText.trim() ? "not-allowed" : "pointer",
-                  fontFamily: "var(--font-inter)",
-                  transition: "background 0.15s",
-                }}
+                style={{ width: "100%", padding: "12px 0" }}
               >
                 {submitting ? "Sending…" : activeQuestion ? "Replace active question" : "Send to Congregation"}
-              </button>
+              </CentralButton>
             </div>
           </div>
         )}
@@ -435,14 +430,16 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         {view === "responses" && (
           <div>
             {!activeQuestion ? (
-              <div style={{ padding: "40px 0", textAlign: "center" }}>
-                <p style={{ fontSize: 14, color: "var(--muted-text)" }}>No active question. Send one from the Ask tab.</p>
-              </div>
+              <EmptyState
+                icon={<BarChart2 className="w-5 h-5" />}
+                title="No active question"
+                subtitle="Send one from the Ask tab."
+              />
             ) : (
               <div>
-                <div style={{ padding: "16px", borderRadius: 12, background: "white", border: "1px solid #E5E0D2", marginBottom: 20 }}>
-                  <span style={{ ...monoStyle, color: "var(--plum)", marginBottom: 6, display: "block" }}>{TYPE_LABELS[activeQuestion.question_type]}</span>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{activeQuestion.question_text}</p>
+                <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--cream)", border: "1px solid var(--line)", marginBottom: 20 }}>
+                  <span style={{ ...MONO_STYLE, color: "var(--plum)", marginBottom: 6, display: "block" }}>{TYPE_LABELS[activeQuestion.question_type]}</span>
+                  <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{activeQuestion.question_text}</p>
                   <p style={{ fontSize: 12, color: "var(--muted-text)" }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
 
                   {loadingResponses ? (
@@ -452,13 +449,9 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                   )}
                 </div>
 
-                <button
-                  onClick={handleClose}
-                  disabled={closing}
-                  style={{ padding: "10px 16px", fontSize: 13, fontWeight: 600, borderRadius: 8, background: "transparent", border: "1px solid #E5E0D2", color: "#9D2D2D", cursor: "pointer" }}
-                >
+                <CentralButton variant="destructive" onClick={handleClose} disabled={closing}>
                   {closing ? "Closing…" : "Close question"}
-                </button>
+                </CentralButton>
               </div>
             )}
           </div>
@@ -470,28 +463,29 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
             {loadingArchive ? (
               <Spinner />
             ) : archived.length === 0 ? (
-              <div style={{ padding: "40px 0", textAlign: "center" }}>
-                <Archive className="w-8 h-8 text-[#C4C4C4] mx-auto mb-2" />
-                <p style={{ fontSize: 14, color: "var(--muted-text)" }}>No closed questions yet.</p>
-              </div>
+              <EmptyState
+                icon={<Archive className="w-5 h-5" />}
+                title="No closed questions yet"
+                subtitle="Questions you close will be archived here."
+              />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {archived.map((q) => (
-                  <div key={q.id} style={{ borderRadius: 12, border: "1px solid #E5E0D2", background: "white", overflow: "hidden" }}>
+                  <div key={q.id} style={{ borderRadius: "var(--r-card)", border: "1px solid var(--line)", background: "var(--cream)", overflow: "hidden" }}>
                     <button
                       onClick={() => toggleArchived(q.id)}
                       style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
                     >
                       <div style={{ flex: 1 }}>
-                        <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>
+                        <span style={{ ...MONO_STYLE, display: "block", marginBottom: 4 }}>
                           {TYPE_LABELS[q.question_type]} · {q.response_count} response{q.response_count !== 1 ? "s" : ""}
                         </span>
                         <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4 }}>{q.question_text}</p>
                       </div>
-                      {q.expanded ? <ChevronUp className="w-4 h-4 text-[var(--muted-text)] flex-shrink-0 mt-0.5" /> : <ChevronDown className="w-4 h-4 text-[var(--muted-text)] flex-shrink-0 mt-0.5" />}
+                      {q.expanded ? <ChevronUp className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--muted-text)" }} /> : <ChevronDown className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--muted-text)" }} />}
                     </button>
                     {q.expanded && (
-                      <div style={{ padding: "0 16px 16px", borderTop: "1px solid #F4F1E8" }}>
+                      <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--line-3)" }}>
                         {loadingArchivedResponses[q.id] ? (
                           <div style={{ paddingTop: 12 }}><Spinner /></div>
                         ) : (
