@@ -85,7 +85,7 @@ export function ReceiptsWorkspace({
           eyebrow={activeTeam ? `RECEIPTS · ${activeTeam.name.toUpperCase()}` : "RECEIPTS"}
           title="Receipts"
         />
-        {teamId && (
+        {teamId && categories.length > 0 && (
           <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
         )}
       </TabPageHeader>
@@ -228,44 +228,57 @@ function CategoryContent({
 
   useEffect(() => { refresh() }, [refresh])
 
+  const submitButton = (
+    <button
+      onClick={() => setShowSubmit(true)}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        height: 36, padding: "0 14px", borderRadius: "var(--r-pill)",
+        background: "var(--plum)", color: "var(--cream)", border: "none",
+        fontSize: 13, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer",
+        flexShrink: 0,
+      }}
+    >
+      <Plus size={14} />
+      Submit a receipt
+    </button>
+  )
+
+  const eyebrow = (
+    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+      {category.name} · {fundLabel(category.fund)}
+    </p>
+  )
+
   return (
     <div>
-      {/* Category eyebrow + submit affordance */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-          {category.name} · {fundLabel(category.fund)}
-        </p>
-        <button
-          onClick={() => setShowSubmit(true)}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            height: 36, padding: "0 14px", borderRadius: "var(--r-pill)",
-            background: "var(--plum)", color: "var(--cream)", border: "none",
-            fontSize: 13, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          <Plus size={14} />
-          Submit a receipt
-        </button>
-      </div>
-
-      {/* Entries */}
       {loading ? null : receipts.length === 0 ? (
-        <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
-          No receipts in {category.name} yet.
-        </p>
-      ) : (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
-          {receipts.map((r, i) => (
-            <ReceiptOneLine
-              key={r.id}
-              receipt={r}
-              first={i === 0}
-              onClick={() => setDetail(r)}
-            />
-          ))}
+        /* Empty category — centered, guided submit CTA */
+        <div className="flex flex-col items-center justify-center text-center" style={{ padding: "48px 24px" }}>
+          {eyebrow}
+          <p style={{ fontSize: 15, color: "var(--body)", margin: "10px 0 20px" }}>
+            No receipts in {category.name} yet.
+          </p>
+          {submitButton}
         </div>
+      ) : (
+        /* Populated — submit at the top-right, above the list */
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+            {eyebrow}
+            {submitButton}
+          </div>
+          <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
+            {receipts.map((r, i) => (
+              <ReceiptOneLine
+                key={r.id}
+                receipt={r}
+                first={i === 0}
+                onClick={() => setDetail(r)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {showSubmit && (
