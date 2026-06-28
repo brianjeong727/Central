@@ -338,6 +338,16 @@ export async function submitReceiptForForm(params: {
     .eq("id", user.id)
     .single()
 
+  // Use the linked form's actual category rather than hardcoding DG dinner —
+  // "other" forms were previously mis-filed as dg_dinner. reimbursement_forms has
+  // no fund column (forms are implicitly church-fund), so fund stays "church".
+  const { data: form } = await supabase
+    .from("reimbursement_forms")
+    .select("category")
+    .eq("id", params.formId)
+    .maybeSingle()
+  const formRow = form as { category?: string } | null
+
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("receipts")
@@ -346,7 +356,7 @@ export async function submitReceiptForForm(params: {
       submitted_by: user.id,
       submitted_by_name: profile?.name ?? null,
       reimbursement_form_id: params.formId,
-      category: "dg_dinner",
+      category: formRow?.category ?? "dg_dinner",
       fund: "church",
       amount: params.amount,
       purchase_date: new Date().toISOString().split("T")[0],

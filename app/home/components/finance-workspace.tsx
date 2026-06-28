@@ -7,7 +7,7 @@ import {
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
   ImageIcon,
 } from "lucide-react"
-import { Spinner, EYEBROW_STYLE } from "./shared"
+import { Spinner, EYEBROW_STYLE, HeaderActionButton } from "./shared"
 import { MonogramChip } from "@/components/central"
 import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
 import {
@@ -125,15 +125,35 @@ function Initials({ name, size = 28 }: { name: string; size?: number }) {
   )
 }
 
-function SubmitReceiptModal({
-  ministryId, limits, categories, onClose, onSubmitted,
+// Fallback category list when the modal is opened outside FinanceWorkspace
+// (e.g. a team member submitting a receipt from the Plan tab) and the dynamic
+// budget categories aren't available. The treasurer can recategorize in their queue.
+const DEFAULT_RECEIPT_CATEGORIES: DynamicCategory[] = [
+  { value: "other", label: "Other", isPermanent: true },
+  DG_DINNER_CATEGORY,
+]
+
+export function SubmitReceiptModal({
+  ministryId, limits: limitsProp, categories: categoriesProp, teamId, onClose, onSubmitted,
 }: {
-  ministryId: string; limits: ReceiptLimit[];
-  categories: DynamicCategory[];
+  ministryId: string; limits?: ReceiptLimit[];
+  categories?: DynamicCategory[];
+  teamId?: string | null;
   onClose: () => void; onSubmitted: (r: ReceiptType) => void
 }) {
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
+  // When not supplied (called outside FinanceWorkspace), self-fetch limits and
+  // fall back to a default category list.
+  const [fetchedLimits, setFetchedLimits] = useState<ReceiptLimit[]>([])
+  const limits = limitsProp ?? fetchedLimits
+  const categories = categoriesProp ?? DEFAULT_RECEIPT_CATEGORIES
+  useEffect(() => {
+    if (limitsProp) return
+    let active = true
+    getReceiptLimits(ministryId).then(res => { if (active) setFetchedLimits(res.data) })
+    return () => { active = false }
+  }, [limitsProp, ministryId])
   const [category, setCategory] = useState(() => categories[0]?.value ?? "DG Dinner")
   const [fund, setFund] = useState("church")
   const [amount, setAmount] = useState("")
@@ -165,7 +185,7 @@ function SubmitReceiptModal({
   async function handleSubmit() {
     if (!amount || numAmount <= 0) { setError("Please enter a valid amount."); return }
     setSubmitting(true); setError(null)
-    const { data, error: err } = await submitReceipt({ ministryId, eventName, category, fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrl, notes })
+    const { data, error: err } = await submitReceipt({ ministryId, teamId: teamId ?? null, eventName, category, fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrl, notes })
     if (err) { setError(err); setSubmitting(false); return }
     if (data) onSubmitted(data)
     onClose()
@@ -903,14 +923,19 @@ export function FinanceWorkspace({
         <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
           {/* DG DINNERS */}
           <div>
-            <div style={{ marginBottom: 24 }}>
-              <div style={monoStyle}>{`DG DINNERS · ${dgForms.length} FORMS`}</div>
-              <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
-                Spring semester rotation
+            <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+              <div>
+                <div style={monoStyle}>{`DG DINNERS · ${dgForms.length} FORMS`}</div>
+                <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
+                  Spring semester rotation
+                </div>
+                <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
+                  One form per assigned Friday — auto-generated from the rotation.
+                </div>
               </div>
-              <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
-                One form per assigned Friday — auto-generated from the rotation.
-              </div>
+              {canManage && (
+                <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceiptModal(true)} />
+              )}
             </div>
 
             {reimburseLoading ? <Spinner /> : dgForms.length === 0 ? (

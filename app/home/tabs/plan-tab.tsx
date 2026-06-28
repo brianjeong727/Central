@@ -45,7 +45,7 @@ import { getInitials } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
-import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
+import { FinanceWorkspace, SubmitReceiptModal, type FinanceSection } from "../components/finance-workspace"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -1813,6 +1813,7 @@ export function PlanTab({
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   const [financeSection, setFinanceSection] = useState<FinanceSection>("reimbursements")
+  const [showSubmitReceipt, setShowSubmitReceipt] = useState(false)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
 
@@ -2059,6 +2060,22 @@ export function PlanTab({
               Viewing as admin · read-only
             </span>
           </div>
+        )}
+        {/* Submit-receipt affordance — any team member (or gov-write admin) can send a
+            receipt to Finance. Hidden in gov-view (read-only) and on the finance team
+            itself (FinanceWorkspace renders the treasurer's own originate trigger). */}
+        {activeTeamId && !govView && !isFinanceTeam && (!!activeUserTeam || govWrite) && (
+          <div className="flex justify-end px-5 md:px-14 pt-5">
+            <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceipt(true)} />
+          </div>
+        )}
+        {activeTeamId && showSubmitReceipt && (
+          <SubmitReceiptModal
+            ministryId={ministryId}
+            teamId={activeTeamId}
+            onClose={() => setShowSubmitReceipt(false)}
+            onSubmitted={() => setShowSubmitReceipt(false)}
+          />
         )}
         {!activeTeamId ? (
           /* ── Three-way branch: 0 teams → empty state | 2+ teams (or any

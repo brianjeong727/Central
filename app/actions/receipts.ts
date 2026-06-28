@@ -13,6 +13,8 @@ export interface ReceiptLimit {
 export interface Receipt {
   id: string
   ministry_id: string
+  team_id: string | null
+  reimbursement_form_id: string | null
   submitted_by: string
   submitted_by_name?: string
   event_name: string | null
@@ -30,6 +32,7 @@ export interface Receipt {
 
 export async function submitReceipt(params: {
   ministryId: string
+  teamId?: string | null
   eventName: string
   category: string
   fund: string
@@ -48,6 +51,7 @@ export async function submitReceipt(params: {
     .from("receipts")
     .insert({
       ministry_id: params.ministryId,
+      team_id: params.teamId ?? null,
       submitted_by: user.id,
       submitted_by_name: (profile as { name?: string } | null)?.name ?? null,
       event_name: params.eventName || null,
