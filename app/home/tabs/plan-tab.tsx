@@ -1748,7 +1748,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
 }
 
 export function PlanTab({
-  userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isDGL, isPastor,
+  userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
   onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat,
   onTeamSelect,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
@@ -1825,7 +1825,7 @@ export function PlanTab({
     const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
       const ut = userTeams.find(t => t.teamId === activeTeamId)
       if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency } satisfies Team
+      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency, admin_access: 'view' } satisfies Team
     })()
     if (!team) return
     setOpenTeam(team)
@@ -1879,10 +1879,11 @@ export function PlanTab({
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
 
   const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
-    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency } : undefined)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency, admin_access: 'view' } : undefined)
 
   const isActiveTeamPresident = activeUserTeam?.isPresident ?? false
-  const canOpenTeamSettings = isAdmin || isActiveTeamPresident
+  // Structural gate: only governing admins (or the team president) may open settings.
+  const canOpenTeamSettings = isGovernanceAdmin || isActiveTeamPresident
 
   const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
   const isDGLPresident = isDGLTeam && isActiveTeamPresident
@@ -2268,6 +2269,7 @@ export function PlanTab({
           userId={userId}
           ministryId={ministryId}
           isAdmin={isAdmin}
+          isGovernanceAdmin={isGovernanceAdmin}
           onClose={closeSettings}
           onChanged={() => { closeSettings(); onTeamsChange() }}
           onOpenChat={onOpenChat}
@@ -9361,11 +9363,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, onChanged, onOpenChat }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
   isAdmin: boolean
+  // Governance-narrowed admin power — gates the structural team-admin actions
+  // (delete, manage). isAdmin is retained for non-structural member-row UI.
+  isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
   onOpenChat?: (id: string, name: string) => void
@@ -9412,9 +9417,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
 
   const myRoleId = members.find(m => m.user_id === userId)?.role_id
   const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
-  const canDelete = isAdmin || isPresident
+  const canDelete = isGovernanceAdmin || isPresident
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
-  const canManageTeam = isAdmin || myRolePerms.includes("can_manage_team")
+  const canManageTeam = isGovernanceAdmin || myRolePerms.includes("can_manage_team")
   const isTechTeam = /\btech\b/i.test(team.name)
   const canCreateGroupChat = isTechTeam || isAdmin || isPresident
 

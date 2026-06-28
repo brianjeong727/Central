@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { formatRelativeTime, getInitials } from "./utils"
-import type { UserTeam, CongregationQuestion } from "./types"
+import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
@@ -43,7 +43,7 @@ export default async function HomePage() {
 
   // Parallel fetch: ministry name + chat previews + user teams + active question
   const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([
-    supabase.from("ministries").select("name").eq("id", profile.ministry_id).single(),
+    supabase.from("ministries").select("name, governance_settings").eq("id", profile.ministry_id).single(),
     supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
     supabase
       .from("team_members")
@@ -94,6 +94,16 @@ export default async function HomePage() {
   })
 
   // Active question + whether this user already responded (sequential — depends on question)
+  // Global governance roster — defaults to "all admins govern" when unset.
+  const rawGov = (ministryResult.data as { governance_settings?: unknown } | null)?.governance_settings as
+    | Partial<GovernanceSettings>
+    | null
+    | undefined
+  const initialGovernanceSettings: GovernanceSettings = {
+    all_admins: rawGov?.all_admins ?? true,
+    roster_ids: Array.isArray(rawGov?.roster_ids) ? rawGov!.roster_ids : [],
+  }
+
   const initialActiveQuestion = (questionResult.data ?? null) as CongregationQuestion | null
   let initialHasResponded = false
   if (initialActiveQuestion) {
@@ -133,6 +143,7 @@ export default async function HomePage() {
       initialUserTeams={initialUserTeams}
       initialActiveQuestion={initialActiveQuestion}
       initialHasResponded={initialHasResponded}
+      initialGovernanceSettings={initialGovernanceSettings}
     />
   )
 }

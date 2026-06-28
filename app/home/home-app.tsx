@@ -8,8 +8,9 @@ import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
+import { isGovernanceAdmin as computeIsGovernanceAdmin } from "./governance"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -31,7 +32,7 @@ import { FormsTab } from "./tabs/forms-tab"
 import { CongregationTab } from "./tabs/congregation-tab"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 
-export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded }: HomeAppProps) {
+export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -153,6 +154,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [])
 
   const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+  // WHO governs teams: by default every admin-tier user; if the roster narrows it,
+  // only listed admins. Behavior-preserving while governance is all_admins.
+  const governanceSettings: GovernanceSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
+  const isGovernanceAdmin = computeIsGovernanceAdmin(userId, isAdmin, governanceSettings)
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
@@ -341,10 +346,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [userId])
 
   const loadAllTeams = useCallback(async () => {
-    if (!isAdmin) return
+    // The all-teams governance list is for governing admins only. Non-roster admins
+    // don't get it (settings-tab access stays gated on raw isAdmin — anti-lockout).
+    if (!isGovernanceAdmin) return
     const { data } = await supabase
       .from("teams")
-      .select("id, name, icon, description, created_by, team_type, allow_co_presidency")
+      .select("id, name, icon, description, created_by, team_type, allow_co_presidency, admin_access")
       .eq("ministry_id", ministryId)
       .order("created_at")
     if (!data) return
@@ -354,14 +361,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
     }
-    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null }
+    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null }
     setAllTeams((data as RawTeam[]).map((t) => {
       const rawType = t.team_type ?? 'standard'
       const team_type: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
-      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, member_count: countMap[t.id] ?? 0 }
+      const rawAccess = t.admin_access ?? 'view'
+      const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, member_count: countMap[t.id] ?? 0 }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, ministryId])
+  }, [isGovernanceAdmin, ministryId])
 
   const loadActiveQuestion = useCallback(async () => {
     const { data: q } = await supabase
@@ -679,6 +688,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 userTeams={userTeams}
                 allTeams={allTeams}
                 isAdmin={isAdmin}
+                isGovernanceAdmin={isGovernanceAdmin}
+                governanceSettings={governanceSettings}
                 isDGL={isDGL}
                 isPastor={isPastor}
                 onTeamsChange={() => { loadUserTeams(); loadAllTeams() }}

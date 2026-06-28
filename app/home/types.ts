@@ -339,6 +339,15 @@ export interface Team {
   member_count: number
   team_type: 'standard' | 'dg_praise' | 'one_time'
   allow_co_presidency: boolean
+  // Per-team admin governance matrix: what governing admins get on this team.
+  admin_access: 'none' | 'view' | 'write'
+}
+
+// Global governance roster (ministries.governance_settings). When all_admins is
+// true every admin-tier user governs; otherwise only roster_ids govern.
+export interface GovernanceSettings {
+  all_admins: boolean
+  roster_ids: string[]
 }
 
 export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
@@ -473,6 +482,10 @@ export interface PlanTabProps {
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean
+  // Whether this user is on the governance roster (narrows raw isAdmin). Used for
+  // structural team-admin gates; equals isAdmin when governance is all_admins.
+  isGovernanceAdmin: boolean
+  governanceSettings: GovernanceSettings
   isDGL: boolean
   isPastor: boolean
   onTeamsChange: () => void
@@ -632,6 +645,7 @@ export interface HomeAppProps {
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null
   initialHasResponded?: boolean
+  initialGovernanceSettings?: GovernanceSettings
 }
 
 export type { ChatPreview }
