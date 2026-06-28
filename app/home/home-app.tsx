@@ -20,7 +20,7 @@ import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/
 import { HomeTab } from "./tabs/home-tab"
 import { AnnouncementsTab, AnnouncementDetailView } from "./tabs/announcements-tab"
 import { ChatsTab, ChatScreen, ChatListPanel } from "./tabs/chats-tab"
-import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionNav } from "./tabs/plan-tab"
+import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionNav, FinanceSectionNav } from "./tabs/plan-tab"
 import type { CalendarEvent } from "./types"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
@@ -220,6 +220,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("sgltab", s === "bible_study" ? null : s)
   }
 
+  // Finance Team section state — lifted here so it drives the sidebar nav (not a content strip)
+  const validFinanceSections = ["reimbursements", "budget", "allocation"] as const
+  const initialFinanceSection = searchParams.get("fsec")
+  const [financeTeamSection, setFinanceTeamSection] = useState<string>(
+    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
+  )
+
+  function handleFinanceSectionChange(s: string) {
+    setFinanceTeamSection(s)
+    replaceParam("fsec", s === "reimbursements" ? null : s)
+  }
+
   // Congregation sub-view — lifted so shell can build accurate crumbs
   const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
 
@@ -232,11 +244,15 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const activeTeamNameForPlan = activeUserTeamForPlan?.teamName ?? activeAllTeamForPlan?.name ?? ""
   const activeTeamLabelForPlan = activeTeamNameForPlan.toLowerCase()
   const activeTeamPermsForPlan = activeUserTeamForPlan?.permissions ?? []
-  const isStudentOrgActive = activeTab === "plan" && isDesktop && (
+  // Finance is an exact team_type — checked first so a finance team (which carries
+  // can_view_finances) can never be misdetected as the Student Org Board. Resolve from
+  // allTeams since UserTeam may not carry team_type for gov-entered teams.
+  const isFinanceActive = activeTab === "plan" && isDesktop && activeAllTeamForPlan?.team_type === "finance"
+  const isStudentOrgActive = activeTab === "plan" && isDesktop && !isFinanceActive && (
     /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
-    activeTeamPermsForPlan.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p))
+    activeTeamPermsForPlan.some(p => ["can_plan_events", "can_manage_members"].includes(p))
   )
-  const isDGLActive = activeTab === "plan" && isDesktop && !isStudentOrgActive && (
+  const isDGLActive = activeTab === "plan" && isDesktop && !isFinanceActive && !isStudentOrgActive && (
     /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabelForPlan) ||
     activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
   )
@@ -268,6 +284,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     <SmallGroupSectionNav
       activeSection={sglSection}
       onSectionChange={handleSglSectionChange}
+    />
+  ) : isFinanceActive ? (
+    <FinanceSectionNav
+      active={financeTeamSection}
+      onChange={handleFinanceSectionChange}
     />
   ) : undefined
 
@@ -740,6 +761,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onStudentOrgCalEventsChange={setStudentOrgCalEvents}
                 sglSection={sglSection}
                 onSglSectionChange={handleSglSectionChange}
+                financeSection={financeTeamSection}
+                onFinanceSectionChange={handleFinanceSectionChange}
                 activeReceiptsTeamId={activeReceiptsTeamId}
                 onReceiptsTeamChange={handleReceiptsTeamChange}
               />

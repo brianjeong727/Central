@@ -510,6 +510,9 @@ export interface PlanTabProps {
   // Lifted small group leaders state (for sidebar)
   sglSection?: string
   onSglSectionChange?: (s: string) => void
+  // Lifted finance team section state (for sidebar)
+  financeSection?: string
+  onFinanceSectionChange?: (s: string) => void
   // Receipts workspace: team selected WITHIN receipts (synced to ?rteam)
   activeReceiptsTeamId?: string | null
   onReceiptsTeamChange?: (id: string) => void

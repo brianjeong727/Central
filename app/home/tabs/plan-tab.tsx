@@ -1802,6 +1802,7 @@ export function PlanTab({
   onTeamSelect,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
   sglSection, onSglSectionChange,
+  financeSection: financeSectionProp, onFinanceSectionChange,
   activeReceiptsTeamId, onReceiptsTeamChange,
 }: PlanTabProps) {
   // Resolve from membership first, then from allTeams (a governance admin may be
@@ -1814,7 +1815,9 @@ export function PlanTab({
   const supabase = createClient()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
-  const [financeSection, setFinanceSection] = useState<FinanceSection>("reimbursements")
+  // Finance section is lifted to home-app (drives the sidebar nav on desktop) and synced to ?fsec.
+  const financeSection = (financeSectionProp ?? "reimbursements") as FinanceSection
+  const setFinanceSection = (s: FinanceSection) => onFinanceSectionChange?.(s)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
 
@@ -1901,6 +1904,7 @@ export function PlanTab({
     params.delete("sotab")
     params.delete("ptab")
     params.delete("sgltab")
+    params.delete("fsec")
     params.delete("evtab")
     params.delete("rteam")
     router.replace(`/home?${params.toString()}`, { scroll: false })
@@ -2255,26 +2259,20 @@ export function PlanTab({
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
           />
         ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
-          <>
-            <PlanSubTabStrip
-              tabs={financeStripTabs}
-              active={financeSection}
-              onChange={k => setFinanceSection(k as FinanceSection)}
+          /* Desktop: section nav lives in the sidebar (FinanceSectionNav) — no content strip here */
+          <div className="px-5 md:px-14 py-7">
+            <FinanceWorkspace
+              ministryId={ministryId}
+              userId={userId}
+              userName={userName}
+              userRole={activeUserTeam?.roleName ?? ""}
+              section={financeSection}
+              onSectionChange={setFinanceSection}
+              canEditBudget={financeCanEdit}
+              canAccessReimbursements={financeCanEdit}
+              readOnly={govView}
             />
-            <div className="px-5 md:px-14 py-7">
-              <FinanceWorkspace
-                ministryId={ministryId}
-                userId={userId}
-                userName={userName}
-                userRole={activeUserTeam?.roleName ?? ""}
-                section={financeSection}
-                onSectionChange={setFinanceSection}
-                canEditBudget={financeCanEdit}
-                canAccessReimbursements={financeCanEdit}
-                readOnly={govView}
-              />
-            </div>
-          </>
+          </div>
         ) : isDgPraiseTeam && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
@@ -2672,6 +2670,36 @@ export function SmallGroupSectionNav({
           key={s.key}
           style={{ ...sidebarItemStyle(activeSection === s.key), marginBottom: 1 }}
           onClick={() => onSectionChange(s.key)}
+        >
+          <span style={{ flex: 1 }}>{s.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── FinanceSectionNav ─────────────────────────────────────────────────────────
+// Vertical sidebar nav for the Finance Team workspace on desktop.
+// Renders in place of the flat team list in DesktopSidebar when a finance team is active.
+export function FinanceSectionNav({
+  active,
+  onChange,
+}: {
+  active: string
+  onChange: (s: string) => void
+}) {
+  const sections = [
+    { key: "reimbursements", label: "Reimbursements" },
+    { key: "budget", label: "Budget" },
+    { key: "allocation", label: "Allocation" },
+  ]
+  return (
+    <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
+      {sections.map(s => (
+        <button
+          key={s.key}
+          style={{ ...sidebarItemStyle(active === s.key), marginBottom: 1 }}
+          onClick={() => onChange(s.key)}
         >
           <span style={{ flex: 1 }}>{s.label}</span>
         </button>
