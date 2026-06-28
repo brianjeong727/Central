@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, HeaderActionButton } from "./shared"
 import { MonogramChip } from "@/components/central"
-import { submitReceipt, getReceiptLimits } from "@/app/actions/receipts"
+import { submitReceipt, getReceiptLimits, getSubmittedReceipts, updateReceiptStatus, type SubmittedReceipt } from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
   saveFormDraft, submitReimbursementForm,
@@ -718,6 +718,121 @@ function ReimbursementCard({
   )
 }
 
+// ── Submitted receipts queue ─────────────────────────────────────────────────────
+// Treasurer's view of standalone receipts (no linked reimbursement form) submitted
+// by any team member. Pending first, then newest. Actions gated to the treasurer
+// (canManage); under gov-view it renders read-only (no action buttons).
+
+function SubmittedReceiptRow({
+  receipt: r, canManage, onUpdateStatus, divider,
+}: {
+  receipt: SubmittedReceipt
+  canManage: boolean
+  onUpdateStatus: (id: string, status: string) => void
+  divider: boolean
+}) {
+  const m = STATUS_META[r.status] ?? STATUS_META.pending
+  const purchase = r.purchase_date
+    ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "—"
+  const detail = [r.event_name, r.notes].filter(Boolean).join(" — ")
+
+  const actionBtn: React.CSSProperties = {
+    padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+    cursor: "pointer", fontFamily: "var(--sans)", border: "none",
+  }
+
+  return (
+    <div style={{ borderTop: divider ? "1px solid var(--line-3)" : "none", padding: "16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+      {/* Thumbnail */}
+      {r.receipt_image_url ? (
+        <a href={r.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, width: 56, height: 56, borderRadius: 10, overflow: "hidden", border: "1px solid var(--line)", display: "block" }}>
+          <img src={r.receipt_image_url} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </a>
+      ) : (
+        <div style={{ flexShrink: 0, width: 56, height: 56, borderRadius: 10, background: "var(--body-bg)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ImageIcon size={18} color="var(--muted-text)" />
+        </div>
+      )}
+
+      {/* Main */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{r.submitted_by_name ?? "Unknown"}</span>
+          {r.team_name && <span style={{ fontSize: 13, color: "var(--muted-text)" }}>· {r.team_name}</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "var(--serif)", fontSize: 20, letterSpacing: -0.2, color: "var(--ink)" }}>${Number(r.amount).toFixed(2)}</span>
+          <span style={{ fontSize: 12.5, color: "var(--body)" }}>{r.category}{r.fund ? ` · ${r.fund}` : ""}</span>
+          <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{purchase}</span>
+        </div>
+        {detail && <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.5 }}>{detail}</p>}
+        {canManage && (
+          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+            {r.status !== "approved" && (
+              <button onClick={() => onUpdateStatus(r.id, "approved")} style={{ ...actionBtn, background: "var(--plum)", color: "var(--cream)" }}>Approve</button>
+            )}
+            {r.status !== "rejected" && (
+              <button onClick={() => onUpdateStatus(r.id, "rejected")} style={{ ...actionBtn, background: "var(--ivory)", color: "var(--danger)", border: "1px solid var(--line)" }}>Reject</button>
+            )}
+            {r.status !== "reimbursed" && (
+              <button onClick={() => onUpdateStatus(r.id, "reimbursed")} style={{ ...actionBtn, background: "var(--ivory)", color: "var(--plum)", border: "1px solid var(--line)" }}>Mark reimbursed</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Status pill */}
+      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 10px", borderRadius: 999, background: m.bg, color: m.text, whiteSpace: "nowrap" }}>
+        {m.label}
+      </span>
+    </div>
+  )
+}
+
+function SubmittedReceiptsQueue({
+  receipts, loading, canManage, onUpdateStatus,
+}: {
+  receipts: SubmittedReceipt[]
+  loading: boolean
+  canManage: boolean
+  onUpdateStatus: (id: string, status: string) => void
+}) {
+  const sorted = [...receipts].sort((a, b) => {
+    const ap = a.status === "pending" ? 0 : 1
+    const bp = b.status === "pending" ? 0 : 1
+    if (ap !== bp) return ap - bp
+    return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+  })
+
+  return (
+    <div>
+      <div style={{ marginBottom: 18 }}>
+        <div style={EYEBROW_STYLE}>{`SUBMITTED RECEIPTS · ${receipts.length}`}</div>
+        <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
+          Receipts from teams
+        </div>
+        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
+          Standalone receipts submitted by team members for your review.
+        </div>
+      </div>
+
+      {loading ? <Spinner /> : sorted.length === 0 ? (
+        <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No submitted receipts</div>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Receipts submitted by team members will appear here for your review.</div>
+        </div>
+      ) : (
+        <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden", background: "var(--cream)" }}>
+          {sorted.map((r, i) => (
+            <SubmittedReceiptRow key={r.id} receipt={r} canManage={canManage} onUpdateStatus={onUpdateStatus} divider={i > 0} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── FinanceWorkspace ────────────────────────────────────────────────────────────
 // Back-office finance content (reimbursements / budget / allocation). Rendered both
 // inside the standalone Finance tab (GivingTab) and the Finance Plan-team workspace.
@@ -757,6 +872,10 @@ export function FinanceWorkspace({
   const [limits, setLimits] = useState<ReceiptLimit[]>([])
   const [creatingOther, setCreatingOther] = useState(false)
   const [showSubmitReceiptModal, setShowSubmitReceiptModal] = useState(false)
+
+  // Treasurer queue of standalone (form-less) submitted receipts
+  const [submittedReceipts, setSubmittedReceipts] = useState<SubmittedReceipt[]>([])
+  const [submittedReceiptsLoading, setSubmittedReceiptsLoading] = useState(false)
 
   // Dynamic categories (DG Dinner permanent + calendar events + custom)
   const [calEventCategories, setCalEventCategories] = useState<string[]>([])
@@ -843,8 +962,26 @@ export function FinanceWorkspace({
     setReimburseLoading(false)
   }, [ministryId, supabase])
 
+  // Queue visible to the treasurer (canManage) and to gov-view (readOnly) read-only.
+  const canSeeReceiptQueue = canManage || readOnly
+
+  const loadSubmittedReceipts = useCallback(async () => {
+    if (!canSeeReceiptQueue) return
+    setSubmittedReceiptsLoading(true)
+    const { data } = await getSubmittedReceipts(ministryId)
+    setSubmittedReceipts(data)
+    setSubmittedReceiptsLoading(false)
+  }, [ministryId, canSeeReceiptQueue])
+
+  async function handleUpdateReceiptStatus(receiptId: string, status: string) {
+    // Optimistic update, then refetch to stay in sync.
+    setSubmittedReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status } : r))
+    await updateReceiptStatus({ receiptId, status })
+    loadSubmittedReceipts()
+  }
+
   useEffect(() => {
-    if (section === "reimbursements") loadReimbursements()
+    if (section === "reimbursements") { loadReimbursements(); loadSubmittedReceipts() }
     else if (section === "budget") loadBudget()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section])
@@ -921,6 +1058,16 @@ export function FinanceWorkspace({
       {/* ── Reimbursements ── */}
       {section === "reimbursements" && reimbAccess && (
         <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
+          {/* SUBMITTED RECEIPTS — treasurer queue (read-only under gov-view) */}
+          {canSeeReceiptQueue && (
+            <SubmittedReceiptsQueue
+              receipts={submittedReceipts}
+              loading={submittedReceiptsLoading}
+              canManage={canManage}
+              onUpdateStatus={handleUpdateReceiptStatus}
+            />
+          )}
+
           {/* DG DINNERS */}
           <div>
             <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
