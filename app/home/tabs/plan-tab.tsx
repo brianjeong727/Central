@@ -1358,19 +1358,30 @@ export function StudentOrgTeamHome({
     <div>
       {/* Mobile tab strip — desktop uses sidebar nav */}
       {!isDesktopView && (
-        <div style={{ marginBottom: 24 }}>
-          <PlanSubTabStrip
-            tabs={[
-              { key: "General", label: "General" },
-              { key: "Meeting Notes", label: "Meeting Notes" },
-              { key: "Events", label: "Events" },
-              { key: "Resources", label: "Resources" },
-              { key: "Groups", label: "Groups" },
-              { key: "Rotations", label: "Rotations" },
-            ]}
-            active={teamTab}
-            onChange={t => setTeamTabAndUrl(t as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
-          />
+        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <PlanSubTabStrip
+              tabs={[
+                { key: "General", label: "General" },
+                { key: "Meeting Notes", label: "Meeting Notes" },
+                { key: "Events", label: "Events" },
+                { key: "Resources", label: "Resources" },
+                { key: "Groups", label: "Groups" },
+                { key: "Rotations", label: "Rotations" },
+              ]}
+              active={teamTab}
+              onChange={t => setTeamTabAndUrl(t as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
+            />
+          </div>
+          {onTeamSettings && (
+            <button
+              onClick={onTeamSettings}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              title="Team settings"
+            >
+              <Settings className="w-4 h-4 text-[var(--body)]" />
+            </button>
+          )}
         </div>
       )}
 
@@ -1397,6 +1408,15 @@ export function StudentOrgTeamHome({
             )}
             {displaySection === "Groups" && canEdit && (
               <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
+            )}
+            {onTeamSettings && (
+              <button
+                onClick={onTeamSettings}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+                title="Team settings"
+              >
+                <Settings className="w-4 h-4 text-[var(--body)]" />
+              </button>
             )}
           </TabPageHeader>
         )
@@ -2263,6 +2283,7 @@ export function PlanTab({
               isPresident={isDGLPresident}
               isPastor={isPastor}
               onOpenChat={onOpenChat}
+              onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
               isDesktopView
               desktopSection={sglSection ?? "bible_study"}
               praiseTeamId={
@@ -2372,6 +2393,7 @@ export function PlanTab({
             isPresident={isDGLPresident}
             isPastor={isPastor}
             onOpenChat={onOpenChat}
+            onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
             praiseTeamId={
               allTeams.find(t =>
                 /\b(praise|worship)\b/i.test(t.name) ||
@@ -11427,6 +11449,7 @@ function SmallGroupLeadersTab({
   isPastor,
   praiseTeamId,
   onOpenChat,
+  onTeamSettings,
   isDesktopView,
   desktopSection,
 }: {
@@ -11437,6 +11460,7 @@ function SmallGroupLeadersTab({
   isPastor: boolean
   praiseTeamId?: string | null
   onOpenChat?: (id: string, name: string) => void
+  onTeamSettings?: () => void
   isDesktopView?: boolean
   desktopSection?: string
 }) {
@@ -11984,20 +12008,40 @@ function SmallGroupLeadersTab({
       {isDesktopView && (
         <TabPageHeader>
           <PageTitle title={effectiveSection === "bible_study" ? "Bible Study" : "Schedule"} compact />
+          {onTeamSettings && (
+            <button
+              onClick={onTeamSettings}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              title="Team settings"
+            >
+              <Settings className="w-4 h-4 text-[var(--body)]" />
+            </button>
+          )}
         </TabPageHeader>
       )}
 
       {/* Mobile sub-tab switcher */}
       {!isDesktopView && (
-        <div style={{ marginBottom: 24 }}>
-          <PlanSubTabStrip
-            tabs={validTabs.map(k => ({
-              key: k,
-              label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
-            }))}
-            active={activeSubTab}
-            onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
-          />
+        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <PlanSubTabStrip
+              tabs={validTabs.map(k => ({
+                key: k,
+                label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+              }))}
+              active={activeSubTab}
+              onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
+            />
+          </div>
+          {onTeamSettings && (
+            <button
+              onClick={onTeamSettings}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              title="Team settings"
+            >
+              <Settings className="w-4 h-4 text-[var(--body)]" />
+            </button>
+          )}
         </div>
       )}
 
