@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, ArrowLeft } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
@@ -623,22 +623,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={activeTeamId === "receipts" ? (
+            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
+              /* Team-agnostic back-to-picker button — shown for the receipts sentinel
+                 AND any team workspace. Don't gate on a per-type flag or new team types
+                 (finance, etc.) silently lose their way back. */
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                className="hover:bg-[#F2EDE0] transition-colors"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 999, padding: "6px 13px", cursor: "pointer" }}
               >
-                ← Planning
-              </button>
-            ) : activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
-              /* Team-agnostic: ANY team workspace (the receipts sentinel is handled
-                 above) gets the back-to-picker button — don't gate on a per-type flag
-                 or new team types (finance, etc.) silently lose their way back. */
-              <button
-                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
-                style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-              >
-                ← All teams
+                <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
               </button>
             ) : undefined}
           />
