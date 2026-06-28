@@ -326,6 +326,8 @@ export interface UserTeam {
   roleId: string
   roleName: string
   permissions: string[]
+  isPresident: boolean
+  allowCoPresidency: boolean
 }
 
 export interface Team {
@@ -336,6 +338,7 @@ export interface Team {
   created_by: string
   member_count: number
   team_type: 'standard' | 'dg_praise' | 'one_time'
+  allow_co_presidency: boolean
 }
 
 export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
@@ -415,6 +418,7 @@ export interface TeamRole {
   team_id: string
   name: string
   permissions: string[]
+  is_president: boolean
 }
 
 export interface TeamMemberDisplay {
@@ -428,6 +432,7 @@ export interface TeamMemberDisplay {
 export interface DraftRole {
   name: string
   permissions: string[]
+  is_president?: boolean
 }
 
 export interface RoleDescription {

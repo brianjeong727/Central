@@ -310,15 +310,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [userId, ministryId])
 
   const loadUserTeams = useCallback(async () => {
+    type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null }
+    type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
     type RawMembership = {
       team_id: string
       role_id: string
-      teams: { id: string; name: string; icon: string | null; description: string | null; team_type: string } | { id: string; name: string; icon: string | null; description: string | null; team_type: string }[] | null
-      team_roles: { id: string; name: string; permissions: string[] } | { id: string; name: string; permissions: string[] }[] | null
+      teams: RawTeamRef | RawTeamRef[] | null
+      team_roles: RawRoleRef | RawRoleRef[] | null
     }
     const { data } = await supabase
       .from("team_members")
-      .select("team_id, role_id, teams(id, name, icon, description, team_type), team_roles(id, name, permissions)")
+      .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency), team_roles(id, name, permissions, is_president)")
       .eq("user_id", userId)
     if (!data) return
     const teams: UserTeam[] = (data as RawMembership[]).flatMap((m) => {
@@ -327,7 +329,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       if (!t || !r) return []
       const rawType = t.team_type ?? 'standard'
       const teamType: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
-      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [] }]
+      return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency }]
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
@@ -342,7 +344,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     if (!isAdmin) return
     const { data } = await supabase
       .from("teams")
-      .select("id, name, icon, description, created_by, team_type")
+      .select("id, name, icon, description, created_by, team_type, allow_co_presidency")
       .eq("ministry_id", ministryId)
       .order("created_at")
     if (!data) return
@@ -352,11 +354,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
     }
-    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string }
+    type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
       const rawType = t.team_type ?? 'standard'
       const team_type: 'standard' | 'dg_praise' | 'one_time' = ['standard','dg_praise','one_time'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' : 'standard'
-      return { ...t, team_type, member_count: countMap[t.id] ?? 0 }
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, member_count: countMap[t.id] ?? 0 }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, ministryId])

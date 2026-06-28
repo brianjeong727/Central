@@ -89,7 +89,7 @@ const TEAM_PRESETS = [
     icon: "📖",
     description: "Discipleship and Bible study",
     roles: [
-      { name: "DGL President", permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"] },
+      { name: "DGL President", is_president: true, permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"] },
       { name: "Leader", permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance"] },
     ],
   },
@@ -99,7 +99,7 @@ const TEAM_PRESETS = [
     icon: "🏛️",
     description: "Ministry operations and administration",
     roles: [
-      { name: "President", permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"] },
+      { name: "President", is_president: true, permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"] },
       { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
       { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
       { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
@@ -112,7 +112,7 @@ const TEAM_PRESETS = [
     description: "Worship and music ministry",
     comingSoon: true,
     roles: [
-      { name: "President", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
+      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
       { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
       { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
     ],
@@ -123,7 +123,10 @@ const TEAM_PRESETS = [
     icon: "💻",
     description: "Technical support and media",
     comingSoon: true,
-    roles: [{ name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] }],
+    roles: [
+      { name: "President", is_president: true, permissions: ["can_view_worship_set", "can_generate_slides", "can_manage_team"] },
+      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
+    ],
   },
   {
     id: "dg_praise",
@@ -133,6 +136,7 @@ const TEAM_PRESETS = [
     comingSoon: true,
     teamType: "dg_praise" as const,
     roles: [
+      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_manage_team"] },
       { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
       { name: "Member", permissions: ["can_view_worship_set"] },
     ],
@@ -145,6 +149,7 @@ const TEAM_PRESETS = [
     comingSoon: true,
     teamType: "one_time" as const,
     roles: [
+      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_manage_team"] },
       { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
       { name: "Member", permissions: ["can_view_worship_set"] },
     ],
@@ -1820,7 +1825,7 @@ export function PlanTab({
     const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
       const ut = userTeams.find(t => t.teamId === activeTeamId)
       if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType } satisfies Team
+      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency } satisfies Team
     })()
     if (!team) return
     setOpenTeam(team)
@@ -1874,9 +1879,9 @@ export function PlanTab({
   const canManageSchedule = isAdmin || praiseTeamPerms.includes("can_manage_schedule")
 
   const activeTeamFull = allTeams.find(t => t.id === activeTeamId)
-    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType } : undefined)
+    ?? (activeUserTeam ? { id: activeUserTeam.teamId, name: activeUserTeam.teamName, icon: activeUserTeam.teamIcon, description: activeUserTeam.teamDescription, created_by: "", member_count: 0, team_type: activeUserTeam.teamType, allow_co_presidency: activeUserTeam.allowCoPresidency } : undefined)
 
-  const isActiveTeamPresident = (activeUserTeam?.roleName ?? "").toLowerCase().includes("president")
+  const isActiveTeamPresident = activeUserTeam?.isPresident ?? false
   const canOpenTeamSettings = isAdmin || isActiveTeamPresident
 
   const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
@@ -8835,7 +8840,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const [teamName, setTeamName] = useState("")
   const [teamIcon, setTeamIcon] = useState("👥")
   const [teamDesc, setTeamDesc] = useState("")
-  const [roles, setRoles] = useState<DraftRole[]>([{ name: "Member", permissions: [] }])
+  const [roles, setRoles] = useState<DraftRole[]>([{ name: "President", permissions: [], is_president: true }, { name: "Member", permissions: [] }])
   const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null)
   const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
   const [memberSearch, setMemberSearch] = useState("")
@@ -8846,12 +8851,12 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Index of the first "president" role (case-insensitive). -1 if none.
-  const presidentRoleIdx = roles.findIndex((r) => r.name.toLowerCase().includes("president"))
+  // Index of the first president role (by explicit flag). -1 if none.
+  const presidentRoleIdx = roles.findIndex((r) => !!r.is_president)
   // Default role for new members: last non-president role, or 0 if all are president.
   const defaultMemberRoleIdx = (() => {
     for (let i = roles.length - 1; i >= 0; i--) {
-      if (!roles[i].name.toLowerCase().includes("president")) return i
+      if (!roles[i].is_president) return i
     }
     return 0
   })()
@@ -8872,7 +8877,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
     setTeamName(preset.name)
     setTeamIcon(preset.icon)
     setTeamDesc(preset.description)
-    setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions] })))
+    setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions], is_president: "is_president" in r ? !!r.is_president : false })))
     setSelectedTeamType((preset as { teamType?: 'standard' | 'dg_praise' | 'one_time' }).teamType ?? 'standard')
     setStep("customize")
   }
@@ -8919,13 +8924,14 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   async function handleSave() {
     if (!teamName.trim()) { setError("Team name is required."); return }
     if (roles.some((r) => !r.name.trim())) { setError("All roles need a name."); return }
-    if (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2))) { setError(coPresidency ? "Please select both co-presidents." : "Please select a president."); return }
+    if (presidentRoleIdx < 0) { setError("Every team needs a President role."); return }
+    if (!presidentPick || (coPresidency && !presidentPick2)) { setError(coPresidency ? "Please select both co-presidents." : "Please select a president."); return }
     setSaving(true)
     setError(null)
 
     const { data: team, error: teamErr } = await supabase
       .from("teams")
-      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType })
+      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType, allow_co_presidency: coPresidency })
       .select("id")
       .single()
 
@@ -8933,7 +8939,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
 
     const { data: createdRoles, error: rolesErr } = await supabase
       .from("team_roles")
-      .insert(roles.map((r) => ({ team_id: team.id, name: r.name.trim(), permissions: r.permissions })))
+      .insert(roles.map((r) => ({ team_id: team.id, name: r.name.trim(), permissions: r.permissions, is_president: !!r.is_president })))
       .select("id")
 
     if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
@@ -9005,7 +9011,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
             </button>
           )}
           {step === "members" && (
-            <button onClick={handleSave} disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))} className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30">
+            <button onClick={handleSave} disabled={saving || presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2)} className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30">
               {saving ? "Saving…" : "Create"}
             </button>
           )}
@@ -9316,7 +9322,7 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
                 const sel = selectedMembers.find((m) => m.userId === member.id)
                 const assignableRoles = roles
                   .map((r, i) => ({ ...r, i }))
-                  .filter(({ name }) => !name.toLowerCase().includes("president"))
+                  .filter((r) => !r.is_president)
                 return (
                   <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[var(--line)] p-3">
                     <button
@@ -9391,8 +9397,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   // Pending member role changes — staged until Save
   const [pendingMemberRoles, setPendingMemberRoles] = useState<Record<string, string>>({})
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
+  // Co-presidency — persisted per-team setting (teams.allow_co_presidency)
+  const [allowCoPresidency, setAllowCoPresidency] = useState(team.allow_co_presidency)
+  const [savingCoPres, setSavingCoPres] = useState(false)
 
-  const isPresident = members.some(m => m.user_id === userId && m.role_name.toLowerCase().includes("president"))
+  const myRoleId = members.find(m => m.user_id === userId)?.role_id
+  const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
   const canDelete = isAdmin || isPresident
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
   const canManageTeam = isAdmin || myRolePerms.includes("can_manage_team")
@@ -9426,7 +9436,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
   useEffect(() => {
     async function load() {
       const [{ data: rolesData }, { data: membersData }] = await Promise.all([
-        supabase.from("team_roles").select("id, team_id, name, permissions").eq("team_id", team.id),
+        supabase.from("team_roles").select("id, team_id, name, permissions, is_president").eq("team_id", team.id),
         supabase
           .from("team_members")
           .select("user_id, role_id, joined_at, profiles!user_id(name), team_roles(name)")
@@ -9439,7 +9449,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
         profiles: { name: string } | { name: string }[] | null
         team_roles: { name: string } | { name: string }[] | null
       }
-      const parsedRoles = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [] }))
+      const parsedRoles: TeamRole[] = (rolesData ?? []).map((r) => ({ ...r, permissions: Array.isArray(r.permissions) ? r.permissions : [], is_president: !!r.is_president }))
       setRoles(parsedRoles)
       setSavedPerms(Object.fromEntries(parsedRoles.map(r => [r.id, r.permissions])))
       setMembers(
@@ -9548,6 +9558,18 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     setEditingTeamName(false)
   }
 
+  async function handleToggleCoPresidency(next: boolean) {
+    setAllowCoPresidency(next)
+    setSavingCoPres(true)
+    const { error: err } = await supabase
+      .from("teams")
+      .update({ allow_co_presidency: next })
+      .eq("id", team.id)
+      .eq("ministry_id", ministryId)
+    if (err) { setAllowCoPresidency(!next); setError(err.message) }
+    setSavingCoPres(false)
+  }
+
   function handleDeleteRole(roleId: string) {
     if (draftRoleIds.has(roleId)) {
       // Draft (not yet in DB): just remove from local state
@@ -9572,7 +9594,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
     const val = newRoleName.trim()
     if (!val) { setAddingRole(false); return }
     const tempId = `draft-${Date.now()}`
-    const newRole: TeamRole = { id: tempId, team_id: team.id, name: val, permissions: [] }
+    const newRole: TeamRole = { id: tempId, team_id: team.id, name: val, permissions: [], is_president: false }
     setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
     setDraftRoleIds(prev => new Set([...prev, tempId]))
     setAddingRole(false)
@@ -9984,6 +10006,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                       ))}
                     </div>
                   </div>
+                  {canManageTeam && (
+                    <div>
+                      <PlanSectionHeader>Leadership</PlanSectionHeader>
+                      <div className="bg-white rounded-2xl border border-[var(--line)] p-4">
+                        <GgToggle
+                          checked={allowCoPresidency}
+                          onChange={handleToggleCoPresidency}
+                          disabled={savingCoPres}
+                          label="Co-presidency"
+                          desc="Allow this team to have two presidents instead of one."
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3 flex-1 mr-3">
@@ -10242,6 +10278,22 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, onClose, 
                   )}
                 </div>
 
+                {/* Co-presidency */}
+                {canManageTeam && (
+                  <>
+                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Leadership</p>
+                    <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 22px", marginBottom: 28 }}>
+                      <GgToggle
+                        checked={allowCoPresidency}
+                        onChange={handleToggleCoPresidency}
+                        disabled={savingCoPres}
+                        label="Co-presidency"
+                        desc="Allow this team to have two presidents instead of one."
+                      />
+                    </div>
+                  </>
+                )}
+
                 {/* Members roster */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Members</p>
@@ -10401,7 +10453,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   const [name, setName] = useState("")
   const [iconKey, setIconKey] = useState("users")
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
-  const [roles, setRoles] = useState<Array<{ name: string; permissions: string[] }>>([])
+  const [roles, setRoles] = useState<Array<{ name: string; permissions: string[]; is_president: boolean }>>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -10411,11 +10463,11 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   const [coPresidency, setCoPresidency] = useState(false)
   const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string }[]>([])
 
-  // Index of the first "president" role — drives the required picker in step 3
-  const presidentRoleIdx = roles.findIndex(r => r.name.toLowerCase().includes("president"))
+  // Index of the first president role (by explicit flag) — drives the required picker in step 3
+  const presidentRoleIdx = roles.findIndex(r => r.is_president)
   const defaultMemberRoleIdx = (() => {
     for (let i = roles.length - 1; i >= 0; i--) {
-      if (!roles[i].name.toLowerCase().includes("president")) return i
+      if (!roles[i].is_president) return i
     }
     return 0
   })()
@@ -10436,7 +10488,7 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
     const display = WIZARD_PRESETS_DISPLAY.find(p => p.id === presetId)
     const data    = TEAM_PRESETS.find(p => p.id === presetId)
     if (display) { if (!name.trim()) setName(display.label); setIconKey(display.iconKey) }
-    if (data) setRoles(data.roles.map(r => ({ name: r.name, permissions: [...r.permissions] })))
+    if (data) setRoles(data.roles.map(r => ({ name: r.name, permissions: [...r.permissions], is_president: "is_president" in r ? !!r.is_president : false })))
     // Reset president picks when preset changes
     setPresidentPick(null); setPresidentPick2(null); setCoPresidency(false)
   }
@@ -10455,7 +10507,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
   }
 
   async function handleCreate() {
-    if (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2))) {
+    if (presidentRoleIdx < 0) { setError("Every team needs a President role."); setSaving(false); return }
+    if (!presidentPick || (coPresidency && !presidentPick2)) {
       setError(coPresidency ? "Please select both co-presidents." : "Please select a president.")
       setSaving(false)
       return
@@ -10464,14 +10517,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
     const presetData = TEAM_PRESETS.find(p => p.id === selectedPresetId)
     const teamType = (presetData as { teamType?: string } | undefined)?.teamType ?? "standard"
     const { data: team, error: tErr } = await supabase
-      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType })
+      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType, allow_co_presidency: coPresidency })
       .select("id").single()
     if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
 
     const createdRoleIds: string[] = []
     for (let i = 0; i < roles.length; i++) {
       const { data: role, error: rErr } = await supabase
-        .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions })
+        .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions, is_president: !!roles[i].is_president })
         .select("id").single()
       if (rErr || !role) { setError(rErr?.message ?? "Failed to create role."); setSaving(false); return }
       createdRoleIds.push(role.id)
@@ -10760,14 +10813,14 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={WIZARD_MONO}>ROLES · {roles.length}</div>
                 {selectedPresetId === "custom" && (
-                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [] }])} style={{ background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [], is_president: false }])} style={{ background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                     <Plus style={{ width: 13, height: 13 }} /> Add role
                   </button>
                 )}
               </div>
 
               {selectedPresetId === "custom" && roles.length === 0 && (
-                <button onClick={() => setRoles([{ name: "New Role", permissions: [] }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-text)", fontFamily: "inherit" }}>
+                <button onClick={() => setRoles([{ name: "New Role", permissions: [], is_president: false }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-text)", fontFamily: "inherit" }}>
                   <Plus style={{ width: 13, height: 13 }} /> Add first role
                 </button>
               )}
@@ -10850,8 +10903,8 @@ export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPra
               <span style={{ fontSize: 12, color: "var(--muted-text)" }}>You can edit roles & permissions any time from team settings.</span>
               <button
                 onClick={handleCreate}
-                disabled={saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))}
-                style={{ padding: "11px 24px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx >= 0 && (!presidentPick || (coPresidency && !presidentPick2)))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                disabled={saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))}
+                style={{ padding: "11px 24px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
               >
                 {saving ? "Creating…" : <><Check style={{ width: 14, height: 14 }} /> Create team</>}
               </button>
