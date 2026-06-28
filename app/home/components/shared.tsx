@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Plus } from "lucide-react"
+import { CentralButton } from "@/components/central"
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 
@@ -199,31 +200,20 @@ export function HeaderActionButton({
   onClick: () => void
   disabled?: boolean
 }) {
+  // The header "+ create" CTA is the `create` role of the button system (§4.3).
+  // Height is pinned to 28px so it never exceeds the compact PageTitle line box
+  // (25 × 1.05 ≈ 26.25px) and grows TabPageHeader's content-driven row.
   return (
-    <button
+    <CentralButton
+      variant="create"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
-      style={{
-        // Height pinned to the compact PageTitle line box (25 × 1.05 ≈ 26.25px,
-        // see components/central/page-title.tsx) so the button can never exceed
-        // the title and grow TabPageHeader's content-driven row. box-sizing
-        // includes the 1px borders; align-items:center vertically centers the
-        // 14px icon + 13px text within the 24px inner box. Floored to 26 so the
-        // title (26.25px) stays the height-governing child. (Follow-up: lift this
-        // and the compact title size into one shared CSS token consumed by both.)
-        boxSizing: "border-box", height: 28,
-        display: "flex", alignItems: "center", gap: 6,
-        padding: "0 14px", borderRadius: 9,
-        border: "1px solid var(--line)", background: "var(--ivory)",
-        color: "var(--ink)", fontSize: 13, fontWeight: 500,
-        cursor: disabled ? "default" : "pointer",
-        flexShrink: 0, marginLeft: "auto",
-        fontFamily: "var(--sans)", opacity: disabled ? 0.5 : 1,
-      }}
+      style={{ boxSizing: "border-box", height: 28, padding: "0 14px", borderRadius: 9, flexShrink: 0, marginLeft: "auto" }}
     >
       <Plus style={{ width: 14, height: 14 }} />
       {label}
-    </button>
+    </CentralButton>
   )
 }
 
