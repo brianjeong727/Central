@@ -2107,7 +2107,7 @@ export function PlanTab({
                       <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
-                          {t.roleName}
+                          {/president/i.test(t.roleName) ? "President" : t.roleName}
                         </p>
                         <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {t.teamName}
@@ -2134,7 +2134,7 @@ export function PlanTab({
                     <PlanLineIcon iconKey="dollar" bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
-                        Workspace
+                        Member
                       </p>
                       <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         Receipts
