@@ -222,19 +222,23 @@ This rule exists because tab styling has broken multiple times due to duplicate 
 
 ### 4.3 Buttons
 
-| Variant | Padding | BG | Color | Border | Radius |
-|---|---|---|---|---|---|
-| Primary | 12×22 (or 10×16 compact) | `#2D0F2E` | `#FDFCF8` | none | 10–12 |
-| Secondary | 10×16 | transparent | `#5A5466` | 1px `#E2DDCF` | 10 |
-| Plum-outline | 8×14 | transparent | `#3E1540` | 1px `#3E1540` | 10 |
-| Dashed placeholder | 12×16 | transparent | `#5A5466` | 1px dashed `#C4C0B0` | 10–14 |
-| Soft-pill | 7×12 | `#F1ECDE` | `#2D0F2E` | 1px `#E2DDCF` | 999 |
-| Mini-pill (in hero) | 4×10 | `rgba(251,248,242,0.12)` | cream | none | 999 |
-| Destructive | 10×18 | transparent | `#9F3030` | 1px `#9F3030` | 10 |
-| Icon button | 30–34 sq | transparent | `#5A5466` | 1px `#E2DDCF` | 8 |
+Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one primary (loud) button per view.** No near-black fills anywhere — the only dark-on-light case is the hero-invert (cream button on a plum hero). Always use `CentralButton` / `IconButton` (`components/central/button.tsx`) — never a raw `<button>` with inline color.
 
-- Primary buttons inside a hero invert: cream bg / plum text.
-- Inside callout cards (cream-3), primary buttons remain plum-2.
+| Role | Use | BG | Text | Border |
+|---|---|---|---|---|
+| **Primary** | the one main action (Save / Send / Create) | `--plum` `#3E1540` | cream | none |
+| **Secondary** | beside primary (Cancel / alt) | transparent | `--body` | 1px `--line-2` |
+| **Quiet** | inline low-stakes text action | none | `--plum` | none |
+| **Create** | "+ New X" | `--ivory` | `--ink` | 1px `--line` |
+| **Destructive** | delete / archive affordance | transparent | `--danger` | 1px `--danger` |
+| **Danger-solid** | the **confirm** click only | `--danger` | cream | none |
+| **Icon-only** | gear / kebab / edit / close | transparent → `--ivory` hover | `--muted` | none |
+
+- **Sizes:** `sm` (8×14, 13px — list rows, headers) and `md` (11×20, 14px — forms, CTAs). Radius `--r-input` (10).
+- **Hero-invert:** a primary inside a plum hero flips to cream bg / plum text.
+- **Verb→icon map (one icon per verb, everywhere):** Edit = `Pencil`, Delete = `Trash2`, Add/Create = `Plus`, Close/Cancel = `X`, Confirm = `Check`, Settings = `Settings`, Search = `Search`.
+
+**Do not:** use near-black (`--plum-2` / `--ink`) as a button fill; use more than one primary per view; hand-roll a raw `<button>` with inline colors; use two different icons for the same verb (the old `Edit3`/`Pencil` split). Legacy `CentralButton` variants (`plum-outline`, `ghost`, `soft-pill`) remain only until their call sites are migrated.
 
 ### 4.4 Inputs
 - **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
