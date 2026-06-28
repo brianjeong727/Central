@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { computeFinanceCapability } from "./finance-auth"
 
 export interface ReceiptLimit {
   id: string
@@ -93,51 +94,6 @@ export async function updateReceiptStatus(params: {
 // ── Reimbursement approval inbox + two-step (treasurer → president) workflow ──────
 // Status chain: pending → approved (treasurer) → reimbursed (president sign-off),
 // with rejected (treasurer) and declined (president) as terminal off-ramps.
-
-const ADMIN_TIER = ["admin", "deacon", "elder", "pastor"]
-
-interface FinanceCapability {
-  canApprove: boolean
-  canSignOff: boolean
-}
-
-// canApprove = member of a team_type='finance' team whose role permissions include
-// `can_view_finances`, OR admin-tier (fallback so it's testable before a Finance
-// team exists). canSignOff = `is_president` on a finance team, OR admin-tier.
-async function computeFinanceCapability(
-  admin: ReturnType<typeof createAdminClient>,
-  ministryId: string,
-  userId: string,
-  role: string,
-): Promise<FinanceCapability> {
-  if (ADMIN_TIER.includes((role ?? "").toLowerCase())) {
-    return { canApprove: true, canSignOff: true }
-  }
-
-  let canApprove = false
-  let canSignOff = false
-
-  const { data: financeTeams } = await admin
-    .from("teams")
-    .select("id")
-    .eq("ministry_id", ministryId)
-    .eq("team_type", "finance")
-  const financeTeamIds = (financeTeams ?? []).map((t: { id: string }) => t.id)
-
-  if (financeTeamIds.length > 0) {
-    const { data: memberRows } = await admin
-      .from("team_members")
-      .select("team_id, team_roles!role_id(permissions, is_president)")
-      .in("team_id", financeTeamIds)
-      .eq("user_id", userId)
-    for (const row of (memberRows ?? []) as { team_roles: { permissions?: string[]; is_president?: boolean } | null }[]) {
-      if ((row.team_roles?.permissions ?? []).includes("can_view_finances")) canApprove = true
-      if (row.team_roles?.is_president) canSignOff = true
-    }
-  }
-
-  return { canApprove, canSignOff }
-}
 
 export interface InboxReceipt {
   id: string
