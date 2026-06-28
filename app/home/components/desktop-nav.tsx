@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet, Receipt } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { getInitials } from "../utils"
@@ -58,7 +58,7 @@ export function DesktopSidebar({
   activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId,
   activeTeamName,
   onActiveTeamChange, profileSection, onProfileSectionChange,
-  financeSection, onFinanceSectionChange, isTreasurer, isDGL,
+  isTreasurer, isDGL,
   canCreateTeam, userId,
   directoryMinistryId, directoryCurrentUserId,
   directorySelectedMemberId, directoryInitialMemberId, onDirectoryMemberSelect,
@@ -73,8 +73,6 @@ export function DesktopSidebar({
     { id: "chats",     label: "Messages",  icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
-    // Finance is back-office only — show only to users with finance access (never to plain members).
-    ...((isAdmin || isTreasurer || isDGL) ? [{ id: "giving" as Tab, label: "Finance", icon: Wallet }] : []),
     { id: "profile",   label: "You",       icon: User },
   ]
 
@@ -89,7 +87,6 @@ export function DesktopSidebar({
         return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Planning"
       }
       case "directory":    return "People"
-      case "giving":       return "Finance"
       case "congregation": return "Congregation"
       case "profile":      return profileSection === "journal" ? "Journal" : "Profile"
       default:             return "Home"
@@ -155,28 +152,6 @@ export function DesktopSidebar({
           initialMemberId={directoryInitialMemberId}
           onSelect={onDirectoryMemberSelect}
         />
-      )
-    }
-
-    // ── Finance (giving tab): sub-sections — Reimbursements + Budget only ──────
-    if (activeTab === "giving") {
-      const financeSections: { label: string; section: "reimbursements" | "budget"; show: boolean }[] = [
-        { label: "Reimbursements", section: "reimbursements", show: !!(isDGL || isTreasurer || isAdmin) },
-        { label: "Budget",         section: "budget",         show: !!(isTreasurer || isAdmin) },
-      ]
-      const visible = financeSections.filter(s => s.show)
-      return (
-        <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
-          {visible.map(s => (
-            <button
-              key={s.section}
-              style={subItemStyle(financeSection === s.section || (s.section === "budget" && financeSection === "allocation"))}
-              onClick={() => onFinanceSectionChange(s.section)}
-            >
-              <span style={{ flex: 1 }}>{s.label}</span>
-            </button>
-          ))}
-        </div>
       )
     }
 

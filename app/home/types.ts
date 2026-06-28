@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"
 
 export interface Profile {
   id: string
@@ -626,8 +626,6 @@ export interface DesktopSidebarProps {
   onActiveTeamChange: (id: string) => void
   profileSection: "spiritual-profile" | "journal"
   onProfileSectionChange: (s: "spiritual-profile" | "journal") => void
-  financeSection: "reimbursements" | "budget" | "allocation"
-  onFinanceSectionChange: (s: "reimbursements" | "budget" | "allocation") => void
   isTreasurer: boolean
   isDGL: boolean
   canCreateTeam?: boolean

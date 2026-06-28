@@ -24,7 +24,6 @@ import { PlanTab, QuickCreateTeamModal, StudentOrgSectionNav, SmallGroupSectionN
 import type { CalendarEvent } from "./types"
 import { DirectoryTab } from "./tabs/directory-tab"
 import type { DirectoryMember } from "./types"
-import { GivingTab } from "./tabs/giving-tab"
 import { GiveView } from "./components/give-view"
 import { ProfileTab } from "./tabs/profile-tab"
 import { SettingsTab } from "./tabs/settings-tab"
@@ -37,8 +36,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "giving", "give", "profile", "settings", "forms", "congregation"]
-  const TAB_ALIASES: Record<string, Tab> = { finance: "giving", you: "profile" }
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
+  const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
   const rawTab = searchParams.get("tab")
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
   const initialTab = resolvedTab && validTabs.includes(resolvedTab) ? resolvedTab : "home"
@@ -195,28 +194,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
   const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
 
-  // Finance (back-office) is reimbursements / budget / allocation only. "Give" (member
-  // donation) is a separate surface — the `give` tab — not a finance section.
-  const canAccessFinance = isAdmin || isTreasurer || isDGL
-  const validFinanceSections = ["reimbursements", "budget", "allocation"] as const
-  const initialFinanceSection = searchParams.get("finance") as "reimbursements" | "budget" | "allocation" | null
-  const [financeSection, setFinanceSection] = useState<"reimbursements" | "budget" | "allocation">(
-    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
-  )
-
-  function handleFinanceSectionChange(s: "reimbursements" | "budget" | "allocation") {
-    setFinanceSection(s)
-    replaceParam("finance", s === "reimbursements" ? null : s)
-  }
-
-  // Guard: a member with no finance access must never land on the (now back-office) Finance
-  // tab and see a blank content area. userTeams is seeded from the server (initialUserTeams),
-  // so canAccessFinance is correct on first render — no async bounce.
-  useEffect(() => {
-    if (activeTab === "giving" && !canAccessFinance) setActiveTab("home")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, canAccessFinance])
-
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
   const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
   const initialSOSection = searchParams.get("sotab")
@@ -296,7 +273,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   // Shell breadcrumb computation — derived from shell-known state, no tab props needed
   function getShellCrumbs(): string[] {
-    const financeLabels: Record<string, string> = { reimbursements: "Reimbursements", budget: "Budget", allocation: "Allocation" }
     const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
     switch (activeTab) {
       case "home":          return ["Central", "Home"]
@@ -305,9 +281,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       case "forms":         return ["Central", "Forms"]
       case "settings":      return ["Central", "Settings"]
       case "chats":         return ["Central", "Chats"]
-      case "giving":        return financeSection !== "reimbursements"
-                              ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
-                              : ["Central", "Finance"]
       case "plan": {
         if (activeTeamId === "receipts") return ["Central", "Planning", "Receipts"]
         if (!activeTeamId || !activeTeamNameForPlan) return ["Central", "Planning"]
@@ -563,8 +536,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     window.location.assign("/login")
   }
 
-  const isDeaconOrElder = ["deacon", "elder"].includes(initialProfile.role.toLowerCase())
-  const showPlanTab = !isDeaconOrElder && (isAdmin || userTeams.length > 0)
+  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {
@@ -599,8 +571,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
         onProfileSectionChange={handleProfileSectionChange}
-        financeSection={financeSection}
-        onFinanceSectionChange={handleFinanceSectionChange}
         isTreasurer={isTreasurer}
         isDGL={isDGL}
         userId={userId}
@@ -802,23 +772,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 ministryId={ministryId}
                 userId={userId}
                 userRole={initialProfile.role}
-              />
-            </div>
-          )}
-
-          {/* Back-office Finance — gated to finance-access users (never blank for others) */}
-          {activeTab === "giving" && canAccessFinance && (
-            <div className="md:h-full md:overflow-y-auto">
-              <GivingTab
-                ministryId={ministryId}
-                userId={userId}
-                userName={initialProfile.name}
-                userRole={initialProfile.role}
-                isAdmin={isAdmin}
-                isTreasurer={isTreasurer}
-                isDGL={isDGL}
-                activeSection={financeSection}
-                onSectionChange={handleFinanceSectionChange}
               />
             </div>
           )}
