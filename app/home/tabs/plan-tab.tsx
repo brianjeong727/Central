@@ -2083,67 +2083,83 @@ export function PlanTab({
              (1-team case auto-entered in home-app before this renders) ── */
           (userTeams.length >= 2 || govTeams.length > 0) ? (
             /* PICKER — full-width, no sidebar */
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "72px 48px 80px" }}>
-              <div style={{ width: "100%", maxWidth: 860 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "44px 48px 64px" }}>
+              <div style={{ width: "100%", maxWidth: 760 }}>
                 <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 14, textAlign: "center" }}>
                   PLANNING · {ministryName.toUpperCase()}
                 </p>
-                <h1 style={{ fontFamily: "var(--sans)", fontSize: 46, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 14px", textAlign: "center" }}>
+                <h1 style={{ fontFamily: "var(--sans)", fontSize: 34, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
                   Which workspace are you entering?
                 </h1>
-                <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 48px", lineHeight: 1.6, textAlign: "center" }}>
+                <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 32px", lineHeight: 1.6, textAlign: "center" }}>
                   Pick a workspace to enter.
                 </p>
-                {userTeams.length > 0 && (
-                  <>
-                    {govTeams.length > 0 && (
-                      <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px" }}>
-                        Your teams
+                {/* Workspaces — member teams + the shared Receipts surface, together */}
+                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>
+                  Workspaces
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                  {userTeams.map(t => (
+                    <button
+                      key={t.teamId}
+                      onClick={() => onTeamSelect?.(t.teamId)}
+                      className="text-left transition-all hover:border-[var(--plum)]"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        background: "var(--ivory)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        cursor: "pointer",
+                        width: "100%",
+                      }}
+                    >
+                      <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
+                          {t.roleName}
+                        </p>
+                        <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {t.teamName}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                  {/* Receipts workspace — a shared surface, not a team */}
+                  <button
+                    onClick={() => onTeamSelect?.("receipts")}
+                    className="text-left transition-all hover:border-[var(--plum)]"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      background: "var(--ivory)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 14,
+                      padding: "14px 16px",
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    <PlanLineIcon iconKey="dollar" bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
+                        Workspace
                       </p>
-                    )}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-                      {userTeams.map(t => {
-                        const evCount = teamEventCounts[t.teamId] ?? 0
-                        const secCount = getPickerSectionCount(t)
-                        return (
-                          <button
-                            key={t.teamId}
-                            onClick={() => onTeamSelect?.(t.teamId)}
-                            className="text-left transition-all hover:border-[var(--plum)]"
-                            style={{
-                              background: "var(--ivory)",
-                              border: "1px solid var(--line)",
-                              borderRadius: 16,
-                              padding: "28px 28px 24px",
-                              cursor: "pointer",
-                              display: "block",
-                              width: "100%",
-                            }}
-                          >
-                            <div style={{ marginBottom: 22 }}>
-                              <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
-                            </div>
-                            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
-                              {t.roleName}
-                            </p>
-                            <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
-                              {t.teamName}
-                            </p>
-                            <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
-                              {evCount} upcoming event{evCount !== 1 ? "s" : ""} · {secCount} sections
-                            </p>
-                          </button>
-                        )
-                      })}
+                      <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        Receipts
+                      </p>
                     </div>
-                  </>
-                )}
+                  </button>
+                </div>
                 {govTeams.length > 0 && (
                   <>
-                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: `${userTeams.length > 0 ? "32px" : "0"} 0 14px` }}>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "28px 0 12px" }}>
                       Admin access
                     </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                       {govTeams.map(t => {
                         const canWrite = t.admin_access === "write"
                         return (
@@ -2152,63 +2168,32 @@ export function PlanTab({
                             onClick={() => onTeamSelect?.(t.id)}
                             className="text-left transition-all hover:border-[var(--plum)]"
                             style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
                               background: "var(--ivory)",
                               border: "1px solid var(--line)",
-                              borderRadius: 16,
-                              padding: "28px 28px 24px",
+                              borderRadius: 14,
+                              padding: "14px 16px",
                               cursor: "pointer",
-                              display: "block",
                               width: "100%",
                             }}
                           >
-                            <div style={{ marginBottom: 22 }}>
-                              <PlanLineIcon iconKey={t.icon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
+                            <PlanLineIcon iconKey={t.icon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
+                                {canWrite ? "Admin · can edit" : "Admin · view only"}
+                              </p>
+                              <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {t.name}
+                              </p>
                             </div>
-                            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
-                              {canWrite ? "Admin · can edit" : "Admin · view only"}
-                            </p>
-                            <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
-                              {t.name}
-                            </p>
-                            <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
-                              {t.member_count} member{t.member_count !== 1 ? "s" : ""}
-                            </p>
                           </button>
                         )
                       })}
                     </div>
                   </>
                 )}
-                {/* Receipts workspace — a shared surface, not a team */}
-                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "32px 0 14px" }}>
-                  Workspaces
-                </p>
-                <button
-                  onClick={() => onTeamSelect?.("receipts")}
-                  className="text-left transition-all hover:border-[var(--plum)]"
-                  style={{
-                    background: "var(--ivory)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 16,
-                    padding: "28px 28px 24px",
-                    cursor: "pointer",
-                    display: "block",
-                    width: "100%",
-                  }}
-                >
-                  <div style={{ marginBottom: 22 }}>
-                    <PlanLineIcon iconKey="dollar" bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
-                  </div>
-                  <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
-                    Workspace
-                  </p>
-                  <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
-                    Receipts
-                  </p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
-                    Submit &amp; track reimbursements
-                  </p>
-                </button>
                 {isAdmin && (
                   <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
