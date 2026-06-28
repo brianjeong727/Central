@@ -117,8 +117,11 @@ const TEAM_PRESETS = [
     description: "Budget, allocation, and reimbursements",
     teamType: "finance" as const,
     roles: [
-      { name: "Finance President", is_president: true, permissions: ["can_view_finances"] },
-      { name: "Treasurer", is_president: false, permissions: ["can_view_finances"] },
+      // Finance has only President + Member. President (the finance deacon) signs off;
+      // Members (the treasurers + any overseeing admins) operate the workspace and
+      // approve. No other roles by design.
+      { name: "President", is_president: true, permissions: ["can_view_finances"] },
+      { name: "Member", is_president: false, permissions: ["can_view_finances"] },
     ],
   },
   {
