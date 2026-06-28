@@ -56,6 +56,7 @@ export function DesktopSidebar({
   activeTab, onTabChange, ministryName, chatsUnread, showPlan,
   userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat,
   activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId,
+  activeTeamName,
   onActiveTeamChange, profileSection, onProfileSectionChange,
   financeSection, onFinanceSectionChange, isTreasurer, isDGL,
   canCreateTeam, userId,
@@ -83,8 +84,9 @@ export function DesktopSidebar({
     switch (activeTab) {
       case "chats":        return "Messages"
       case "plan": {
-        const activeTeam = userTeams.find(t => t.teamId === activeTeamId)
-        return activeTeam?.teamName ?? "Planning"
+        // Prefer the shell-resolved name (covers gov-view teams the user isn't a member of),
+        // then membership, then the generic fallback.
+        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Planning"
       }
       case "directory":    return "People"
       case "giving":       return "Finance"

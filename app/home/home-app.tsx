@@ -227,9 +227,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Congregation sub-view — lifted so shell can build accurate crumbs
   const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
 
-  // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb)
+  // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb).
+  // Resolve from membership first, then from allTeams — a governance admin may be viewing a team
+  // they don't belong to (gov-view). Without the allTeams fallback the shell would mirror the user's
+  // member-team list instead of the team actually being viewed.
   const activeUserTeamForPlan = userTeams.find(t => t.teamId === activeTeamId)
-  const activeTeamLabelForPlan = (activeUserTeamForPlan?.teamName ?? "").toLowerCase()
+  const activeAllTeamForPlan = allTeams.find(t => t.id === activeTeamId)
+  const activeTeamNameForPlan = activeUserTeamForPlan?.teamName ?? activeAllTeamForPlan?.name ?? ""
+  const activeTeamLabelForPlan = activeTeamNameForPlan.toLowerCase()
   const activeTeamPermsForPlan = activeUserTeamForPlan?.permissions ?? []
   const isStudentOrgActive = activeTab === "plan" && isDesktop && (
     /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
@@ -240,8 +245,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
   )
 
-  // Plan context sidebar — replaces the flat team list when student org or DGL is active
-  const planContextContent = isStudentOrgActive && activeUserTeamForPlan ? (
+  // Plan context sidebar — replaces the flat team list when student org or DGL is active.
+  // The section-nav components only need activeSection/onSectionChange (not the member object),
+  // so these render for gov-entered teams too — no `&& activeUserTeamForPlan` guard.
+  const planContextContent = isStudentOrgActive ? (
     <StudentOrgSectionNav
       activeSection={studentOrgSection}
       onSectionChange={handleStudentOrgSectionChange}
@@ -252,7 +259,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         setStudentOrgPlanningEvent(ev)
       }}
     />
-  ) : isDGLActive && activeUserTeamForPlan ? (
+  ) : isDGLActive ? (
     <SmallGroupSectionNav
       activeSection={sglSection}
       onSectionChange={handleSglSectionChange}
@@ -274,12 +281,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                               ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
                               : ["Central", "Finance"]
       case "plan": {
-        const team = userTeams.find(t => t.teamId === activeTeamId)
-        if (!team) return ["Central", "Planning"]
+        if (!activeTeamId || !activeTeamNameForPlan) return ["Central", "Planning"]
         if (isStudentOrgActive && studentOrgPlanningEvent) {
-          return ["Central", "Planning", team.teamName, studentOrgPlanningEvent.title]
+          return ["Central", "Planning", activeTeamNameForPlan, studentOrgPlanningEvent.title]
         }
-        return ["Central", "Planning", team.teamName]
+        return ["Central", "Planning", activeTeamNameForPlan]
       }
       case "directory":     return ["Central", "Directory"]
       case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
@@ -558,6 +564,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         canCreateTeam={canCreateTeam}
         onCreateTeam={() => setShowQuickCreateTeam(true)}
         activeTeamId={activeTeamId}
+        activeTeamName={activeTeamNameForPlan || undefined}
         onActiveTeamChange={handleTeamChange}
         profileSection={profileSection}
         onProfileSectionChange={handleProfileSectionChange}

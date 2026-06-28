@@ -790,6 +790,7 @@ export function MeetingNoteEditor({
   initialContent,
   onSave,
   onEditorReady,
+  canWrite = true,
 }: {
   noteId: string
   userId: string
@@ -797,6 +798,7 @@ export function MeetingNoteEditor({
   initialContent: string
   onSave: (html: string) => Promise<void>
   onEditorReady?: (editor: Editor | null) => void
+  canWrite?: boolean
 }) {
   const { ydoc, activeUsers, receivedStateRef, initDoneRef, isApplyingRemote } = useNoteCollab(noteId, userId, userName)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -804,6 +806,7 @@ export function MeetingNoteEditor({
   const editorRef = useRef<Editor | null>(null)
 
   const editor = useEditor({
+    editable: canWrite,
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ undoRedo: false }), // Collaboration handles undo/redo
@@ -913,6 +916,7 @@ export function MeetingNoteCard({
   onToggle,
   onSaveTitle,
   onSaveBody,
+  canWrite = true,
 }: {
   note: MeetingNote
   isExpanded: boolean
@@ -921,6 +925,7 @@ export function MeetingNoteCard({
   onToggle: () => void
   onSaveTitle: (id: string, title: string) => Promise<void>
   onSaveBody: (id: string, body: string) => Promise<void>
+  canWrite?: boolean
 }) {
   const supabase = createClient()
   const [localTitle, setLocalTitle] = useState(note.title)
@@ -1003,13 +1008,15 @@ export function MeetingNoteCard({
         <ChevronDown size={14} style={{ color: "#C4C4C4" }} />
       </div>
 
-      <TiptapToolbar editor={noteEditor} />
+      {canWrite && <TiptapToolbar editor={noteEditor} />}
 
       {/* Document body */}
       <div style={{ padding: "28px 32px 0" }}>
         <input
           value={localTitle}
+          readOnly={!canWrite}
           onChange={e => {
+            if (!canWrite) return
             setLocalTitle(e.target.value)
             if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current)
             titleSaveTimer.current = setTimeout(() => {
@@ -1043,6 +1050,7 @@ export function MeetingNoteCard({
         initialContent={note.body}
         onSave={(html) => onSaveBody(note.id, html)}
         onEditorReady={setNoteEditor}
+        canWrite={canWrite}
       />
     </div>
   )
@@ -1154,6 +1162,7 @@ export function MeetingNotesSection({
               onToggle={() => toggleExpand(note.id)}
               onSaveTitle={saveTitle}
               onSaveBody={saveBody}
+              canWrite={canWrite}
             />
           ))}
         </div>
@@ -1740,15 +1749,21 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
                     <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--plum)" : "var(--body)" }}>{dateLabel}</p>
                     {isToday && <p style={{ fontSize: 10.5, color: "var(--muted-text)", marginTop: 1 }}>This week</p>}
                   </div>
-                  <select
-                    value={assignment?.assigned_to ?? ""}
-                    disabled={saving === key}
-                    onChange={e => handleAssign(type, weekDate, e.target.value || null)}
-                    style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
-                  >
-                    <option value="">— Unassigned —</option>
-                    {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-                  </select>
+                  {canEdit ? (
+                    <select
+                      value={assignment?.assigned_to ?? ""}
+                      disabled={saving === key}
+                      onChange={e => handleAssign(type, weekDate, e.target.value || null)}
+                      style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      <option value="">— Unassigned —</option>
+                      {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+                    </select>
+                  ) : (
+                    <span style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", fontFamily: "inherit" }}>
+                      {assignment?.assigned_name ?? "— Unassigned —"}
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -1915,8 +1930,11 @@ export function PlanTab({
 
   // Tech Team detected by name first — before isPraiseTeam — to avoid permission overlap
   // (Tech Team shares can_view_worship_set / can_generate_slides with praise team members)
+  // Under gov-view, activeTeamPerms is empty (non-member), so fall back to the name match plus
+  // the governance-admin flag so a Tech team still renders TechTeamTab (read-only) rather than the
+  // calendar fallback.
   const isTechTeam = /\btech\b/i.test(activeTeamLabel)
-    && activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p))
+    && (activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p)) || isGovernanceAdmin)
 
   const isPraiseTeam = !isTechTeam && (/\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p)))
   const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
@@ -5969,14 +5987,16 @@ export function MinistryCalendar({
                     ) : (
                       <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px" }}>Needs planning</span>
                     )}
-                    <button
-                      onClick={() => setPlanningEvent(ev)}
-                      style={{ fontSize: 11, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, textDecoration: "underline", textDecorationColor: "transparent" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "var(--plum)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
-                    >
-                      {isPlanned ? "View plan" : "Plan →"}
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => setPlanningEvent(ev)}
+                        style={{ fontSize: 11, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, textDecoration: "underline", textDecorationColor: "transparent" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "var(--plum)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
+                      >
+                        {isPlanned ? "View plan" : "Plan →"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )

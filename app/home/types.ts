@@ -613,6 +613,8 @@ export interface DesktopSidebarProps {
   isPastor?: boolean
   onCreateTeam?: () => void
   activeTeamId: string | null
+  // Resolved active-team name (membership OR allTeams fallback for gov-view) — drives the panel header
+  activeTeamName?: string
   onActiveTeamChange: (id: string) => void
   profileSection: "spiritual-profile" | "journal"
   onProfileSectionChange: (s: "spiritual-profile" | "journal") => void
