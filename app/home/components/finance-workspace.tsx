@@ -5,10 +5,10 @@ import { createPortal } from "react-dom"
 import { createClient } from "@/lib/supabase"
 import {
   Plus, X, ArrowLeft,
-  Upload, Download, DollarSign, AlertTriangle, ChevronRight,
+  Upload, Download, DollarSign, AlertTriangle,
   ImageIcon,
 } from "lucide-react"
-import { Spinner, EYEBROW_STYLE, HeaderActionButton } from "./shared"
+import { Spinner, EYEBROW_STYLE } from "./shared"
 import { MonogramChip } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -16,10 +16,6 @@ import {
   type InboxReceipt,
 } from "@/app/actions/receipts"
 import {
-  getDGDinnerForms, getOtherForms, createOtherForm,
-  saveFormDraft, submitReimbursementForm,
-  dismissForm, undismissForm,
-  submitReceiptForForm, getReceiptForForm, getUserSavedSignature,
   addBudgetEntry, getBudgetEntries, exportBudgetCSV,
 } from "@/app/actions/reimbursements"
 import {
@@ -34,7 +30,7 @@ function currentFiscalYear(): string {
   return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 import type { Receipt as ReceiptType, ReceiptLimit } from "@/app/actions/receipts"
-import type { ReimbursementForm, ItemizedExpense, BudgetEntry } from "@/app/actions/reimbursements"
+import type { BudgetEntry } from "@/app/actions/reimbursements"
 
 export type FinanceSection = "reimbursements" | "budget" | "allocation"
 
@@ -72,18 +68,6 @@ export const STATUS_META: Record<string, { label: string; bg: string; text: stri
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
 
-const FORM_STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  not_started: { label: "Not started", bg: "var(--ivory)", text: "var(--muted-text)" },
-  in_progress: { label: "In progress", bg: "#FFF3CD",      text: "#854D0E" },
-  complete:    { label: "Complete",    bg: "#DCFCE7",       text: "#166534" },
-}
-
-const DISMISSAL_REASONS = [
-  { value: "break", label: "Break" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "provided", label: "Provided" },
-]
-
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "10px 12px", border: "1px solid var(--line)",
   borderRadius: "var(--r-input)", fontSize: 13, color: "var(--ink)", background: "var(--cream)",
@@ -92,43 +76,6 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
   textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 5, display: "block",
-}
-
-function FormStatusBadge({ status }: { status: string }) {
-  const m = FORM_STATUS_META[status] ?? FORM_STATUS_META.not_started
-  return (
-    <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: 999, background: m.bg, color: m.text, whiteSpace: "nowrap" }}>
-      {m.label}
-    </span>
-  )
-}
-
-function RPersonChip({ name }: { name: string }) {
-  const parts = name.trim().split(" ")
-  const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 3px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>
-      <MonogramChip initials={initials.toUpperCase()} style={{ width: 20, height: 20, fontSize: 7.5, fontWeight: 600, letterSpacing: 0.3 }} />
-      {name}
-    </span>
-  )
-}
-
-function RStatusPill({ status }: { status: string }) {
-  const m = FORM_STATUS_META[status] ?? FORM_STATUS_META.not_started
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 10px", borderRadius: 999, background: "var(--cream)", border: "1px solid var(--line-2)", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", textTransform: "uppercase" as const, whiteSpace: "nowrap" }}>
-      {m.label}
-    </span>
-  )
-}
-
-function Initials({ name, size = 28 }: { name: string; size?: number }) {
-  const parts = name.trim().split(" ")
-  const initials = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)
-  return (
-    <MonogramChip initials={initials.toUpperCase()} style={{ width: size, height: size, fontSize: size * 0.36, fontWeight: 600 }} />
-  )
 }
 
 // Fallback category list when the modal is opened outside FinanceWorkspace
@@ -257,483 +204,6 @@ export function SubmitReceiptModal({
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-interface ReceiptData {
-  id: string
-  receipt_image_url: string | null
-  amount: number
-  submitted_by_name: string | null
-  submitted_at: string
-}
-
-function ReceiptPanel({
-  form, dglNames, isTreasurer, isAdmin, isDGLPair, ministryId, dgDinnerLimit,
-  receiptData, onReceiptSubmitted,
-}: {
-  form: ReimbursementForm
-  dglNames: Map<string, string>
-  isTreasurer: boolean
-  isAdmin: boolean
-  isDGLPair: boolean
-  ministryId: string
-  dgDinnerLimit: number | null
-  receiptData: ReceiptData | null
-  onReceiptSubmitted: (r: ReceiptData) => void
-}) {
-  const supabase = createClient()
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [amount, setAmount] = useState("")
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const canUpload = isDGLPair || isTreasurer || isAdmin
-  const numAmount = parseFloat(amount) || 0
-  const overLimit = dgDinnerLimit !== null && numAmount > 0 && numAmount > dgDinnerLimit
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
-    const ext = file.name.split(".").pop() ?? "jpg"
-    const { data, error } = await supabase.storage.from("announcement-images").upload(`receipts/${ministryId}/${Date.now()}.${ext}`, file, { upsert: false })
-    if (!error && data) {
-      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(data.path)
-      setImageUrl(publicUrl)
-    }
-    setUploading(false)
-    if (fileRef.current) fileRef.current.value = ""
-  }
-
-  async function handleSubmit() {
-    if (!imageUrl) { setError("Please upload a receipt photo."); return }
-    if (!amount || numAmount <= 0) { setError("Please enter the receipt amount."); return }
-    setSubmitting(true); setError(null)
-    const { data, error: err } = await submitReceiptForForm({ ministryId, formId: form.id, receiptImageUrl: imageUrl, amount: numAmount })
-    if (err) { setError(err); setSubmitting(false); return }
-    if (data) onReceiptSubmitted(data)
-  }
-
-  const dgl1 = form.assigned_dgl_ids[0] ? dglNames.get(form.assigned_dgl_ids[0]) : null
-  const dgl2 = form.assigned_dgl_ids[1] ? dglNames.get(form.assigned_dgl_ids[1]) : null
-
-  return (
-    <div>
-      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Receipt</p>
-
-      {receiptData ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {receiptData.receipt_image_url ? (
-            <a href={receiptData.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 10, overflow: "hidden", border: "1px solid var(--line)", maxWidth: 200 }}>
-              <img src={receiptData.receipt_image_url} alt="Receipt" style={{ width: "100%", display: "block", objectFit: "cover" }} />
-            </a>
-          ) : (
-            <div style={{ width: 48, height: 48, borderRadius: 10, background: "var(--body-bg)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ImageIcon size={18} color="var(--muted-text)" />
-            </div>
-          )}
-          <div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>${Number(receiptData.amount).toFixed(2)}</p>
-            {overLimit && (
-              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
-                <AlertTriangle size={12} color={WARN_TEXT} />
-                <span style={{ fontSize: 11, color: WARN_TEXT, fontWeight: 600 }}>Over ${dgDinnerLimit} limit</span>
-              </div>
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-              <Initials name={receiptData.submitted_by_name ?? "?"} size={22} />
-              <div>
-                <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink)" }}>{receiptData.submitted_by_name ?? "Unknown"}</p>
-                <p style={{ fontSize: 11, color: "var(--muted-text)" }}>{new Date(receiptData.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : canUpload ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {(dgl1 || dgl2) && (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
-              Waiting for receipt from{" "}
-              {dgl1 && <strong style={{ color: "var(--ink)" }}>{dgl1}</strong>}
-              {dgl1 && dgl2 && " or "}
-              {dgl2 && <strong style={{ color: "var(--ink)" }}>{dgl2}</strong>}
-            </p>
-          )}
-          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} />
-          {imageUrl ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>View uploaded photo</a>
-              <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
-            </div>
-          ) : (
-            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer" }}>
-              <Upload size={14} />{uploading ? "Uploading…" : "Upload receipt photo"}
-            </button>
-          )}
-          <div>
-            <label style={labelStyle}>Amount ($)</label>
-            <input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, maxWidth: 140 }} />
-          </div>
-          {overLimit && (
-            <div style={{ display: "flex", gap: 6, alignItems: "flex-start", background: WARN_BG, border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 10px" }}>
-              <AlertTriangle size={12} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 11.5, color: WARN_TEXT, lineHeight: 1.4 }}>Over ${dgDinnerLimit} limit</p>
-            </div>
-          )}
-          {error && <p style={{ fontSize: 12.5, color: "var(--danger)" }}>{error}</p>}
-          <button onClick={handleSubmit} disabled={submitting} style={{ padding: "8px 16px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1, alignSelf: "flex-start" }}>
-            {submitting ? "Submitting…" : "Submit receipt"}
-          </button>
-        </div>
-      ) : (
-        <div style={{ padding: "16px", background: "var(--cream)", borderRadius: 10, border: "1px dashed var(--dashed)" }}>
-          {(dgl1 || dgl2) ? (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
-              Waiting for receipt from{" "}
-              {dgl1 && <strong style={{ color: "var(--body)" }}>{dgl1}</strong>}
-              {dgl1 && dgl2 && " or "}
-              {dgl2 && <strong style={{ color: "var(--body)" }}>{dgl2}</strong>}
-            </p>
-          ) : (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)" }}>No receipt submitted yet.</p>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FormPanel({
-  form, canEditForm, savedSignature, onDraft, onSubmit,
-}: {
-  form: ReimbursementForm
-  canEditForm: boolean
-  savedSignature: string | null
-  onDraft: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => Promise<string | null>
-  onSubmit: (params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }) => Promise<string | null>
-}) {
-  const [expensePurpose, setExpensePurpose] = useState(form.expense_purpose ?? "")
-  const [items, setItems] = useState<ItemizedExpense[]>(
-    form.itemized_expenses.length > 0
-      ? form.itemized_expenses
-      : [{ date: form.friday_date ?? new Date().toISOString().split("T")[0], description: "", cost: 0 }]
-  )
-  const [notes, setNotes] = useState(form.notes ?? "")
-  const [signature, setSignature] = useState(form.signature ?? savedSignature ?? "")
-  const [signatureSaved, setSignatureSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const total = items.reduce((sum, it) => sum + (Number(it.cost) || 0), 0)
-
-  function addItem() {
-    if (items.length >= 10) return
-    setItems(prev => [...prev, { date: form.friday_date ?? new Date().toISOString().split("T")[0], description: "", cost: 0 }])
-  }
-
-  function updateItem(i: number, field: keyof ItemizedExpense, value: string | number) {
-    setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: field === "cost" ? (parseFloat(value as string) || 0) : value } : it))
-  }
-
-  function removeItem(i: number) {
-    setItems(prev => prev.filter((_, idx) => idx !== i))
-  }
-
-  async function handleDraft() {
-    setSaving(true); setError(null)
-    const err = await onDraft({ expensePurpose, items, notes, signature, signatureSaved })
-    if (err) setError(err)
-    setSaving(false)
-  }
-
-  async function handleSubmit() {
-    if (!signature.trim()) { setError("Please sign the form."); return }
-    if (items.filter(it => it.description.trim()).length === 0) { setError("Add at least one line item."); return }
-    setSubmitting(true); setError(null)
-    const err = await onSubmit({ expensePurpose, items, notes, signature, signatureSaved })
-    if (err) setError(err)
-    setSubmitting(false)
-  }
-
-  const readOnly = !canEditForm || form.status === "complete" || !!form.dismissal_reason
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Name + Date */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div>
-          <label style={labelStyle}>Name</label>
-          <input type="text" value={form.treasurer_name ?? ""} readOnly style={{ ...inputStyle, background: "var(--body-bg)", color: "var(--body)" }} />
-        </div>
-        <div>
-          <label style={labelStyle}>Date</label>
-          <input type="text" value={form.friday_date ? new Date(form.friday_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""} readOnly style={{ ...inputStyle, background: "var(--body-bg)", color: "var(--body)" }} />
-        </div>
-      </div>
-
-      {/* Expense Purpose */}
-      <div>
-        <label style={labelStyle}>Expense purpose</label>
-        {readOnly
-          ? <p style={{ fontSize: 13, color: "var(--ink)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)" }}>{expensePurpose || "—"}</p>
-          : <input type="text" placeholder="e.g. DG Dinner – Oct 18" value={expensePurpose} onChange={e => setExpensePurpose(e.target.value)} style={inputStyle} />
-        }
-      </div>
-
-      {/* Itemized expenses */}
-      <div>
-        <label style={labelStyle}>Itemized expenses</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 80px 24px", gap: 6 }}>
-            {["Date", "Description", "Cost", ""].map(h => (
-              <span key={h} style={{ fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 2 }}>{h}</span>
-            ))}
-          </div>
-          {items.map((it, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr 80px 24px", gap: 6, alignItems: "center" }}>
-              {readOnly ? (
-                <>
-                  <span style={{ fontSize: 12.5, color: "var(--body)", padding: "8px 10px" }}>{it.date ? new Date(it.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span>
-                  <span style={{ fontSize: 13, color: "var(--ink)", padding: "8px 10px" }}>{it.description}</span>
-                  <span style={{ fontSize: 13, color: "var(--ink)", padding: "8px 10px" }}>${Number(it.cost).toFixed(2)}</span>
-                  <span />
-                </>
-              ) : (
-                <>
-                  <input type="date" value={it.date ?? ""} onChange={e => updateItem(i, "date", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
-                  <input type="text" placeholder="What was purchased" value={it.description} onChange={e => updateItem(i, "description", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
-                  <input type="number" min="0" step="0.01" placeholder="0.00" value={it.cost === 0 ? "" : it.cost} onChange={e => updateItem(i, "cost", e.target.value)} style={{ ...inputStyle, padding: "7px 8px" }} />
-                  <button onClick={() => removeItem(i)} disabled={items.length === 1} style={{ width: 24, height: 24, borderRadius: "50%", background: items.length === 1 ? "transparent" : "var(--ivory)", border: "none", cursor: items.length === 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: items.length === 1 ? 0.3 : 1 }}>
-                    <X size={10} color="var(--body)" />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-            {!readOnly && items.length < 10
-              ? <button onClick={addItem} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}><Plus size={12} /> Add row</button>
-              : <span />
-            }
-            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)" }}>Total: ${total.toFixed(2)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Notes */}
-      <div>
-        <label style={labelStyle}>Notes</label>
-        {readOnly
-          ? <p style={{ fontSize: 13, color: "var(--body)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)", minHeight: 38 }}>{notes || "—"}</p>
-          : <textarea placeholder="Additional context for the deacon" value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} />
-        }
-      </div>
-
-      {/* Signature */}
-      <div>
-        <label style={labelStyle}>Signature</label>
-        {readOnly
-          ? <p style={{ fontSize: 13, fontStyle: "italic", color: "var(--ink)", padding: "10px 12px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)" }}>{signature || "—"}</p>
-          : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input type="text" placeholder="Type your full name to sign" value={signature} onChange={e => setSignature(e.target.value)} style={{ ...inputStyle, fontStyle: "italic" }} />
-              {!savedSignature && (
-                <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 12.5, color: "var(--body)" }}>
-                  <input type="checkbox" checked={signatureSaved} onChange={e => setSignatureSaved(e.target.checked)} style={{ accentColor: "var(--plum)", width: 14, height: 14 }} />
-                  Save for future forms
-                </label>
-              )}
-            </div>
-          )
-        }
-      </div>
-
-      {error && <p style={{ fontSize: 12.5, color: "var(--danger)" }}>{error}</p>}
-
-      {!readOnly && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={handleDraft} disabled={saving} style={{ flex: 1, height: 42, background: "var(--cream)", color: "var(--ink)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Saving…" : "Save draft"}
-          </button>
-          <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, height: 42, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1 }}>
-            {submitting ? "Submitting…" : "Submit form"}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ReimbursementCard({
-  form, dglNames, userId, isTreasurer, isAdmin, isDGLPair, ministryId, dgDinnerLimit,
-  savedSignature, receiptCache, onFormUpdate, onReceiptCached, inline,
-}: {
-  form: ReimbursementForm
-  dglNames: Map<string, string>
-  userId: string
-  isTreasurer: boolean
-  isAdmin: boolean
-  isDGLPair: boolean
-  ministryId: string
-  dgDinnerLimit: number | null
-  savedSignature: string | null
-  receiptCache: Map<string, ReceiptData | null>
-  onFormUpdate: (updated: ReimbursementForm) => void
-  onReceiptCached: (formId: string, data: ReceiptData) => void
-  inline?: boolean
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [pendingDismiss, setPendingDismiss] = useState<string | null>(null)
-  const [receiptData, setReceiptData] = useState<ReceiptData | null | undefined>(
-    receiptCache.has(form.id) ? receiptCache.get(form.id) : undefined
-  )
-
-  const isDismissed = !!form.dismissal_reason
-  const canEditForm = isTreasurer || isAdmin
-  const canDismiss = isTreasurer || isAdmin
-
-  useEffect(() => {
-    if (!expanded || receiptData !== undefined) return
-    getReceiptForForm(form.id).then(({ data }) => {
-      setReceiptData(data)
-      onReceiptCached(form.id, data as ReceiptData)
-    })
-  }, [expanded, form.id, receiptData, onReceiptCached])
-
-  async function handleDraft(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }): Promise<string | null> {
-    const { error } = await saveFormDraft({ formId: form.id, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: params.items.reduce((s, it) => s + Number(it.cost), 0), notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved })
-    if (error) return error
-    onFormUpdate({ ...form, status: "in_progress", expense_purpose: params.expensePurpose, itemized_expenses: params.items, total_amount: params.items.reduce((s, it) => s + Number(it.cost), 0), notes: params.notes, signature: params.signature })
-    return null
-  }
-
-  async function handleSubmit(params: { expensePurpose: string; items: ItemizedExpense[]; notes: string; signature: string; signatureSaved: boolean }): Promise<string | null> {
-    const total = params.items.reduce((s, it) => s + Number(it.cost), 0)
-    const { error } = await submitReimbursementForm({ formId: form.id, ministryId, expensePurpose: params.expensePurpose, itemizedExpenses: params.items, totalAmount: total, notes: params.notes, signature: params.signature, signatureSaved: params.signatureSaved, category: form.category })
-    if (error) return error
-    onFormUpdate({ ...form, status: "complete", expense_purpose: params.expensePurpose, itemized_expenses: params.items, total_amount: total, notes: params.notes, signature: params.signature })
-    return null
-  }
-
-  async function handleDismiss(reason: string) {
-    await dismissForm({ formId: form.id, reason })
-    onFormUpdate({ ...form, dismissal_reason: reason, dismissed_at: new Date().toISOString(), dismissed_by: userId })
-    setPendingDismiss(null)
-  }
-
-  async function handleUndismiss() {
-    await undismissForm(form.id)
-    onFormUpdate({ ...form, dismissal_reason: null, dismissed_at: null, dismissed_by: null })
-  }
-
-  // Format friday date header
-  const fridayHeader = form.friday_date
-    ? new Date(form.friday_date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : (form.expense_purpose ?? "Form")
-
-  const dgl1Name = form.assigned_dgl_ids[0] ? (dglNames.get(form.assigned_dgl_ids[0]) ?? "DGL") : null
-  const dgl2Name = form.assigned_dgl_ids[1] ? (dglNames.get(form.assigned_dgl_ids[1]) ?? "DGL") : null
-
-  return (
-    <div style={{ background: "var(--cream)", border: inline ? "none" : "1px solid var(--line)", borderRadius: inline ? 0 : 12, overflow: "hidden", opacity: isDismissed ? 0.65 : 1 }}>
-      {/* Card header — click to expand */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--cream-2)" }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent" }}
-        style={{ width: "100%", padding: "15px 14px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto 20px", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer", textAlign: "left", transition: "background 120ms ease" }}
-      >
-        {/* Date */}
-        <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, letterSpacing: -0.2, color: isDismissed ? "var(--muted-text)" : "var(--ink)", textDecoration: isDismissed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {fridayHeader}
-        </span>
-        {/* Assignee chip(s) or dismissal pill */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {isDismissed ? (
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--muted-text)", textTransform: "uppercase" }}>
-              {DISMISSAL_REASONS.find(d => d.value === form.dismissal_reason)?.label ?? form.dismissal_reason}
-            </span>
-          ) : (
-            <>
-              {dgl1Name && <RPersonChip name={dgl1Name} />}
-              {dgl2Name && <RPersonChip name={dgl2Name} />}
-            </>
-          )}
-        </div>
-        {/* Status pill */}
-        {isDismissed ? <span /> : <RStatusPill status={form.status} />}
-        {/* Chevron */}
-        <ChevronRight size={15} color="var(--faint)" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
-      </button>
-
-      {/* Expanded content */}
-      {expanded && (
-        <div style={{ borderTop: "1px solid var(--line-3)", padding: "18px 16px", background: "var(--cream-2)", display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Two-panel layout on desktop */}
-          <div className="md:grid md:gap-8" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            {/* Form panel — Treasurer/Admin only */}
-            {canEditForm && (
-              <FormPanel
-                form={form}
-                canEditForm={canEditForm}
-                savedSignature={savedSignature}
-                onDraft={handleDraft}
-                onSubmit={handleSubmit}
-              />
-            )}
-
-            {/* Receipt panel */}
-            <div>
-              <ReceiptPanel
-                form={form}
-                dglNames={dglNames}
-                isTreasurer={isTreasurer}
-                isAdmin={isAdmin}
-                isDGLPair={isDGLPair}
-                ministryId={ministryId}
-                dgDinnerLimit={dgDinnerLimit}
-                receiptData={receiptData ?? null}
-                onReceiptSubmitted={data => {
-                  setReceiptData(data)
-                  onReceiptCached(form.id, data)
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Dismiss controls */}
-          {canDismiss && !isDismissed && (
-            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ivory)" }}>
-              <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 8 }}>Dismiss this form</p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                {DISMISSAL_REASONS.map(dr => (
-                  pendingDismiss === dr.value ? (
-                    <div key={dr.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 12, color: "var(--body)" }}>Dismiss as {dr.label}?</span>
-                      <button onClick={() => handleDismiss(dr.value)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--plum)", color: "var(--cream)", border: "none", cursor: "pointer" }}>Yes</button>
-                      <button onClick={() => setPendingDismiss(null)} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--ivory)", color: "var(--body)", border: "none", cursor: "pointer" }}>No</button>
-                    </div>
-                  ) : (
-                    <button key={dr.value} onClick={() => setPendingDismiss(dr.value)} disabled={!!pendingDismiss} style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 999, background: "var(--ivory)", color: "var(--body)", border: "none", cursor: "pointer", opacity: pendingDismiss && pendingDismiss !== dr.value ? 0.4 : 1 }}>
-                      Mark as {dr.label}
-                    </button>
-                  )
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isDismissed && canDismiss && (
-            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ivory)" }}>
-              <button onClick={handleUndismiss} style={{ fontSize: 12.5, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Undo dismissal</button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -1128,16 +598,8 @@ export function FinanceWorkspace({
 
   const [loading, setLoading] = useState(true)
 
-  // Reimbursements
-  const [dgForms, setDgForms] = useState<ReimbursementForm[]>([])
-  const [otherForms, setOtherForms] = useState<ReimbursementForm[]>([])
-  const [reimburseLoading, setReimburseLoading] = useState(false)
-  const [dglNames, setDglNames] = useState<Map<string, string>>(new Map())
-  const [savedSignature, setSavedSignature] = useState<string | null>(null)
-  const [receiptCache, setReceiptCache] = useState<Map<string, ReceiptData | null>>(new Map())
+  // Receipt limits (consumed by SubmitReceiptModal callers)
   const [limits, setLimits] = useState<ReceiptLimit[]>([])
-  const [creatingOther, setCreatingOther] = useState(false)
-  const [showSubmitReceiptModal, setShowSubmitReceiptModal] = useState(false)
 
   // Reimbursement inbox — all standalone submitted receipts + this caller's
   // finance capability (treasurer can approve, president can sign off).
@@ -1184,8 +646,6 @@ export function FinanceWorkspace({
   const budgetAccess = canEditBudget || readOnly
   const canManage = canEditBudget && !readOnly
 
-  const dgDinnerLimit = limits.find(l => l.category === "dg_dinner" && l.fund === "church")?.max_amount ?? null
-
   useEffect(() => {
     async function load() {
       const [limitsRes, eventsRes, customCatRes] = await Promise.all([
@@ -1208,29 +668,6 @@ export function FinanceWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId])
 
-  const loadReimbursements = useCallback(async () => {
-    setReimburseLoading(true)
-    const [dgRes, otherRes, sigRes] = await Promise.all([
-      getDGDinnerForms(ministryId),
-      getOtherForms(ministryId),
-      getUserSavedSignature(),
-    ])
-    const allForms = [...dgRes.data, ...otherRes.data]
-    setDgForms(dgRes.data)
-    setOtherForms(otherRes.data)
-    setSavedSignature(sigRes)
-
-    // Resolve all DGL names
-    const allDglIds = Array.from(new Set(allForms.flatMap(f => f.assigned_dgl_ids)))
-    if (allDglIds.length > 0) {
-      const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", allDglIds)
-      const nameMap = new Map<string, string>()
-      for (const p of (profiles ?? []) as { id: string; name: string }[]) nameMap.set(p.id, p.name)
-      setDglNames(nameMap)
-    }
-    setReimburseLoading(false)
-  }, [ministryId, supabase])
-
   // Inbox visible to the treasurer (canManage) and to gov-view (readOnly) read-only.
   // The server re-derives the real finance capability; this only gates the fetch.
   const canSeeReceiptQueue = canManage || readOnly
@@ -1246,7 +683,7 @@ export function FinanceWorkspace({
   }, [ministryId, canSeeReceiptQueue])
 
   useEffect(() => {
-    if (section === "reimbursements") { loadReimbursements(); loadInbox() }
+    if (section === "reimbursements") loadInbox()
     else if (section === "budget") loadBudget()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section])
@@ -1265,13 +702,6 @@ export function FinanceWorkspace({
     const { data } = await getBudgetEntries(ministryId)
     setBudgetEntries(data)
     setBudgetLoading(false)
-  }
-
-  async function handleCreateOtherForm() {
-    setCreatingOther(true)
-    const { data } = await createOtherForm({ ministryId, expensePurpose: "" })
-    if (data) setOtherForms(prev => [data, ...prev])
-    setCreatingOther(false)
   }
 
   async function handleAddBudgetEntry() {
@@ -1294,15 +724,6 @@ export function FinanceWorkspace({
     setBudgetExporting(false)
   }
 
-  function handleReceiptCached(formId: string, data: ReceiptData | null) {
-    setReceiptCache(prev => { const m = new Map(prev); m.set(formId, data); return m })
-  }
-
-  // Determine if current user is in DGL pair for a given form (never under read-only).
-  function isInDGLPair(form: ReimbursementForm): boolean {
-    return !readOnly && form.assigned_dgl_ids.includes(userId)
-  }
-
   // Build category summary from dynamic categories + any orphaned categories in actual entries
   const allEntryCategories = Array.from(new Set(budgetEntries.map(e => e.category)))
   const orphanedCategories = allEntryCategories
@@ -1313,8 +734,6 @@ export function FinanceWorkspace({
     ...cat,
     total: budgetEntries.filter(e => e.category === cat.value).reduce((sum, e) => sum + Number(e.amount), 0),
   })).filter(c => c.total > 0)
-
-  const monoStyle = EYEBROW_STYLE
 
   if (loading) return <Spinner />
 
@@ -1334,123 +753,6 @@ export function FinanceWorkspace({
               readOnly={readOnly}
               onRefetch={loadInbox}
             />
-          )}
-
-          {/* DG DINNERS */}
-          <div>
-            <div style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
-              <div>
-                <div style={monoStyle}>{`DG DINNERS · ${dgForms.length} FORMS`}</div>
-                <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
-                  Spring semester rotation
-                </div>
-                <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
-                  One form per assigned Friday — auto-generated from the rotation.
-                </div>
-              </div>
-              {canManage && (
-                <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceiptModal(true)} />
-              )}
-            </div>
-
-            {reimburseLoading ? <Spinner /> : dgForms.length === 0 ? (
-              <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-                <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No DG dinner forms yet</div>
-                <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Forms are auto-created when the DGL rotation is published.</div>
-              </div>
-            ) : (() => {
-              const byMonth = new Map<string, ReimbursementForm[]>()
-              for (const f of dgForms) {
-                const label = f.friday_date
-                  ? new Date(f.friday_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                  : "Other"
-                if (!byMonth.has(label)) byMonth.set(label, [])
-                byMonth.get(label)!.push(f)
-              }
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-                  {[...byMonth.entries()].map(([month, forms]) => (
-                    <div key={month}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 6 }}>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "var(--muted-text)" }}>{month.toUpperCase()}</span>
-                        <span style={{ height: 1, background: "var(--line)", flex: 1 }} />
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase" as const, color: "var(--faint)" }}>{forms.length} {forms.length === 1 ? "FORM" : "FORMS"}</span>
-                      </div>
-                      <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
-                        {forms.map((form, i) => (
-                          <div key={form.id} style={{ borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
-                            <ReimbursementCard
-                              form={form}
-                              dglNames={dglNames}
-                              userId={userId}
-                              isTreasurer={canManage}
-                              isAdmin={false}
-                              isDGLPair={isInDGLPair(form)}
-                              ministryId={ministryId}
-                              dgDinnerLimit={dgDinnerLimit}
-                              savedSignature={savedSignature}
-                              receiptCache={receiptCache}
-                              onFormUpdate={updated => setDgForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                              onReceiptCached={handleReceiptCached}
-                              inline
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            })()}
-          </div>
-
-          {/* OTHERS */}
-          {canManage && (
-            <div>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 18, gap: 24 }}>
-                <div>
-                  <div style={monoStyle}>OTHERS</div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
-                    Other expenses
-                  </div>
-                  <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
-                    Manual reimbursement forms for one-off ministry expenses.
-                  </div>
-                </div>
-                <button onClick={handleCreateOtherForm} disabled={creatingOther} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: creatingOther ? 0.6 : 1, fontFamily: "var(--sans)" }}>
-                  <Plus size={14} />New form
-                </button>
-              </div>
-
-              {otherForms.length === 0 ? (
-                <div style={{ padding: "44px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No other forms yet</div>
-                  <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Manual reimbursements you create will appear here.</div>
-                </div>
-              ) : (
-                <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
-                  {otherForms.map((form, i) => (
-                    <div key={form.id} style={{ borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
-                      <ReimbursementCard
-                        form={form}
-                        dglNames={dglNames}
-                        userId={userId}
-                        isTreasurer={canManage}
-                        isAdmin={false}
-                        isDGLPair={isInDGLPair(form)}
-                        ministryId={ministryId}
-                        dgDinnerLimit={null}
-                        savedSignature={savedSignature}
-                        receiptCache={receiptCache}
-                        onFormUpdate={updated => setOtherForms(prev => prev.map(f => f.id === updated.id ? updated : f))}
-                        onReceiptCached={handleReceiptCached}
-                        inline
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           )}
         </div>
       )}
@@ -1541,16 +843,6 @@ export function FinanceWorkspace({
             </div>
           )}
         </div>
-      )}
-
-      {showSubmitReceiptModal && (
-        <SubmitReceiptModal
-          ministryId={ministryId}
-          limits={limits}
-          categories={dynamicCategories}
-          onClose={() => setShowSubmitReceiptModal(false)}
-          onSubmitted={() => { loadInbox() }}
-        />
       )}
     </>
   )

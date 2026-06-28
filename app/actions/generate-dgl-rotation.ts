@@ -277,11 +277,6 @@ export async function publishDGLRotationAction(params: {
     .eq("semester", params.semester)
   if (error) return { error: "Failed to update publish status." }
 
-  if (params.publish) {
-    const { syncDGDinnerFormsForMinistry } = await import("./reimbursements")
-    await syncDGDinnerFormsForMinistry(params.ministryId)
-  }
-
   return {}
 }
 
