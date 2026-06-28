@@ -115,8 +115,8 @@ const TEAM_PRESETS = [
     description: "Budget, allocation, and reimbursements",
     teamType: "finance" as const,
     roles: [
-      { name: "Treasurer", is_president: true, permissions: ["can_view_finances"] },
-      { name: "Finance Team", permissions: ["can_view_finances"] },
+      { name: "Finance President", is_president: true, permissions: ["can_view_finances"] },
+      { name: "Treasurer", is_president: false, permissions: ["can_view_finances"] },
     ],
   },
   {
