@@ -46,6 +46,7 @@ import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
 import { FinanceWorkspace, SubmitReceiptModal, type FinanceSection } from "../components/finance-workspace"
+import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -1801,6 +1802,7 @@ export function PlanTab({
   onTeamSelect,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
   sglSection, onSglSectionChange,
+  activeReceiptsTeamId, onReceiptsTeamChange,
 }: PlanTabProps) {
   // Resolve from membership first, then from allTeams (a governance admin may be
   // viewing a team they don't belong to), then the ministry-name fallback.
@@ -1901,6 +1903,7 @@ export function PlanTab({
     params.delete("ptab")
     params.delete("sgltab")
     params.delete("evtab")
+    params.delete("rteam")
     router.replace(`/home?${params.toString()}`, { scroll: false })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
@@ -1987,6 +1990,12 @@ export function PlanTab({
     return access === "gov-view" || access === "gov-write"
   })
 
+  // Teams shown in the Receipts workspace: teams the user is a member of OR governs.
+  const receiptsTeams: ReceiptsTeamRef[] = [
+    ...userTeams.map(t => ({ id: t.teamId, name: t.teamName })),
+    ...govTeams.map(t => ({ id: t.id, name: t.name })),
+  ]
+
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
@@ -2032,8 +2041,9 @@ export function PlanTab({
 
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-        {/* Page header — hidden for student org board, DGL team (both use section-level headers), and the no-team picker screen */}
-        {activeTeamId && !isStudentOrgBoard && !isDGLTeam && (
+        {/* Page header — hidden for student org board, DGL team (both use section-level headers),
+            the no-team picker screen, and the Receipts sentinel (ReceiptsWorkspace owns its own header) */}
+        {activeTeamId && activeTeamId !== "receipts" && !isStudentOrgBoard && !isDGLTeam && (
           <TabPageHeader>
             <PageTitle
               eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
@@ -2053,7 +2063,7 @@ export function PlanTab({
 
         {/* Scrollable team content */}
         <div className="flex-1 overflow-y-auto">
-        {activeTeamId && govView && (
+        {activeTeamId && activeTeamId !== "receipts" && govView && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 56px", background: "var(--ivory)", borderBottom: "1px solid var(--line)" }}>
             <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
             <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
@@ -2068,12 +2078,12 @@ export function PlanTab({
             the team's data), so it's exempt from the gov-view content read-only rule.
             Hidden only on the finance team itself (FinanceWorkspace renders the
             treasurer's own originate trigger). */}
-        {activeTeamId && !isFinanceTeam && (
+        {activeTeamId && activeTeamId !== "receipts" && !isFinanceTeam && (
           <div className="flex justify-end px-5 md:px-14 pt-5">
             <HeaderActionButton label="Submit receipt" onClick={() => setShowSubmitReceipt(true)} />
           </div>
         )}
-        {activeTeamId && showSubmitReceipt && (
+        {activeTeamId && activeTeamId !== "receipts" && showSubmitReceipt && (
           <SubmitReceiptModal
             ministryId={ministryId}
             teamId={activeTeamId}
@@ -2093,12 +2103,10 @@ export function PlanTab({
                   PLANNING · {ministryName.toUpperCase()}
                 </p>
                 <h1 style={{ fontFamily: "var(--sans)", fontSize: 46, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 14px", textAlign: "center" }}>
-                  Which team are you planning for?
+                  Which workspace are you entering?
                 </h1>
                 <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 48px", lineHeight: 1.6, textAlign: "center" }}>
-                  {userTeams.length >= 2
-                    ? `You coordinate across ${userTeams.length} teams. Pick one to open its planning workspace.`
-                    : "Pick a team to open its planning workspace."}
+                  Pick a workspace to enter.
                 </p>
                 {userTeams.length > 0 && (
                   <>
@@ -2185,6 +2193,36 @@ export function PlanTab({
                     </div>
                   </>
                 )}
+                {/* Receipts workspace — a shared surface, not a team */}
+                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "32px 0 14px" }}>
+                  Workspaces
+                </p>
+                <button
+                  onClick={() => onTeamSelect?.("receipts")}
+                  className="text-left transition-all hover:border-[var(--plum)]"
+                  style={{
+                    background: "var(--ivory)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 16,
+                    padding: "28px 28px 24px",
+                    cursor: "pointer",
+                    display: "block",
+                    width: "100%",
+                  }}
+                >
+                  <div style={{ marginBottom: 22 }}>
+                    <PlanLineIcon iconKey="dollar" bg="var(--plum)" fg="var(--cream)" size={48} radius={12} />
+                  </div>
+                  <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                    Workspace
+                  </p>
+                  <p style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2, margin: "0 0 18px" }}>
+                    Receipts
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", margin: 0 }}>
+                    Submit &amp; track reimbursements
+                  </p>
+                </button>
                 {isAdmin && (
                   <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
@@ -2225,6 +2263,15 @@ export function PlanTab({
               </div>
             </div>
           )
+        ) : activeTeamId === "receipts" ? (
+          <ReceiptsWorkspace
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            teams={receiptsTeams}
+            activeReceiptsTeamId={activeReceiptsTeamId ?? null}
+            onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
+          />
         ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
           <>
             <PlanSubTabStrip
@@ -2346,7 +2393,16 @@ export function PlanTab({
             </span>
           </div>
         )}
-        {isFinanceTeam && activeTeamId && financeCanAccess ? (
+        {activeTeamId === "receipts" ? (
+          <ReceiptsWorkspace
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            teams={receiptsTeams}
+            activeReceiptsTeamId={activeReceiptsTeamId ?? null}
+            onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
+          />
+        ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
           <div>
             <div style={{ marginBottom: 16 }}>
               <PlanSubTabStrip

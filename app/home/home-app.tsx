@@ -14,7 +14,7 @@ import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "
 
 // Components
 import { CommandPalette } from "./components/command-palette"
-import { DesktopSidebar, DesktopTopbar } from "./components/desktop-nav"
+import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
 
 // Tabs
 import { HomeTab } from "./tabs/home-tab"
@@ -90,6 +90,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     replaceParam("team", teamId)
   }
 
+  // Team selected WITHIN the Receipts workspace (sentinel activeTeamId === "receipts").
+  const [activeReceiptsTeamId, setActiveReceiptsTeamId] = useState<string | null>(
+    () => searchParams.get("rteam")
+  )
+
+  function handleReceiptsTeamChange(teamId: string) {
+    setActiveReceiptsTeamId(teamId)
+    // One atomic replace (convention #5) — build the full param set, replace once.
+    const params = new URLSearchParams(window.location.search)
+    params.set("rteam", teamId)
+    router.replace(`/home?${params.toString()}`, { scroll: false })
+  }
+
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
     setProfileSection(section)
     replaceParam("section", section === "spiritual-profile" ? null : section)
@@ -119,11 +132,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Governance-accessible non-member teams: teams the user is NOT on but can enter
   // via the matrix (gov-view/gov-write). Mirrors plan-tab's `govTeams` derivation.
   const memberTeamIds = new Set(userTeams.map(t => t.teamId))
-  const govTeamCount = allTeams.filter(t => {
+  const govTeams = allTeams.filter(t => {
     if (memberTeamIds.has(t.id)) return false
     const access = teamAccessLevel({ isMember: false, isGovernanceAdmin, adminAccess: t.admin_access })
     return access === "gov-view" || access === "gov-write"
-  }).length
+  })
+  const govTeamCount = govTeams.length
+  // Teams shown in the Receipts workspace sidebar: member teams OR governed teams.
+  const receiptsTeams = [
+    ...userTeams.map(t => ({ id: t.teamId, name: t.teamName })),
+    ...govTeams.map(t => ({ id: t.id, name: t.name })),
+  ]
 
   // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
   // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
@@ -245,10 +264,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
   )
 
+  // Receipts sentinel active → its sidebar lists the user's member/governed teams.
+  const isReceiptsActive = activeTab === "plan" && isDesktop && activeTeamId === "receipts"
+
   // Plan context sidebar — replaces the flat team list when student org or DGL is active.
   // The section-nav components only need activeSection/onSectionChange (not the member object),
   // so these render for gov-entered teams too — no `&& activeUserTeamForPlan` guard.
-  const planContextContent = isStudentOrgActive ? (
+  const planContextContent = isReceiptsActive ? (
+    <ReceiptsSidebarNav
+      teams={receiptsTeams}
+      active={activeReceiptsTeamId}
+      onSelect={handleReceiptsTeamChange}
+    />
+  ) : isStudentOrgActive ? (
     <StudentOrgSectionNav
       activeSection={studentOrgSection}
       onSectionChange={handleStudentOrgSectionChange}
@@ -281,6 +309,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                               ? ["Central", "Finance", financeLabels[financeSection] ?? financeSection]
                               : ["Central", "Finance"]
       case "plan": {
+        if (activeTeamId === "receipts") return ["Central", "Planning", "Receipts"]
         if (!activeTeamId || !activeTeamNameForPlan) return ["Central", "Planning"]
         if (isStudentOrgActive && studentOrgPlanningEvent) {
           return ["Central", "Planning", activeTeamNameForPlan, studentOrgPlanningEvent.title]
@@ -356,6 +385,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
     setUserTeams(teams)
     setActiveTeamId((prev) => {
+      // The Receipts sentinel is not a real team — never reconcile it away on refresh.
+      if (prev === "receipts") return prev
       // Keep a valid existing selection; otherwise apply three-way routing
       if (prev && teams.some((t) => t.teamId === prev)) return prev
       return teams.length === 1 ? teams[0].teamId : null
@@ -601,7 +632,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(isStudentOrgActive || isDGLActive) && activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
+            right={activeTeamId === "receipts" ? (
+              <button
+                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ← Planning
+              </button>
+            ) : (isStudentOrgActive || isDGLActive) && activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
                 style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
@@ -732,6 +770,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onStudentOrgCalEventsChange={setStudentOrgCalEvents}
                 sglSection={sglSection}
                 onSglSectionChange={handleSglSectionChange}
+                activeReceiptsTeamId={activeReceiptsTeamId}
+                onReceiptsTeamChange={handleReceiptsTeamChange}
               />
             </div>
           )}

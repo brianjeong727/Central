@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Wallet, Receipt } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { getInitials } from "../utils"
@@ -135,6 +135,12 @@ export function DesktopSidebar({
               )
             })
           )}
+          {/* Receipts workspace — always reachable from the team list (sentinel). */}
+          <div style={{ height: 1, background: LINE, opacity: 0.5, margin: "6px 10px" }} />
+          <button onClick={() => onActiveTeamChange("receipts")} style={subItemStyle(activeTeamId === "receipts")}>
+            <Receipt className="w-3.5 h-3.5" style={{ marginRight: 8, flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>Receipts</span>
+          </button>
         </div>
       )
     }
@@ -359,5 +365,32 @@ export function DesktopSidebar({
 
       </div>}
     </>
+  )
+}
+
+// ── ReceiptsSidebarNav ──────────────────────────────────────────────────────
+// Context-panel team list for the Receipts workspace. Lists the teams the user is
+// a member of OR governs; selecting one writes ?rteam. Replaces the flat plan team
+// list when the Receipts sentinel is active.
+export function ReceiptsSidebarNav({
+  teams, active, onSelect,
+}: {
+  teams: { id: string; name: string }[]
+  active: string | null
+  onSelect: (id: string) => void
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto px-2 pb-3">
+      <p style={{ ...MONO, padding: "8px 8px 6px" }}>Your teams · {teams.length}</p>
+      {teams.length === 0 ? (
+        <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px" }}>No teams yet</p>
+      ) : (
+        teams.map((t) => (
+          <button key={t.id} onClick={() => onSelect(t.id)} style={sidebarItemStyle(t.id === active)}>
+            <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+          </button>
+        ))
+      )}
+    </div>
   )
 }
