@@ -47,6 +47,7 @@ import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
+import { classifyTeam } from "../team-type"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -1922,7 +1923,6 @@ export function PlanTab({
   }
 
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
-  const activeTeamLabel = activeTeamName.toLowerCase()
   const activeTeamPerms = activeUserTeam?.permissions ?? []
 
   // The active team object — from membership if a member, else from allTeams
@@ -1940,9 +1940,11 @@ export function PlanTab({
   const govWrite = activeTeamAccess === "gov-write"
   const govView = activeTeamAccess === "gov-view"
 
-  // Finance is an exact team_type — checked before the perm-based detectors below
-  // (a finance team carries can_view_finances, which would otherwise trip isStudentOrgBoard).
-  const isFinanceTeam = activeTeamFull?.team_type === 'finance'
+  // Single classifier — team_type + name only, no permission probes. See
+  // app/home/team-type.ts for precedence and rationale. This is the only thing
+  // that decides which workspace renders for the active team.
+  const teamKind = classifyTeam(activeTeamFull)
+
   // Finance write = member with can_view_finances OR governance-write. Read-only under gov-view.
   const financeCanEdit = activeTeamPerms.includes("can_view_finances") || govWrite
   const financeCanAccess = financeCanEdit || govView
@@ -1952,20 +1954,10 @@ export function PlanTab({
     { key: "allocation", label: "Allocation" },
   ]
 
-  const isStudentOrgBoard = !isFinanceTeam && (/\b(student org|board|leadership|officer)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_plan_events", "can_view_finances", "can_manage_members"].includes(p)))
-  const studentOrgRole = (isStudentOrgBoard ? activeUserTeam?.roleName : undefined) ?? ""
+  const studentOrgRole = (teamKind === "studentOrg" ? activeUserTeam?.roleName : undefined) ?? ""
   const canEditStudentOrg = activeTeamPerms.includes("can_plan_events") || govWrite
 
-  // Tech Team detected by name first — before isPraiseTeam — to avoid permission overlap
-  // (Tech Team shares can_view_worship_set / can_generate_slides with praise team members)
-  // Under gov-view, activeTeamPerms is empty (non-member), so fall back to the name match plus
-  // the governance-admin flag so a Tech team still renders TechTeamTab (read-only) rather than the
-  // calendar fallback.
-  const isTechTeam = /\btech\b/i.test(activeTeamLabel)
-    && (activeTeamPerms.some(p => ["can_view_worship_set", "can_generate_slides"].includes(p)) || isGovernanceAdmin)
-
-  const isPraiseTeam = !isTechTeam && (/\b(praise|worship)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_schedule"].includes(p)))
-  const praiseTeamPerms = isPraiseTeam ? activeTeamPerms : []
+  const praiseTeamPerms = teamKind === "praise" ? activeTeamPerms : []
   const canManageWorship = praiseTeamPerms.includes("can_manage_worship_set") || govWrite
   const canManageSchedule = praiseTeamPerms.includes("can_manage_schedule") || govWrite
 
@@ -1974,11 +1966,7 @@ export function PlanTab({
   // open settings only when the team grants them view or write (matrix ≠ none).
   const canOpenTeamSettings = isActiveTeamPresident || activeTeamAccess === "gov-view" || activeTeamAccess === "gov-write"
 
-  const isDGLTeam = /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabel) || activeTeamPerms.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
-  const isDGLPresident = isDGLTeam && (isActiveTeamPresident || govWrite)
-
-  const isDgPraiseTeam = activeTeamFull?.team_type === 'dg_praise'
-  const isOneTimeTeam = activeTeamFull?.team_type === 'one_time'
+  const isDGLPresident = teamKind === "dgl" && (isActiveTeamPresident || govWrite)
   // isPraiseTeamMember: used for CreateTeamOverlay visibility
   const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
@@ -2046,7 +2034,7 @@ export function PlanTab({
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
         {/* Page header — hidden for student org board, DGL team (both use section-level headers),
             the no-team picker screen, and the Receipts sentinel (ReceiptsWorkspace owns its own header) */}
-        {activeTeamId && activeTeamId !== "receipts" && !isStudentOrgBoard && !isDGLTeam && (
+        {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && (
           <TabPageHeader>
             <PageTitle
               eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
@@ -2243,7 +2231,7 @@ export function PlanTab({
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
           />
-        ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
+        ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
           /* Desktop: section nav lives in the sidebar (FinanceSectionNav) — no content strip here */
           <div className="px-5 md:px-14 py-7">
             <FinanceWorkspace
@@ -2258,7 +2246,7 @@ export function PlanTab({
               readOnly={govView}
             />
           </div>
-        ) : isDgPraiseTeam && activeTeamId ? (
+        ) : teamKind === "dgPraise" && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
               teamId={activeTeamId}
@@ -2267,7 +2255,7 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : isOneTimeTeam && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId ? (
           <div className="px-14 py-7">
             <OneTimeTeamTab
               teamId={activeTeamId}
@@ -2276,11 +2264,11 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : isTechTeam ? (
+        ) : teamKind === "tech" ? (
           <div className="px-14 py-7">
             <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
           </div>
-        ) : isPraiseTeam && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2288,7 +2276,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : isStudentOrgBoard ? (
+        ) : teamKind === "studentOrg" ? (
           <StudentOrgTeamHome
               teamId={activeTeamId}
               teamName={activeTeamName}
@@ -2309,7 +2297,7 @@ export function PlanTab({
               onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
               onEditEvent={() => setShowEditEvent(true)}
             />
-        ) : isDGLTeam && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId ? (
           <SmallGroupLeadersTab
               teamId={activeTeamId}
               ministryId={ministryId}
@@ -2367,7 +2355,7 @@ export function PlanTab({
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
           />
-        ) : isFinanceTeam && activeTeamId && financeCanAccess ? (
+        ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
           <div>
             <div style={{ marginBottom: 16 }}>
               <PlanSubTabStrip
@@ -2388,23 +2376,23 @@ export function PlanTab({
               readOnly={govView}
             />
           </div>
-        ) : isDgPraiseTeam && activeTeamId ? (
+        ) : teamKind === "dgPraise" && activeTeamId ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : isOneTimeTeam && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId ? (
           <OneTimeTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : isTechTeam ? (
+        ) : teamKind === "tech" ? (
           <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
-        ) : isPraiseTeam && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2412,7 +2400,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : isStudentOrgBoard ? (
+        ) : teamKind === "studentOrg" ? (
           <StudentOrgTeamHome
             teamId={activeTeamId}
             teamName={activeTeamName}
@@ -2428,7 +2416,7 @@ export function PlanTab({
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
           />
-        ) : isDGLTeam && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId ? (
           <SmallGroupLeadersTab
             teamId={activeTeamId}
             ministryId={ministryId}

@@ -11,6 +11,7 @@ import type { ChatPreview } from "@/components/ui/chats-section"
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
+import { classifyTeam } from "./team-type"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -242,20 +243,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const activeUserTeamForPlan = userTeams.find(t => t.teamId === activeTeamId)
   const activeAllTeamForPlan = allTeams.find(t => t.id === activeTeamId)
   const activeTeamNameForPlan = activeUserTeamForPlan?.teamName ?? activeAllTeamForPlan?.name ?? ""
-  const activeTeamLabelForPlan = activeTeamNameForPlan.toLowerCase()
-  const activeTeamPermsForPlan = activeUserTeamForPlan?.permissions ?? []
-  // Finance is an exact team_type — checked first so a finance team (which carries
-  // can_view_finances) can never be misdetected as the Student Org Board. Resolve from
-  // allTeams since UserTeam may not carry team_type for gov-entered teams.
-  const isFinanceActive = activeTab === "plan" && isDesktop && activeAllTeamForPlan?.team_type === "finance"
-  const isStudentOrgActive = activeTab === "plan" && isDesktop && !isFinanceActive && (
-    /\b(student org|board|leadership|officer)\b/.test(activeTeamLabelForPlan) ||
-    activeTeamPermsForPlan.some(p => ["can_plan_events", "can_manage_members"].includes(p))
+  // Single classifier — team_type + name only, no permission probes (see
+  // app/home/team-type.ts). Resolve from allTeams (carries team_type even for
+  // gov-entered teams), falling back to the UserTeam name when not in allTeams.
+  const planTeamKind = classifyTeam(
+    activeAllTeamForPlan ?? (activeTeamNameForPlan ? { name: activeTeamNameForPlan } : null)
   )
-  const isDGLActive = activeTab === "plan" && isDesktop && !isFinanceActive && !isStudentOrgActive && (
-    /\b(dgl|small group|discipleship|sg)\b/.test(activeTeamLabelForPlan) ||
-    activeTeamPermsForPlan.some(p => ["can_create_dgs", "can_view_dgs"].includes(p))
-  )
+  const isPlanDesktopTeam = activeTab === "plan" && isDesktop
+  const isFinanceActive = isPlanDesktopTeam && planTeamKind === "finance"
+  const isStudentOrgActive = isPlanDesktopTeam && planTeamKind === "studentOrg"
+  const isDGLActive = isPlanDesktopTeam && planTeamKind === "dgl"
 
   // Receipts sentinel active → its sidebar lists the user's member/governed teams.
   const isReceiptsActive = activeTab === "plan" && isDesktop && activeTeamId === "receipts"
