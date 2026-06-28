@@ -305,6 +305,23 @@
   .content-enter { animation: none; opacity: 1; transform: none; }
 }
 
+/* ── Plan team Settings / Create-team overlays ──────────────────────────────
+   These overlays are portaled to <body> (so position:fixed is viewport-relative,
+   escaping the transformed .content-enter tab wrapper). Mobile keeps the
+   full-screen 390px column from Tailwind classes; on md+ the overlay is pinned
+   from the shell offset to the right viewport edge, filling the content body. */
+@media (min-width: 768px) {
+  .team-overlay-desktop {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--shell-offset);
+    max-width: none;
+    margin: 0;
+    background: var(--cream);
+  }
+}
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }

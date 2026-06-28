@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
@@ -9051,6 +9052,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   onCreated: (teamId: string) => void
 }) {
   const supabase = createClient()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const [step, setStep] = useState<CreateStep>("preset")
   const [selectedTeamType, setSelectedTeamType] = useState<'standard' | 'dg_praise' | 'one_time' | 'finance'>('standard')
   const [teamName, setTeamName] = useState("")
@@ -9207,8 +9210,8 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
   const STEPS = ["Choose a shape", "Customize", "Invite"]
   const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
-  return (
-    <AnimateIn className="fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto md:left-[var(--shell-offset)] md:right-0 md:max-w-none md:mx-0 md:bg-[var(--cream)]">
+  const overlay = (
+    <AnimateIn className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-14 border-b border-[var(--line)] bg-[#FBF8F2] md:bg-[var(--cream)]">
         <button
@@ -9601,6 +9604,9 @@ export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPrais
       </div>
     </AnimateIn>
   )
+
+  if (!mounted) return null
+  return createPortal(overlay, document.body)
 }
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
@@ -9618,6 +9624,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   onOpenChat?: (id: string, name: string) => void
 }) {
   const supabase = createClient()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const [roles, setRoles] = useState<TeamRole[]>([])
   const [savedPerms, setSavedPerms] = useState<Record<string, string[]>>({})
   const [savingPerms, setSavingPerms] = useState(false)
@@ -10208,8 +10216,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     </div>
   )
 
-  return (
-    <AnimateIn className="fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto md:left-[var(--shell-offset)] md:right-0 md:max-w-none md:mx-0 md:bg-[var(--cream)]">
+  const overlay = (
+    <AnimateIn className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
 
       {/* ── Mobile header ── */}
       <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[var(--line)] bg-[#FBF8F2]">
@@ -10848,6 +10856,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
     </AnimateIn>
   )
+
+  if (!mounted) return null
+  return createPortal(overlay, document.body)
 }
 
 // ── QuickCreateTeamModal — 3-step design-system-aligned wizard ────────────────
