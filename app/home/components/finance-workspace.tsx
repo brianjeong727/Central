@@ -1,15 +1,20 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { createClient } from "@/lib/supabase"
 import {
-  Plus, X,
+  Plus, X, ArrowLeft,
   Upload, Download, DollarSign, AlertTriangle, ChevronRight,
   ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, HeaderActionButton } from "./shared"
 import { MonogramChip } from "@/components/central"
-import { submitReceipt, getReceiptLimits, getSubmittedReceipts, updateReceiptStatus, type SubmittedReceipt } from "@/app/actions/receipts"
+import {
+  submitReceipt, getReceiptLimits,
+  getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
+  type InboxReceipt,
+} from "@/app/actions/receipts"
 import {
   getDGDinnerForms, getOtherForms, createOtherForm,
   saveFormDraft, submitReimbursementForm,
@@ -733,119 +738,365 @@ function ReimbursementCard({
   )
 }
 
-// ── Submitted receipts queue ─────────────────────────────────────────────────────
-// Treasurer's view of standalone receipts (no linked reimbursement form) submitted
-// by any team member. Pending first, then newest. Actions gated to the treasurer
-// (canManage); under gov-view it renders read-only (no action buttons).
+// ── Reimbursement inbox ──────────────────────────────────────────────────────────
+// The one processing surface for the two-step treasurer → president workflow:
+//   pending → approved (treasurer) → reimbursed (president), with rejected /
+//   declined as terminal off-ramps. A Needs-action / All toggle over one
+//   chronological list of compact one-line rows; clicking a row opens an immersive
+//   detail with role-gated actions. Under gov-view (readOnly) the list renders but
+//   no action buttons show.
 
-function SubmittedReceiptRow({
-  receipt: r, canManage, onUpdateStatus, divider,
-}: {
-  receipt: SubmittedReceipt
-  canManage: boolean
-  onUpdateStatus: (id: string, status: string) => void
-  divider: boolean
-}) {
-  const m = STATUS_META[r.status] ?? STATUS_META.pending
-  const purchase = r.purchase_date
-    ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : "—"
-  const detail = [r.event_name, r.notes].filter(Boolean).join(" — ")
+const FUND_LABELS: Record<string, string> = { church: "Church", cmu: "CMU", pitt: "Pitt", other: "Other" }
+function fundLabel(f?: string) { return f ? (FUND_LABELS[f.toLowerCase()] ?? f) : "" }
 
-  const actionBtn: React.CSSProperties = {
-    padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
-    cursor: "pointer", fontFamily: "var(--sans)", border: "none",
-  }
-
+function FinanceStatusPill({ status }: { status: string }) {
+  const m = STATUS_META[status] ?? STATUS_META.pending
   return (
-    <div style={{ borderTop: divider ? "1px solid var(--line-3)" : "none", padding: "16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
-      {/* Thumbnail */}
-      {r.receipt_image_url ? (
-        <a href={r.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, width: 56, height: 56, borderRadius: 10, overflow: "hidden", border: "1px solid var(--line)", display: "block" }}>
-          <img src={r.receipt_image_url} alt="Receipt" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        </a>
-      ) : (
-        <div style={{ flexShrink: 0, width: 56, height: 56, borderRadius: 10, background: "var(--body-bg)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ImageIcon size={18} color="var(--muted-text)" />
-        </div>
-      )}
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
+      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
+    }}>
+      {m.label}
+    </span>
+  )
+}
 
-      {/* Main */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{r.submitted_by_name ?? "Unknown"}</span>
-          {r.team_name && <span style={{ fontSize: 13, color: "var(--muted-text)" }}>· {r.team_name}</span>}
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "var(--serif)", fontSize: 20, letterSpacing: -0.2, color: "var(--ink)" }}>${Number(r.amount).toFixed(2)}</span>
-          <span style={{ fontSize: 12.5, color: "var(--body)" }}>{r.category}{r.fund ? ` · ${r.fund}` : ""}</span>
-          <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{purchase}</span>
-        </div>
-        {detail && <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.5 }}>{detail}</p>}
-        {canManage && (
-          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            {r.status !== "approved" && (
-              <button onClick={() => onUpdateStatus(r.id, "approved")} style={{ ...actionBtn, background: "var(--plum)", color: "var(--cream)" }}>Approve</button>
-            )}
-            {r.status !== "rejected" && (
-              <button onClick={() => onUpdateStatus(r.id, "rejected")} style={{ ...actionBtn, background: "var(--ivory)", color: "var(--danger)", border: "1px solid var(--line)" }}>Reject</button>
-            )}
-            {r.status !== "reimbursed" && (
-              <button onClick={() => onUpdateStatus(r.id, "reimbursed")} style={{ ...actionBtn, background: "var(--ivory)", color: "var(--plum)", border: "1px solid var(--line)" }}>Mark reimbursed</button>
-            )}
-          </div>
+function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first: boolean; onClick: () => void }) {
+  const meta = [r.team_name, r.category_name ?? r.category].filter(Boolean).join(" · ")
+  return (
+    <button
+      onClick={onClick}
+      className="hover:bg-[#F4F1E8] transition-colors"
+      style={{
+        display: "flex", alignItems: "center", gap: 12, width: "100%",
+        padding: "11px 16px", background: "transparent", border: "none",
+        borderTop: first ? "none" : "1px solid var(--line)", cursor: "pointer", textAlign: "left",
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {r.submitted_by_name ?? "Unknown"}
+        </span>
+        {meta && (
+          <span style={{ fontSize: 12.5, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {meta}
+          </span>
         )}
       </div>
-
-      {/* Status pill */}
-      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 10px", borderRadius: 999, background: m.bg, color: m.text, whiteSpace: "nowrap" }}>
-        {m.label}
+      <span style={{ fontSize: 13, color: "var(--body)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+        ${Number(r.amount).toFixed(2)}
       </span>
+      <FinanceStatusPill status={r.status} />
+    </button>
+  )
+}
+
+function InboxEmpty({ title }: { title: string }) {
+  return (
+    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
+      <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{title}</div>
     </div>
   )
 }
 
-function SubmittedReceiptsQueue({
-  receipts, loading, canManage, onUpdateStatus,
+type InboxFilter = "needs" | "all"
+
+function ReimbursementInbox({
+  ministryId, items, loading, canApprove, canSignOff, readOnly, onRefetch,
 }: {
-  receipts: SubmittedReceipt[]
+  ministryId: string
+  items: InboxReceipt[]
   loading: boolean
-  canManage: boolean
-  onUpdateStatus: (id: string, status: string) => void
+  canApprove: boolean
+  canSignOff: boolean
+  readOnly: boolean
+  onRefetch: () => void
 }) {
-  const sorted = [...receipts].sort((a, b) => {
-    const ap = a.status === "pending" ? 0 : 1
-    const bp = b.status === "pending" ? 0 : 1
-    if (ap !== bp) return ap - bp
-    return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
-  })
+  const [filter, setFilter] = useState<InboxFilter>("needs")
+  const [detail, setDetail] = useState<InboxReceipt | null>(null)
+
+  // Action capabilities the UI actually exposes — gov-view suppresses every action.
+  const uiCanApprove = canApprove && !readOnly
+  const uiCanSignOff = canSignOff && !readOnly
+
+  const needsAction = items.filter(r =>
+    (uiCanApprove && r.status === "pending") || (uiCanSignOff && r.status === "approved")
+  )
+  const shown = filter === "needs" ? needsAction : items
+
+  const segBtn = (key: InboxFilter, label: string, count: number) => {
+    const active = filter === key
+    return (
+      <button
+        onClick={() => setFilter(key)}
+        style={{
+          padding: "5px 12px", borderRadius: 999, border: "none", cursor: "pointer",
+          fontSize: 12.5, fontWeight: active ? 500 : 400, fontFamily: "var(--sans)",
+          background: active ? "var(--cream)" : "transparent",
+          color: active ? "var(--ink)" : "var(--muted-text)",
+          boxShadow: active ? "0 0 0 1px var(--line)" : "none",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}{count > 0 ? ` · ${count}` : ""}
+      </button>
+    )
+  }
 
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
-        <div style={EYEBROW_STYLE}>{`SUBMITTED RECEIPTS · ${receipts.length}`}</div>
-        <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
-          Receipts from teams
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
+        <div>
+          <div style={EYEBROW_STYLE}>{`REIMBURSEMENT INBOX · ${items.length}`}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
+            Receipts from teams
+          </div>
+          <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
+            Review, approve, and sign off on receipts submitted by team members.
+          </div>
         </div>
-        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
-          Standalone receipts submitted by team members for your review.
+        <div style={{ display: "inline-flex", gap: 2, padding: 3, borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", flexShrink: 0 }}>
+          {segBtn("needs", "Needs action", needsAction.length)}
+          {segBtn("all", "All", 0)}
         </div>
       </div>
 
-      {loading ? <Spinner /> : sorted.length === 0 ? (
-        <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>No submitted receipts</div>
-          <div style={{ fontSize: 13, color: "var(--muted-text)", maxWidth: 360, lineHeight: 1.5 }}>Receipts submitted by team members will appear here for your review.</div>
-        </div>
+      {loading ? <Spinner /> : shown.length === 0 ? (
+        <InboxEmpty title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"} />
       ) : (
         <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden", background: "var(--cream)" }}>
-          {sorted.map((r, i) => (
-            <SubmittedReceiptRow key={r.id} receipt={r} canManage={canManage} onUpdateStatus={onUpdateStatus} divider={i > 0} />
+          {shown.map((r, i) => (
+            <InboxRow key={r.id} receipt={r} first={i === 0} onClick={() => setDetail(r)} />
           ))}
+        </div>
+      )}
+
+      {detail && (
+        <InboxDetailOverlay
+          receipt={detail}
+          ministryId={ministryId}
+          canApprove={uiCanApprove}
+          canSignOff={uiCanSignOff}
+          onClose={() => setDetail(null)}
+          onActed={() => { setDetail(null); onRefetch() }}
+        />
+      )}
+    </div>
+  )
+}
+
+function InboxDetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 4px" }}>{label}</p>
+      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>{value}</p>
+    </div>
+  )
+}
+
+const INBOX_STATUS_STEPS = ["Submitted", "Approved", "Reimbursed"] as const
+
+function InboxDetailOverlay({
+  receipt: r, ministryId, canApprove, canSignOff, onClose, onActed,
+}: {
+  receipt: InboxReceipt
+  ministryId: string
+  canApprove: boolean
+  canSignOff: boolean
+  onClose: () => void
+  onActed: () => void
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  const [mode, setMode] = useState<"idle" | "reject" | "decline">("idle")
+  const [reason, setReason] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const isNegative = r.status === "rejected" || r.status === "declined"
+  const reachedIndex = r.status === "reimbursed" ? 2 : r.status === "approved" ? 1 : 0
+
+  const submitterName = r.submitted_by_name ?? "Unknown"
+  const initials = (() => {
+    const parts = submitterName.trim().split(" ")
+    return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
+  })()
+
+  const showApprove = r.status === "pending" && canApprove
+  const showSignOff = r.status === "approved" && canSignOff
+  const hasFooter = showApprove || showSignOff
+
+  async function run(fn: () => Promise<{ error: string | null }>) {
+    setBusy(true); setError(null)
+    const { error: err } = await fn()
+    if (err) { setError(err); setBusy(false); return }
+    onActed()
+  }
+
+  const primaryBtn: React.CSSProperties = {
+    flex: 1, height: 44, background: "var(--plum)", color: "var(--cream)", borderRadius: 12,
+    border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--sans)",
+  }
+  const secondaryBtn: React.CSSProperties = {
+    flex: 1, height: 44, background: "var(--ivory)", color: "var(--danger)", borderRadius: 12,
+    border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
+  }
+
+  const overlay = (
+    <div className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 pt-12 md:pt-5 pb-3.5 border-b border-[var(--line)]">
+        <button
+          onClick={onClose}
+          className="hover:bg-[#F2EDE0] transition-colors"
+          style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ivory)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+        >
+          <ArrowLeft size={16} color="var(--ink)" />
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Reimbursement</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {r.event_name || r.category_name || r.category || "Receipt"}
+          </p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "22px 20px 40px" }}>
+        {/* Amount + status */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
+            ${Number(r.amount).toFixed(2)}
+          </p>
+          <div style={{ marginTop: 6 }}><FinanceStatusPill status={r.status} /></div>
+        </div>
+
+        {/* Status path */}
+        {isNegative ? (
+          <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>
+              {STATUS_META[r.status]?.label ?? "Declined"}
+            </p>
+            {r.decision_reason && (
+              <p style={{ fontSize: 13, color: "var(--body)", margin: "6px 0 0", lineHeight: 1.5 }}>{r.decision_reason}</p>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+            {INBOX_STATUS_STEPS.map((step, i) => {
+              const done = i <= reachedIndex
+              return (
+                <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < INBOX_STATUS_STEPS.length - 1 ? 1 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                  </div>
+                  {i < INBOX_STATUS_STEPS.length - 1 && (
+                    <span style={{ flex: 1, height: 1, background: i < reachedIndex ? "var(--plum)" : "var(--line)" }} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Details */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+          <InboxDetailRow label="Fund" value={fundLabel(r.fund) || "—"} />
+          <InboxDetailRow label="Purchase date" value={r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"} />
+          <InboxDetailRow label="Category" value={r.category_name ?? r.category ?? "—"} />
+          <InboxDetailRow label="Team" value={r.team_name || "—"} />
+        </div>
+
+        <div style={{ marginBottom: 22 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>Submitted by</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MonogramChip initials={initials} style={{ width: 24, height: 24, fontSize: 9, fontWeight: 600 }} />
+            <span style={{ fontSize: 14, color: "var(--ink)" }}>{submitterName}</span>
+          </div>
+        </div>
+
+        {r.notes && (
+          <div style={{ marginBottom: 22 }}>
+            <InboxDetailRow label="Notes" value={r.notes} />
+          </div>
+        )}
+
+        {/* Receipt image */}
+        <div>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>Receipt image</p>
+          {r.receipt_image_url ? (
+            <a href={r.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--line)", maxWidth: 280 }}>
+              <img src={r.receipt_image_url} alt="Receipt" style={{ width: "100%", display: "block", objectFit: "cover" }} />
+            </a>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", border: "1px dashed var(--dashed)", borderRadius: 12, color: "var(--muted-text)" }}>
+              <ImageIcon size={16} />
+              <span style={{ fontSize: 13 }}>No image attached</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Action footer — role-gated */}
+      {hasFooter && (
+        <div style={{ padding: "14px 20px 24px", borderTop: "1px solid var(--line)", background: "var(--cream)" }}>
+          {error && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "0 0 10px" }}>{error}</p>}
+
+          {mode === "reject" || mode === "decline" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <textarea
+                autoFocus
+                placeholder={`Reason for ${mode === "reject" ? "rejecting" : "declining"} (optional)`}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                rows={2}
+                style={{ ...inputStyle, resize: "none" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 44, background: "var(--ivory)", color: "var(--body)", borderRadius: 12, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => run(() => mode === "reject"
+                    ? rejectReceipt(r.id, ministryId, reason)
+                    : declineReceipt(r.id, ministryId, reason))}
+                  disabled={busy}
+                  style={{ ...secondaryBtn, opacity: busy ? 0.6 : 1 }}
+                >
+                  {busy ? "Saving…" : mode === "reject" ? "Reject" : "Decline"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              {showApprove && (
+                <>
+                  <button onClick={() => setMode("reject")} disabled={busy} style={secondaryBtn}>Reject</button>
+                  <button onClick={() => run(() => approveReceipt(r.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
+                    {busy ? "Approving…" : "Approve"}
+                  </button>
+                </>
+              )}
+              {showSignOff && (
+                <>
+                  <button onClick={() => setMode("decline")} disabled={busy} style={secondaryBtn}>Decline</button>
+                  <button onClick={() => run(() => signOffReceipt(r.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
+                    {busy ? "Signing off…" : "Sign off"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
+
+  if (!mounted) return null
+  return createPortal(overlay, document.body)
 }
 
 // ── FinanceWorkspace ────────────────────────────────────────────────────────────
@@ -888,9 +1139,12 @@ export function FinanceWorkspace({
   const [creatingOther, setCreatingOther] = useState(false)
   const [showSubmitReceiptModal, setShowSubmitReceiptModal] = useState(false)
 
-  // Treasurer queue of standalone (form-less) submitted receipts
-  const [submittedReceipts, setSubmittedReceipts] = useState<SubmittedReceipt[]>([])
-  const [submittedReceiptsLoading, setSubmittedReceiptsLoading] = useState(false)
+  // Reimbursement inbox — all standalone submitted receipts + this caller's
+  // finance capability (treasurer can approve, president can sign off).
+  const [inboxItems, setInboxItems] = useState<InboxReceipt[]>([])
+  const [inboxCanApprove, setInboxCanApprove] = useState(false)
+  const [inboxCanSignOff, setInboxCanSignOff] = useState(false)
+  const [inboxLoading, setInboxLoading] = useState(false)
 
   // Dynamic categories (DG Dinner permanent + calendar events + custom)
   const [calEventCategories, setCalEventCategories] = useState<string[]>([])
@@ -977,26 +1231,22 @@ export function FinanceWorkspace({
     setReimburseLoading(false)
   }, [ministryId, supabase])
 
-  // Queue visible to the treasurer (canManage) and to gov-view (readOnly) read-only.
+  // Inbox visible to the treasurer (canManage) and to gov-view (readOnly) read-only.
+  // The server re-derives the real finance capability; this only gates the fetch.
   const canSeeReceiptQueue = canManage || readOnly
 
-  const loadSubmittedReceipts = useCallback(async () => {
+  const loadInbox = useCallback(async () => {
     if (!canSeeReceiptQueue) return
-    setSubmittedReceiptsLoading(true)
-    const { data } = await getSubmittedReceipts(ministryId)
-    setSubmittedReceipts(data)
-    setSubmittedReceiptsLoading(false)
+    setInboxLoading(true)
+    const { items, canApprove, canSignOff } = await getReimbursementInbox(ministryId)
+    setInboxItems(items)
+    setInboxCanApprove(canApprove)
+    setInboxCanSignOff(canSignOff)
+    setInboxLoading(false)
   }, [ministryId, canSeeReceiptQueue])
 
-  async function handleUpdateReceiptStatus(receiptId: string, status: string) {
-    // Optimistic update, then refetch to stay in sync.
-    setSubmittedReceipts(prev => prev.map(r => r.id === receiptId ? { ...r, status } : r))
-    await updateReceiptStatus({ receiptId, status })
-    loadSubmittedReceipts()
-  }
-
   useEffect(() => {
-    if (section === "reimbursements") { loadReimbursements(); loadSubmittedReceipts() }
+    if (section === "reimbursements") { loadReimbursements(); loadInbox() }
     else if (section === "budget") loadBudget()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section])
@@ -1073,13 +1323,16 @@ export function FinanceWorkspace({
       {/* ── Reimbursements ── */}
       {section === "reimbursements" && reimbAccess && (
         <div style={{ display: "flex", flexDirection: "column", gap: 48 }}>
-          {/* SUBMITTED RECEIPTS — treasurer queue (read-only under gov-view) */}
+          {/* REIMBURSEMENT INBOX — treasurer/president (read-only under gov-view) */}
           {canSeeReceiptQueue && (
-            <SubmittedReceiptsQueue
-              receipts={submittedReceipts}
-              loading={submittedReceiptsLoading}
-              canManage={canManage}
-              onUpdateStatus={handleUpdateReceiptStatus}
+            <ReimbursementInbox
+              ministryId={ministryId}
+              items={inboxItems}
+              loading={inboxLoading}
+              canApprove={inboxCanApprove}
+              canSignOff={inboxCanSignOff}
+              readOnly={readOnly}
+              onRefetch={loadInbox}
             />
           )}
 
@@ -1296,7 +1549,7 @@ export function FinanceWorkspace({
           limits={limits}
           categories={dynamicCategories}
           onClose={() => setShowSubmitReceiptModal(false)}
-          onSubmitted={() => {}}
+          onSubmitted={() => { loadInbox() }}
         />
       )}
     </>
