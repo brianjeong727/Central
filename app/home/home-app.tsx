@@ -630,7 +630,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
               >
                 ← Planning
               </button>
-            ) : (isStudentOrgActive || isDGLActive) && activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
+            ) : activeTeamId && (userTeams.length > 1 || govTeamCount > 0) ? (
+              /* Team-agnostic: ANY team workspace (the receipts sentinel is handled
+                 above) gets the back-to-picker button — don't gate on a per-type flag
+                 or new team types (finance, etc.) silently lose their way back. */
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
                 style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
