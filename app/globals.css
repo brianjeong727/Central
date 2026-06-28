@@ -305,6 +305,25 @@
   .content-enter { animation: none; opacity: 1; transform: none; }
 }
 
+/* ── Central button system: hover + press states ────────────────────────────
+   Roles are styled inline by CentralButton; the interactive feel (hover tint,
+   press scale) lives here keyed on data-variant so every button feels designed
+   without per-call-site state. */
+.central-btn {
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+}
+.central-btn:not(:disabled):active { transform: scale(0.98); }
+.central-btn[data-variant="primary"]:not(:disabled):hover { filter: brightness(1.12); }
+.central-btn[data-variant="danger-solid"]:not(:disabled):hover { filter: brightness(1.1); }
+.central-btn[data-variant="secondary"]:not(:disabled):hover { background: var(--ivory); }
+.central-btn[data-variant="create"]:not(:disabled):hover { background: var(--cream-2); }
+.central-btn[data-variant="destructive"]:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.central-btn[data-variant="quiet"]:not(:disabled):hover { filter: brightness(1.15); }
+
+.central-icon-btn { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.central-icon-btn:not(:disabled):hover { background: var(--ivory); color: var(--ink); }
+.central-icon-btn:not(:disabled):active { transform: scale(0.94); }
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }

@@ -1,6 +1,6 @@
 export { CentralCard } from "./card"
 export { SectionHeader } from "./section-header"
-export { CentralButton } from "./button"
+export { CentralButton, IconButton } from "./button"
 export { UpNextCard } from "./up-next-card"
 export type { UpNextEventDetail } from "./up-next-card"
 export { HomeHeroCarousel, HeroFrame, HeroSectionLabel } from "./home-hero-carousel"
