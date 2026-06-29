@@ -77,3 +77,41 @@
 - Reduced decorative gold usage across home, announcements, chat info, profile, pending, and plan surfaces while preserving gold for notification badges.
 - Made Plan/Praise Team and church-chat eligibility less brittle by recognizing permissions and common team names, not exact strings only.
 - Verification: `npm run lint` exits 0 with 65 warnings; `npm run build` passes; local landing page rendered at `http://localhost:3000/` and exposed the updated concrete H1/copy in browser DOM.
+
+# Navigation Persistence System
+
+Goal: make reload-restoration and nav-click behavior a consistent, enforced SYSTEM instead of per-tab hand-rolling.
+
+## The three rules
+1. **Browse/read state persists** (URL): top-level tab, every subtab, and every "what am I viewing" selection (open chat, open announcement, selected member/team/section/event, congregation/form responses, journal subtab). Reload restores exactly.
+2. **Create/edit/settings surfaces are ephemeral** (plain state, never URL): compose announcement, plan team settings, congregation create form, journal entry editor, chat settings, create-chat, form fill. Reload drops you back to the underlying browse view; unsaved work gone.
+3. **Clicking the ACTIVE top-level nav resets that tab to its landing** (clears its subtabs + selection + overlays). Switching to a DIFFERENT tab RESUMES its last sub-state (decided 2026-06-29).
+
+## Architecture
+- Single shared nav-state module (replace the 3 copied `replaceParam` impls in home-app, announcements-tab, plan-tab).
+- Per-tab param registry: each tab declares its browse-params (persist) + editor-states (ephemeral). Active-nav-reset deletes that tab's params atomically (one `router.replace`).
+- Codify as a CLAUDE.md convention + update lessons.md §URL State Persistence.
+
+## Phase 1 — Foundation (shared module + active-nav-reset)
+- [ ] Extract one shared atomic multi-param helper; delete the 3 duplicate `replaceParam` impls.
+- [ ] Build the tab→owned-params registry.
+- [ ] Active-nav-reset: re-clicking the active tab clears that tab's params + closes ephemeral overlays in ONE atomic replace. Desktop sidebar + mobile bottom-nav SYMMETRIC.
+- [ ] Switching to a different tab: just set `?tab=`, leave other params (resume-where-left-off).
+
+## Phase 2 — Flip editors to ephemeral
+- [ ] `?compose=` (announcements) → plain state; remove reload-restore effect.
+- [ ] `?view=settings` (plan team settings) → plain state; simplify auto-open + cleanup.
+- [ ] `?cnew=1` (congregation create) → plain state.
+- Consequence: deep-link-to-edit lost (deep-link-to-VIEW still works). Accepted.
+
+## Phase 3 — Add missing browse params
+- [ ] `?chat={groupId}` — open conversation (desktop + mobile). Absent → desktop auto-opens most-recent; mobile shows list.
+- [ ] `?ann={id}` — open announcement detail (read view).
+- [ ] `?jtab=` — journal subtab (devotionals/prayers/verses).
+- [ ] form-responses read view param (forms-tab).
+
+## Out of scope (flagged separately)
+- `page.tsx:85` SSR teamType narrowing omits `"finance"` → finance teams misclassified until client refetch. Pre-existing, unrelated.
+
+## Review
+(filled at end)

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { SWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle, ArrowLeft } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
@@ -14,6 +14,7 @@ import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, 
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
+import { useNavState } from "./nav-state"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -54,7 +55,6 @@ const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m =
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
@@ -63,21 +63,28 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
   const initialTab = resolvedTab && validTabs.includes(resolvedTab) ? resolvedTab : "home"
   const [activeTab, setActiveTabState] = useState<Tab>(initialTab)
+  // Bumped only on an active-tab RESET (re-click) to force-remount the active tab
+  // so it re-lazy-inits its internal view-state from the now-cleared URL params.
+  // Never bumped on a normal tab switch (resume-where-left-off stays intact).
+  const [navResetKey, setNavResetKey] = useState(0)
 
-  // Persist a single URL param without clobbering others
-  function replaceParam(key: string, value: string | null) {
-    const params = new URLSearchParams(window.location.search)
-    if (value === null) params.delete(key)
-    else params.set(key, value)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
-  }
-
-  function setActiveTab(tab: Tab) {
-    setActiveTabState(tab)
-    replaceParam("tab", tab)
-  }
-  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
-  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(null)
+  // Canonical URL-param helpers (shared module, one atomic replace each).
+  const { setParam, setParams, clearTabParams } = useNavState()
+  // Thin alias preserves every existing `replaceParam(key, value)` call site.
+  const replaceParam = setParam
+  // Restore the open conversation from ?chat — but only when the chats tab is the
+  // active tab, so the fullscreen overlay never leaks over another restored tab on
+  // reload. Name is unknown at mount → init "" and backfill from recentChats below.
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
+    if (typeof window === "undefined") return null
+    const chatId = new URLSearchParams(window.location.search).get("chat")
+    return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
+  })
+  // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return new URLSearchParams(window.location.search).get("ann")
+  })
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -105,9 +112,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     initialSection && (validSections as readonly string[]).includes(initialSection) ? initialSection : "spiritual-profile"
   )
 
+  // Sub-page params that belong to a team workspace — cleared on every team switch
+  // so the new team never inherits the previous team's deep-link state.
+  const TEAM_SUBPARAMS = { sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null } as const
+
   function handleTeamChange(teamId: string) {
     setActiveTeamId(teamId)
-    replaceParam("team", teamId)
+    // One atomic replace (Convention #5): set the new team AND clear all of the
+    // previous team's sub-params in a single URL update. PlanTab no longer owns
+    // this clear (its teamSwitchRef effect only does non-URL bookkeeping now).
+    setParams({ team: teamId, ...TEAM_SUBPARAMS })
   }
 
   // Team selected WITHIN the Receipts workspace (sentinel activeTeamId === "receipts").
@@ -117,10 +131,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   function handleReceiptsTeamChange(teamId: string) {
     setActiveReceiptsTeamId(teamId)
-    // One atomic replace (convention #5) — build the full param set, replace once.
-    const params = new URLSearchParams(window.location.search)
-    params.set("rteam", teamId)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+    // One atomic replace (Convention #5) via the shared nav-state module.
+    setParam("rteam", teamId)
   }
 
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
@@ -554,7 +566,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 
-  // On desktop, auto-select the most recent chat when arriving at the chats tab
+  // On desktop, auto-select the most recent chat when arriving at the chats tab.
+  // This is the master-detail DEFAULT for the empty state only — it writes NO URL
+  // (Convention #5: avoid racing the nav's setParams). An explicitly-opened chat
+  // owns ?chat via handleOpenChat; `!globalOpenChat` already prevents overriding a
+  // URL-restored conversation (the lazy-init sets it before this effect runs).
   useEffect(() => {
     if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats.length > 0) {
       const top = recentChats[0]
@@ -563,13 +579,35 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop, activeTab, recentChats])
 
+  // Backfill the header name for a URL-restored chat once recentChats loads.
+  useEffect(() => {
+    if (!globalOpenChat || globalOpenChat.name !== "") return
+    const match = recentChats.find((c) => c.id === globalOpenChat.id)
+    if (match) setGlobalOpenChat((prev) => prev && prev.name === "" ? { ...prev, name: match.groupName } : prev)
+  }, [globalOpenChat, recentChats])
+
+  // Opening a chat is atomic: switch to the chats tab AND mirror ?chat in one replace.
   function handleOpenChat(id: string, name: string) {
+    setActiveTabState("chats")
     setGlobalOpenChat({ id, name })
+    setParams({ tab: "chats", chat: id })
   }
 
   function handleChatClose() {
     setGlobalOpenChat(null)
     setChatRefreshKey((k) => k + 1)
+    setParam("chat", null)
+  }
+
+  // Announcement detail open/close mirror ?ann (read view, persists on reload).
+  function handleOpenAnnouncement(id: string) {
+    setOpenAnnouncementId(id)
+    setParam("ann", id)
+  }
+
+  function handleCloseAnnouncement() {
+    setOpenAnnouncementId(null)
+    setParam("ann", null)
   }
 
   function handleChatNameChange(name: string) {
@@ -577,15 +615,54 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     setChatRefreshKey((k) => k + 1)
   }
 
-  function handleSidebarTabChange(tab: Tab) {
-    setGlobalOpenChat(null)
-    setActiveTabState(tab)
-    // Atomic URL update: set new tab and clear sub-page overlay params so they
-    // don't auto-reopen when the user returns to the plan tab later.
-    const params = new URLSearchParams(window.location.search)
-    params.set("tab", tab)
-    params.delete("view")
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+  // Unified, symmetric nav handler — wired to BOTH the desktop sidebar and the
+  // mobile bottom nav (and the command palette). Re-clicking the active tab RESETS
+  // it to its landing view (clears that tab's owned params + shell-owned transients);
+  // clicking a different tab SWITCHES while leaving other tabs' params intact
+  // (resume-where-left-off). One atomic replace per logical navigation (Convention #5).
+  function handleNavClick(tab: Tab) {
+    // The announcement detail overlay is transient — it closes on every nav action.
+    setOpenAnnouncementId(null)
+
+    if (tab === activeTab) {
+      // RESET: also clear the shell-owned, plain-state transients for this tab so
+      // re-clicking truly lands on the tab's first view (URL params alone aren't
+      // enough — these states lazy-init from the URL only on mount).
+      setGlobalOpenChat(null)
+      if (tab === "plan") {
+        setActiveTeamId(null)
+        setActiveReceiptsTeamId(null)
+        setStudentOrgPlanningEvent(null)
+      }
+      if (tab === "directory") {
+        setActiveMemberId(null)
+        setSelectedDirectoryMember(null)
+      }
+      if (tab === "profile") setProfileSection("spiritual-profile")
+      if (tab === "congregation") setCongregationView("list")
+      setActiveTabState(tab)
+      // Remount the active tab so tabs that hold their own internal view-state
+      // (CongregationTab's view, chats list, journal subtab, …) re-init from the
+      // cleared URL and land on their first view — no per-tab controlled props.
+      setNavResetKey(k => k + 1)
+      // clearTabParams drops this tab's owned params (?chat on chats, ?ann on
+      // announcements, …); also clear ?ann unconditionally since the detail
+      // overlay can sit over any tab.
+      clearTabParams(tab, { tab, ann: null })
+    } else {
+      // SWITCH: leave other tabs' params untouched — only ?tab changes (+ clear the
+      // transient ?ann overlay). ?chat is PRESERVED so the chats tab resumes its
+      // open conversation; we re-derive the overlay only when entering chats and
+      // null it otherwise (so the fullscreen overlay never leaks over another tab).
+      setActiveTabState(tab)
+      if (tab === "chats") {
+        const chatId = new URLSearchParams(window.location.search).get("chat")
+        setGlobalOpenChat(chatId ? { id: chatId, name: "" } : null)
+      } else {
+        setGlobalOpenChat(null)
+      }
+      setParams({ tab, ann: null })
+    }
   }
 
   async function handleLogout() {
@@ -609,7 +686,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
         activeTab={activeTab}
-        onTabChange={handleSidebarTabChange}
+        onTabChange={handleNavClick}
         ministryName={ministryName}
         chatsUnread={totalChatsUnread}
         showPlan={showPlanTab}
@@ -665,7 +742,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                  AND any team workspace. Don't gate on a per-type flag or new team types
                  (finance, etc.) silently lose their way back. */
               <button
-                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                onClick={() => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) }}
                 className="hover:bg-[#F2EDE0] transition-colors"
                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 999, padding: "6px 13px", cursor: "pointer" }}
               >
@@ -682,8 +759,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
               remounts and replays the fade+rise on every top-level tab switch
               (one mount point, not one per tab). md:h-full + md:overflow-hidden
               pass the shell's height/scroll context through to each tab's own
-              wrapper, which resolves md:h-full against this element. */}
-          <div key={activeTab} className="content-enter md:h-full md:overflow-hidden">
+              wrapper, which resolves md:h-full against this element. The
+              `navResetKey` segment ALSO remounts on an active-tab reset (re-click)
+              so the active tab re-inits from the cleared URL — it never changes on
+              a plain switch, so resume-where-left-off is preserved. */}
+          <div key={`${activeTab}-${navResetKey}`} className="content-enter md:h-full md:overflow-hidden">
 
           {activeTab === "home" && (
             <div className="md:h-full md:overflow-y-auto">
@@ -693,11 +773,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 ministryId={ministryId}
                 ministryName={ministryName}
                 recentChats={recentChats}
-                onSeeChats={() => setActiveTab("chats")}
-                onSeeAnnouncements={() => setActiveTab("announcements")}
+                onSeeChats={() => handleNavClick("chats")}
+                onSeeAnnouncements={() => handleNavClick("announcements")}
                 onOpenChat={handleOpenChat}
-                onGoToProfile={() => setActiveTab("profile")}
-                onOpenAnnouncement={(id) => setOpenAnnouncementId(id)}
+                onGoToProfile={() => handleNavClick("profile")}
+                onOpenAnnouncement={handleOpenAnnouncement}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -708,7 +788,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => setOpenAnnouncementId(id)} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={handleOpenAnnouncement} />
             </div>
           )}
 
@@ -726,7 +806,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   onOpenChat={handleOpenChat}
                   onTotalUnreadChange={setTotalChatsUnread}
                   refreshKey={chatRefreshKey}
-                  onOpenDirectory={() => setActiveTab("directory")}
+                  onOpenDirectory={() => handleNavClick("directory")}
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                 />
@@ -779,7 +859,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
                 onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
-                onOpenChat={(id, name) => { setActiveTab("chats"); handleOpenChat(id, name) }}
+                onOpenChat={handleOpenChat}
                 onTeamSelect={handleTeamChange}
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
@@ -813,11 +893,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 initialMemberId={activeMemberId ?? undefined}
                 selectedMember={selectedDirectoryMember}
                 onMemberSelect={handleMemberSelect}
-                onBack={() => setActiveTab("chats")}
-                onOpenChat={(id, name) => {
-                  setActiveTab("chats")
-                  handleOpenChat(id, name)
-                }}
+                onBack={() => handleNavClick("chats")}
+                onOpenChat={handleOpenChat}
               />
             </div>
           )}
@@ -888,7 +965,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
         <BottomNav
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleNavClick}
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
         />
@@ -917,7 +994,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           ministryId={ministryId}
           userRole={initialProfile.role}
           userName={initialProfile.name}
-          onClose={() => setOpenAnnouncementId(null)}
+          onClose={handleCloseAnnouncement}
         />
       )}
 
@@ -925,7 +1002,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         ministryId={ministryId}
-        onTabChange={(tab) => { setPaletteOpen(false); handleSidebarTabChange(tab) }}
+        onTabChange={(tab) => { setPaletteOpen(false); handleNavClick(tab) }}
         onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
       />
 
@@ -941,8 +1018,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             setShowQuickCreateTeam(false)
             loadUserTeams()
             loadAllTeams()
-            setActiveTab("plan")
-            handleTeamChange(teamId)
+            // Switch to Plan AND select the new team in one atomic replace — never
+            // route through handleNavClick here (would reset-clear team params when
+            // already on Plan). Direct state + single param write instead.
+            setActiveTabState("plan")
+            setActiveTeamId(teamId)
+            setParams({ tab: "plan", team: teamId, ...TEAM_SUBPARAMS })
           }}
         />
       )}

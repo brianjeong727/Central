@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -677,12 +676,9 @@ function InlineEditFields({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const router = useRouter()
-  // Read ?compose= once on mount so the editor can restore on refresh/deep-link.
-  const [initialCompose] = useState(() =>
-    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("compose") : null
-  )
-  const [showCreate, setShowCreate] = useState(initialCompose === "new")
+  // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
+  // drops back to the underlying announcements list (Phase 2).
+  const [showCreate, setShowCreate] = useState(false)
   const [compact, setCompact] = useState(false)
   const [filter, setFilter] = useState<FilterType>("all")
 
@@ -691,30 +687,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
 
-  // One atomic compose-param write (Convention #5).
-  function setComposeParam(value: string | null) {
-    const params = new URLSearchParams(window.location.search)
-    if (value === null) params.delete("compose")
-    else params.set("compose", value)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
-  }
-
   function openCreate() {
     setEditingAnnouncement(null)
     setShowCreate(true)
-    setComposeParam("new")
   }
 
   function openEdit(ann: EnrichedAnnouncement) {
     setShowCreate(false)
     setEditingAnnouncement(ann)
-    setComposeParam(ann.id)
   }
 
   function closeCompose() {
     setShowCreate(false)
     setEditingAnnouncement(null)
-    setComposeParam(null)
   }
 
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
@@ -814,19 +799,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     ["announcements", ministryId, userId, isLeaderOrAdmin, userGradYear],
     loadAnnouncements
   )
-
-  // Restore the deep-linked editor once announcements load (?compose={id}).
-  const didRestoreCompose = useRef(false)
-  useEffect(() => {
-    if (didRestoreCompose.current) return
-    if (!initialCompose || initialCompose === "new") { didRestoreCompose.current = true; return }
-    if (announcements.length === 0) return
-    didRestoreCompose.current = true
-    const found = announcements.find((a) => a.id === initialCompose)
-    if (found) setEditingAnnouncement(found)
-    else setComposeParam(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [announcements, initialCompose])
 
   // True toggle: flips going state and count, optimistically updates the attendee
   // list, AND persists to the rsvps table. Used by the desktop RSVP buttons and
