@@ -64,7 +64,7 @@ export const WORKSPACE_PRESETS: WorkspacePreset[] = [
   },
   {
     id: "finance",
-    name: "Finance Team",
+    name: "Finance",
     emoji: "💰",
     iconKey: "dollar",
     description: "Budget, allocation, and reimbursements",

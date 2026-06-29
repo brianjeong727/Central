@@ -361,7 +361,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // carry destination closures, and the final/current crumb has no onClick.
   function getShellCrumbs(): Crumb[] {
     const root: Crumb = { label: ministryName, onClick: () => handleNavClick("home") }
-    const planningCrumb: Crumb = { label: "Planning", onClick: () => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) } }
+    const planningCrumb: Crumb = { label: "Workspace", onClick: () => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) } }
     const congregationLabels: Record<string, string> = { list: "", create: "New question", detail: "Responses" }
     switch (activeTab) {
       case "home":          return [root, { label: "Home" }]
@@ -372,7 +372,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       case "chats":         return [root, { label: "Chats" }]
       case "plan": {
         if (activeTeamId === "receipts") return [root, planningCrumb, { label: "Receipts" }]
-        if (!activeTeamId || !activeTeamNameForPlan) return [root, { label: "Planning" }]
+        if (!activeTeamId || !activeTeamNameForPlan) return [root, { label: "Workspace" }]
         if (isStudentOrgActive && studentOrgPlanningEvent) {
           return [
             root, planningCrumb,

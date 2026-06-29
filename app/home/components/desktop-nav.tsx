@@ -93,7 +93,7 @@ export function DesktopSidebar({
   const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: "home",      label: "Home",        icon: Home },
     { id: "chats",     label: "Messages",  icon: MessageCircle },
-    ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
+    ...(showPlan ? [{ id: "plan" as Tab, label: "Workspace", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
     { id: "profile",   label: "You",       icon: User },
   ]
@@ -106,7 +106,7 @@ export function DesktopSidebar({
       case "plan": {
         // Prefer the shell-resolved name (covers gov-view teams the user isn't a member of),
         // then membership, then the generic fallback.
-        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Planning"
+        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Workspace"
       }
       case "directory":    return "People"
       case "congregation": return "Congregation"

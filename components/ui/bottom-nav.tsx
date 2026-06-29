@@ -18,7 +18,7 @@ const TABS_BASE = [
   { id: "profile" as Tab,   label: "You",       icon: User },
 ]
 
-const PLAN_TAB = { id: "plan" as Tab, label: "Plan", icon: ClipboardList }
+const PLAN_TAB = { id: "plan" as Tab, label: "Workspace", icon: ClipboardList }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
   const base = TABS_BASE.filter(t => t.id !== "profile")

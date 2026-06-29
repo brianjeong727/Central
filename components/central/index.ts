@@ -12,6 +12,7 @@ export { InsetHairline } from "./hairline"
 export { TabPageHeader } from "./tab-page-header"
 export { MonogramChip } from "./MonogramChip"
 export { PlanSubTabStrip } from "./plan-sub-tab-strip"
+export { FilterDropdown } from "./filter-dropdown"
 export {
   SkeletonBlock,
   HomeTabSkeleton,
