@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { SWRConfig } from "swr"
+import { SWRConfig, useSWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle, ArrowLeft } from "lucide-react"
 import { useSearchParams } from "next/navigation"
@@ -15,6 +15,7 @@ import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState } from "./nav-state"
+import { fetchChatList } from "./chat-list"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -55,6 +56,7 @@ const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m =
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const { mutate: globalMutate } = useSWRConfig()
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
@@ -522,6 +524,44 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       .then(({ data }) => { if (data) setMinistryIsPublic(data.is_public ?? false) })
   }, [isAdmin, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Latest open chat, read inside the realtime callback without re-subscribing.
+  const globalOpenChatRef = useRef(globalOpenChat)
+  useEffect(() => { globalOpenChatRef.current = globalOpenChat }, [globalOpenChat])
+
+  // Throttled refetch of the shared chat-list SWR cache (the Messages sidebar).
+  // Leading + trailing at 300ms: the first message in a burst refetches instantly,
+  // the last one is always captured by the trailing call so the final order/preview/
+  // unread land. We pass a FETCHER (not a bare key) to mutate so it never collides
+  // with the global dedupingInterval:5000 — provided data updates the cache directly
+  // instead of routing through the dedup-gated revalidation path. The fetcher also
+  // re-forces the currently-open chat to unread 0, so an incoming-while-open message
+  // can't resurrect a badge on the chat the user is actively reading (the open chat's
+  // ChatScreen writes last_read_at async, which could otherwise race get_chat_list).
+  const chatListThrottle = useRef<{ last: number; timer: ReturnType<typeof setTimeout> | null }>({ last: 0, timer: null })
+  const refetchChatList = useCallback(() => {
+    const run = () => {
+      chatListThrottle.current.last = Date.now()
+      globalMutate(
+        ["chat-list", userId, ministryId],
+        async () => {
+          const groups = await fetchChatList(["chat-list", userId, ministryId])
+          const openId = globalOpenChatRef.current?.id
+          return openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
+        },
+        { revalidate: false },
+      )
+    }
+    const elapsed = Date.now() - chatListThrottle.current.last
+    if (elapsed >= 300) {
+      run()
+    } else if (!chatListThrottle.current.timer) {
+      chatListThrottle.current.timer = setTimeout(() => {
+        chatListThrottle.current.timer = null
+        run()
+      }, 300 - elapsed)
+    }
+  }, [globalMutate, userId, ministryId])
+
   // Realtime: keep recentChats preview fresh as messages arrive
   useEffect(() => {
     const channel = supabase
@@ -531,6 +571,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
+          // Drive the Messages sidebar live (order, preview, unread badges).
+          refetchChatList()
           supabase
             .from("profiles")
             .select("name")
