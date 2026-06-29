@@ -40,7 +40,6 @@ const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScre
 const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
 
 const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
-const QuickCreateTeamModal = dynamic(() => import("./tabs/plan-tab").then(m => m.QuickCreateTeamModal), { loading: () => <Spinner />, ssr: false })
 const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
 const FinanceSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.FinanceSectionNav), { loading: () => <Spinner />, ssr: false })
@@ -90,7 +89,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(initialActiveQuestion ?? null)
   const [hasResponded, setHasResponded] = useState(initialHasResponded ?? false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
-  const [showQuickCreateTeam, setShowQuickCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
     const urlTeam = searchParams.get("team")
     if (urlTeam) return urlTeam
@@ -212,8 +210,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
-  const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
-  const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
+  const canCreateTeam = isAdmin
 
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
   const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
@@ -394,6 +391,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency, allowAdminMembers: !!t.allow_admin_members }]
     })
+    // Which of these teams have a member assigned to their president role.
+    const ids = teams.map((t) => t.teamId)
+    let presidentSet = new Set<string>()
+    if (ids.length > 0) {
+      const { data: pres } = await supabase
+        .from("team_members")
+        .select("team_id, team_roles!inner(is_president)")
+        .in("team_id", ids)
+        .eq("team_roles.is_president", true)
+      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
+    }
+    for (const t of teams) t.hasPresident = presidentSet.has(t.teamId)
     setUserTeams(teams)
     setActiveTeamId((prev) => {
       // The Receipts sentinel is not a real team — never reconcile it away on refresh.
@@ -417,9 +426,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     if (!data) return
     const teamIds = (data as { id: string }[]).map((t) => t.id)
     const countMap: Record<string, number> = {}
+    let presidentSet = new Set<string>()
     if (teamIds.length > 0) {
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
+      const { data: pres } = await supabase
+        .from("team_members")
+        .select("team_id, team_roles!inner(is_president)")
+        .in("team_id", teamIds)
+        .eq("team_roles.is_president", true)
+      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
     }
     type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null; allow_admin_members: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
@@ -427,7 +443,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       const rawAccess = t.admin_access ?? 'view'
       const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
-      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0 }
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0, hasPresident: presidentSet.has(t.id) }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGovernanceAdmin, ministryId])
@@ -621,7 +637,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         isAdmin={isAdmin}
         isPastor={isPastor}
         canCreateTeam={canCreateTeam}
-        onCreateTeam={() => setShowQuickCreateTeam(true)}
+        onCreateTeam={() => { setActiveTab("plan"); setShowCreateTeam(true) }}
         activeTeamId={activeTeamId}
         activeTeamName={activeTeamNameForPlan || undefined}
         onActiveTeamChange={handleTeamChange}
@@ -776,7 +792,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
-                onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
                 onOpenChat={(id, name) => { setActiveTab("chats"); handleOpenChat(id, name) }}
                 onTeamSelect={handleTeamChange}
                 studentOrgSection={studentOrgSection}
@@ -927,23 +942,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
       />
 
-      {showQuickCreateTeam && (
-        <QuickCreateTeamModal
-          userId={userId}
-          ministryId={ministryId}
-          isAdmin={isAdmin}
-          isDGL={isDGL}
-          isPraiseTeamMember={isPraiseTeamMember}
-          onClose={() => setShowQuickCreateTeam(false)}
-          onCreated={(teamId) => {
-            setShowQuickCreateTeam(false)
-            loadUserTeams()
-            loadAllTeams()
-            setActiveTab("plan")
-            handleTeamChange(teamId)
-          }}
-        />
-      )}
 
       {showGradPrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>
