@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo, PlanLineIcon } from "@/app/home/components/shared"
+import { WORKSPACE_PRESETS } from "@/app/home/workspace-presets"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -16,7 +17,7 @@ const mono: React.CSSProperties = {
 const STEPS = [
   { label: "Basic info",  sub: "Name, campus, size"  },
   { label: "Structure",   sub: "Visibility & access" },
-  { label: "Teams",       sub: "Starting groups"     },
+  { label: "Workspaces",  sub: "What you need"       },
   { label: "Review",      sub: "Confirm & submit"    },
 ]
 
@@ -98,24 +99,59 @@ function ToggleRow({ title, desc, on, onClick }: {
   )
 }
 
-// ─── Fixed beta teams ────────────────────────────────────────────
-const BETA_TEAMS = [
-  { iconKey: "book",  name: "Small Group Leaders",  desc: "Bible study & discipleship"  },
-  { iconKey: "users", name: "Student Org Board",    desc: "Campus ministry leadership"  },
-]
-
-function BetaTeamRow({ iconKey, name, desc }: { iconKey: string; name: string; desc: string }) {
+// ─── Selectable workspace card ───────────────────────────────────
+// Workspaces come from the shared preset list. Available presets are multi-select
+// (default none); coming-soon presets render dimmed and disabled.
+function WorkspacePickCard({ iconKey, name, desc, selected, comingSoon, onToggle }: {
+  iconKey: string; name: string; desc: string
+  selected: boolean; comingSoon?: boolean; onToggle?: () => void
+}) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
-      border: "1px solid var(--line)", borderRadius: 10, background: "#FDFCF8", marginBottom: 10,
-    }}>
+    <button
+      type="button"
+      disabled={comingSoon}
+      onClick={onToggle}
+      aria-pressed={selected}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+        border: `1.5px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
+        borderRadius: 10,
+        // Selected = ivory surface + plum border (the app's active-state pattern).
+        // Plum is a surgical accent, never a card fill — esp. with multi-select.
+        background: comingSoon ? "var(--cream-3)" : selected ? "var(--ivory)" : "#FDFCF8",
+        marginBottom: 10, textAlign: "left", fontFamily: SANS,
+        cursor: comingSoon ? "default" : "pointer", opacity: comingSoon ? 0.55 : 1,
+        transition: "border-color .12s ease, background .12s ease",
+      }}
+    >
       <PlanLineIcon iconKey={iconKey} size={38} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, color: "var(--ink)" }}>{name}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15, color: "var(--ink)" }}>{name}</span>
+          {comingSoon && (
+            <span style={{
+              ...mono, fontSize: 9.5, letterSpacing: "0.1em", color: "var(--muted-text)",
+              border: "1px solid var(--line-2)", borderRadius: 99, padding: "2px 7px",
+            }}>Coming soon</span>
+          )}
+        </div>
         <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
       </div>
-    </div>
+      {!comingSoon && (
+        <span style={{
+          width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+          border: `2px solid ${selected ? "var(--plum)" : "#C4C0B0"}`,
+          background: selected ? "var(--plum)" : "transparent",
+          display: "grid", placeItems: "center",
+        }}>
+          {selected && (
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#FDFCF8" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          )}
+        </span>
+      )}
+    </button>
   )
 }
 
@@ -227,8 +263,11 @@ export default function OnboardingPage() {
   const [allowInviteCode, setAllowInviteCode] = useState(true)
   const [requireApproval, setRequireApproval] = useState(false)
 
-  // Step 3
-  const [includeTeams, setIncludeTeams] = useState(true)
+  // Step 3 — workspaces (preset ids). Default: none selected.
+  const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>([])
+  function toggleWorkspace(id: string) {
+    setSelectedWorkspaces(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   // Submit
   const [submitting, setSubmitting] = useState(false)
@@ -262,7 +301,7 @@ export default function OnboardingPage() {
       university: universities[0] ?? "",
       universities,
       location, size,
-      teams: includeTeams ? BETA_TEAMS.map(t => ({ name: t.name, icon: t.iconKey })) : [],
+      workspaces: selectedWorkspaces,
       isPublic,
     })
     if (err) { setError(err); setSubmitting(false); return }
@@ -477,66 +516,30 @@ export default function OnboardingPage() {
           {step === 2 && (
             <>
               <StepHeader
-                eyebrow="Step 3 of 4 · Teams"
-                title="Starter teams."
-                sub="These are the teams available during beta. You can configure roles and members after your ministry is approved."
+                eyebrow="Step 3 of 4 · Workspaces"
+                title="Choose your workspaces."
+                sub="Select the workspaces your ministry needs. They'll be ready and empty when you're approved — you can assign a leader and add more anytime."
               />
 
-              <div style={mono}>Available teams</div>
+              <div style={mono}>Available workspaces</div>
               <div style={{ marginTop: 12 }}>
-                {BETA_TEAMS.map(t => (
-                  <BetaTeamRow key={t.name} iconKey={t.iconKey} name={t.name} desc={t.desc} />
+                {WORKSPACE_PRESETS.map(p => (
+                  <WorkspacePickCard
+                    key={p.id}
+                    iconKey={p.iconKey}
+                    name={p.name}
+                    desc={p.description}
+                    comingSoon={p.comingSoon}
+                    selected={selectedWorkspaces.includes(p.id)}
+                    onToggle={() => toggleWorkspace(p.id)}
+                  />
                 ))}
               </div>
 
-              {/* Beta notice */}
-              <div style={{
-                display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4, marginBottom: 24,
-                background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10,
-                padding: "13px 15px", fontSize: 13, color: "var(--body)", lineHeight: 1.5,
-              }}>
-                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#A09A8C" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0, marginTop: 1 }}>
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                In beta, Small Group Leaders and Student Org Board are the only supported teams. More team types are coming soon.
-              </div>
-
-              {/* Accept / skip choice */}
-              <div style={mono}>Would you like to include these teams?</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                {[
-                  { value: true,  label: "Yes, add these teams",    sub: "Start with Small Group Leaders and Student Org Board." },
-                  { value: false, label: "Skip for now",            sub: "You can add teams later from your ministry settings." },
-                ].map(opt => (
-                  <button
-                    key={String(opt.value)}
-                    type="button"
-                    onClick={() => setIncludeTeams(opt.value)}
-                    style={{
-                      display: "flex", alignItems: "flex-start", gap: 14, padding: 16,
-                      border: `1.5px solid ${includeTeams === opt.value ? "var(--plum)" : "var(--line-2)"}`,
-                      borderRadius: 12,
-                      background: includeTeams === opt.value ? "#F4EFF8" : "#FDFCF8",
-                      cursor: "pointer", textAlign: "left", fontFamily: SANS,
-                      transition: "border-color .12s ease, background .12s ease",
-                    }}
-                  >
-                    <span style={{
-                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
-                      border: `2px solid ${includeTeams === opt.value ? "var(--plum)" : "#C4C0B0"}`,
-                      background: includeTeams === opt.value ? "var(--plum)" : "transparent",
-                      display: "grid", placeItems: "center",
-                    }}>
-                      {includeTeams === opt.value && (
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#FDFCF8" }}/>
-                      )}
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{opt.label}</div>
-                      <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>{opt.sub}</div>
-                    </div>
-                  </button>
-                ))}
+              <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4, marginBottom: 4, lineHeight: 1.5 }}>
+                {selectedWorkspaces.length === 0
+                  ? "No workspaces selected — that's fine. You can add your first one once your ministry is live."
+                  : `${selectedWorkspaces.length} workspace${selectedWorkspaces.length === 1 ? "" : "s"} selected.`}
               </div>
 
               <NavRow onBack={back} onNext={next} nextLabel="Continue"/>
@@ -569,7 +572,7 @@ export default function OnboardingPage() {
                 <ReviewRow label="Location"  value={location || "—"}/>
                 <ReviewRow label="Size"       value={sizeLabel}/>
                 <ReviewRow label="Discovery"  value={discoveryLabel}/>
-                <ReviewRow label="Teams"      value={includeTeams ? BETA_TEAMS.map(t => t.name).join(", ") : "None"} last/>
+                <ReviewRow label="Workspaces" value={selectedWorkspaces.length > 0 ? selectedWorkspaces.map(id => WORKSPACE_PRESETS.find(p => p.id === id)?.name ?? id).join(", ") : "None"} last/>
               </div>
 
               {/* Approval notice */}

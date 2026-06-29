@@ -330,6 +330,8 @@ export interface UserTeam {
   allowCoPresidency: boolean
   // Per-team override: when false (default), admin-tier users can't be team members.
   allowAdminMembers: boolean
+  // Whether this team has a member assigned to its president role.
+  hasPresident?: boolean
 }
 
 export interface Team {
@@ -346,6 +348,8 @@ export interface Team {
   // Per-team override: when false (default), admin-tier users (admin/deacon/elder/pastor)
   // can't be added as members. Admins govern from outside unless this is enabled.
   allow_admin_members: boolean
+  // Whether this team has a member assigned to its president role.
+  hasPresident?: boolean
 }
 
 // Global governance roster (ministries.governance_settings). When all_admins is
@@ -497,7 +501,6 @@ export interface PlanTabProps {
   showCreateTeam: boolean
   onShowCreateTeam: (v: boolean) => void
   activeTeamId: string | null
-  onTeamCreated: (teamId: string) => void
   onOpenChat?: (id: string, name: string, type?: string) => void
   // Called when user clicks a team card in the picker (no-team-selected state)
   onTeamSelect?: (teamId: string) => void

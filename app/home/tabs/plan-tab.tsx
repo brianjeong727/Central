@@ -49,10 +49,11 @@ import { MonogramChip, PlanSubTabStrip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
+import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
-  WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category, CreateStep,
+  WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
   EventType, EventExtraTab, EventNewFolk,
 } from "../types"
 import { teamAccessLevel, type TeamAccess } from "../governance"
@@ -87,95 +88,6 @@ function getVisiblePermissions(teamName: string): string[] {
   if (/small.*group|dgl|discipleship/.test(lower)) return TEAM_PERMISSION_FILTERS.small_group
   return ALL_PERMISSIONS
 }
-
-const TEAM_PRESETS = [
-  {
-    id: "dgl",
-    name: "Small Group Leaders",
-    icon: "📖",
-    description: "Discipleship and Bible study",
-    roles: [
-      { name: "DGL President", is_president: true, permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"] },
-      { name: "Leader", permissions: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance"] },
-    ],
-  },
-  {
-    id: "board",
-    name: "Student Org Board",
-    icon: "🏛️",
-    description: "Ministry operations and administration",
-    roles: [
-      { name: "President", is_president: true, permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"] },
-      { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
-      { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
-      { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
-    ],
-  },
-  {
-    id: "finance",
-    name: "Finance Team",
-    icon: "💰",
-    description: "Budget, allocation, and reimbursements",
-    teamType: "finance" as const,
-    roles: [
-      // Finance has only President + Member. President (the finance deacon) signs off;
-      // Members (the treasurers + any overseeing admins) operate the workspace and
-      // approve. No other roles by design.
-      { name: "President", is_president: true, permissions: ["can_view_finances"] },
-      { name: "Member", is_president: false, permissions: ["can_view_finances"] },
-    ],
-  },
-  {
-    id: "praise",
-    name: "Praise Team",
-    icon: "🎵",
-    description: "Worship and music ministry",
-    comingSoon: true,
-    roles: [
-      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team", "can_manage_schedule"] },
-      { name: "Worship Leader", permissions: ["can_manage_worship_set", "can_view_worship_set", "can_generate_slides", "can_manage_team"] },
-      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
-    ],
-  },
-  {
-    id: "tech",
-    name: "Tech Team",
-    icon: "💻",
-    description: "Technical support and media",
-    comingSoon: true,
-    roles: [
-      { name: "President", is_president: true, permissions: ["can_view_worship_set", "can_generate_slides", "can_manage_team"] },
-      { name: "Member", permissions: ["can_view_worship_set", "can_generate_slides"] },
-    ],
-  },
-  {
-    id: "dg_praise",
-    name: "DG Praise Team",
-    icon: "🎵",
-    description: "Discipleship group praise and worship",
-    comingSoon: true,
-    teamType: "dg_praise" as const,
-    roles: [
-      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_manage_team"] },
-      { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
-      { name: "Member", permissions: ["can_view_worship_set"] },
-    ],
-  },
-  {
-    id: "one_time",
-    name: "One-Time Event",
-    icon: "⭐",
-    description: "Praise team for a one-time event (SSO, Welcome Week, etc.)",
-    comingSoon: true,
-    teamType: "one_time" as const,
-    roles: [
-      { name: "President", is_president: true, permissions: ["can_manage_worship_set", "can_view_worship_set", "can_manage_team"] },
-      { name: "Leader", permissions: ["can_manage_worship_set", "can_view_worship_set"] },
-      { name: "Member", permissions: ["can_view_worship_set"] },
-    ],
-  },
-]
-
 
 
 const WORSHIP_FEATURES = [
@@ -1842,7 +1754,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
 
 export function PlanTab({
   userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
-  onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onTeamCreated, onOpenChat,
+  onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onOpenChat,
   onTeamSelect,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
   sglSection, onSglSectionChange,
@@ -1905,6 +1817,23 @@ export function PlanTab({
 
   function closeSettings() {
     setOpenTeam(null)
+  }
+
+  // Build a minimal Team object from a UserTeam (matches the auto-open fallback shape).
+  function userTeamToTeam(t: UserTeam): Team {
+    return {
+      id: t.teamId, name: t.teamName, icon: t.teamIcon, description: t.teamDescription,
+      created_by: "", member_count: 0, team_type: t.teamType,
+      allow_co_presidency: t.allowCoPresidency, admin_access: "view",
+      allow_admin_members: t.allowAdminMembers, hasPresident: t.hasPresident,
+    }
+  }
+
+  // Clicking a workspace card: admins on a presidentless workspace are routed to
+  // settings to assign one; everyone else enters the workspace normally.
+  function handleWorkspaceCardClick(team: Team) {
+    if (isAdmin && team.hasPresident === false) { openSettings(team); return }
+    onTeamSelect?.(team.id)
   }
 
   // Reset internal component state when the user switches to a different team.
@@ -1974,8 +1903,6 @@ export function PlanTab({
   const canOpenTeamSettings = isActiveTeamPresident || activeTeamAccess === "gov-view" || activeTeamAccess === "gov-write"
 
   const isDGLPresident = teamKind === "dgl" && (isActiveTeamPresident || govWrite)
-  // isPraiseTeamMember: used for CreateTeamOverlay visibility
-  const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
 
   // Governance-accessible teams: ministry teams the user is NOT a member of but
   // may enter as a governing admin (matrix grants view or write). Empty for
@@ -2097,7 +2024,7 @@ export function PlanTab({
                   {userTeams.map(t => (
                     <button
                       key={t.teamId}
-                      onClick={() => onTeamSelect?.(t.teamId)}
+                      onClick={() => handleWorkspaceCardClick(userTeamToTeam(t))}
                       className="text-left transition-all hover:border-[var(--plum)]"
                       style={{
                         display: "flex",
@@ -2119,6 +2046,11 @@ export function PlanTab({
                         <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {t.teamName}
                         </p>
+                        {t.hasPresident === false && (
+                          <span style={{ display: "inline-block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px" }}>
+                            Needs a president
+                          </span>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -2160,7 +2092,7 @@ export function PlanTab({
                         return (
                           <button
                             key={t.id}
-                            onClick={() => onTeamSelect?.(t.id)}
+                            onClick={() => handleWorkspaceCardClick(t)}
                             className="text-left transition-all hover:border-[var(--plum)]"
                             style={{
                               display: "flex",
@@ -2182,6 +2114,11 @@ export function PlanTab({
                               <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                 {t.name}
                               </p>
+                              {t.hasPresident === false && (
+                                <span style={{ display: "inline-block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px" }}>
+                                  Needs a president
+                                </span>
+                              )}
                             </div>
                           </button>
                         )
@@ -2192,12 +2129,11 @@ export function PlanTab({
                 {isAdmin && (
                   <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
                     <button
-                      disabled
-                      title="Custom team creation coming soon"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "10px 20px", background: "transparent", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "not-allowed", opacity: 0.45 }}
+                      onClick={() => setShowCreateTeam(true)}
+                      className="hover:bg-[var(--plum)] hover:text-[#FBF8F2] transition-colors"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "10px 20px", background: "transparent", color: "var(--plum)", border: "1px solid var(--plum)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                     >
-                      <Plus style={{ width: 13, height: 13 }} /> New team
-                      <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 999, background: "var(--line)", color: "var(--muted-text)", letterSpacing: "0.5px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
+                      <Plus style={{ width: 13, height: 13 }} /> Add workspace
                     </button>
                   </div>
                 )}
@@ -2211,11 +2147,11 @@ export function PlanTab({
                   {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
                 </div>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                  {isAdmin ? "Create your first team." : "You're not on a team yet."}
+                  {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
                 </h2>
                 <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
                   {isAdmin
-                    ? "Teams keep your ministry organized — Praise, Small Groups, Student Org Board, and more."
+                    ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
                     : "Ask a leader to add you to a team."}
                 </p>
                 {isAdmin && (
@@ -2223,7 +2159,7 @@ export function PlanTab({
                     onClick={() => setShowCreateTeam(true)}
                     style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                   >
-                    <Plus style={{ width: 14, height: 14 }} /> Create a team
+                    <Plus style={{ width: 14, height: 14 }} /> Add a workspace
                   </button>
                 )}
               </div>
@@ -2494,15 +2430,17 @@ export function PlanTab({
       </div>
 
       {showCreateTeam && (
-        <CreateTeamOverlay
-          userId={userId}
-          userName={userName}
+        <AddWorkspaceModal
           ministryId={ministryId}
-          isDGL={isDGL}
-          isPraiseTeamMember={isPraiseTeamMember}
-          isAdmin={isAdmin}
+          userId={userId}
+          ownedKeys={ownedPresetKeys([...userTeams.map(t => ({ team_type: t.teamType, name: t.teamName })), ...allTeams.map(t => ({ team_type: t.team_type, name: t.name }))])}
           onClose={() => setShowCreateTeam(false)}
-          onCreated={(teamId) => { setShowCreateTeam(false); onTeamsChange(); onTeamCreated(teamId) }}
+          onCreated={(team) => {
+            setShowCreateTeam(false)
+            onTeamsChange()
+            // Open the new (empty) workspace's settings so the admin assigns a president.
+            openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "view", allow_admin_members: false, hasPresident: false })
+          }}
         />
       )}
 
@@ -9073,567 +9011,156 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
   )
 }
 
-// ── CreateTeamOverlay ─────────────────────────────────────────────────────────
 
-export function CreateTeamOverlay({ userId, userName, ministryId, isDGL, isPraiseTeamMember, isAdmin, onClose, onCreated }: {
-  userId: string
-  userName: string
+// ── AddWorkspaceModal ─────────────────────────────────────────────────────────
+//
+// Preset-only "Add workspace" modal. Central no longer supports custom team
+// creation — every workspace comes from a fixed preset (see workspace-presets.ts).
+// This creates the team + its seed roles EMPTY (no members → no president); the
+// admin assigns a president afterward in the workspace's settings.
+
+export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCreated }: {
   ministryId: string
-  isDGL?: boolean
-  isPraiseTeamMember?: boolean
-  isAdmin?: boolean
+  userId: string
+  ownedKeys: Set<string>
   onClose: () => void
-  onCreated: (teamId: string) => void
+  onCreated: (team: { id: string; name: string; icon: string; team_type: string }) => void
 }) {
   const supabase = createClient()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  const [step, setStep] = useState<CreateStep>("preset")
-  const [selectedTeamType, setSelectedTeamType] = useState<'standard' | 'dg_praise' | 'one_time' | 'finance'>('standard')
-  const [teamName, setTeamName] = useState("")
-  const [teamIcon, setTeamIcon] = useState("👥")
-  const [teamDesc, setTeamDesc] = useState("")
-  const [roles, setRoles] = useState<DraftRole[]>([{ name: "President", permissions: [], is_president: true }, { name: "Member", permissions: [] }])
-  const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; role?: string }[]>([])
-  const [memberSearch, setMemberSearch] = useState("")
-  const [selectedMembers, setSelectedMembers] = useState<{ userId: string; roleIdx: number }[]>([])
-  const [presidentPick, setPresidentPick] = useState<string | null>(null)
-  const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
-  const [coPresidency, setCoPresidency] = useState(false)
-  // New teams default to governance separation: admin-tier users excluded from membership.
-  const [allowAdminMembers, setAllowAdminMembers] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState("")
 
-  // Index of the first president role (by explicit flag). -1 if none.
-  const presidentRoleIdx = roles.findIndex((r) => !!r.is_president)
-  // Default role for new members: last non-president role, or 0 if all are president.
-  const defaultMemberRoleIdx = (() => {
-    for (let i = roles.length - 1; i >= 0; i--) {
-      if (!roles[i].is_president) return i
+  const available = AVAILABLE_PRESETS.filter((p) => !ownedKeys.has(p.id))
+  const comingSoon = WORKSPACE_PRESETS.filter((p) => p.comingSoon)
+
+  async function handleSelect(preset: typeof WORKSPACE_PRESETS[number]) {
+    if (saving) return
+    setSaving(preset.id)
+    setError("")
+    try {
+      const { data: team, error: teamErr } = await supabase
+        .from("teams")
+        .insert({
+          ministry_id: ministryId,
+          name: preset.name,
+          icon: preset.emoji,
+          description: preset.description,
+          team_type: preset.teamType,
+          created_by: userId,
+        })
+        .select("id")
+        .single()
+      if (teamErr || !team) throw teamErr ?? new Error("Could not create workspace.")
+
+      const { error: rolesErr } = await supabase
+        .from("team_roles")
+        .insert(preset.roles.map((r) => ({
+          team_id: team.id,
+          name: r.name,
+          permissions: r.permissions,
+          is_president: !!r.is_president,
+        })))
+      if (rolesErr) throw rolesErr
+
+      onCreated({ id: team.id, name: preset.name, icon: preset.emoji, team_type: preset.teamType })
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong creating the workspace.")
+      setSaving(null)
     }
-    return 0
-  })()
-
-  useEffect(() => {
-    if (step !== "members") return
-    supabase
-      .from("profiles")
-      .select("id, name, role")
-      .eq("ministry_id", ministryId)
-      .neq("id", userId)
-      .order("name")
-      .then(({ data }) => setMinistryMembers(data ?? []))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
-
-  function applyPreset(preset: typeof TEAM_PRESETS[0]) {
-    setTeamName(preset.name)
-    setTeamIcon(preset.icon)
-    setTeamDesc(preset.description)
-    setRoles(preset.roles.map((r) => ({ name: r.name, permissions: [...r.permissions], is_president: "is_president" in r ? !!r.is_president : false })))
-    setSelectedTeamType((preset as { teamType?: 'standard' | 'dg_praise' | 'one_time' | 'finance' }).teamType ?? 'standard')
-    setStep("customize")
   }
-
-  function addRole() {
-    const next = [...roles, { name: "", permissions: [] }]
-    setRoles(next)
-    setEditingRoleIdx(next.length - 1)
-  }
-
-  function updateRoleName(idx: number, name: string) {
-    setRoles((prev) => prev.map((r, i) => (i === idx ? { ...r, name } : r)))
-  }
-
-  function toggleRolePermission(idx: number, perm: string) {
-    setRoles((prev) =>
-      prev.map((r, i) =>
-        i === idx
-          ? { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter((p) => p !== perm) : [...r.permissions, perm] }
-          : r
-      )
-    )
-  }
-
-  function removeRole(idx: number) {
-    setRoles((prev) => prev.filter((_, i) => i !== idx))
-    setSelectedMembers((prev) =>
-      prev.filter((m) => m.roleIdx !== idx).map((m) => ({ ...m, roleIdx: m.roleIdx > idx ? m.roleIdx - 1 : m.roleIdx }))
-    )
-    if (editingRoleIdx === idx) setEditingRoleIdx(null)
-  }
-
-  function toggleMemberSelection(memberId: string) {
-    setSelectedMembers((prev) => {
-      const exists = prev.find((m) => m.userId === memberId)
-      return exists ? prev.filter((m) => m.userId !== memberId) : [...prev, { userId: memberId, roleIdx: defaultMemberRoleIdx }]
-    })
-  }
-
-  function updateMemberRole(memberId: string, roleIdx: number) {
-    setSelectedMembers((prev) => prev.map((m) => (m.userId === memberId ? { ...m, roleIdx } : m)))
-  }
-
-  async function handleSave() {
-    if (!teamName.trim()) { setError("Team name is required."); return }
-    if (roles.some((r) => !r.name.trim())) { setError("All roles need a name."); return }
-    if (presidentRoleIdx < 0) { setError("Every team needs a President role."); return }
-    if (!presidentPick || (coPresidency && !presidentPick2)) { setError(coPresidency ? "Please select both co-presidents." : "Please select a president."); return }
-    setSaving(true)
-    setError(null)
-
-    const { data: team, error: teamErr } = await supabase
-      .from("teams")
-      .insert({ name: teamName.trim(), icon: teamIcon, description: teamDesc.trim() || null, ministry_id: ministryId, created_by: userId, team_type: selectedTeamType, allow_co_presidency: coPresidency, allow_admin_members: allowAdminMembers })
-      .select("id")
-      .single()
-
-    if (teamErr || !team) { setError(teamErr?.message ?? "Failed to create team."); setSaving(false); return }
-
-    const { data: createdRoles, error: rolesErr } = await supabase
-      .from("team_roles")
-      .insert(roles.map((r) => ({ team_id: team.id, name: r.name.trim(), permissions: r.permissions, is_president: !!r.is_president })))
-      .select("id")
-
-    if (rolesErr || !createdRoles) { setError(rolesErr?.message ?? "Failed to create roles."); setSaving(false); return }
-
-    // Creator always added with default non-president role.
-    // President is whoever was explicitly picked from the ministry.
-    const allMembersMap = new Map<string, number>()
-    allMembersMap.set(userId, defaultMemberRoleIdx)
-    if (presidentPick) allMembersMap.set(presidentPick, presidentRoleIdx >= 0 ? presidentRoleIdx : 0)
-    if (coPresidency && presidentPick2) allMembersMap.set(presidentPick2, presidentRoleIdx >= 0 ? presidentRoleIdx : 0)
-    for (const m of selectedMembers) {
-      if (!allMembersMap.has(m.userId)) allMembersMap.set(m.userId, m.roleIdx)
-    }
-
-    const { error: membersErr } = await supabase.from("team_members").insert(
-      Array.from(allMembersMap.entries()).map(([user_id, roleIdx]) => ({
-        team_id: team.id,
-        user_id,
-        role_id: createdRoles[roleIdx]?.id ?? createdRoles[0].id,
-        added_by: userId,
-      }))
-    )
-    if (membersErr) { setError(membersErr.message); setSaving(false); return }
-
-    // Elevate all initial members to "leader" role for DGL and Board teams
-    const allPerms = roles.flatMap(r => r.permissions)
-    const isLeaderTeam = allPerms.includes("can_create_dgs") || allPerms.includes("can_view_dgs") ||
-      (allPerms.includes("can_view_finances") && allPerms.includes("can_manage_members"))
-    if (isLeaderTeam) {
-      await elevateToLeader(Array.from(allMembersMap.keys()), ministryId)
-    }
-
-    onCreated(team.id)
-  }
-
-  // Governance separation: exclude admin-tier candidates unless this new team allows admin members.
-  const eligibleMembers = allowAdminMembers ? ministryMembers : ministryMembers.filter((m) => !isAdminTierRole(m.role))
-
-  const filteredMembers = eligibleMembers.filter((m) =>
-    m.name.toLowerCase().includes(memberSearch.toLowerCase()) &&
-    m.id !== presidentPick &&
-    m.id !== presidentPick2
-  )
-
-  const canAdvance = teamName.trim() !== "" && roles.every((r) => r.name.trim() !== "")
-
-  const STEPS = ["Choose a shape", "Customize", "Invite"]
-  const stepIndex = step === "preset" ? 0 : step === "customize" ? 1 : 2
 
   const overlay = (
-    <AnimateIn className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
+    <AnimateIn className="workspace-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-14 border-b border-[var(--line)] bg-[#FBF8F2] md:bg-[var(--cream)]">
         <button
-          onClick={step === "preset" ? onClose : () => setStep(step === "members" ? "customize" : "preset")}
+          onClick={onClose}
           className="flex items-center gap-1.5 text-[13px] text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          {step === "preset" ? "Cancel" : "Back"}
+          Cancel
         </button>
-        <span className="text-[14px] font-semibold text-[var(--ink)]">
-          {step === "preset" ? "New Team" : step === "customize" ? "Customize" : "Add Members"}
-        </span>
-        <div className="w-14 flex justify-end">
-          {step === "customize" && (
-            <button
-              onClick={() => setStep("members")}
-              disabled={!canAdvance}
-              className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30"
-            >
-              Next
-            </button>
-          )}
-          {step === "members" && (
-            <button onClick={handleSave} disabled={saving || presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2)} className="text-[13px] font-semibold text-[var(--plum)] disabled:opacity-30">
-              {saving ? "Saving…" : "Create"}
-            </button>
-          )}
-        </div>
+        <span className="text-[14px] font-semibold text-[var(--ink)]">Add workspace</span>
+        <div className="w-14" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-10 md:py-8 md:max-w-[900px] md:mx-auto md:w-full">
+      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-14 md:py-8 md:max-w-[820px] md:mx-auto md:w-full">
         {error && (
-          <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium mb-4">{error}</div>
+          <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium mb-4" style={{ background: "color-mix(in oklab, var(--plum) 8%, transparent)" }}>{error}</div>
         )}
 
-        {/* Desktop: serif hero + stepper */}
+        {/* Desktop serif hero */}
         <div className="hidden md:block mb-8">
-          <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--muted-text)] mb-2">Step {stepIndex + 1} of {STEPS.length}</p>
+          <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--muted-text)] mb-2">New workspace</p>
           <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, lineHeight: 1, color: "var(--ink)", fontWeight: 400, marginBottom: 8 }}>
-            {step === "preset" && "Pick the shape it should take."}
-            {step === "customize" && "Tune the details."}
-            {step === "members" && "Bring people in."}
+            Choose a workspace.
           </h1>
-          {step === "preset" && (
-            <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 560, lineHeight: 1.6 }}>
-              Start from a preset that fits your ministry. You can rename it, add or remove roles, and adjust permissions — nothing here is locked in.
-            </p>
-          )}
-          {step === "members" && (
-            <p style={{ fontSize: 14, color: "var(--body)" }}>Add members now, or skip and invite later.</p>
-          )}
-          {/* Stepper */}
-          <div style={{ display: "flex", gap: 28, marginTop: 22 }}>
-            {STEPS.map((s, i) => (
-              <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, opacity: i === stepIndex ? 1 : 0.45 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: 999,
-                  background: i < stepIndex ? "var(--plum)" : i === stepIndex ? "var(--ink)" : "transparent",
-                  border: i > stepIndex ? "1px solid var(--line)" : "none",
-                  color: "#F6F4EF", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11,
-                }}>
-                  {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
-                </div>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>{s}</span>
-              </div>
-            ))}
-          </div>
+          <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 560, lineHeight: 1.6 }}>
+            Each workspace comes preset for a part of your ministry. It starts empty — you&apos;ll assign a president next.
+          </p>
         </div>
+        <p className="md:hidden text-[13px] text-[var(--muted-text)] mb-3">Each workspace comes preset for a part of your ministry.</p>
 
-        {/* Step 1: Preset picker */}
-        {step === "preset" && (
-          <div>
-            {/* Mobile intro */}
-            <p className="md:hidden text-[13px] text-[var(--muted-text)] mb-3">Start with a preset or build from scratch.</p>
+        {available.length === 0 && (
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--cream-2)] px-4 py-5 mb-6 text-[13px] text-[var(--body)] leading-relaxed">
+            You already have every available workspace. More types are coming soon.
+          </div>
+        )}
 
-            {/* Desktop: 2-col grid; mobile: stack */}
-            <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {TEAM_PRESETS.map((preset) => {
-                const disabled = (preset as { comingSoon?: boolean }).comingSoon
-                return disabled ? (
-                  <div
-                    key={preset.id}
-                    className="w-full rounded-2xl border border-[var(--line)] p-4 text-left md:p-5"
-                    style={{ background: "#F8F6F2", opacity: 0.6, cursor: "not-allowed" }}
-                  >
-                    <div className="flex items-start gap-3 mb-2">
-                      <span className="text-[22px] mt-0.5 grayscale">{preset.icon}</span>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
-                          <span className="text-[10px] font-semibold tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
-                        </div>
-                        <p className="text-[12px] text-[#C4C0B0] mt-1">{preset.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
+        {/* Available presets */}
+        {available.length > 0 && (
+          <div className="flex flex-col gap-3 md:grid md:gap-4 mb-6" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            {available.map((preset) => {
+              const isSaving = saving === preset.id
+              return (
                 <button
                   key={preset.id}
-                  onClick={() => applyPreset(preset)}
-                  className="w-full bg-white rounded-2xl border border-[var(--line)] p-4 text-left hover:border-[#3E1540]/40 hover:bg-[#FDFBF7] transition-all shadow-[0_1px_4px_rgba(19,16,26,0.06)] md:p-5"
-                  style={{ boxShadow: "none" }}
+                  onClick={() => handleSelect(preset)}
+                  disabled={!!saving}
+                  className="w-full bg-[var(--ivory)] rounded-2xl border border-[var(--line)] p-4 text-left hover:border-[var(--plum)] transition-all md:p-5 disabled:opacity-60"
                 >
-                  <div className="flex items-start gap-3 mb-2">
-                    <span className="text-[22px] mt-0.5">{preset.icon}</span>
-                    <div className="flex-1">
+                  <div className="flex items-start gap-3">
+                    <PlanLineIcon iconKey={preset.iconKey} size={40} />
+                    <div className="flex-1 min-w-0">
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--ink)] leading-tight">{preset.name}</p>
                       <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
                     </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-[var(--line)]">
-                    <p className="text-[10px] tracking-[0.12em] uppercase text-[var(--muted-text)] mb-2">Roles · {preset.roles.length}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {preset.roles.map((r) => (
-                        <span key={r.name} className="text-[11px] bg-[#FBF8F2] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
-                          {r.name}
-                        </span>
-                      ))}
-                    </div>
+                    {isSaving && <Loader2 className="w-4 h-4 animate-spin text-[var(--plum)] mt-1" />}
                   </div>
                 </button>
-                )
-              })}
-            </div>
-
-            {/* Desktop: footer nav */}
-            <div className="hidden md:flex justify-end mt-8 pt-6 border-t border-[var(--line)]">
-              <p className="text-[12px] text-[var(--muted-text)] flex-1 self-center">You can change everything later.</p>
-            </div>
+              )
+            })}
           </div>
         )}
 
-        {/* Step 2: Customize */}
-        {step === "customize" && (
-          <div className="flex flex-col gap-5">
-            <div className="flex gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[var(--body)]">Icon</label>
-                <input
-                  type="text"
-                  value={teamIcon}
-                  onChange={(e) => setTeamIcon(e.target.value.slice(-2) || "👥")}
-                  className="w-14 h-12 text-center text-[20px] rounded-xl border border-[var(--line)] bg-[#FBF8F2] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-                />
-              </div>
-              <div className="flex-1 flex flex-col gap-1.5">
-                <label className="text-[12px] font-medium text-[var(--body)]">Team name</label>
-                <input
-                  type="text"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  placeholder="e.g. Praise Team"
-                  className="w-full h-12 px-4 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[12px] font-medium text-[var(--body)]">Description (optional)</label>
-              <input
-                type="text"
-                value={teamDesc}
-                onChange={(e) => setTeamDesc(e.target.value)}
-                placeholder="What does this team do?"
-                className="w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-[12px] font-medium text-[var(--body)]">Roles</label>
-                <button onClick={addRole} className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity">
-                  + Add role
-                </button>
-              </div>
-              <div className="flex flex-col gap-2">
-                {roles.map((role, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden">
-                    <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                      onClick={() => setEditingRoleIdx(editingRoleIdx === idx ? null : idx)}
-                    >
-                      <input
-                        type="text"
-                        value={role.name}
-                        onChange={(e) => { e.stopPropagation(); updateRoleName(idx, e.target.value) }}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="Role name"
-                        className="flex-1 text-[14px] font-semibold text-[var(--ink)] bg-transparent focus:outline-none placeholder:text-[#C4C4C4] placeholder:font-normal"
-                      />
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[11px] text-[var(--muted-text)]">{role.permissions.length} perms</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-[#C4C4C4] transition-transform ${editingRoleIdx === idx ? "rotate-180" : ""}`} />
-                        {roles.length > 1 && (
-                          <button onClick={(e) => { e.stopPropagation(); removeRole(idx) }}>
-                            <X className="w-3.5 h-3.5 text-[#C4C4C4] hover:text-[var(--plum)] transition-colors" />
-                          </button>
-                        )}
+        {/* Coming-soon presets (disabled) */}
+        {comingSoon.length > 0 && (
+          <>
+            <p className="text-[11px] tracking-[0.12em] uppercase text-[var(--muted-text)] mb-3">More coming soon</p>
+            <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              {comingSoon.map((preset) => (
+                <div
+                  key={preset.id}
+                  className="w-full rounded-2xl border border-[var(--line)] p-4 text-left md:p-5"
+                  style={{ background: "var(--cream-2)", opacity: 0.6, cursor: "not-allowed" }}
+                >
+                  <div className="flex items-start gap-3">
+                    <PlanLineIcon iconKey={preset.iconKey} size={40} bg="var(--line)" fg="var(--muted-text)" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
+                        <span className="text-[10px] font-semibold tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
                       </div>
+                      <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
                     </div>
-                    {editingRoleIdx === idx && (
-                      <div className="border-t border-[var(--line)] px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {ALL_PERMISSIONS.map((perm) => {
-                            const active = role.permissions.includes(perm)
-                            return (
-                              <button
-                                key={perm}
-                                onClick={() => toggleRolePermission(idx, perm)}
-                                className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
-                                  active
-                                    ? "bg-[var(--plum)] border-[var(--plum)] text-[#F6F4EF]"
-                                    : "bg-[#FBF8F2] border-[var(--line)] text-[var(--body)] hover:border-[#3E1540]/30"
-                                }`}
-                              >
-                                {PERMISSION_LABELS[perm]}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Members */}
-        {step === "members" && (
-          <div className="flex flex-col gap-4">
-            <p className="text-[13px] text-[var(--muted-text)]">Select {coPresidency ? "two co-presidents" : "a president"}, then add other members.</p>
-
-            {/* ── Required: President picker ── */}
-            {presidentRoleIdx >= 0 && (
-              <div className="rounded-xl border-2 border-[#3E1540]/25 bg-[#F8F5FF] p-3 flex flex-col gap-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-[var(--plum)] uppercase tracking-wider">{roles[presidentRoleIdx].name}</span>
-                  <span className="text-[10px] font-medium text-[#EF4444] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-full">Required</span>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
-                      className="flex items-center gap-1.5 text-[11px] text-[var(--body)] hover:text-[var(--plum)] transition-colors"
-                    >
-                      <span className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${coPresidency ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"}`}>
-                        {coPresidency && <Check className="w-2.5 h-2.5 text-white" />}
-                      </span>
-                      Co-presidency
-                    </button>
                   </div>
                 </div>
-                {/* First president */}
-                {presidentPick ? (
-                  <div className="flex items-center gap-3 bg-[var(--plum)] rounded-lg px-3 py-2.5">
-                    <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
-                      {ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}
-                    </span>
-                    <button onClick={() => setPresidentPick(null)} className="text-[#F6F4EF]/60 hover:text-[#F6F4EF] transition-colors">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <select
-                    value=""
-                    onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
-                    className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-                  >
-                    <option value="" disabled>Select a person…</option>
-                    {eligibleMembers.filter(m => m.id !== presidentPick2).map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                )}
-                {/* Second president (co-presidency only) */}
-                {coPresidency && (
-                  presidentPick2 ? (
-                    <div className="flex items-center gap-3 bg-[var(--plum)] rounded-lg px-3 py-2.5">
-                      <span className="flex-1 text-[14px] font-medium text-[#F6F4EF]">
-                        {ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}
-                      </span>
-                      <button onClick={() => setPresidentPick2(null)} className="text-[#F6F4EF]/60 hover:text-[#F6F4EF] transition-colors">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <select
-                      value=""
-                      onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
-                      className="w-full bg-white border border-[var(--line)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-                    >
-                      <option value="" disabled>Select second person…</option>
-                      {eligibleMembers.filter(m => m.id !== presidentPick).map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Allow admins as members — governance override (default off) */}
-            <button
-              type="button"
-              onClick={() => setAllowAdminMembers(v => {
-                const next = !v
-                if (!next) {
-                  if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick)?.role)) setPresidentPick(null)
-                  if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick2)?.role)) setPresidentPick2(null)
-                  setSelectedMembers(prev => prev.filter(sm => !isAdminTierRole(ministryMembers.find(m => m.id === sm.userId)?.role)))
-                }
-                return next
-              })}
-              className="flex items-start gap-2.5 rounded-xl border border-[var(--line)] bg-white p-3 text-left"
-            >
-              <span className={`mt-0.5 w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center flex-shrink-0 transition-colors ${allowAdminMembers ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"}`}>
-                {allowAdminMembers && <Check className="w-2.5 h-2.5 text-white" />}
-              </span>
-              <span className="flex flex-col">
-                <span className="text-[13px] font-medium text-[var(--ink)]">Allow admins as members</span>
-                <span className="text-[12px] text-[var(--muted-text)]">By default admins govern teams without being members.</span>
-              </span>
-            </button>
-
-            {/* Creator row — always added with non-president role */}
-            <div className="flex items-center gap-3 bg-[#F4F1E8] rounded-xl border border-[var(--line)] p-3">
-              <div className="w-5 h-5 rounded-md bg-[var(--plum)] border-[var(--plum)] border-2 flex items-center justify-center flex-shrink-0">
-                <Check className="w-3 h-3 text-white" />
-              </div>
-              <span className="flex-1 text-[14px] font-medium text-[var(--ink)]">
-                {userName} <span className="text-[var(--muted-text)] font-normal">(you)</span>
-              </span>
-              <span className="text-[12px] text-[var(--body)] font-medium">
-                {roles[defaultMemberRoleIdx]?.name ?? roles[0]?.name}
-              </span>
+              ))}
             </div>
-
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C4C4C4]" />
-              <input
-                type="text"
-                value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
-                placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] border border-[var(--line)] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {filteredMembers.length === 0 && (
-                <p className="text-[13px] text-[var(--muted-text)] text-center py-6">No other members to add.</p>
-              )}
-              {filteredMembers.map((member) => {
-                const sel = selectedMembers.find((m) => m.userId === member.id)
-                const assignableRoles = roles
-                  .map((r, i) => ({ ...r, i }))
-                  .filter((r) => !r.is_president)
-                return (
-                  <div key={member.id} className="flex items-center gap-3 bg-white rounded-xl border border-[var(--line)] p-3">
-                    <button
-                      onClick={() => toggleMemberSelection(member.id)}
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                        sel ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#C4C4C4]"
-                      }`}
-                    >
-                      {sel && <Check className="w-3 h-3 text-white" />}
-                    </button>
-                    <span className="flex-1 text-[14px] font-medium text-[var(--ink)]">{member.name}</span>
-                    {sel && assignableRoles.length > 1 && (
-                      <select
-                        value={sel.roleIdx}
-                        onChange={(e) => updateMemberRole(member.id, Number(e.target.value))}
-                        className="text-[12px] text-[var(--body)] bg-[#FBF8F2] border border-[var(--line)] rounded-lg px-2 py-1 focus:outline-none"
-                      >
-                        {assignableRoles.map(({ name, i }) => (
-                          <option key={i} value={i}>{name || `Role ${i + 1}`}</option>
-                        ))}
-                      </select>
-                    )}
-                    {sel && assignableRoles.length <= 1 && (
-                      <span className="text-[12px] text-[var(--muted-text)]">{assignableRoles[0]?.name ?? roles[0].name}</span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          </>
         )}
       </div>
     </AnimateIn>
@@ -10900,546 +10427,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
   if (!mounted) return null
   return createPortal(overlay, document.body)
-}
-
-// ── QuickCreateTeamModal — 3-step design-system-aligned wizard ────────────────
-
-// SVG paths for the icon picker grid (Lucide-stroked, 24×24 viewBox)
-const WIZARD_ICON_OPTIONS = [
-  { key: "users",    d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm7-8a4 4 0 0 1 0 7.75" },
-  { key: "music",    d: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" },
-  { key: "book",     d: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" },
-  { key: "slides",   d: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8 21h8M12 17v4" },
-  { key: "chat",     d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
-  { key: "plan",     d: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" },
-  { key: "calendar", d: "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 2v4M16 2v4" },
-  { key: "globe",    d: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" },
-  { key: "sparkle",  d: "M12 3v6M12 15v6M3 12h6M15 12h6M6.4 6.4l3.2 3.2M14.4 14.4l3.2 3.2M6.4 17.6l3.2-3.2M14.4 9.6l3.2-3.2" },
-  { key: "clipboard",d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" },
-  { key: "dollar",   d: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
-]
-
-// Step 1 preset display data (icon keys, no emojis)
-const WIZARD_PRESETS_DISPLAY = [
-  { id: "board",     iconKey: "book",     label: "Student Org Board",   desc: "Event planning, finances, attendance, member management.", restricted: false, comingSoon: false },
-  { id: "finance",   iconKey: "dollar",   label: "Finance Team",        desc: "Budget, allocation, and reimbursements.",                 restricted: false, comingSoon: false },
-  { id: "dgl",       iconKey: "users",    label: "Small Group Leaders", desc: "Discipleship groups, bible study, attendance.",            restricted: false, comingSoon: false },
-  { id: "praise",    iconKey: "music",    label: "Praise Team",         desc: "Worship scheduling, set lists, slides, charts.",          restricted: false, comingSoon: true  },
-  { id: "tech",      iconKey: "slides",   label: "Tech Team",           desc: "Slides, A/V, and worship set viewing.",                   restricted: false, comingSoon: true  },
-  { id: "dg_praise", iconKey: "music",    label: "DG Praise Team",      desc: "Lightweight praise team for a discipleship group.",        restricted: true,  comingSoon: true  },
-  { id: "one_time",  iconKey: "music",    label: "One-Time Event",      desc: "Praise team for a one-time event (SSO, Welcome Week…).",  restricted: true,  comingSoon: true  },
-]
-
-const WIZARD_MONO = {
-  fontFamily: "ui-monospace,'SF Mono',Menlo,monospace" as const,
-  fontSize: 11,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  color: "var(--muted-text)",
-}
-
-export function QuickCreateTeamModal({ userId, ministryId, isAdmin, isDGL, isPraiseTeamMember, onClose, onCreated }: {
-  userId: string
-  ministryId: string
-  isAdmin?: boolean
-  isDGL?: boolean
-  isPraiseTeamMember?: boolean
-  onClose: () => void
-  onCreated: (teamId: string) => void
-}) {
-  const supabase = createClient()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [name, setName] = useState("")
-  const [iconKey, setIconKey] = useState("users")
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
-  const [roles, setRoles] = useState<Array<{ name: string; permissions: string[]; is_president: boolean }>>([])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // President picker state
-  const [presidentPick, setPresidentPick] = useState<string | null>(null)
-  const [presidentPick2, setPresidentPick2] = useState<string | null>(null)
-  const [coPresidency, setCoPresidency] = useState(false)
-  // New teams default to governance separation: admin-tier users excluded from membership.
-  const [allowAdminMembers, setAllowAdminMembers] = useState(false)
-  const [ministryMembers, setMinistryMembers] = useState<{ id: string; name: string; role?: string }[]>([])
-
-  // Index of the first president role (by explicit flag) — drives the required picker in step 3
-  const presidentRoleIdx = roles.findIndex(r => r.is_president)
-  const defaultMemberRoleIdx = (() => {
-    for (let i = roles.length - 1; i >= 0; i--) {
-      if (!roles[i].is_president) return i
-    }
-    return 0
-  })()
-
-  useEffect(() => {
-    if (step !== 3 || presidentRoleIdx < 0) return
-    supabase
-      .from("profiles")
-      .select("id, name, role")
-      .eq("ministry_id", ministryId)
-      .neq("id", userId)
-      .order("name")
-      .then(({ data }) => setMinistryMembers(data ?? []))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, presidentRoleIdx])
-
-  function applyPreset(presetId: string) {
-    const display = WIZARD_PRESETS_DISPLAY.find(p => p.id === presetId)
-    const data    = TEAM_PRESETS.find(p => p.id === presetId)
-    if (display) { if (!name.trim()) setName(display.label); setIconKey(display.iconKey) }
-    if (data) setRoles(data.roles.map(r => ({ name: r.name, permissions: [...r.permissions], is_president: "is_president" in r ? !!r.is_president : false })))
-    // Reset president picks when preset changes
-    setPresidentPick(null); setPresidentPick2(null); setCoPresidency(false)
-  }
-
-  function toggleRolePermission(ri: number, perm: string) {
-    setRoles(prev => prev.map((r, i) => {
-      if (i !== ri) return r
-      return { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter(p => p !== perm) : [...r.permissions, perm] }
-    }))
-  }
-
-  function getVisiblePerms(): string[] {
-    if (!selectedPresetId) return ALL_PERMISSIONS
-    const map: Record<string, string[]> = { praise: TEAM_PERMISSION_FILTERS.praise, board: TEAM_PERMISSION_FILTERS.student_org, dgl: TEAM_PERMISSION_FILTERS.small_group }
-    return map[selectedPresetId] ?? ALL_PERMISSIONS
-  }
-
-  async function handleCreate() {
-    if (presidentRoleIdx < 0) { setError("Every team needs a President role."); setSaving(false); return }
-    if (!presidentPick || (coPresidency && !presidentPick2)) {
-      setError(coPresidency ? "Please select both co-presidents." : "Please select a president.")
-      setSaving(false)
-      return
-    }
-    setSaving(true); setError(null)
-    const presetData = TEAM_PRESETS.find(p => p.id === selectedPresetId)
-    const teamType = (presetData as { teamType?: string } | undefined)?.teamType ?? "standard"
-    const { data: team, error: tErr } = await supabase
-      .from("teams").insert({ name: name.trim(), icon: iconKey, ministry_id: ministryId, created_by: userId, team_type: teamType, allow_co_presidency: coPresidency, allow_admin_members: allowAdminMembers })
-      .select("id").single()
-    if (tErr || !team) { setError(tErr?.message ?? "Failed to create team."); setSaving(false); return }
-
-    const createdRoleIds: string[] = []
-    for (let i = 0; i < roles.length; i++) {
-      const { data: role, error: rErr } = await supabase
-        .from("team_roles").insert({ team_id: team.id, name: roles[i].name, permissions: roles[i].permissions, is_president: !!roles[i].is_president })
-        .select("id").single()
-      if (rErr || !role) { setError(rErr?.message ?? "Failed to create role."); setSaving(false); return }
-      createdRoleIds.push(role.id)
-    }
-    if (createdRoleIds.length === 0) {
-      const { data: admin, error: aErr } = await supabase
-        .from("team_roles").insert({ team_id: team.id, name: "Admin", permissions: ALL_PERMISSIONS })
-        .select("id").single()
-      if (aErr || !admin) { setError(aErr?.message ?? "Failed to create role."); setSaving(false); return }
-      createdRoleIds.push(admin.id)
-    }
-
-    // Build member map: creator gets default non-president role; picked president(s) get president role
-    const memberRoleMap = new Map<string, string>()
-    const creatorRoleId = createdRoleIds[defaultMemberRoleIdx] ?? createdRoleIds[0]
-    const presidentRoleId = presidentRoleIdx >= 0 ? (createdRoleIds[presidentRoleIdx] ?? createdRoleIds[0]) : createdRoleIds[0]
-    memberRoleMap.set(userId, creatorRoleId)
-    if (presidentPick) memberRoleMap.set(presidentPick, presidentRoleId)
-    if (coPresidency && presidentPick2) memberRoleMap.set(presidentPick2, presidentRoleId)
-
-    const { error: mErr } = await supabase.from("team_members").insert(
-      Array.from(memberRoleMap.entries()).map(([user_id, role_id]) => ({ team_id: team.id, user_id, role_id, added_by: userId }))
-    )
-    if (mErr) { setError(mErr.message); setSaving(false); return }
-
-    // Elevate all initial members to "leader" for DGL and Board teams
-    if (selectedPresetId === "dgl" || selectedPresetId === "board") {
-      await elevateToLeader(Array.from(memberRoleMap.keys()), ministryId)
-    }
-
-    // For DGL teams, auto-seed the semester roster with the picked presidents
-    if (selectedPresetId === "dgl" && (presidentPick || presidentPick2)) {
-      const rosterIds = [presidentPick, coPresidency ? presidentPick2 : null].filter(Boolean) as string[]
-      await confirmDGLRosterAction(team.id, ministryId, rosterIds, getSemesterLabel(), userId)
-    }
-
-    onCreated(team.id)
-  }
-
-  const visiblePerms = getVisiblePerms()
-  const selectedDisplay = WIZARD_PRESETS_DISPLAY.find(p => p.id === selectedPresetId)
-  const topRoleName = roles[0]?.name ?? "Admin"
-  // Governance separation: exclude admin-tier candidates unless this new team allows admin members.
-  const eligibleMembers = allowAdminMembers ? ministryMembers : ministryMembers.filter((m) => !isAdminTierRole(m.role))
-
-  const stepTitles = { 1: "Choose a template", 2: "Name your team", 3: "Review & create" } as const
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center animate-backdrop-in"
-      style={{ background: "rgba(20,16,26,0.32)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="animate-dialog-in" style={{ width: 640, maxHeight: "92vh", display: "flex", flexDirection: "column", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
-
-        {/* Modal header */}
-        <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {step > 1 ? (
-            <button onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-              <ArrowLeft style={{ width: 14, height: 14 }} /> Back
-            </button>
-          ) : <span />}
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <X style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
-
-        <div style={{ padding: "12px 32px 0", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-          <div>
-            <div style={WIZARD_MONO}>NEW TEAM</div>
-            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 34, margin: "6px 0 0", letterSpacing: "-0.4px", color: "var(--ink)", fontWeight: 400, lineHeight: 1.1 }}>
-              {stepTitles[step]}
-            </h2>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <span style={{ ...WIZARD_MONO, fontSize: 10, letterSpacing: "0.08em" }}>STEP {step} OF 3</span>
-            <div style={{ display: "flex", gap: 4 }}>
-              {[1, 2, 3].map(i => <span key={i} style={{ width: 22, height: 3, borderRadius: 99, background: i <= step ? "var(--plum)" : "var(--line-2)" }} />)}
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px 28px" }}>
-
-          {/* ── Step 1: Choose a template ── */}
-          {step === 1 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {WIZARD_PRESETS_DISPLAY.filter(p => {
-                if (p.restricted) return isAdmin || isDGL || isPraiseTeamMember
-                return !!isAdmin
-              }).map(p => {
-                const on = selectedPresetId === p.id
-                const roleCount = TEAM_PRESETS.find(t => t.id === p.id)?.roles.length ?? 0
-                const iconOpt = WIZARD_ICON_OPTIONS.find(o => o.key === p.iconKey)
-                if (p.comingSoon) {
-                  return (
-                    <div key={p.id} style={{
-                      display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
-                      border: "1px solid var(--line)", background: "#F8F6F2",
-                      opacity: 0.55, cursor: "not-allowed",
-                    }}>
-                      <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: "#EDE9E0", color: "#A09A8C", display: "grid", placeItems: "center" }}>
-                        {iconOpt && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconOpt.d}/></svg>}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--muted-text)" }}>{p.label}</span>
-                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--line)", color: "var(--muted-text)", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>Coming soon</span>
-                        </span>
-                        <span style={{ display: "block", fontSize: 12.5, color: "#C4C0B0", marginTop: 3 }}>{p.desc}</span>
-                      </span>
-                    </div>
-                  )
-                }
-                return (
-                  <button key={p.id} onClick={() => setSelectedPresetId(p.id)} style={{
-                    display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 12,
-                    textAlign: "left" as const, width: "100%", cursor: "pointer", fontFamily: "inherit",
-                    border: "1px solid " + (on ? "var(--plum)" : "var(--line)"),
-                    background: on ? "#F6F2E8" : "#FBF8F2",
-                    boxShadow: on ? "inset 0 0 0 1px var(--plum)" : "none",
-                    transition: "border-color 0.1s, background 0.1s",
-                  }}>
-                    <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: on ? "var(--plum)" : "var(--ivory)", color: on ? "#FBF8F2" : "var(--plum)", display: "grid", placeItems: "center" }}>
-                      {iconOpt && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={iconOpt.d}/></svg>}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{p.label}</span>
-                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--muted-text)", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 500 }}>{roleCount} roles</span>
-                      </span>
-                      <span style={{ display: "block", fontSize: 12.5, color: "var(--body)", marginTop: 3 }}>{p.desc}</span>
-                    </span>
-                    <span style={{ width: 18, height: 18, borderRadius: 99, flexShrink: 0, border: "1.5px solid " + (on ? "var(--plum)" : "#C4C0B0"), background: on ? "var(--plum)" : "transparent", display: "grid", placeItems: "center" }}>
-                      {on && <span style={{ width: 7, height: 7, borderRadius: 99, background: "#FBF8F2" }} />}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* ── Step 2: Name your team ── */}
-          {step === 2 && (
-            <>
-              {/* Live preview tile */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid var(--line)", borderRadius: 14, background: "#F6F2E8", marginBottom: 28 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="var(--plum)" fg="#FBF8F2" />
-                <div>
-                  <div style={WIZARD_MONO}>PREVIEW</div>
-                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", marginTop: 4, letterSpacing: "-0.2px", fontWeight: 400, lineHeight: 1.1 }}>
-                    {name || selectedDisplay?.label || "Your Team"}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 3 }}>
-                    {roles.length} role{roles.length !== 1 ? "s" : ""} · You will be {topRoleName}
-                  </div>
-                </div>
-              </div>
-
-              <label style={{ display: "block", marginBottom: 24 }}>
-                <div style={WIZARD_MONO}>TEAM NAME</div>
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={e => { setName(e.target.value); setError(null) }}
-                  onKeyDown={e => { if (e.key === "Escape") onClose() }}
-                  placeholder={selectedDisplay?.label ?? "e.g. Media Team"}
-                  style={{
-                    width: "100%", padding: "11px 14px", marginTop: 8,
-                    border: "1px solid " + (error ? "#9F3030" : "var(--line-2)"), borderRadius: 10,
-                    background: "#FBF8F2", fontSize: 15, fontFamily: "inherit", color: "var(--ink)",
-                    outline: "none", boxSizing: "border-box" as const,
-                  }}
-                />
-                {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 6 }}>{error}</p>}
-              </label>
-
-              <div>
-                <div style={WIZARD_MONO}>ICON</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 8, marginTop: 10 }}>
-                  {WIZARD_ICON_OPTIONS.map(opt => (
-                    <button key={opt.key} onClick={() => setIconKey(opt.key)} style={{
-                      aspectRatio: "1", borderRadius: 10, cursor: "pointer", padding: 8,
-                      border: "1px solid " + (iconKey === opt.key ? "var(--plum)" : "var(--line-2)"),
-                      background: iconKey === opt.key ? "var(--plum)" : "#FBF8F2",
-                      color: iconKey === opt.key ? "#FBF8F2" : "var(--body)",
-                      boxShadow: iconKey === opt.key ? "0 0 0 3px #F6F2E8 inset" : "none",
-                      display: "grid", placeItems: "center",
-                      transition: "border-color 0.1s, background 0.1s",
-                    }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                        <path d={opt.d}/>
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-                <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8 }}>One small, monochromatic mark — keeps the sidebar legible.</p>
-              </div>
-            </>
-          )}
-
-          {/* ── Step 3: Review & create ── */}
-          {step === 3 && (
-            <>
-              {/* Identity summary */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 22px", border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", marginBottom: 24 }}>
-                <PlanLineIcon iconKey={iconKey} size={52} bg="var(--plum)" fg="#FBF8F2" />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.2px", fontWeight: 400 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>
-                    {selectedDisplay ? `Based on ${selectedDisplay.label}` : "Custom"} · {roles.length} role{roles.length !== 1 ? "s" : ""}
-                  </div>
-                </div>
-                <button onClick={() => setStep(2)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Edit3 style={{ width: 13, height: 13 }} /> Edit
-                </button>
-              </div>
-
-              {/* ── President picker (required when preset has a president role) ── */}
-              {presidentRoleIdx >= 0 && (
-                <div style={{ border: "2px solid rgba(62,21,64,0.2)", borderRadius: 14, background: "#F8F5FF", padding: "16px 18px", marginBottom: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <span style={{ ...WIZARD_MONO, color: "var(--plum)" }}>{roles[presidentRoleIdx].name}</span>
-                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#FEE2E2", color: "#9F3030", border: "1px solid #FECACA", fontWeight: 600, letterSpacing: "0.3px", textTransform: "uppercase" as const }}>Required</span>
-                    <div style={{ marginLeft: "auto" }}>
-                      <button
-                        type="button"
-                        onClick={() => { setCoPresidency(v => !v); setPresidentPick2(null) }}
-                        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--body)", fontFamily: "inherit", padding: 0 }}
-                      >
-                        <span style={{ width: 14, height: 14, borderRadius: 3, border: `1px solid ${coPresidency ? "var(--plum)" : "#C4C4C4"}`, background: coPresidency ? "var(--plum)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
-                          {coPresidency && <Check style={{ width: 9, height: 9, color: "#fff" }} />}
-                        </span>
-                        Co-presidency
-                      </button>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 10, lineHeight: 1.5 }}>
-                    You will remain in your ministry role. Pick who holds this position from your ministry.
-                  </p>
-                  {/* First president */}
-                  {presidentPick ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--plum)", borderRadius: 10, padding: "10px 14px", marginBottom: coPresidency ? 8 : 0 }}>
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick)?.name ?? "Unknown"}</span>
-                      <button onClick={() => setPresidentPick(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
-                        <X style={{ width: 14, height: 14 }} />
-                      </button>
-                    </div>
-                  ) : (
-                    <select
-                      value=""
-                      onChange={e => { if (e.target.value) setPresidentPick(e.target.value) }}
-                      style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit", marginBottom: coPresidency ? 8 : 0 }}
-                    >
-                      <option value="" disabled>Select a person…</option>
-                      {eligibleMembers.filter(m => m.id !== presidentPick2).map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  {/* Second president (co-presidency) */}
-                  {coPresidency && (
-                    presidentPick2 ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--plum)", borderRadius: 10, padding: "10px 14px" }}>
-                        <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "#F6F4EF" }}>{ministryMembers.find(m => m.id === presidentPick2)?.name ?? "Unknown"}</span>
-                        <button onClick={() => setPresidentPick2(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(246,244,239,0.6)", padding: 0, display: "flex" }}>
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value=""
-                        onChange={e => { if (e.target.value) setPresidentPick2(e.target.value) }}
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "#fff", fontSize: 13, color: "var(--ink)", fontFamily: "inherit" }}
-                      >
-                        <option value="" disabled>Select second person…</option>
-                        {eligibleMembers.filter(m => m.id !== presidentPick).map(m => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
-                    )
-                  )}
-                </div>
-              )}
-
-              {/* Allow admins as members — governance override (default off) */}
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !allowAdminMembers
-                  if (!next) {
-                    if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick)?.role)) setPresidentPick(null)
-                    if (isAdminTierRole(ministryMembers.find(m => m.id === presidentPick2)?.role)) setPresidentPick2(null)
-                  }
-                  setAllowAdminMembers(next)
-                }}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", border: "1px solid var(--line)", background: "#fff", borderRadius: 12, padding: "12px 14px", marginBottom: 24, cursor: "pointer", fontFamily: "inherit", textAlign: "left" as const }}
-              >
-                <span style={{ marginTop: 2, width: 14, height: 14, borderRadius: 3, border: `1px solid ${allowAdminMembers ? "var(--plum)" : "#C4C4C4"}`, background: allowAdminMembers ? "var(--plum)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.1s" }}>
-                  {allowAdminMembers && <Check style={{ width: 9, height: 9, color: "#fff" }} />}
-                </span>
-                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Allow admins as members</span>
-                  <span style={{ fontSize: 12, color: "var(--muted-text)" }}>By default admins govern teams without being members.</span>
-                </span>
-              </button>
-
-              {/* Roles header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={WIZARD_MONO}>ROLES · {roles.length}</div>
-                {selectedPresetId === "custom" && (
-                  <button onClick={() => setRoles(prev => [...prev, { name: "New Role", permissions: [], is_president: false }])} style={{ background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                    <Plus style={{ width: 13, height: 13 }} /> Add role
-                  </button>
-                )}
-              </div>
-
-              {selectedPresetId === "custom" && roles.length === 0 && (
-                <button onClick={() => setRoles([{ name: "New Role", permissions: [], is_president: false }])} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", borderRadius: 10, border: "1px dashed #C4C0B0", background: "none", cursor: "pointer", fontSize: 13, color: "var(--muted-text)", fontFamily: "inherit" }}>
-                  <Plus style={{ width: 13, height: 13 }} /> Add first role
-                </button>
-              )}
-
-              {roles.map((role, ri) => (
-                <div key={ri} style={{ padding: "14px 0", borderTop: ri > 0 ? "1px solid #EFE9DA" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    {selectedPresetId === "custom" ? (
-                      <input
-                        value={role.name}
-                        onChange={e => setRoles(prev => prev.map((r, i) => i === ri ? { ...r, name: e.target.value } : r))}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)", border: "none", background: "transparent", outline: "none", padding: 0, flex: 1 }}
-                      />
-                    ) : (
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)" }}>{role.name}</span>
-                    )}
-                    {ri === defaultMemberRoleIdx && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--plum-2)", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>You</span>}
-                    {ri === presidentRoleIdx && presidentRoleIdx !== defaultMemberRoleIdx && presidentPick && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", letterSpacing: "0.4px", textTransform: "uppercase" as const, fontWeight: 600 }}>{ministryMembers.find(m => m.id === presidentPick)?.name?.split(" ")[0] ?? "Selected"}</span>}
-                    <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{role.permissions.length} permission{role.permissions.length !== 1 ? "s" : ""}</span>
-                    {selectedPresetId === "custom" && (
-                      <button onClick={() => setRoles(prev => prev.filter((_, i) => i !== ri))} style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: "var(--muted-text)", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                        <X style={{ width: 13, height: 13 }} />
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-                    {visiblePerms.map(perm => {
-                      const active = role.permissions.includes(perm)
-                      return (
-                        <button key={perm} onClick={() => toggleRolePermission(ri, perm)} style={{
-                          padding: "5px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                          border: "1px solid " + (active ? "#C8C0D8" : "var(--line)"),
-                          background: active ? "var(--ivory)" : "#FBF8F2",
-                          color: active ? "var(--plum-2)" : "#A09A8C",
-                          transition: "all 0.1s",
-                        }}>
-                          {PERMISSION_LABELS[perm] ?? perm}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {error && <p style={{ fontSize: 12, color: "#9F3030", marginTop: 16 }}>{error}</p>}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: "16px 28px 22px", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBF8F2" }}>
-          {step === 1 && (
-            <>
-              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Templates pre-fill icon, roles, and permissions. You can change anything next.</span>
-              <button
-                disabled={!selectedPresetId}
-                onClick={() => { if (selectedPresetId) { applyPreset(selectedPresetId); setStep(2) } }}
-                style={{ padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, cursor: selectedPresetId ? "pointer" : "not-allowed", opacity: selectedPresetId ? 1 : 0.45 }}
-              >
-                Continue <ChevronRight style={{ width: 14, height: 14 }} />
-              </button>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
-                Based on <span style={{ color: "var(--plum-2)", fontWeight: 500 }}>{selectedDisplay?.label ?? "custom"}</span>
-              </span>
-              <button
-                onClick={() => { if (!name.trim()) { setError("Team name is required."); return }; setError(null); setStep(3) }}
-                style={{ padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
-              >
-                Continue <ChevronRight style={{ width: 14, height: 14 }} />
-              </button>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>You can edit roles & permissions any time from team settings.</span>
-              <button
-                onClick={handleCreate}
-                disabled={saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))}
-                style={{ padding: "11px 24px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: (saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))) ? "not-allowed" : "pointer", opacity: (saving || (presidentRoleIdx < 0 || !presidentPick || (coPresidency && !presidentPick2))) ? 0.45 : 1, display: "flex", alignItems: "center", gap: 8 }}
-              >
-                {saving ? "Creating…" : <><Check style={{ width: 14, height: 14 }} /> Create team</>}
-              </button>
-            </>
-          )}
-        </div>
-
-      </div>
-    </div>
-  )
 }
 
 // ── SmallGroupLeadersTab ──────────────────────────────────────────────────────
