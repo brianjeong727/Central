@@ -1836,6 +1836,18 @@ export function PlanTab({
     onTeamSelect?.(team.id)
   }
 
+  // Receipts is a team like any other (unifying formality): its settings page is
+  // the active Receipts team's TeamDetailOverlay (members + president). Only the
+  // team's president or a governance admin may open it.
+  const activeReceiptsUserTeam = userTeams.find(t => t.teamId === activeReceiptsTeamId)
+  const canManageReceiptsTeam = !!activeReceiptsTeamId && ((activeReceiptsUserTeam?.isPresident ?? false) || isGovernanceAdmin)
+  function openActiveReceiptsTeamSettings() {
+    if (!activeReceiptsTeamId) return
+    const full = allTeams.find(t => t.id === activeReceiptsTeamId)
+      ?? (activeReceiptsUserTeam ? userTeamToTeam(activeReceiptsUserTeam) : null)
+    if (full) openSettings(full)
+  }
+
   // Reset internal component state when the user switches to a different team.
   // The sub-page URL params are cleared by home-app's handleTeamChange (one atomic
   // replace, set team + clear sub-params); this effect only does non-URL bookkeeping.
@@ -2175,6 +2187,7 @@ export function PlanTab({
             teams={receiptsTeams}
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
+            onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
           />
         ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
           /* Desktop: section nav lives in the sidebar (FinanceSectionNav) — no content strip here */
@@ -2299,6 +2312,7 @@ export function PlanTab({
             teams={receiptsTeams}
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
+            onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
           />
         ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
           <div>
