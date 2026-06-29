@@ -8,7 +8,7 @@ import { MonogramChip } from "./MonogramChip"
 interface ChatStripProps {
   chats: ChatPreview[]
   totalUnread: number
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   onSeeAll: () => void
   style?: CSSProperties
 }

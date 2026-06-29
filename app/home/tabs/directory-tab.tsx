@@ -158,7 +158,7 @@ export function DirectoryTab({
   initialMemberId?: string
   selectedMember?: DirectoryMember | null
   onMemberSelect?: (id: string | null) => void
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   onBack?: () => void
 }) {
   // Mobile-only state — desktop selection is driven by home-app via selectedMember prop
@@ -321,7 +321,7 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
   member: DirectoryMember
   currentUserId: string
   currentUserName: string
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [dmLoading, setDmLoading] = useState(false)
@@ -480,7 +480,7 @@ export function MemberSheet({
   currentUserId: string
   currentUserName: string
   onClose: () => void
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [dmLoading, setDmLoading] = useState(false)

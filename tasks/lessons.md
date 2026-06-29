@@ -12,43 +12,33 @@
 - Every client-side call to a server action needs a `catch` block, not just `try/finally`. `finally` runs but does not catch — if the action boundary itself throws (network error, serialization failure, unhandled server exception), the error propagates as an unhandled Promise rejection and the UI shows nothing. Pattern: `try { ... } catch (e) { setError(e.message) } finally { setLoading(false) }`.
 - Always check the return value of Supabase delete/insert/update and return the error with a descriptive message (not just "Failed to save"). Vague errors make production debugging impossible.
 
-## URL State Persistence
-Date: 2026-05-23
+## Navigation Persistence System (URL state)
+Date: 2026-05-23 (system formalized 2026-06-29)
 
-Rule: Every tabbed view must sync its active tab to the URL as a query parameter. This is not optional and should be implemented at the same time as the tabs themselves — never added manually later.
+This is now a SYSTEM, not per-tab hand-rolling. The single source of truth is `app/home/nav-state.ts` — do not reintroduce a copy-pasted `replaceParam` or write `new URLSearchParams + router.replace` inline.
 
-**Pattern:**
-```typescript
-// 1. Lazy init from URL on mount
-const [tab, setTab] = useState<TabType>(() => {
-  const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("mytab") : null
-  return validTabs.includes(p ?? "") ? p as TabType : "default"
-})
-// 2. Setter that writes state + URL together
-function setTabAndUrl(t: TabType) {
-  setTab(t)
-  const sp = new URLSearchParams(window.location.search)
-  sp.set("mytab", t)
-  router.replace(`/home?${sp.toString()}`, { scroll: false })
-}
-```
+### The three rules
+1. **Browse/read state persists** (URL): top-level tab, every subtab, and every "what am I viewing" selection. Reload restores you exactly.
+2. **Create/edit/settings surfaces are EPHEMERAL** (plain React state, NEVER a URL param): compose/edit, team settings, congregation create, journal entry editor, form-fill, chat settings, create-chat. A reload drops you back to the underlying browse view, unsaved work gone. Tabs unmount on switch and remount on active-nav reset, so plain state gives this for free.
+3. **Clicking the ACTIVE top-level nav resets that tab to its landing** (clears its params via `clearTabParams` + bumps `navResetKey` to remount the tab). **Switching to a DIFFERENT tab resumes where you left off** — only `?tab=` changes; other tabs' params are left intact.
 
-**URL params in use (as of 2026-05-23):**
-- `?tab=` — top-level sidebar tab (home/announcements/chats/plan/etc.)
-- `?team=` — active team ID in Plan tab
-- `?chats=` — ChatsTab sub-tab (church/my)
-- `?sotab=` — Student Org Board team tabs (General/Plan/Roster/Resources/Groups)
-- `?ptab=` — PraiseTeam sub-tabs (schedule/setlist/slides/availability)
-- `?evtab=` — EventPlanWorkspace sections (overview/checklist/roles/notes)
-- `?sgltab=` — SmallGroupLeadersTab tabs (home/schedule)
-- `?section=` — Profile section (spiritual-profile/journal)
-- `?member=` — Directory member
-- `?compose=` — Announcements compose/edit page (`new` = create, `{id}` = edit a specific announcement)
-- `?view=` — Plan tab sub-page overlay (settings)
+### The module (`app/home/nav-state.ts`)
+- `useNavState()` → `{ setParam, setParams, clearTabParams }`. `setParams(mutations)` is canonical: ONE atomic `router.replace` (set non-null keys, delete null keys), reads `window.location.search` at call time, SSR-guarded. `setParam` is the one-key convenience. `clearTabParams(tab, extra?)` deletes every `TAB_PARAMS[tab]` key in one replace.
+- `TAB_PARAMS: Record<Tab, string[]>` — the per-tab registry of owned BROWSE params. **Every browse param a tab writes MUST be listed here**, or active-nav reset leaves it stale. Ephemeral surfaces are NOT in the registry (they're plain state, not URL).
+- `handleNavClick(tab)` in home-app is the single handler wired to BOTH desktop sidebar and mobile bottom-nav (keep them symmetric — never two different handlers).
 
-**Sidebar navigation must atomically clear `view` param:** `handleSidebarTabChange` clears `view=settings` and sets `tab` in one `router.replace` call. Two separate `replaceParam` calls race on `window.location.search` — the second overwrites the first's deletion.
+### URL params in use (browse only; as of 2026-06-29)
+- `?tab=` — top-level tab · `?chats=` — ChatsTab church/my subtab · `?chat=` — open conversation (desktop+mobile)
+- `?team=`, `?sotab=`, `?ptab=`, `?evtab=`, `?sgltab=`, `?fsec=`, `?rteam=`, `?week=` — Plan tab / team sub-state
+- `?member=` — Directory member · `?section=` + `?jtab=` — Profile section + journal subtab
+- `?ann=` — open announcement detail overlay · `?cq=` — congregation responses detail · `?fresp=` — admin form-responses view · `?stab=` — Settings subtab
+- **Removed (now ephemeral plain state):** `?compose=` (announcements editor), `?view=settings` (plan settings), `?cnew=` (congregation create).
 
-**Team switch must clear all team-specific sub-params atomically:** On team change, clear `view`, `sotab`, `ptab`, `sgltab`, `evtab` in a single `router.replace` — same race condition applies to sequential calls.
+### Atomic-replace traps (Convention #5)
+- Never two `router.replace` in sequence for one logical navigation — they race on `window.location.search`. Build the full mutation and call `setParams({...})` once.
+- **Open-from-another-tab is atomic:** opening a chat from any tab goes through `handleOpenChat` = `setParams({ tab:"chats", chat:id })` (one replace), NOT `handleNavClick("chats")` + a separate open.
+- **Don't mirror a default into the URL from an effect.** The desktop "auto-open most-recent chat" sets local `globalOpenChat` only — it writes NO `?chat` (writing it would race the nav's `setParams`). Explicit opens own `?chat`; the auto-default doesn't need to persist.
+- Invariant: `globalOpenChat` non-null ⟹ `activeTab === "chats"` (lazy-init from `?chat` only when `initialTab==="chats"`; the switch branch nulls it off-chats) — otherwise the fullscreen chat overlay leaks over another tab on reload.
 
 ## Deletion must always have confirmation
 Date: 2026-05-24
@@ -219,3 +209,9 @@ This repo commits BOTH `package-lock.json` (npm) and `pnpm-lock.yaml` (pnpm), bu
 - A fast Vercel failure (a few seconds, before compilation) is almost always the **install step** (lockfile/peer mismatch), NOT a code/type error. A passing local `npm run build` does NOT prove the Vercel install will succeed if the two package managers' lockfiles diverge.
 - Diagnose Vercel failures from the actual build log (`mcp__vercel__get_deployment_build_logs`, errorsOnly) before guessing.
 - To verify before pushing, run the exact thing Vercel runs: `pnpm install --frozen-lockfile` (exit 0 = good).
+
+## Dev server vs `npm run build` share `.next` in a worktree slot
+- Running `npm run build` (production) in a session worktree while that slot's `next dev` is live writes into the SAME `.next` directory and corrupts Turbopack's cache — the dev server then hangs (`curl` → 000) or 500s with `ENOENT .next/.../build-manifest.json` / "Unable to open static sorted file ...sst". The code is fine; only the cache is wrecked.
+- Do NOT `rm -rf .next` while the dev server is running — it yanks the directory out from under the live process (same failure).
+- To type-check/verify WITHOUT disturbing a live dev server, use `npx tsc --noEmit` (doesn't touch `.next`). Reserve `npm run build` for when dev is stopped.
+- Recovery: `lsof -tiTCP:<port> | xargs kill -9` (kill ALL listeners — a half-killed old process causes EADDRINUSE on restart), `rm -rf .next`, then relaunch ONE `next dev`. Confirm a single listener before polling.

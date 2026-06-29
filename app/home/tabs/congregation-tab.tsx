@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, X, BarChart2, Archive, ChevronDown, ChevronUp } from "lucide-react"
+import { useNavState } from "../nav-state"
+import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton, PlanSubTabStrip } from "@/components/central"
+import { Spinner, MONO_STYLE, EmptyState, HeaderActionButton } from "../components/shared"
+import { TabPageHeader, PageTitle, CentralButton } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -14,18 +15,11 @@ interface Response {
   response_scale: number | null
 }
 
-interface ArchivedQuestion extends CongregationQuestion {
+interface QuestionEntry extends CongregationQuestion {
   response_count: number
-  expanded: boolean
 }
 
-type View = "ask" | "responses" | "archive"
-
-const VIEW_TABS = [
-  { key: "ask", label: "Ask" },
-  { key: "responses", label: "Responses" },
-  { key: "archive", label: "Archive" },
-] as const
+type View = "list" | "create" | "detail"
 
 const TYPE_LABELS: Record<string, string> = {
   poll: "Poll",
@@ -57,94 +51,86 @@ const inputStyle: React.CSSProperties = {
 
 export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
   const supabase = createClient()
-  const [view, setViewState] = useState<View>("ask")
-  function setView(v: View) { setViewState(v); onViewChange?.(v) }
+  const { setParam } = useNavState()
 
-  // Active question
-  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(null)
-  const [activeResponseCount, setActiveResponseCount] = useState(0)
-  const [loadingActive, setLoadingActive] = useState(true)
+  // ── View + selection state ──
+  // Only the detail/responses view is URL-synced (?cq=<id>) so it survives reload
+  // (Convention #12). The create view is ephemeral plain state — a reload mid-create
+  // drops back to the list (Phase 2). Absence of ?cq → list, never create.
+  const [view, setViewState] = useState<View>(() => {
+    if (typeof window === "undefined") return "list"
+    return new URLSearchParams(window.location.search).get("cq") ? "detail" : "list"
+  })
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return new URLSearchParams(window.location.search).get("cq")
+  })
 
-  // Create form
+  // detail writes ?cq (read view, persists); list + create clear it (create adds no param).
+  function goTo(v: View, questionId: string | null = null) {
+    setViewState(v)
+    setSelectedQuestionId(v === "detail" ? questionId : null)
+    onViewChange?.(v)
+    setParam("cq", v === "detail" && questionId ? questionId : null)
+  }
+
+  // Propagate the URL-derived initial view to the shell breadcrumb on mount.
+  useEffect(() => { onViewChange?.(view) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── List state ──
+  const [questions, setQuestions] = useState<QuestionEntry[]>([])
+  const [loadingList, setLoadingList] = useState(true)
+  const [archivingId, setArchivingId] = useState<string | null>(null)
+
+  // ── Create form state ──
   const [questionText, setQuestionText] = useState("")
   const [questionType, setQuestionType] = useState<"poll" | "scale" | "open" | "prayer">("poll")
   const [pollOptions, setPollOptions] = useState(["", ""])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Responses view
+  // ── Detail state ──
   const [responses, setResponses] = useState<Response[]>([])
   const [loadingResponses, setLoadingResponses] = useState(false)
-  const [closing, setClosing] = useState(false)
 
-  // Archive view
-  const [archived, setArchived] = useState<ArchivedQuestion[]>([])
-  const [loadingArchive, setLoadingArchive] = useState(false)
-  const [archivedResponses, setArchivedResponses] = useState<Record<string, Response[]>>({})
-  const [loadingArchivedResponses, setLoadingArchivedResponses] = useState<Record<string, boolean>>({})
-
-  const loadActive = useCallback(async () => {
-    setLoadingActive(true)
+  const loadList = useCallback(async () => {
+    setLoadingList(true)
     const { data } = await supabase
       .from("congregation_questions")
       .select("*")
       .eq("ministry_id", ministryId)
-      .eq("is_active", true)
-      .maybeSingle()
-    setActiveQuestion(data ?? null)
-
-    if (data) {
-      const { count } = await supabase
-        .from("congregation_responses")
-        .select("*", { count: "exact", head: true })
-        .eq("question_id", data.id)
-      setActiveResponseCount(count ?? 0)
-    } else {
-      setActiveResponseCount(0)
-    }
-    setLoadingActive(false)
+      .order("created_at", { ascending: false })
+    const qs = data ?? []
+    const withCounts: QuestionEntry[] = await Promise.all(
+      qs.map(async (q) => {
+        const { count } = await supabase
+          .from("congregation_responses")
+          .select("*", { count: "exact", head: true })
+          .eq("question_id", q.id)
+        return { ...q, response_count: count ?? 0 }
+      })
+    )
+    setQuestions(withCounts)
+    setLoadingList(false)
   }, [ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { loadActive() }, [loadActive])
+  useEffect(() => { loadList() }, [loadList]) // eslint-disable-line react-hooks/set-state-in-effect
 
+  // Load responses for the selected question when entering detail view.
   useEffect(() => {
-    if (view !== "responses" || !activeQuestion) return
-    setLoadingResponses(true)
+    if (view !== "detail" || !selectedQuestionId) return
+    setLoadingResponses(true) // eslint-disable-line react-hooks/set-state-in-effect
     supabase
       .from("congregation_responses")
       .select("id, response_text, response_option, response_scale")
-      .eq("question_id", activeQuestion.id)
+      .eq("question_id", selectedQuestionId)
       .then(({ data }) => {
         setResponses(data ?? [])
         setLoadingResponses(false)
       })
-  }, [view, activeQuestion]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, selectedQuestionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (view !== "archive") return
-    setLoadingArchive(true)
-    supabase
-      .from("congregation_questions")
-      .select("*")
-      .eq("ministry_id", ministryId)
-      .eq("is_active", false)
-      .not("closed_at", "is", null)
-      .order("closed_at", { ascending: false })
-      .then(async ({ data }) => {
-        const questions = data ?? []
-        const withCounts: ArchivedQuestion[] = await Promise.all(
-          questions.map(async (q) => {
-            const { count } = await supabase
-              .from("congregation_responses")
-              .select("*", { count: "exact", head: true })
-              .eq("question_id", q.id)
-            return { ...q, response_count: count ?? 0, expanded: false }
-          })
-        )
-        setArchived(withCounts)
-        setLoadingArchive(false)
-      })
-  }, [view, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const selectedQuestion = questions.find(q => q.id === selectedQuestionId) ?? null
 
   async function handleSend() {
     if (!questionText.trim()) { setError("Enter a question first."); return }
@@ -155,12 +141,14 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     setSubmitting(true)
     setError(null)
 
-    // Deactivate any existing active question
-    if (activeQuestion) {
+    // Deactivate any existing active question (only one live at a time).
+    const active = questions.find(q => q.is_active)
+    if (active) {
       await supabase
         .from("congregation_questions")
         .update({ is_active: false, closed_at: new Date().toISOString() })
-        .eq("id", activeQuestion.id)
+        .eq("id", active.id)
+        .eq("ministry_id", ministryId)
     }
 
     const { error: insertErr } = await supabase
@@ -180,33 +168,20 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     setPollOptions(["", ""])
     setQuestionType("poll")
     setSubmitting(false)
-    await loadActive()
+    await loadList()
+    goTo("list")
   }
 
-  async function handleClose() {
-    if (!activeQuestion) return
-    setClosing(true)
+  // Archive = set is_active:false + closed_at:now() on the live question.
+  async function handleArchive(id: string) {
+    setArchivingId(id)
     await supabase
       .from("congregation_questions")
       .update({ is_active: false, closed_at: new Date().toISOString() })
-      .eq("id", activeQuestion.id)
-    setActiveQuestion(null)
-    setActiveResponseCount(0)
-    setClosing(false)
-    if (view === "responses") setView("ask")
-  }
-
-  async function toggleArchived(id: string) {
-    setArchived(prev => prev.map(q => q.id === id ? { ...q, expanded: !q.expanded } : q))
-    const q = archived.find(a => a.id === id)
-    if (!q || archivedResponses[id] || !q.expanded === false) return
-    setLoadingArchivedResponses(prev => ({ ...prev, [id]: true }))
-    const { data } = await supabase
-      .from("congregation_responses")
-      .select("id, response_text, response_option, response_scale")
-      .eq("question_id", id)
-    setArchivedResponses(prev => ({ ...prev, [id]: data ?? [] }))
-    setLoadingArchivedResponses(prev => ({ ...prev, [id]: false }))
+      .eq("id", id)
+      .eq("ministry_id", ministryId)
+    setArchivingId(null)
+    await loadList()
   }
 
   function renderResults(q: CongregationQuestion, resps: Response[]) {
@@ -268,72 +243,108 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
   return (
     <div className="pb-28 md:pb-0">
-      {/* Mobile header */}
-      <div className="md:hidden px-5 pt-14 pb-3">
-        <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation</p>
-        <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
-          Congregation
-        </h1>
-        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
-          Ask your congregation — responses are anonymous.
-        </p>
-      </div>
+      {/* Mobile header — full title + create in list view only */}
+      {view === "list" && (
+        <div className="md:hidden px-5 pt-14 pb-3 flex items-start justify-between gap-3">
+          <div>
+            <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation</p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
+              Congregation
+            </h1>
+            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
+              Ask your congregation — responses are anonymous.
+            </p>
+          </div>
+          <HeaderActionButton label="New question" onClick={() => goTo("create")} />
+        </div>
+      )}
 
       {/* Desktop header */}
-      <TabPageHeader>
+      <TabPageHeader className="justify-between">
         <PageTitle title="Congregation" compact />
+        {view === "list" && <HeaderActionButton label="New question" onClick={() => goTo("create")} />}
       </TabPageHeader>
 
-      {/* Desktop sub-tabs — sibling of the header, no horizontal padding (§4.2) */}
-      <div className="hidden md:block">
-        <PlanSubTabStrip tabs={VIEW_TABS} active={view} onChange={k => setView(k as View)} />
-      </div>
-
-      <div className="px-5 md:px-14 pt-5 md:pt-7" style={{ maxWidth: 760 }}>
-
-        {/* Mobile sub-tabs */}
-        <div className="md:hidden" style={{ marginBottom: 20 }}>
-          <PlanSubTabStrip tabs={VIEW_TABS} active={view} onChange={k => setView(k as View)} />
-        </div>
-
-        {/* ── ASK VIEW ── */}
-        {view === "ask" && (
-          <div>
-            {/* Active question status */}
-            {loadingActive ? (
+      <div
+        className={`px-5 md:px-14 ${view === "list" ? "pt-5" : "pt-14"} md:pt-7`}
+      >
+        {/* ── LIST VIEW ── */}
+        {view === "list" && (
+          <>
+            {loadingList ? (
               <Spinner />
-            ) : activeQuestion ? (
-              <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--ivory)", border: "1px solid var(--line-2)", marginBottom: 24 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ ...MONO_STYLE, color: "var(--plum)", marginBottom: 6, display: "block" }}>Active · {TYPE_LABELS[activeQuestion.question_type]}</span>
-                    <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4 }}>{activeQuestion.question_text}</p>
-                    <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6 }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
-                  </div>
-                  <CentralButton
-                    variant="destructive"
-                    onClick={handleClose}
-                    disabled={closing}
-                    style={{ flexShrink: 0, padding: "6px 12px", fontSize: 12 }}
-                  >
-                    {closing ? "Closing…" : "Close question"}
+            ) : questions.length === 0 ? (
+              <div>
+                <EmptyState
+                  icon={<BarChart2 className="w-5 h-5" />}
+                  title="No questions yet"
+                  subtitle="Ask your congregation something to get started."
+                />
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                  <CentralButton onClick={() => goTo("create")}>
+                    <Plus className="w-3.5 h-3.5" /> New question
                   </CentralButton>
                 </div>
-                <CentralButton
-                  variant="ghost"
-                  onClick={() => setView("responses")}
-                  style={{ marginTop: 12, color: "var(--plum)", fontWeight: 500 }}
-                >
-                  <BarChart2 className="w-3.5 h-3.5" /> View responses
-                </CentralButton>
               </div>
             ) : (
-              <div style={{ padding: "14px 16px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: "1px dashed var(--dashed)", marginBottom: 24, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
-                No active question. Send one below.
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {questions.map((q) => (
+                  <div
+                    key={q.id}
+                    style={{
+                      borderRadius: "var(--r-card)",
+                      border: "1px solid var(--line)",
+                      background: "var(--cream)",
+                      padding: "14px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ ...MONO_STYLE, color: q.is_active ? "var(--plum)" : "var(--muted-text)" }}>
+                      {q.is_active ? "Active" : "Archived"} · {TYPE_LABELS[q.question_type]}
+                    </span>
+                    <p style={{ fontSize: 14, fontWeight: 400, color: "var(--ink)", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {q.question_text}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                      <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                        {q.response_count} response{q.response_count !== 1 ? "s" : ""}
+                      </span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <CentralButton
+                          variant="ghost"
+                          onClick={() => goTo("detail", q.id)}
+                          style={{ color: "var(--plum)", fontWeight: 500 }}
+                        >
+                          <BarChart2 className="w-3.5 h-3.5" /> See responses
+                        </CentralButton>
+                        {q.is_active && (
+                          <CentralButton
+                            variant="secondary"
+                            onClick={() => handleArchive(q.id)}
+                            disabled={archivingId === q.id}
+                            style={{ padding: "6px 12px", fontSize: 12 }}
+                          >
+                            {archivingId === q.id ? "Archiving…" : "Archive"}
+                          </CentralButton>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+          </>
+        )}
 
-            {/* Create form */}
+        {/* ── CREATE VIEW ── */}
+        {view === "create" && (
+          <div>
+            <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
+              <ChevronLeft className="w-4 h-4" /> Back
+            </CentralButton>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Your question</label>
@@ -420,81 +431,42 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                 disabled={submitting || !questionText.trim()}
                 style={{ width: "100%", padding: "12px 0" }}
               >
-                {submitting ? "Sending…" : activeQuestion ? "Replace active question" : "Send to Congregation"}
+                {submitting ? "Sending…" : "Send to Congregation"}
               </CentralButton>
             </div>
           </div>
         )}
 
-        {/* ── RESPONSES VIEW ── */}
-        {view === "responses" && (
+        {/* ── DETAIL VIEW ── */}
+        {view === "detail" && (
           <div>
-            {!activeQuestion ? (
+            <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
+              <X className="w-4 h-4" /> Back
+            </CentralButton>
+
+            {loadingList && !selectedQuestion ? (
+              <Spinner />
+            ) : !selectedQuestion ? (
               <EmptyState
                 icon={<BarChart2 className="w-5 h-5" />}
-                title="No active question"
-                subtitle="Send one from the Ask tab."
+                title="Question not found"
+                subtitle="It may have been removed."
               />
             ) : (
-              <div>
-                <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--cream)", border: "1px solid var(--line)", marginBottom: 20 }}>
-                  <span style={{ ...MONO_STYLE, color: "var(--plum)", marginBottom: 6, display: "block" }}>{TYPE_LABELS[activeQuestion.question_type]}</span>
-                  <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{activeQuestion.question_text}</p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)" }}>{activeResponseCount} response{activeResponseCount !== 1 ? "s" : ""}</p>
+              <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--cream)", border: "1px solid var(--line)" }}>
+                <span style={{ ...MONO_STYLE, color: selectedQuestion.is_active ? "var(--plum)" : "var(--muted-text)", marginBottom: 6, display: "block" }}>
+                  {selectedQuestion.is_active ? "Active" : "Archived"} · {TYPE_LABELS[selectedQuestion.question_type]}
+                </span>
+                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{selectedQuestion.question_text}</p>
+                <p style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                  {selectedQuestion.response_count} response{selectedQuestion.response_count !== 1 ? "s" : ""}
+                </p>
 
-                  {loadingResponses ? (
-                    <div style={{ marginTop: 12 }}><Spinner /></div>
-                  ) : (
-                    renderResults(activeQuestion, responses)
-                  )}
-                </div>
-
-                <CentralButton variant="destructive" onClick={handleClose} disabled={closing}>
-                  {closing ? "Closing…" : "Close question"}
-                </CentralButton>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── ARCHIVE VIEW ── */}
-        {view === "archive" && (
-          <div>
-            {loadingArchive ? (
-              <Spinner />
-            ) : archived.length === 0 ? (
-              <EmptyState
-                icon={<Archive className="w-5 h-5" />}
-                title="No closed questions yet"
-                subtitle="Questions you close will be archived here."
-              />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {archived.map((q) => (
-                  <div key={q.id} style={{ borderRadius: "var(--r-card)", border: "1px solid var(--line)", background: "var(--cream)", overflow: "hidden" }}>
-                    <button
-                      onClick={() => toggleArchived(q.id)}
-                      style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <span style={{ ...MONO_STYLE, display: "block", marginBottom: 4 }}>
-                          {TYPE_LABELS[q.question_type]} · {q.response_count} response{q.response_count !== 1 ? "s" : ""}
-                        </span>
-                        <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4 }}>{q.question_text}</p>
-                      </div>
-                      {q.expanded ? <ChevronUp className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--muted-text)" }} /> : <ChevronDown className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--muted-text)" }} />}
-                    </button>
-                    {q.expanded && (
-                      <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--line-3)" }}>
-                        {loadingArchivedResponses[q.id] ? (
-                          <div style={{ paddingTop: 12 }}><Spinner /></div>
-                        ) : (
-                          renderResults(q, archivedResponses[q.id] ?? [])
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {loadingResponses ? (
+                  <div style={{ marginTop: 12 }}><Spinner /></div>
+                ) : (
+                  renderResults(selectedQuestion, responses)
+                )}
               </div>
             )}
           </div>
