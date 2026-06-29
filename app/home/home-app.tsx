@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { SWRConfig, useSWRConfig } from "swr"
 import dynamic from "next/dynamic"
-import { MessageCircle, ArrowLeft } from "lucide-react"
+import { MessageCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, Crumb } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
@@ -179,6 +179,36 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     ...govTeams.map(t => ({ id: t.id, name: t.name })),
   ]
 
+  // Rail brand mark — contextual "back to Plan workspaces" control. On the Plan tab
+  // for users with 2+ plan workspaces it returns to the picker; everywhere else it
+  // goes to /landing (its original behavior).
+  const hasMultiWorkspaces = userTeams.length >= 2 || govTeamCount > 0
+  const handleLogoClick = () => {
+    if (activeTab === "plan" && hasMultiWorkspaces) {
+      setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS })
+    } else {
+      window.location.assign("/landing")
+    }
+  }
+  // One-time workspace-nav teaching hint — shown the first time a 2+-workspace user
+  // reaches the plan picker, then persisted "once ever" via profiles.seen_workspace_nav_hint.
+  const [navHintSeen] = useState(!!initialProfile.seen_workspace_nav_hint)
+  const [hintDismissed, setHintDismissed] = useState(false)
+  const atPicker = activeTab === "plan" && !activeTeamId && hasMultiWorkspaces
+  const showWorkspaceNavHint = atPicker && !navHintSeen && !hintDismissed
+  const hintPersistedRef = useRef(false)
+  useEffect(() => {
+    if (showWorkspaceNavHint && !hintPersistedRef.current) {
+      hintPersistedRef.current = true
+      supabase.from("profiles").update({ seen_workspace_nav_hint: true }).eq("id", userId).eq("ministry_id", ministryId).then(() => {})
+    }
+  }, [showWorkspaceNavHint, userId, ministryId, supabase])
+  useEffect(() => {
+    // once they leave the picker after seeing it, stop showing it this session too
+    if (!atPicker && hintPersistedRef.current && !hintDismissed) setHintDismissed(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atPicker])
+
   // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
   // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
   // Skip auto-enter when the user also has governance-accessible teams, so the picker
@@ -326,30 +356,38 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     />
   ) : undefined
 
-  // Shell breadcrumb computation — derived from shell-known state, no tab props needed
-  function getShellCrumbs(): string[] {
+  // Shell breadcrumb computation — derived from shell-known state, no tab props needed.
+  // Returns Crumb[]; the root crumb (ministry name) navigates Home, middle crumbs
+  // carry destination closures, and the final/current crumb has no onClick.
+  function getShellCrumbs(): Crumb[] {
+    const root: Crumb = { label: ministryName, onClick: () => handleNavClick("home") }
+    const planningCrumb: Crumb = { label: "Planning", onClick: () => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) } }
     const congregationLabels: Record<string, string> = { list: "", create: "New question", detail: "Responses" }
     switch (activeTab) {
-      case "home":          return ["Central", "Home"]
-      case "announcements": return ["Central", "Announcements"]
-      case "give":          return ["Central", "Give"]
-      case "forms":         return ["Central", "Forms"]
-      case "settings":      return ["Central", "Settings"]
-      case "chats":         return ["Central", "Chats"]
+      case "home":          return [root, { label: "Home" }]
+      case "announcements": return [root, { label: "Announcements" }]
+      case "give":          return [root, { label: "Give" }]
+      case "forms":         return [root, { label: "Forms" }]
+      case "settings":      return [root, { label: "Settings" }]
+      case "chats":         return [root, { label: "Chats" }]
       case "plan": {
-        if (activeTeamId === "receipts") return ["Central", "Planning", "Receipts"]
-        if (!activeTeamId || !activeTeamNameForPlan) return ["Central", "Planning"]
+        if (activeTeamId === "receipts") return [root, planningCrumb, { label: "Receipts" }]
+        if (!activeTeamId || !activeTeamNameForPlan) return [root, { label: "Planning" }]
         if (isStudentOrgActive && studentOrgPlanningEvent) {
-          return ["Central", "Planning", activeTeamNameForPlan, studentOrgPlanningEvent.title]
+          return [
+            root, planningCrumb,
+            { label: activeTeamNameForPlan, onClick: () => { setStudentOrgPlanningEvent(null); setParam("evtab", null) } },
+            { label: studentOrgPlanningEvent.title },
+          ]
         }
-        return ["Central", "Planning", activeTeamNameForPlan]
+        return [root, planningCrumb, { label: activeTeamNameForPlan }]
       }
-      case "directory":     return ["Central", "Directory"]
-      case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
+      case "directory":     return [root, { label: "Directory" }]
+      case "profile":       return profileSection === "journal" ? [root, { label: "Journal" }] : [root, { label: "Profile" }]
       case "congregation":  return congregationLabels[congregationView]
-        ? ["Central", "Congregation", congregationLabels[congregationView]]
-        : ["Central", "Congregation"]
-      default:              return ["Central"]
+        ? [root, { label: "Congregation", onClick: () => { setNavResetKey(k => k + 1); setParam("cq", null) } }, { label: congregationLabels[congregationView] }]
+        : [root, { label: "Congregation" }]
+      default:              return [root]
     }
   }
 
@@ -823,6 +861,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         }
         planContextContent={planContextContent}
         hideSidePanel={activeTab === "plan" && !activeTeamId}
+        onLogoClick={handleLogoClick}
+        showWorkspaceNavHint={showWorkspaceNavHint}
+        onDismissNavHint={() => setHintDismissed(true)}
       />
 
       {/* Content + bottom nav wrapper */}
@@ -830,21 +871,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
         {/* Shell topbar — suppressed on chats and on planning team picker (picker has its own full-width header) */}
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
-          <DesktopTopbar
-            crumbs={getShellCrumbs()}
-            right={activeTab === "plan" && (activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
-              /* Team-agnostic back-to-picker button — shown for the receipts sentinel
-                 AND any team workspace. Don't gate on a per-type flag or new team types
-                 (finance, etc.) silently lose their way back. */
-              <button
-                onClick={() => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) }}
-                className="hover:bg-[#F2EDE0] transition-colors"
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 999, padding: "6px 13px", cursor: "pointer" }}
-              >
-                <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
-              </button>
-            ) : undefined}
-          />
+          <DesktopTopbar crumbs={getShellCrumbs()} />
         )}
 
         {/* Scrollable content area */}
