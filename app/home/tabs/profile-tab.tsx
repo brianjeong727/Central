@@ -515,6 +515,34 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   )
 }
 
+// Self-contained gear + display-settings popover, rendered in the Journal header.
+function JournalSettingsMenu({ showEntries, showStreak, onToggleEntries, onToggleStreak }: {
+  showEntries: boolean
+  showStreak: boolean
+  onToggleEntries: (v: boolean) => void
+  onToggleStreak: (v: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <IconButton active={open} onClick={() => setOpen(v => !v)}><Settings size={14} /></IconButton>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
+          <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
+            <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>
+            <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+            <span style={{ fontSize: 13, color: "var(--ink)" }}>Show streak</span>
+            <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Journal Section ───────────────────────────────────────────────────────────
 
 export function JournalSection({
@@ -536,7 +564,6 @@ export function JournalSection({
   const [entryCount, setEntryCount] = useState(0)
   const [entryDates, setEntryDates] = useState<string[]>([])
   const [prayerCount, setPrayerCount] = useState(0)
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
   useEffect(() => {
@@ -589,37 +616,17 @@ export function JournalSection({
 
   return (
     <>
-      {/* Settings gear + stats bar */}
-      <div style={{ position: "relative", paddingTop: 4 }}>
-        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
-          <IconButton active={showSettingsMenu} onClick={() => setShowSettingsMenu(v => !v)}>
-            <Settings size={14} />
-          </IconButton>
-          {showSettingsMenu && (
-            <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
-              <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>
-                <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
-              </label>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show streak</span>
-                <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
-              </label>
+      {/* Stats bar (the display-settings gear now lives in the Journal header) */}
+      {showStats && (
+        <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+          {statsItems.map((item, i) => (
+            <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
+              <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
+              <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
             </div>
-          )}
+          ))}
         </div>
-        {showStats && (
-          <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
-            {statsItems.map((item, i) => (
-              <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
-                <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
-                <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Mobile: tab strip + single column */}
       <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
@@ -984,18 +991,18 @@ export function ProfileTab({
 
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
-          {/* Mobile header */}
-          <div className="md:hidden px-5 pt-14 pb-5">
-            <p style={{ ...MONO_STYLE, marginBottom: 6 }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
-            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Your prayers, reflections, and devotionals.</p>
+          {/* Mobile header — compact, gear inline right */}
+          <div className="md:hidden px-5 pt-14 pb-3" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Journal</h1>
+            <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
 
-          {/* Desktop header */}
+          {/* Desktop header — compact, gear in the right slot */}
           <TabPageHeader>
-            <PageTitle eyebrow="Your Journal" title="Journal">
-              <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
-            </PageTitle>
+            <PageTitle title="Journal" compact />
+            <div style={{ marginLeft: "auto" }}>
+              <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
+            </div>
           </TabPageHeader>
 
           <div className="px-5 md:px-14">
