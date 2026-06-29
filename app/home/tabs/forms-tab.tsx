@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Check, ChevronDown, FileText, X } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
@@ -39,8 +39,7 @@ interface AnnouncementWithForm {
   body: string
   created_at: string
   form_id: string
-  user_has_responded: boolean
-  response_count?: number
+  response_count: number
 }
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
@@ -472,18 +471,15 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
 
 // ── Forms Tab ─────────────────────────────────────────────────────────────────
 
-export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
+export function FormsTab({ ministryId }: FormsTabProps) {
   const supabase = createClient()
   const { setParam } = useNavState()
-  const isAdmin = ['admin', 'leader', 'deacon', 'elder'].includes(userRole.toLowerCase())
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<AnnouncementWithForm[]>([])
-  // Fill-in is an input/edit surface — ephemeral, never URL-synced.
-  const [fillState, setFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
-  // Admin "view responses" is a read view → restore from ?fresp on reload
-  // (admin-only; title is backfilled from items once they load).
+  // "View responses" is a read view → restore from ?fresp on reload
+  // (title is backfilled from items once they load).
   const [responsesState, setResponsesState] = useState<{ formId: string; title: string } | null>(() => {
-    if (typeof window === "undefined" || !isAdmin) return null
+    if (typeof window === "undefined") return null
     const formId = new URLSearchParams(window.location.search).get("fresp")
     return formId ? { formId, title: "" } : null
   })
@@ -524,21 +520,12 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
       .order("created_at", { ascending: false })
 
     const formIds = forms.map(f => f.id)
-    const { data: responseData } = await supabase
+    const responseCounts: Record<string, number> = {}
+    const { data: countData } = await supabase
       .from("form_responses")
       .select("form_id")
       .in("form_id", formIds)
-      .eq("user_id", userId)
-    const respondedSet = new Set<string>((responseData ?? []).map(r => r.form_id))
-
-    let responseCounts: Record<string, number> = {}
-    if (isAdmin) {
-      const { data: countData } = await supabase
-        .from("form_responses")
-        .select("form_id")
-        .in("form_id", formIds)
-      for (const r of countData ?? []) responseCounts[r.form_id] = (responseCounts[r.form_id] ?? 0) + 1
-    }
+    for (const r of countData ?? []) responseCounts[r.form_id] = (responseCounts[r.form_id] ?? 0) + 1
 
     setItems((annData ?? []).map(ann => ({
       id: ann.id,
@@ -546,28 +533,24 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
       body: ann.body,
       created_at: ann.created_at,
       form_id: formByAnn[ann.id],
-      user_has_responded: respondedSet.has(formByAnn[ann.id]),
-      response_count: isAdmin ? (responseCounts[formByAnn[ann.id]] ?? 0) : undefined,
+      response_count: responseCounts[formByAnn[ann.id]] ?? 0,
     })))
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, ministryId, isAdmin])
+  }, [ministryId])
 
   useEffect(() => { load() }, [load])
 
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header */}
+      {/* Mobile header — compact */}
       <div className="md:hidden px-5 pt-14 pb-5">
         <p style={MONO_STYLE}>Forms</p>
-        <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Forms</h1>
-        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Announcements that include a form for you to fill out.</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
       </div>
 
       <TabPageHeader>
-        <PageTitle eyebrow={`${items.length} form${items.length !== 1 ? 's' : ''} attached`} title="Forms">
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Announcements that include a form to fill out.</p>
-        </PageTitle>
+        <PageTitle title="Forms" compact />
       </TabPageHeader>
 
       <div className="md:flex-1 md:overflow-y-auto">
@@ -575,65 +558,31 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
           <div className="px-5 md:px-14"><Spinner /></div>
         ) : items.length === 0 ? (
           <div className="px-5 md:px-14">
-            <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="When a form is attached to an announcement it appears here." />
+            <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Forms you attach to announcements will show here with their responses." />
           </div>
         ) : (
           <div className="px-5 md:px-14 py-6 flex flex-col gap-3">
             {items.map(item => (
-              <div key={item.id} style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
-                    <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.body}</p>
-                  </div>
-                  {item.user_has_responded ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, color: '#2E7D32', fontSize: 13, fontWeight: 500 }}>
-                      <Check style={{ width: 14, height: 14 }} />
-                      Submitted
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setFillState({ formId: item.form_id, announcementId: item.id, title: item.title })}
-                      style={{
-                        flexShrink: 0, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--plum)',
-                        background: 'transparent', color: 'var(--plum)', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Fill out form
-                    </button>
-                  )}
+              <button
+                key={item.id}
+                onClick={() => openResponses(item.form_id, item.title)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, width: '100%', textAlign: 'left',
+                  border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', cursor: 'pointer',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 6 }}>
+                    {item.response_count} response{item.response_count !== 1 ? 's' : ''}
+                  </p>
                 </div>
-                {isAdmin && item.response_count !== undefined && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>{item.response_count} response{item.response_count !== 1 ? 's' : ''}</span>
-                    <button
-                      onClick={() => openResponses(item.form_id, item.title)}
-                      style={{ fontSize: 13, fontWeight: 500, color: 'var(--plum)', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                    >
-                      View responses →
-                    </button>
-                  </div>
-                )}
-              </div>
+                <ChevronRight style={{ width: 18, height: 18, color: 'var(--muted-text)', flexShrink: 0 }} />
+              </button>
             ))}
           </div>
         )}
       </div>
-
-      {fillState && (
-        <FormFillView
-          formId={fillState.formId}
-          announcementId={fillState.announcementId}
-          announcementTitle={fillState.title}
-          userId={userId}
-          ministryId={ministryId}
-          onClose={() => setFillState(null)}
-          onSubmitted={() => {
-            setItems(prev => prev.map(i => i.form_id === fillState.formId ? { ...i, user_has_responded: true } : i))
-            setFillState(null)
-          }}
-        />
-      )}
 
       {responsesState && (
         <FormResponsesView

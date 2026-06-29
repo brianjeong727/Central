@@ -225,6 +225,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }, [])
 
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
+  // Leader-tier (Convention #2): gates the Forms insights tab — leaders + all admin-tier
+  // (pastor INCLUDED). Members/visitors are excluded entirely; they fill forms via Announcements.
+  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
   const canCreateTeam = isAdmin
@@ -790,6 +793,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         onLogout={handleLogout}
         isAdmin={isAdmin}
         isPastor={isPastor}
+        isLeaderOrAdmin={isLeaderOrAdmin}
         canCreateTeam={canCreateTeam}
         onCreateTeam={() => { handleNavClick("plan"); setShowCreateTeam(true) }}
         activeTeamId={activeTeamId}
@@ -1033,7 +1037,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             />
           )}
 
-          {activeTab === "forms" && (
+          {activeTab === "forms" && isLeaderOrAdmin && (
             <FormsTab
               userId={userId}
               userName={initialProfile.name}

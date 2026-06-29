@@ -629,6 +629,8 @@ export interface DesktopSidebarProps {
   onLogout: () => void
   isAdmin?: boolean
   isPastor?: boolean
+  // Leader-tier (Convention #2, incl. pastor) — gates the Forms insights nav item.
+  isLeaderOrAdmin?: boolean
   onCreateTeam?: () => void
   activeTeamId: string | null
   // Resolved active-team name (membership OR allTeams fallback for gov-view) — drives the panel header
