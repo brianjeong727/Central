@@ -332,6 +332,8 @@ export interface UserTeam {
   allowAdminMembers: boolean
   // Whether this team has a member assigned to its president role.
   hasPresident?: boolean
+  // Number of members on this team (for the workspace picker subtitle).
+  memberCount?: number
 }
 
 export interface Team {

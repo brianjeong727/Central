@@ -422,6 +422,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
     }
     for (const t of teams) t.hasPresident = presidentSet.has(t.teamId)
+    // Member counts for each of the user's teams (one query, tallied per team).
+    if (ids.length > 0) {
+      const { data: counts } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .in("team_id", ids)
+      const countMap = new Map<string, number>()
+      for (const r of (counts ?? []) as { team_id: string }[]) {
+        countMap.set(r.team_id, (countMap.get(r.team_id) ?? 0) + 1)
+      }
+      for (const t of teams) t.memberCount = countMap.get(t.teamId) ?? 0
+    }
     setUserTeams(teams)
     setActiveTeamId((prev) => {
       // The Receipts sentinel is not a real team — never reconcile it away on refresh.
