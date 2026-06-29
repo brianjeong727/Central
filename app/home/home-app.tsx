@@ -316,6 +316,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // Congregation sub-view — lifted so shell can build accurate crumbs
   const [congregationView, setCongregationView] = useState<"list" | "create" | "detail">("list")
 
+  // Forms sub-view — lifted so shell can build accurate crumbs (back = breadcrumb, §3.2 Zone A)
+  const [formsView, setFormsView] = useState<"list" | "detail">("list")
+  const [formsDetailTitle, setFormsDetailTitle] = useState("")
+
   // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb).
   // Resolve from membership first, then from allTeams — a governance admin may be viewing a team
   // they don't belong to (gov-view). Without the allTeams fallback the shell would mirror the user's
@@ -380,7 +384,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       case "home":          return [root, { label: "Home" }]
       case "announcements": return [root, { label: "Announcements" }]
       case "give":          return [root, { label: "Give" }]
-      case "forms":         return [root, { label: "Forms" }]
+      case "forms":         return formsView === "detail"
+        ? [root, { label: "Forms", onClick: () => { setNavResetKey(k => k + 1); setParam("fresp", null) } }, { label: formsDetailTitle }]
+        : [root, { label: "Forms" }]
       case "settings":      return [root, { label: "Settings" }]
       case "chats":         return [root, { label: "Chats" }]
       case "plan": {
@@ -1092,6 +1098,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               userRole={initialProfile.role}
               ministryId={ministryId}
               ministryName={ministryName}
+              onViewChange={(v, t) => { setFormsView(v); if (t) setFormsDetailTitle(t) }}
             />
           )}
 
