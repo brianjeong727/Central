@@ -3485,6 +3485,21 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId])
 
+  // Follow the open chat's category: when activeGroupId changes to a group present
+  // in allGroups, snap the church/my subtab to that group's category. Reacts to
+  // activeGroupId CHANGES only (the ref ensures an allGroups refresh alone won't
+  // re-snap, so the user can freely click the other subtab while a chat stays open),
+  // but still resolves once allGroups loads after activeGroupId was already set.
+  const subTabSyncedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeGroupId) { subTabSyncedFor.current = null; return }
+    if (subTabSyncedFor.current === activeGroupId) return
+    const g = (data ?? []).find((x) => x.id === activeGroupId)
+    if (!g) return
+    subTabSyncedFor.current = activeGroupId
+    setSubTab(g.type === "church" ? "church" : "my")
+  }, [activeGroupId, data])
+
   // Revalidate the shared list when a chat closes (refreshKey bumps) — without
   // putting refreshKey in the SWR key (that would fragment the cache).
   useEffect(() => {
@@ -3786,7 +3801,7 @@ export interface ChatListPanelProps {
   userId: string
   ministryId: string
   activeGroupId?: string | null
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   refreshKey: number
   canCreateChurchChat: boolean
   userProfile: Profile
@@ -3833,6 +3848,17 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
     if (activeGroupId) clearUnread(activeGroupId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroupId])
+
+  // Follow the open chat's category — see ChatsTab above for rationale.
+  const subTabSyncedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!activeGroupId) { subTabSyncedFor.current = null; return }
+    if (subTabSyncedFor.current === activeGroupId) return
+    const g = (data ?? []).find((x) => x.id === activeGroupId)
+    if (!g) return
+    subTabSyncedFor.current = activeGroupId
+    setSubTab(g.type === "church" ? "church" : "my")
+  }, [activeGroupId, data])
 
   // Revalidate the shared list when a chat closes (refreshKey bumps) — without
   // fragmenting the cache by putting refreshKey in the SWR key.

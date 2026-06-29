@@ -367,6 +367,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       .map((row) => ({
         id: row.group_id,
         groupName: row.group_name,
+        type: row.group_type,
         lastMessage: row.last_msg_content ?? "",
         lastMessageSender: row.last_msg_sender_name ?? "",
         unreadCount: Number(row.unread_count),
@@ -586,11 +587,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     if (match) setGlobalOpenChat((prev) => prev && prev.name === "" ? { ...prev, name: match.groupName } : prev)
   }, [globalOpenChat, recentChats])
 
-  // Opening a chat is atomic: switch to the chats tab AND mirror ?chat in one replace.
-  function handleOpenChat(id: string, name: string) {
+  // Opening a chat is atomic: switch to the chats tab, mirror ?chat, and (when the
+  // group category is known) set ?chats so the church/my subtab reflects the open
+  // chat — all in one replace.
+  function handleOpenChat(id: string, name: string, type?: string) {
     setActiveTabState("chats")
     setGlobalOpenChat({ id, name })
-    setParams({ tab: "chats", chat: id })
+    const sub = type ? (type === "church" ? "church" : "my") : null
+    setParams({ tab: "chats", chat: id, ...(sub ? { chats: sub } : {}) })
   }
 
   function handleChatClose() {
@@ -1003,7 +1007,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         onClose={() => setPaletteOpen(false)}
         ministryId={ministryId}
         onTabChange={(tab) => { setPaletteOpen(false); handleNavClick(tab) }}
-        onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
+        onOpenChat={(id, name, type) => { setPaletteOpen(false); handleOpenChat(id, name, type) }}
       />
 
       {showQuickCreateTeam && (

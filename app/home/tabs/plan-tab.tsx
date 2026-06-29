@@ -1239,7 +1239,7 @@ export function StudentOrgTeamHome({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
   refreshSignal?: number
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
   desktopSection?: string
   isDesktopView?: boolean
   onCalEventsChange?: (events: CalendarEvent[]) => void
@@ -5851,7 +5851,7 @@ export function MinistryCalendar({
   teamId: string | null
   userId: string
   canEdit: boolean
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
@@ -6112,7 +6112,7 @@ export function EventPlanWorkspace({
   onClose: () => void
   inline?: boolean
   teamId?: string | null
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -9681,7 +9681,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [mounted, setMounted] = useState(false)
@@ -11511,7 +11511,7 @@ function SmallGroupLeadersTab({
   isPresident: boolean
   isPastor: boolean
   praiseTeamId?: string | null
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
   onTeamSettings?: () => void
   isDesktopView?: boolean
   desktopSection?: string
@@ -12846,7 +12846,7 @@ function BibleStudySubTab({
   userId: string
   isPastor: boolean
   isPresident: boolean
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
 

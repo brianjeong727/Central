@@ -9,13 +9,15 @@ export interface ChatPreview {
   unreadCount: number
   initials: string
   time: string
+  // Group category — drives the Messages church/my subtab when opening from here.
+  type?: string
 }
 
 interface ChatsSectionProps {
   chats: ChatPreview[]
   totalUnread: number
   onSeeAll?: () => void
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }
 
 export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: ChatsSectionProps) {
@@ -43,7 +45,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
 
       <div className="flex flex-col gap-2.5">
         {chats.map((chat, i) => (
-          <ChatCard key={chat.id} chat={chat} index={i} onClick={onOpenChat ? () => onOpenChat(chat.id, chat.groupName) : undefined} />
+          <ChatCard key={chat.id} chat={chat} index={i} onClick={onOpenChat ? () => onOpenChat(chat.id, chat.groupName, chat.type) : undefined} />
         ))}
       </div>
     </section>
