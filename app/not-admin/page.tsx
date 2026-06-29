@@ -18,10 +18,10 @@ export default function NotAdminPage() {
         <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.1) 1px, transparent 1px)", backgroundSize: "22px 22px", pointerEvents: "none" }} />
         <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%, rgba(246,244,239,0.07) 0%, transparent 50%)", pointerEvents: "none" }} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+        <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, position: "relative", textDecoration: "none", color: "inherit" }}>
           <RingCrossLogo size={26} color="#F6F4EF" />
           <span style={{ fontFamily: SERIF, fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
-        </div>
+        </Link>
 
         <div style={{ position: "relative" }}>
           <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "#F6F4EF", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
@@ -41,10 +41,10 @@ export default function NotAdminPage() {
 
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 6, textDecoration: "none", color: "inherit" }}>
             <RingCrossLogo size={28} color="var(--plum)" />
             <span style={{ fontFamily: SERIF, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.01em" }}>Central</span>
-          </div>
+          </Link>
         </div>
 
         <div style={{ width: "100%", maxWidth: 400 }}>

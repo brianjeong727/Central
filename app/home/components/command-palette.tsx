@@ -54,7 +54,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
         items.push({ type: "person", id: p.id, label: p.name, sublabel: p.email })
       }
       for (const g of (groupsRes.data ?? []) as { id: string; name: string; type: string }[]) {
-        items.push({ type: "chat", id: g.id, label: g.name, sublabel: g.type === "church" ? "Church chat" : g.type === "dm" ? "Direct message" : "Group chat" })
+        items.push({ type: "chat", id: g.id, label: g.name, chatType: g.type, sublabel: g.type === "church" ? "Church chat" : g.type === "dm" ? "Direct message" : "Group chat" })
       }
       for (const a of (announcementsRes.data ?? []) as { id: string; title: string }[]) {
         items.push({ type: "announcement", id: a.id, label: a.title, sublabel: "Announcement" })
@@ -70,7 +70,9 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
     onClose()
     if (item.type === "nav" && item.tab) { onTabChange(item.tab); return }
     if (item.type === "person") { onTabChange("directory"); return }
-    if (item.type === "chat") { onTabChange("chats"); onOpenChat(item.id, item.label); return }
+    // handleOpenChat switches to the chats tab atomically (and sets ?chats from the
+    // category), so we forward chatType and skip the redundant onTabChange("chats").
+    if (item.type === "chat") { onOpenChat(item.id, item.label, item.chatType); return }
     if (item.type === "announcement") { onTabChange("announcements"); return }
   }
 

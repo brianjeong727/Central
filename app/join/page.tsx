@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner } from "@/app/home/components/shared"
@@ -452,7 +453,9 @@ function JoinContent() {
             background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
           }}/>
           <div style={{ position: "relative", maxWidth: 520, margin: "0 auto", padding: "0 24px" }}>
-            <Wordmark tone="plum"/>
+            <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", textDecoration: "none", color: "inherit" }}>
+              <Wordmark tone="plum"/>
+            </Link>
             <div style={{ ...mono, color: "rgba(251,248,242,0.55)", marginTop: 22, marginBottom: 8 }}>
               Find your ministry
             </div>

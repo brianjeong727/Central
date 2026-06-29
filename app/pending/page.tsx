@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 
 export default function PendingPage() {
@@ -49,7 +50,7 @@ export default function PendingPage() {
       <div className="w-full max-w-[390px] flex flex-col items-center text-center">
 
         {/* Logo */}
-        <div className="flex items-center gap-2.5 mb-10">
+        <Link href="/" aria-label="Central — home" className="inline-flex items-center gap-2.5 mb-10 transition-opacity hover:opacity-70" style={{ textDecoration: "none", color: "inherit" }}>
           <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
             <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
             <circle cx="50" cy="50" r="6" fill="var(--plum)" />
@@ -57,7 +58,7 @@ export default function PendingPage() {
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
             Central
           </span>
-        </div>
+        </Link>
 
         {/* Status icon */}
         <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center mb-6">

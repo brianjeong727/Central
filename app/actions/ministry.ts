@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
+import { presetById } from "@/app/home/workspace-presets"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -195,7 +196,9 @@ export async function submitMinistryApplication(data: {
   universities?: string[]
   location: string
   size: "small" | "medium" | "large"
-  teams: Array<{ name: string; icon: string }>
+  // Preset workspace ids the admin selected during onboarding (e.g. ["dgl","finance"]).
+  // Persisted on the ministry and auto-created as empty workspaces on approval.
+  workspaces: string[]
   isPublic?: boolean
   founderRole?: "pastor" | "deacon" | "elder"
 }): Promise<{ error: string | null }> {
@@ -235,6 +238,9 @@ export async function submitMinistryApplication(data: {
       created_by: user.id,
       status: "pending",
       is_public: data.isPublic ?? false,
+      // Stored now, created as empty workspaces on approval (see approveMinistry).
+      // Filter to known presets so a stale/garbage id can't reach approval.
+      onboarding_workspaces: (data.workspaces ?? []).filter((id) => !!presetById(id)),
     })
     .select("id")
     .single()
@@ -264,20 +270,59 @@ export async function submitMinistryApplication(data: {
   const { data: founderProfile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
   await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null, founderRole)
 
-  // Create teams
-  if (data.teams.length > 0) {
-    const { error: teamsErr } = await admin.from("teams").insert(
-      data.teams.map((t) => ({
-        ministry_id: ministry.id,
-        name: t.name,
-        icon: t.icon,
-        created_by: user.id,
-      }))
-    )
-    if (teamsErr) return { error: teamsErr.message }
-  }
+  // Workspaces are NOT created here. The selected presets are stored on the
+  // ministry (onboarding_workspaces) and created as empty workspaces only once
+  // the application is approved — see createOnboardingWorkspaces / approveMinistry.
 
   return { error: null }
+}
+
+// Create the selected onboarding workspaces as EMPTY teams (preset roles, but no
+// members → no president assigned). Idempotent: only seeds if the ministry has no
+// teams yet, so re-approval can't duplicate. Runs with the service-role client.
+async function createOnboardingWorkspaces(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  createdBy: string,
+  workspaceIds: string[],
+): Promise<void> {
+  const ids = (workspaceIds ?? []).filter((id) => !!presetById(id))
+  if (ids.length === 0) return
+
+  // Idempotency guard — never seed a ministry that already has teams.
+  const { count } = await admin
+    .from("teams")
+    .select("id", { count: "exact", head: true })
+    .eq("ministry_id", ministryId)
+  if ((count ?? 0) > 0) return
+
+  for (const id of ids) {
+    const preset = presetById(id)
+    if (!preset) continue
+    const { data: team, error: teamErr } = await admin
+      .from("teams")
+      .insert({
+        ministry_id: ministryId,
+        name: preset.name,
+        icon: preset.emoji,
+        description: preset.description,
+        team_type: preset.teamType,
+        created_by: createdBy,
+      })
+      .select("id")
+      .single()
+    if (teamErr || !team) continue
+    // Seed the preset's roles (incl. the is_president role). No team_members —
+    // the admin assigns the president later from the workspace's settings.
+    await admin.from("team_roles").insert(
+      preset.roles.map((r) => ({
+        team_id: team.id,
+        name: r.name,
+        permissions: r.permissions,
+        is_president: !!r.is_president,
+      }))
+    )
+  }
 }
 
 // Legacy — kept for backwards compatibility; new ministries should use submitMinistryApplication
@@ -368,7 +413,7 @@ export async function getPendingMinistries(): Promise<{
 
   const { data: ministries, error: ministriesErr } = await admin
     .from("ministries")
-    .select("id, name, university, location, size, invite_code, created_at, created_by")
+    .select("id, name, university, location, size, invite_code, created_at, created_by, onboarding_workspaces")
     .eq("status", "pending")
     .order("created_at", { ascending: false })
 
@@ -384,25 +429,24 @@ export async function getPendingMinistries(): Promise<{
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]))
 
-  // Fetch teams
-  const ministryIds = ministries.map((m) => m.id)
-  const { data: teams } = await admin
-    .from("teams")
-    .select("ministry_id, name, icon")
-    .in("ministry_id", ministryIds)
-
-  const teamsMap: Record<string, Array<{ name: string; icon: string | null }>> = {}
-  for (const t of teams ?? []) {
-    if (!teamsMap[t.ministry_id]) teamsMap[t.ministry_id] = []
-    teamsMap[t.ministry_id].push({ name: t.name, icon: t.icon })
-  }
-
-  const result = ministries.map((m) => ({
-    ...m,
-    creatorName: profileMap[m.created_by]?.name ?? null,
-    creatorEmail: profileMap[m.created_by]?.email ?? null,
-    teams: teamsMap[m.id] ?? [],
-  }))
+  // Workspaces are no longer created at registration time — the selected presets
+  // live on the ministry until approval. Map the stored ids → preset names/icons
+  // for the approval card. (`teams` field kept for the existing admin-panel shape.)
+  const result = ministries.map((m) => {
+    const ids: string[] = Array.isArray(m.onboarding_workspaces) ? m.onboarding_workspaces : []
+    const teams = ids
+      .map((id) => {
+        const p = presetById(id)
+        return p ? { name: p.name, icon: p.emoji } : null
+      })
+      .filter((t): t is { name: string; icon: string } => t !== null)
+    return {
+      ...m,
+      creatorName: profileMap[m.created_by]?.name ?? null,
+      creatorEmail: profileMap[m.created_by]?.email ?? null,
+      teams,
+    }
+  })
 
   return { data: result, error: null }
 }
@@ -423,9 +467,17 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
   // Seed ministry_schools from the universities array collected during onboarding
   const { data: ministry } = await admin
     .from("ministries")
-    .select("universities")
+    .select("universities, onboarding_workspaces, created_by")
     .eq("id", ministryId)
     .single()
+
+  // Create the workspaces the admin selected at onboarding, empty (no president).
+  const onboardingWorkspaces: string[] = Array.isArray(ministry?.onboarding_workspaces)
+    ? ministry!.onboarding_workspaces
+    : []
+  if (ministry?.created_by) {
+    await createOnboardingWorkspaces(admin, ministryId, ministry.created_by, onboardingWorkspaces)
+  }
 
   const unis: string[] = Array.isArray(ministry?.universities) ? ministry.universities : []
   if (unis.length > 0) {

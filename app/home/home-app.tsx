@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { SWRConfig } from "swr"
+import { SWRConfig, useSWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle, ArrowLeft } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
@@ -14,6 +14,8 @@ import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, 
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
+import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
+import { fetchChatList } from "./chat-list"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -40,7 +42,6 @@ const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScre
 const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
 
 const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
-const QuickCreateTeamModal = dynamic(() => import("./tabs/plan-tab").then(m => m.QuickCreateTeamModal), { loading: () => <Spinner />, ssr: false })
 const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
 const FinanceSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.FinanceSectionNav), { loading: () => <Spinner />, ssr: false })
@@ -54,8 +55,8 @@ const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m =
 
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
-  const router = useRouter()
   const searchParams = useSearchParams()
+  const { mutate: globalMutate } = useSWRConfig()
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
@@ -63,21 +64,30 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
   const initialTab = resolvedTab && validTabs.includes(resolvedTab) ? resolvedTab : "home"
   const [activeTab, setActiveTabState] = useState<Tab>(initialTab)
+  // Bumped only on an active-tab RESET (re-click) to force-remount the active tab
+  // so it re-lazy-inits its internal view-state from the now-cleared URL params.
+  // Never bumped on a normal tab switch (resume-where-left-off stays intact).
+  const [navResetKey, setNavResetKey] = useState(0)
 
-  // Persist a single URL param without clobbering others
-  function replaceParam(key: string, value: string | null) {
-    const params = new URLSearchParams(window.location.search)
-    if (value === null) params.delete(key)
-    else params.set(key, value)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
-  }
-
-  function setActiveTab(tab: Tab) {
-    setActiveTabState(tab)
-    replaceParam("tab", tab)
-  }
-  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
-  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(null)
+  // Canonical URL-param helpers (shared module, one atomic replace each).
+  const { setParam, setParams, clearTabParams } = useNavState()
+  // Thin alias preserves every existing `replaceParam(key, value)` call site.
+  const replaceParam = setParam
+  // Restore the open conversation from ?chat — but only when the chats tab is the
+  // active tab, so the fullscreen overlay never leaks over another restored tab on
+  // reload. Name is unknown at mount → init "" and backfill from recentChats below.
+  // Init from `searchParams` (useSearchParams), NOT window.location.search — the latter
+  // is undefined on the server, so SSR rendered the "no chat" branch while the client
+  // restored the chat → hydration mismatch. searchParams is SSR-consistent (same source
+  // as initialTab), so server and client agree on the first render.
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
+    const chatId = searchParams.get("chat")
+    return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
+  })
+  // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
+    searchParams.get("ann")
+  )
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -90,7 +100,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(initialActiveQuestion ?? null)
   const [hasResponded, setHasResponded] = useState(initialHasResponded ?? false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
-  const [showQuickCreateTeam, setShowQuickCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
     const urlTeam = searchParams.get("team")
     if (urlTeam) return urlTeam
@@ -105,9 +114,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     initialSection && (validSections as readonly string[]).includes(initialSection) ? initialSection : "spiritual-profile"
   )
 
+  // Sub-page params that belong to a team workspace — cleared on every team switch
+  // so the new team never inherits the previous team's deep-link state.
+  const TEAM_SUBPARAMS = { sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null } as const
+
   function handleTeamChange(teamId: string) {
     setActiveTeamId(teamId)
-    replaceParam("team", teamId)
+    // One atomic replace (Convention #5): set the new team AND clear all of the
+    // previous team's sub-params in a single URL update. PlanTab no longer owns
+    // this clear (its teamSwitchRef effect only does non-URL bookkeeping now).
+    setParams({ tab: "plan", team: teamId, ...TEAM_SUBPARAMS })
   }
 
   // Team selected WITHIN the Receipts workspace (sentinel activeTeamId === "receipts").
@@ -117,20 +133,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   function handleReceiptsTeamChange(teamId: string) {
     setActiveReceiptsTeamId(teamId)
-    // One atomic replace (convention #5) — build the full param set, replace once.
-    const params = new URLSearchParams(window.location.search)
-    params.set("rteam", teamId)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+    // One atomic replace (Convention #5) via the shared nav-state module.
+    // Assert the owning tab so a mount-fired write can't clobber ?tab (race fix).
+    setParams({ tab: "plan", rteam: teamId })
   }
 
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
     setProfileSection(section)
-    replaceParam("section", section === "spiritual-profile" ? null : section)
+    setParams({ tab: "profile", section: section === "spiritual-profile" ? null : section })
   }
 
   function handleMemberSelect(memberId: string | null) {
     setActiveMemberId(memberId)
-    replaceParam("member", memberId)
+    setParams({ tab: "directory", member: memberId })
   }
 
   function handleDirectoryMemberSelect(member: DirectoryMember) {
@@ -212,8 +227,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
-  const isPraiseTeamMember = userTeams.some(t => t.teamType === 'standard' && (/\b(praise|worship)\b/.test(t.teamName.toLowerCase()) || t.permissions.some(p => ["can_manage_worship_set","can_view_worship_set","can_manage_schedule"].includes(p))))
-  const canCreateTeam = isAdmin || isDGL || isPraiseTeamMember
+  const canCreateTeam = isAdmin
 
   // Student Org Board planning state — lifted here for breadcrumb + sidebar
   const validSOSections = ["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"] as const
@@ -254,7 +268,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }
 
   // Congregation sub-view — lifted so shell can build accurate crumbs
-  const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
+  const [congregationView, setCongregationView] = useState<"list" | "create" | "detail">("list")
 
   // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb).
   // Resolve from membership first, then from allTeams — a governance admin may be viewing a team
@@ -311,7 +325,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   // Shell breadcrumb computation — derived from shell-known state, no tab props needed
   function getShellCrumbs(): string[] {
-    const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
+    const congregationLabels: Record<string, string> = { list: "", create: "New question", detail: "Responses" }
     switch (activeTab) {
       case "home":          return ["Central", "Home"]
       case "announcements": return ["Central", "Announcements"]
@@ -329,7 +343,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       }
       case "directory":     return ["Central", "Directory"]
       case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
-      case "congregation":  return ["Central", "Congregation", congregationLabels[congregationView]]
+      case "congregation":  return congregationLabels[congregationView]
+        ? ["Central", "Congregation", congregationLabels[congregationView]]
+        : ["Central", "Congregation"]
       default:              return ["Central"]
     }
   }
@@ -353,6 +369,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       .map((row) => ({
         id: row.group_id,
         groupName: row.group_name,
+        type: row.group_type,
         lastMessage: row.last_msg_content ?? "",
         lastMessageSender: row.last_msg_sender_name ?? "",
         unreadCount: Number(row.unread_count),
@@ -394,6 +411,30 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency, allowAdminMembers: !!t.allow_admin_members }]
     })
+    // Which of these teams have a member assigned to their president role.
+    const ids = teams.map((t) => t.teamId)
+    let presidentSet = new Set<string>()
+    if (ids.length > 0) {
+      const { data: pres } = await supabase
+        .from("team_members")
+        .select("team_id, team_roles!inner(is_president)")
+        .in("team_id", ids)
+        .eq("team_roles.is_president", true)
+      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
+    }
+    for (const t of teams) t.hasPresident = presidentSet.has(t.teamId)
+    // Member counts for each of the user's teams (one query, tallied per team).
+    if (ids.length > 0) {
+      const { data: counts } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .in("team_id", ids)
+      const countMap = new Map<string, number>()
+      for (const r of (counts ?? []) as { team_id: string }[]) {
+        countMap.set(r.team_id, (countMap.get(r.team_id) ?? 0) + 1)
+      }
+      for (const t of teams) t.memberCount = countMap.get(t.teamId) ?? 0
+    }
     setUserTeams(teams)
     setActiveTeamId((prev) => {
       // The Receipts sentinel is not a real team — never reconcile it away on refresh.
@@ -417,9 +458,16 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     if (!data) return
     const teamIds = (data as { id: string }[]).map((t) => t.id)
     const countMap: Record<string, number> = {}
+    let presidentSet = new Set<string>()
     if (teamIds.length > 0) {
       const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
       for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
+      const { data: pres } = await supabase
+        .from("team_members")
+        .select("team_id, team_roles!inner(is_president)")
+        .in("team_id", teamIds)
+        .eq("team_roles.is_president", true)
+      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
     }
     type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null; allow_admin_members: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
@@ -427,7 +475,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       const team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       const rawAccess = t.admin_access ?? 'view'
       const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
-      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0 }
+      return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0, hasPresident: presidentSet.has(t.id) }
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGovernanceAdmin, ministryId])
@@ -491,6 +539,44 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       .then(({ data }) => { if (data) setMinistryIsPublic(data.is_public ?? false) })
   }, [isAdmin, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Latest open chat, read inside the realtime callback without re-subscribing.
+  const globalOpenChatRef = useRef(globalOpenChat)
+  useEffect(() => { globalOpenChatRef.current = globalOpenChat }, [globalOpenChat])
+
+  // Throttled refetch of the shared chat-list SWR cache (the Messages sidebar).
+  // Leading + trailing at 300ms: the first message in a burst refetches instantly,
+  // the last one is always captured by the trailing call so the final order/preview/
+  // unread land. We pass a FETCHER (not a bare key) to mutate so it never collides
+  // with the global dedupingInterval:5000 — provided data updates the cache directly
+  // instead of routing through the dedup-gated revalidation path. The fetcher also
+  // re-forces the currently-open chat to unread 0, so an incoming-while-open message
+  // can't resurrect a badge on the chat the user is actively reading (the open chat's
+  // ChatScreen writes last_read_at async, which could otherwise race get_chat_list).
+  const chatListThrottle = useRef<{ last: number; timer: ReturnType<typeof setTimeout> | null }>({ last: 0, timer: null })
+  const refetchChatList = useCallback(() => {
+    const run = () => {
+      chatListThrottle.current.last = Date.now()
+      globalMutate(
+        ["chat-list", userId, ministryId],
+        async () => {
+          const groups = await fetchChatList(["chat-list", userId, ministryId])
+          const openId = globalOpenChatRef.current?.id
+          return openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
+        },
+        { revalidate: false },
+      )
+    }
+    const elapsed = Date.now() - chatListThrottle.current.last
+    if (elapsed >= 300) {
+      run()
+    } else if (!chatListThrottle.current.timer) {
+      chatListThrottle.current.timer = setTimeout(() => {
+        chatListThrottle.current.timer = null
+        run()
+      }, 300 - elapsed)
+    }
+  }, [globalMutate, userId, ministryId])
+
   // Realtime: keep recentChats preview fresh as messages arrive
   useEffect(() => {
     const channel = supabase
@@ -500,6 +586,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
+          // Drive the Messages sidebar live (order, preview, unread badges).
+          refetchChatList()
           supabase
             .from("profiles")
             .select("name")
@@ -552,7 +640,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 
-  // On desktop, auto-select the most recent chat when arriving at the chats tab
+  // On desktop, auto-select the most recent chat when arriving at the chats tab.
+  // This is the master-detail DEFAULT for the empty state only — it writes NO URL
+  // (Convention #5: avoid racing the nav's setParams). An explicitly-opened chat
+  // owns ?chat via handleOpenChat; `!globalOpenChat` already prevents overriding a
+  // URL-restored conversation (the lazy-init sets it before this effect runs).
   useEffect(() => {
     if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats.length > 0) {
       const top = recentChats[0]
@@ -561,13 +653,38 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop, activeTab, recentChats])
 
-  function handleOpenChat(id: string, name: string) {
+  // Backfill the header name for a URL-restored chat once recentChats loads.
+  useEffect(() => {
+    if (!globalOpenChat || globalOpenChat.name !== "") return
+    const match = recentChats.find((c) => c.id === globalOpenChat.id)
+    if (match) setGlobalOpenChat((prev) => prev && prev.name === "" ? { ...prev, name: match.groupName } : prev)
+  }, [globalOpenChat, recentChats])
+
+  // Opening a chat is atomic: switch to the chats tab, mirror ?chat, and (when the
+  // group category is known) set ?chats so the church/my subtab reflects the open
+  // chat — all in one replace.
+  function handleOpenChat(id: string, name: string, type?: string) {
+    setActiveTabState("chats")
     setGlobalOpenChat({ id, name })
+    const sub = type ? (type === "church" ? "church" : "my") : null
+    setParams({ tab: "chats", chat: id, ...(sub ? { chats: sub } : {}) })
   }
 
   function handleChatClose() {
     setGlobalOpenChat(null)
     setChatRefreshKey((k) => k + 1)
+    setParam("chat", null)
+  }
+
+  // Announcement detail open/close mirror ?ann (read view, persists on reload).
+  function handleOpenAnnouncement(id: string) {
+    setOpenAnnouncementId(id)
+    setParam("ann", id)
+  }
+
+  function handleCloseAnnouncement() {
+    setOpenAnnouncementId(null)
+    setParam("ann", null)
   }
 
   function handleChatNameChange(name: string) {
@@ -575,15 +692,68 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     setChatRefreshKey((k) => k + 1)
   }
 
-  function handleSidebarTabChange(tab: Tab) {
-    setGlobalOpenChat(null)
-    setActiveTabState(tab)
-    // Atomic URL update: set new tab and clear sub-page overlay params so they
-    // don't auto-reopen when the user returns to the plan tab later.
-    const params = new URLSearchParams(window.location.search)
-    params.set("tab", tab)
-    params.delete("view")
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+  // Unified, symmetric nav handler — wired to BOTH the desktop sidebar and the
+  // mobile bottom nav (and the command palette). Re-clicking the active tab RESETS
+  // it to its landing view (clears that tab's owned params + shell-owned transients);
+  // clicking a different tab SWITCHES while leaving other tabs' params intact
+  // (resume-where-left-off). One atomic replace per logical navigation (Convention #5).
+  function handleNavClick(tab: Tab) {
+    // The announcement detail overlay is transient — it closes on every nav action.
+    setOpenAnnouncementId(null)
+
+    if (tab === activeTab) {
+      // RESET: also clear the shell-owned, plain-state transients for this tab so
+      // re-clicking truly lands on the tab's first view (URL params alone aren't
+      // enough — these states lazy-init from the URL only on mount).
+      setGlobalOpenChat(null)
+      if (tab === "plan") {
+        setActiveTeamId(null)
+        setActiveReceiptsTeamId(null)
+        setStudentOrgPlanningEvent(null)
+      }
+      if (tab === "directory") {
+        setActiveMemberId(null)
+        setSelectedDirectoryMember(null)
+      }
+      if (tab === "profile") setProfileSection("spiritual-profile")
+      if (tab === "congregation") setCongregationView("list")
+      setActiveTabState(tab)
+      // Remount the active tab so tabs that hold their own internal view-state
+      // (CongregationTab's view, chats list, journal subtab, …) re-init from the
+      // cleared URL and land on their first view — no per-tab controlled props.
+      setNavResetKey(k => k + 1)
+      // clearTabParams drops this tab's owned params (?chat on chats, ?ann on
+      // announcements, …); also clear ?ann unconditionally since the detail
+      // overlay can sit over any tab.
+      clearTabParams(tab, { tab, ann: null })
+    } else {
+      // SWITCH: SIDEBAR-LEVEL params (plan's team/rteam, chats' chats/chat,
+      // directory's member) are PRESERVED so each tab resumes its last
+      // workspace/member; FOLDED-IN params (deep subtabs, settings sub-pages,
+      // drill-in detail) are CLEARED so returning lands on the section default.
+      // ?ann (transient detail overlay) is also cleared. One atomic replace.
+      // ?chat is PRESERVED so the chats tab resumes its open conversation; we
+      // re-derive the overlay only when entering chats and null it otherwise (so
+      // the fullscreen overlay never leaks over another tab).
+      setActiveTabState(tab)
+      if (tab === "chats") {
+        const chatId = new URLSearchParams(window.location.search).get("chat")
+        setGlobalOpenChat(chatId ? { id: chatId, name: "" } : null)
+      } else {
+        setGlobalOpenChat(null)
+      }
+      // Reset folded-in SHELL-OWNED transients (these live in React state and
+      // survive tab switches, so clearing the URL param alone won't reset them).
+      // Sidebar-level shell state (activeTeamId, activeReceiptsTeamId,
+      // activeMemberId, selectedDirectoryMember) is intentionally left untouched.
+      setProfileSection("spiritual-profile")
+      setStudentOrgPlanningEvent(null)
+      setStudentOrgSection("Events")
+      setSglSection("bible_study")
+      setFinanceTeamSection("reimbursements")
+      setCongregationView("list")
+      setParams({ tab, ann: null, ...Object.fromEntries(ALL_FOLDED_PARAMS.map((p) => [p, null])) })
+    }
   }
 
   async function handleLogout() {
@@ -607,7 +777,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
         activeTab={activeTab}
-        onTabChange={handleSidebarTabChange}
+        onTabChange={handleNavClick}
         ministryName={ministryName}
         chatsUnread={totalChatsUnread}
         showPlan={showPlanTab}
@@ -621,7 +791,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         isAdmin={isAdmin}
         isPastor={isPastor}
         canCreateTeam={canCreateTeam}
-        onCreateTeam={() => setShowQuickCreateTeam(true)}
+        onCreateTeam={() => { handleNavClick("plan"); setShowCreateTeam(true) }}
         activeTeamId={activeTeamId}
         activeTeamName={activeTeamNameForPlan || undefined}
         onActiveTeamChange={handleTeamChange}
@@ -658,12 +828,12 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
+            right={activeTab === "plan" && (activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
               /* Team-agnostic back-to-picker button — shown for the receipts sentinel
                  AND any team workspace. Don't gate on a per-type flag or new team types
                  (finance, etc.) silently lose their way back. */
               <button
-                onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
+                onClick={() => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) }}
                 className="hover:bg-[#F2EDE0] transition-colors"
                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 999, padding: "6px 13px", cursor: "pointer" }}
               >
@@ -680,8 +850,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
               remounts and replays the fade+rise on every top-level tab switch
               (one mount point, not one per tab). md:h-full + md:overflow-hidden
               pass the shell's height/scroll context through to each tab's own
-              wrapper, which resolves md:h-full against this element. */}
-          <div key={activeTab} className="content-enter md:h-full md:overflow-hidden">
+              wrapper, which resolves md:h-full against this element. The
+              `navResetKey` segment ALSO remounts on an active-tab reset (re-click)
+              so the active tab re-inits from the cleared URL — it never changes on
+              a plain switch, so resume-where-left-off is preserved. */}
+          <div key={`${activeTab}-${navResetKey}`} className="content-enter md:h-full md:overflow-hidden">
 
           {activeTab === "home" && (
             <div className="md:h-full md:overflow-y-auto">
@@ -691,11 +864,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 ministryId={ministryId}
                 ministryName={ministryName}
                 recentChats={recentChats}
-                onSeeChats={() => setActiveTab("chats")}
-                onSeeAnnouncements={() => setActiveTab("announcements")}
+                onSeeChats={() => handleNavClick("chats")}
+                onSeeAnnouncements={() => handleNavClick("announcements")}
                 onOpenChat={handleOpenChat}
-                onGoToProfile={() => setActiveTab("profile")}
-                onOpenAnnouncement={(id) => setOpenAnnouncementId(id)}
+                onGoToProfile={() => handleNavClick("profile")}
+                onOpenAnnouncement={handleOpenAnnouncement}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -706,7 +879,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => setOpenAnnouncementId(id)} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={handleOpenAnnouncement} />
             </div>
           )}
 
@@ -724,14 +897,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   onOpenChat={handleOpenChat}
                   onTotalUnreadChange={setTotalChatsUnread}
                   refreshKey={chatRefreshKey}
-                  onOpenDirectory={() => setActiveTab("directory")}
+                  onOpenDirectory={() => handleNavClick("directory")}
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
+              {/* Gate the ChatScreen MOUNT on isDesktop (not just the CSS `hidden md:flex`):
+                  on a reload with ?chat=, globalOpenChat is set before isDesktop resolves,
+                  so without this gate BOTH this (CSS-hidden) ChatScreen and the mobile
+                  overlay below mount for the same group → duplicate realtime channel topic
+                  ("cannot add postgres_changes callbacks after subscribe()"). */}
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-                {globalOpenChat ? (
+                {isDesktop && globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.id}
                     groupId={globalOpenChat.id}
@@ -777,8 +955,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 showCreateTeam={showCreateTeam}
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
-                onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
-                onOpenChat={(id, name) => { setActiveTab("chats"); handleOpenChat(id, name) }}
+                onOpenChat={handleOpenChat}
                 onTeamSelect={handleTeamChange}
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
@@ -812,11 +989,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 initialMemberId={activeMemberId ?? undefined}
                 selectedMember={selectedDirectoryMember}
                 onMemberSelect={handleMemberSelect}
-                onBack={() => setActiveTab("chats")}
-                onOpenChat={(id, name) => {
-                  setActiveTab("chats")
-                  handleOpenChat(id, name)
-                }}
+                onBack={() => handleNavClick("chats")}
+                onOpenChat={handleOpenChat}
               />
             </div>
           )}
@@ -887,7 +1061,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
         <BottomNav
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleNavClick}
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
         />
@@ -917,7 +1091,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           ministryId={ministryId}
           userRole={initialProfile.role}
           userName={initialProfile.name}
-          onClose={() => setOpenAnnouncementId(null)}
+          onClose={handleCloseAnnouncement}
         />
       )}
 
@@ -925,27 +1099,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         ministryId={ministryId}
-        onTabChange={(tab) => { setPaletteOpen(false); handleSidebarTabChange(tab) }}
-        onOpenChat={(id, name) => { setPaletteOpen(false); handleOpenChat(id, name) }}
+        onTabChange={(tab) => { setPaletteOpen(false); handleNavClick(tab) }}
+        onOpenChat={(id, name, type) => { setPaletteOpen(false); handleOpenChat(id, name, type) }}
       />
 
-      {showQuickCreateTeam && (
-        <QuickCreateTeamModal
-          userId={userId}
-          ministryId={ministryId}
-          isAdmin={isAdmin}
-          isDGL={isDGL}
-          isPraiseTeamMember={isPraiseTeamMember}
-          onClose={() => setShowQuickCreateTeam(false)}
-          onCreated={(teamId) => {
-            setShowQuickCreateTeam(false)
-            loadUserTeams()
-            loadAllTeams()
-            setActiveTab("plan")
-            handleTeamChange(teamId)
-          }}
-        />
-      )}
 
       {showGradPrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>

@@ -158,6 +158,14 @@ For pages without a hero banner:
 - Serif H1 (44–52px)
 - Optional 15px body sentence describing the page
 
+### 3.1 Workspace headers are compact
+
+**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. Right-slot actions (the settings gear, `HeaderActionButton`) sit in the same `TabPageHeader` row; `HeaderActionButton` is pinned to 28px to match the compact line box.
+
+The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
+
+**Carve-out:** event/identity drill-down headers are NOT workspace nav headers and keep the full 36px `PageTitle` + eyebrow — e.g. the Student Org and Small Group **event-detail** headers (eyebrow = `{EVENT_TYPE} · {DATE}`, title = the event name). Compact is for the workspace's own top-level header, not these earned identity moments.
+
 ---
 
 ## 4. Component library
@@ -381,6 +389,15 @@ Mandatory elements above the fold:
 
 ## 7. Layout patterns by page type
 
+### 7.0 Horizontal width & whitespace — read before choosing any layout
+
+A max-width cap is a **readability tool, not a default**, and never an excuse to leave half the content area empty. The failure mode to avoid: a fixed-width block left-aligned in a wide content area, stranding a large dead margin on one side (a 760px column on a 1400px desktop). "Make everything full width" is the wrong correction — it stretches prose and forms past a comfortable measure. The rule is by content type:
+
+- **Reading- / form-measure content** (prose, devotionals, a single-column form, an editorial body): cap the line length for legibility (~460–720px by type size), but then **use the freed space** — center the column (`margin: 0 auto`) or pair it with a companion rail/aside. Never left-align a narrow column against empty space. (Auth body = 460 centered, onboarding = 560 centered, identity/settings = two-column `1.5fr/1fr` — all already do this.)
+- **Collection / data content** (lists of cards, tables, stat grids, response charts): these have **no reading-measure constraint** — let them **fill the content area** out to the page padding (`px-14` / `0 40px`), and reflow into more columns as width grows. Do not trap a list or grid in a fixed narrow column.
+
+Test before shipping: at desktop width, is there a large band of unused space with content hugging one edge? If yes, the layout is wrong — center/pair the capped column, or let the collection expand.
+
 ### 7.1 Identity page (team home, event detail, profile)
 1. Plum hero
 2. Underline tabs
@@ -476,6 +493,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 18. **Verse callout is permanent.** Don't drop it to save space.
 19. **Underline tabs only.** Never pill tabs, never boxed tabs.
 20. **Cream bg `#FDFCF8`, page bg `#F1ECDE`** — never invert.
+21. **No fixed-width column stranded in a wide content area.** Cap width only for reading measure (and center or pair it); let lists, grids, tables, and stat content fill the content area (§7.0). A page with content hugging one edge and a dead band of unused space on the other is a layout bug.
 
 ---
 

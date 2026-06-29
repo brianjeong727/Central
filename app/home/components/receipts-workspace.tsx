@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { X, ArrowLeft, Plus, Image as ImageIcon } from "lucide-react"
+import { X, ArrowLeft, Plus, Image as ImageIcon, Settings } from "lucide-react"
 import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
 import { HeaderActionButton } from "./shared"
 import { createClient } from "@/lib/supabase"
@@ -25,6 +25,10 @@ interface ReceiptsWorkspaceProps {
   teams: ReceiptsTeamRef[]
   activeReceiptsTeamId: string | null
   onReceiptsTeamChange: (id: string) => void
+  // Opens the active team's settings (members + president). Provided only when the
+  // current user may manage that team (its president or a governance admin); the
+  // gear is hidden otherwise.
+  onOpenTeamSettings?: () => void
 }
 
 const FUND_OPTIONS = [
@@ -38,6 +42,7 @@ export function ReceiptsWorkspace({
   teams,
   activeReceiptsTeamId,
   onReceiptsTeamChange,
+  onOpenTeamSettings,
 }: ReceiptsWorkspaceProps) {
   // Auto-select the first team when none is chosen yet (e.g. landing via the
   // sidebar "Receipts" entry without an ?rteam param).
@@ -81,12 +86,24 @@ export function ReceiptsWorkspace({
     <>
       {/* Desktop header (TabPageHeader is hidden on mobile) */}
       <TabPageHeader>
+        {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow. */}
         <PageTitle
-          eyebrow={activeTeam ? `RECEIPTS · ${activeTeam.name.toUpperCase()}` : "RECEIPTS"}
           title="Receipts"
+          compact
         />
         {teamId && (
-          <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
+          <div className="ml-auto flex items-center gap-2">
+            {onOpenTeamSettings && (
+              <button
+                onClick={onOpenTeamSettings}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+                title="Team settings"
+              >
+                <Settings className="w-4 h-4 text-[var(--body)]" />
+              </button>
+            )}
+            <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
+          </div>
         )}
       </TabPageHeader>
 
