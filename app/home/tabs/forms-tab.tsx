@@ -617,7 +617,10 @@ export function FormsTab({ ministryId, onViewChange }: FormsTabProps) {
                         {item.response_count} response{item.response_count !== 1 ? 's' : ''}
                       </p>
                     </div>
-                    <ChevronRight style={{ width: 18, height: 18, color: 'var(--muted-text)', flexShrink: 0 }} />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, fontSize: 13, fontWeight: 500, color: 'var(--plum)' }}>
+                      View responses
+                      <ChevronRight style={{ width: 16, height: 16 }} />
+                    </span>
                   </button>
                 ))}
               </div>
