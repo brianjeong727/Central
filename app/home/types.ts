@@ -118,6 +118,7 @@ export interface FormsTabProps {
   userRole: string
   ministryId: string
   ministryName: string
+  onViewChange?: (view: "list" | "detail", title?: string) => void
 }
 
 export interface ChatGroup {

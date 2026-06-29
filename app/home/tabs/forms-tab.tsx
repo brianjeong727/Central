@@ -354,12 +354,6 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
     { key: 'summary', label: 'Summary' },
   ] as const
 
-  const backBtnStyle: React.CSSProperties = {
-    width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)",
-    background: "transparent", display: "flex", alignItems: "center",
-    justifyContent: "center", cursor: "pointer", flexShrink: 0,
-  }
-
   return (
     <>
       {/* Mobile header — compact, with back */}
@@ -376,14 +370,9 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
         </h1>
       </div>
 
-      {/* Desktop header — own header with back affordance + form title */}
+      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header back */}
       <TabPageHeader>
-        <button onClick={onClose} aria-label="Back to forms" style={backBtnStyle}>
-          <ChevronLeft className="w-4 h-4 text-[var(--body)]" />
-        </button>
-        <div style={{ marginLeft: 14, minWidth: 0 }}>
-          <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={announcementTitle} compact />
-        </div>
+        <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={announcementTitle} compact />
       </TabPageHeader>
 
       {/* Subtabs — desktop (root sibling, outside the padded content wrapper) */}
@@ -497,7 +486,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
 
 // ── Forms Tab ─────────────────────────────────────────────────────────────────
 
-export function FormsTab({ ministryId }: FormsTabProps) {
+export function FormsTab({ ministryId, onViewChange }: FormsTabProps) {
   const supabase = createClient()
   const { setParam } = useNavState()
   const [loading, setLoading] = useState(true)
@@ -513,18 +502,33 @@ export function FormsTab({ ministryId }: FormsTabProps) {
   function openResponses(formId: string, title: string) {
     setResponsesState({ formId, title })
     setParam("fresp", formId)
+    onViewChange?.("detail", title)
   }
 
   function closeResponses() {
     setResponsesState(null)
     setParam("fresp", null)
+    onViewChange?.("list")
   }
 
-  // Backfill the responses-view title from items for a URL-restored ?fresp.
+  // Propagate the URL-restored initial view to the shell breadcrumb on mount.
+  // No ?fresp → list immediately. With ?fresp → the detail crumb is announced
+  // by the title-backfill effect below, since the form title isn't known until
+  // items load. (Mirrors CongregationTab's mount-effect view lift.)
+  useEffect(() => {
+    if (!responsesState) onViewChange?.("list")
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Backfill the responses-view title from items for a URL-restored ?fresp,
+  // and lift the detail view + title to the shell the same moment.
   useEffect(() => {
     if (!responsesState || responsesState.title !== "") return
     const match = items.find((i) => i.form_id === responsesState.formId)
-    if (match) setResponsesState((prev) => prev && prev.title === "" ? { ...prev, title: match.title } : prev)
+    if (match) {
+      setResponsesState((prev) => prev && prev.title === "" ? { ...prev, title: match.title } : prev)
+      onViewChange?.("detail", match.title)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [responsesState, items])
 
   const load = useCallback(async () => {
