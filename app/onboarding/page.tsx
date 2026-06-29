@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo, PlanLineIcon } from "@/app/home/components/shared"
 
@@ -285,7 +286,7 @@ export default function OnboardingPage() {
       }}>
         {/* Brand */}
         <div style={{ padding: "30px 28px 24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 11, textDecoration: "none", color: "inherit" }}>
             <span style={{
               width: 34, height: 34, borderRadius: 9, display: "grid", placeItems: "center",
               background: "var(--plum-2)", flexShrink: 0,
@@ -293,7 +294,7 @@ export default function OnboardingPage() {
               <RingCrossLogo size={20} color="var(--ivory)"/>
             </span>
             <span style={{ fontFamily: SERIF, fontSize: 21, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
-          </div>
+          </Link>
         </div>
 
         {/* Register eyebrow */}
@@ -326,6 +327,17 @@ export default function OnboardingPage() {
       {/* ── Content area ── */}
       <div style={{ flex: 1, background: "#FDFCF8", overflowY: "auto" }}>
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "56px 40px 80px" }}>
+
+          {/* Persistent exit — back to landing (shown on every step, both layouts) */}
+          <Link href="/" className="transition-opacity hover:opacity-70" style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            color: "var(--body)", textDecoration: "none", fontSize: 14, marginBottom: 28,
+          }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back to home
+          </Link>
 
           {/* ── Step 1 — Basic info ── */}
           {step === 0 && (

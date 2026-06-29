@@ -37,7 +37,7 @@ export default async function RegisterMinistryPage() {
       fontFamily: SANS, padding: "40px 24px",
     }}>
       {/* Brand */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
+      <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 48, textDecoration: "none", color: "inherit" }}>
         <span style={{
           width: 36, height: 36, borderRadius: 10, background: "var(--plum-2)",
           display: "grid", placeItems: "center", flexShrink: 0,
@@ -45,7 +45,7 @@ export default async function RegisterMinistryPage() {
           <RingCrossLogo size={20} color="var(--ivory)"/>
         </span>
         <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
-      </div>
+      </Link>
 
       {/* Card */}
       <div style={{

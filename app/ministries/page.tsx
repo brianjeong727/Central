@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
@@ -155,7 +156,7 @@ function MinistriesContent() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "22px 48px", borderBottom: "1px solid #EFE9DA",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 11, textDecoration: "none", color: "inherit" }}>
           <span style={{
             width: 32, height: 32, borderRadius: 9, display: "grid", placeItems: "center",
             background: "var(--plum-2)", flexShrink: 0,
@@ -163,7 +164,7 @@ function MinistriesContent() {
             <RingCrossLogo size={18} color="var(--ivory)"/>
           </span>
           <span style={{ fontFamily: SERIF, fontSize: 20, letterSpacing: "-0.01em" }}>Central</span>
-        </div>
+        </Link>
         <a href="/home" style={{
           display: "inline-flex", alignItems: "center", gap: 8,
           fontSize: 14, color: "var(--muted-text)", textDecoration: "none",

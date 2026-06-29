@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
 const SERIF = "var(--font-instrument-serif)"
@@ -25,7 +26,7 @@ export function AuthPhotoPanel() {
         background: "linear-gradient(155deg, rgba(27,10,30,0.58) 0%, rgba(45,15,46,0.76) 58%, rgba(27,10,30,0.93) 100%)",
       }}/>
       {/* Brand */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 11 }}>
+      <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ position: "relative", display: "flex", alignItems: "center", gap: 11, textDecoration: "none", color: "inherit" }}>
         <span style={{
           width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
           background: "rgba(253,252,248,0.12)", border: "1px solid rgba(253,252,248,0.22)",
@@ -33,7 +34,7 @@ export function AuthPhotoPanel() {
           <RingCrossLogo size={20} color="var(--ivory)" />
         </span>
         <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#FBF8F2" }}>Central</span>
-      </div>
+      </Link>
       {/* Tagline + verse */}
       <div style={{ position: "relative" }}>
         <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.03, letterSpacing: "-0.02em", color: "#FBF8F2" }}>
@@ -76,14 +77,14 @@ export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; chi
         }}>
           {/* Mobile-only wordmark */}
           <div className="md:hidden" style={{ marginBottom: 36, alignSelf: "flex-start" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 12, textDecoration: "none", color: "inherit" }}>
               <span style={{
                 width: 32, height: 32, borderRadius: 8, background: "var(--plum)",
                 color: "#FBF8F2", display: "grid", placeItems: "center",
                 fontFamily: SERIF, fontSize: 15, flexShrink: 0,
               }}>C</span>
               <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
-            </div>
+            </Link>
           </div>
           <div style={{ width: "100%", maxWidth: 460 }}>{children}</div>
         </div>
