@@ -193,7 +193,7 @@ export interface CongregationTabProps {
   userId: string
   ministryId: string
   userRole: string
-  onViewChange?: (view: "ask" | "responses" | "archive") => void
+  onViewChange?: (view: "list" | "create" | "detail") => void
 }
 
 export interface HomeTabProps {
