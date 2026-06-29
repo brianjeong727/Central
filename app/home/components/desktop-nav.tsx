@@ -55,7 +55,7 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
 export function DesktopSidebar({
   activeTab, onTabChange, ministryName, chatsUnread, showPlan,
   userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat,
-  activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId,
+  activeGroupId, onLogout, isAdmin, isPastor, isLeaderOrAdmin, onCreateTeam, activeTeamId,
   activeTeamName,
   onActiveTeamChange, profileSection, onProfileSectionChange,
   isTreasurer, isDGL,
@@ -192,7 +192,8 @@ export function DesktopSidebar({
       { label: "Overview",          tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
-      { label: "Forms",           tab: "forms" },
+      // Forms is a leader-only insights hub — members/visitors fill forms via Announcements.
+      ...(isLeaderOrAdmin ? [{ label: "Forms", tab: "forms" as const }] : []),
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
     const generalTabs  = ["home", "announcements", "give"] as const
