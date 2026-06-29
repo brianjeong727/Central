@@ -658,10 +658,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
-              /* Team-agnostic back-to-picker button — shown for the receipts sentinel
-                 AND any team workspace. Don't gate on a per-type flag or new team types
-                 (finance, etc.) silently lose their way back. */
+            right={(activeTab === "plan" && activeTeamId && (userTeams.length > 1 || govTeamCount > 0)) ? (
+              /* Team-agnostic back-to-picker button — ONLY on the Plan tab, when a
+                 workspace is selected AND the user has multiple workspaces to return
+                 to (matches when the picker is reachable in plan-tab). activeTeamId is
+                 global state that persists across tabs, so the activeTab gate is what
+                 keeps this off every other tab's breadcrumb. The receipts sentinel is
+                 covered (truthy activeTeamId); don't gate on a per-type flag or new
+                 team types (finance, etc.) silently lose their way back. */
               <button
                 onClick={() => { setActiveTeamId(null); replaceParam("team", null) }}
                 className="hover:bg-[#F2EDE0] transition-colors"
