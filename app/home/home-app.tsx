@@ -876,8 +876,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
+              {/* Gate the ChatScreen MOUNT on isDesktop (not just the CSS `hidden md:flex`):
+                  on a reload with ?chat=, globalOpenChat is set before isDesktop resolves,
+                  so without this gate BOTH this (CSS-hidden) ChatScreen and the mobile
+                  overlay below mount for the same group → duplicate realtime channel topic
+                  ("cannot add postgres_changes callbacks after subscribe()"). */}
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-                {globalOpenChat ? (
+                {isDesktop && globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.id}
                     groupId={globalOpenChat.id}
