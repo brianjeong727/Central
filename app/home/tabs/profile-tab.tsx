@@ -3,21 +3,15 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Edit3, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { RoleDescriptionEditor } from "./plan-tab"
-import { CentralButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton } from "@/components/central"
-import type { Profile, Devotional, Prayer, PrayerStatus, Verse } from "../types"
-
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  praying:  { label: "Praying",  bg: "var(--ivory)", text: "var(--plum)" },
-  answered: { label: "Answered", bg: "var(--cream)", text: "var(--body)" },
-  ongoing:  { label: "Ongoing",  bg: "var(--cream)", text: "var(--muted-text)" },
-}
+import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton } from "@/components/central"
+import type { Profile, Devotional, Prayer, Verse } from "../types"
 
 const JOURNAL_TABS = [
   { key: "devotionals", label: "Devotionals" },
@@ -117,54 +111,56 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit devotional" : "New devotional"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.title.trim()}
+        saveLabel={editingEntry ? "Update" : "Save entry"}
+      >
+        <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <RoleDescriptionEditor
+          key={editingEntry?.id ?? "new"}
+          initialContent={draft.content}
+          onChange={html => setDraft(d => ({ ...d, content: html }))}
+          placeholder="Write your reflections here…"
+          minHeight={340}
+        >
+          <div style={{ paddingBottom: 4 }}>
+            <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", marginBottom: 6, letterSpacing: "-0.02em" }} />
+            <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 14, color: "var(--plum)", borderBottom: "1px solid var(--line)", marginBottom: 0, paddingBottom: 10 }} />
+          </div>
+        </RoleDescriptionEditor>
+        <div style={{ paddingTop: 16 }}>
+          {draft.image_url ? (
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <img src={draft.image_url} alt="" style={{ maxHeight: 220, maxWidth: "100%", borderRadius: 8 }} />
+              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+            </div>
+          ) : (
+            <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer" }}>
+              <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
+            </button>
+          )}
+        </div>
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
-      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Devotionals · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>Reflections</h2>
-      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New entry
         </CentralButton>
       </div>
-
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
-          <RoleDescriptionEditor
-            key={editingEntry?.id ?? "new"}
-            initialContent={draft.content}
-            onChange={html => setDraft(d => ({ ...d, content: html }))}
-            placeholder="Write your reflections here…"
-          >
-            <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Entry title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 6, letterSpacing: "-0.02em" }} />
-              <input type="text" placeholder="Passage reference (e.g. John 3:16–17)" value={draft.passage} onChange={e => setDraft(d => ({ ...d, passage: e.target.value }))} style={{ ...inputBase, fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 14, color: "var(--plum)", borderBottom: "1px solid var(--line)", marginBottom: 0, paddingBottom: 10 }} />
-            </div>
-          </RoleDescriptionEditor>
-          <div style={{ padding: "0 26px 20px" }}>
-            {draft.image_url ? (
-              <div style={{ position: "relative", marginBottom: 14, display: "inline-block" }}>
-                <img src={draft.image_url} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 8 }} />
-                <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
-              </div>
-            ) : (
-              <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer", marginBottom: 14 }}>
-                <ImageIcon size={12} />{uploadingImage ? "Uploading…" : "Attach photo or image"}
-              </button>
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save entry"}</CentralButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <JournalListSkeleton />
@@ -192,10 +188,10 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -230,14 +226,12 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   )
   const entries = useMemo(() => data ?? [], [data])
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState<PrayerStatus | "all">("all")
   const [showEditor, setShowEditor] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Prayer | null>(null)
-  const [draft, setDraft] = useState({ title: "", content: "", status: "praying" as PrayerStatus })
+  const [draft, setDraft] = useState({ title: "", content: "" })
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
 
   // Report count to the parent whenever the cached list changes.
   useEffect(() => {
@@ -246,24 +240,22 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   }, [data])
 
   const filtered = useMemo(() => {
-    let base = entries
-    if (filterStatus !== "all") base = base.filter(e => e.status === filterStatus)
-    if (!searchQuery.trim()) return base
+    if (!searchQuery.trim()) return entries
     const q = searchQuery.toLowerCase()
-    return base.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
-  }, [entries, searchQuery, filterStatus])
+    return entries.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
+  }, [entries, searchQuery])
 
-  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "", status: "praying" }); setShowEditor(true); setOpenMenuId(null) }
-  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content, status: entry.status }); setShowEditor(true); setOpenMenuId(null) }
+  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "" }); setShowEditor(true); setOpenMenuId(null) }
+  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content }); setShowEditor(true); setOpenMenuId(null) }
 
   async function handleSave() {
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
-      const { data: row, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content, status: draft.status }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
+      const { data: row, error } = await supabase.from("prayers").update({ title: draft.title, content: draft.content }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === editingEntry.id ? (row as Prayer) : e), { revalidate: false })
     } else {
-      const { data: row, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content, status: draft.status }).select().single()
+      const { data: row, error } = await supabase.from("prayers").insert({ user_id: userId, ministry_id: ministryId, title: draft.title, content: draft.content }).select().single()
       if (!error && row) mutate(curr => [row as Prayer, ...(curr ?? [])], { revalidate: false })
     }
     setSaving(false); setShowEditor(false); setEditingEntry(null)
@@ -275,95 +267,47 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     setOpenMenuId(null)
   }
 
-  async function updateStatus(id: string, status: PrayerStatus) {
-    const { data: row, error } = await supabase.from("prayers").update({ status }).eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
-    if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === id ? (row as Prayer) : e), { revalidate: false })
-    setStatusMenuId(null)
-  }
-
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
-
-  function StatusBadge({ status, entryId }: { status: PrayerStatus; entryId: string }) {
-    const cfg = STATUS_CONFIG[status]
-    const isOpen = statusMenuId === entryId
-    return (
-      <div style={{ position: "relative", display: "inline-block" }}>
-        <button onClick={e => { e.stopPropagation(); setStatusMenuId(isOpen ? null : entryId); setOpenMenuId(null) }} style={{ padding: "2px 9px", borderRadius: 20, background: cfg.bg, color: cfg.text, fontSize: 11, fontWeight: 600, border: "1px solid var(--line)", cursor: "pointer", letterSpacing: "0.03em" }}>
-          {cfg.label}
-        </button>
-        {isOpen && (
-          <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, overflow: "hidden", minWidth: 130 }}>
-            {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => (
-              <button key={s} onClick={e => { e.stopPropagation(); updateStatus(entryId, s) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: s === status ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_CONFIG[s].text, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>{STATUS_CONFIG[s].label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit prayer" : "New prayer"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.title.trim()}
+        saveLabel={editingEntry ? "Update" : "Save prayer"}
+      >
+        <RoleDescriptionEditor
+          key={editingEntry?.id ?? "new"}
+          initialContent={draft.content}
+          onChange={html => setDraft(d => ({ ...d, content: html }))}
+          placeholder="Write your prayer here…"
+          minHeight={340}
+        >
+          <div style={{ paddingBottom: 4 }}>
+            <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid var(--line)", paddingBottom: 10 }} />
+          </div>
+        </RoleDescriptionEditor>
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Prayers · {entries.length}</p>
-        <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: 0 }}>What you&apos;re praying</h2>
-      </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["all", "praying", "answered", "ongoing"] as const).map(f => {
-          const isActive = filterStatus === f
-          const label = f === "all" ? "All" : STATUS_CONFIG[f].label
-          return (
-            <button key={f} onClick={() => setFilterStatus(f)} style={{ padding: "4px 12px", borderRadius: 20, border: isActive ? "none" : "1px solid var(--line-2)", background: isActive ? "var(--plum-2)" : "var(--ivory)", color: isActive ? "var(--cream)" : "var(--body)", fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: "pointer", transition: "background 150ms" }}>
-              {label}
-            </button>
-          )
-        })}
-      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New prayer
         </CentralButton>
       </div>
 
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", marginBottom: 20, overflow: "hidden" }}>
-          <RoleDescriptionEditor
-            key={editingEntry?.id ?? "new"}
-            initialContent={draft.content}
-            onChange={html => setDraft(d => ({ ...d, content: html }))}
-            placeholder="Write your prayer here…"
-            minHeight={152}
-          >
-            <div style={{ padding: "18px 26px 0" }}>
-              <input type="text" placeholder="Prayer title…" value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 0, letterSpacing: "-0.02em", borderBottom: "1px solid var(--line)", paddingBottom: 10 }} />
-            </div>
-          </RoleDescriptionEditor>
-          <div style={{ padding: "0 26px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Status</span>
-              {(["praying", "answered", "ongoing"] as PrayerStatus[]).map(s => {
-                const cfg = STATUS_CONFIG[s]; const sel = draft.status === s
-                return (
-                  <button key={s} onClick={() => setDraft(d => ({ ...d, status: s }))} style={{ padding: "3px 11px", borderRadius: 20, background: sel ? cfg.bg : "transparent", color: sel ? cfg.text : "var(--muted-text)", fontSize: 12, fontWeight: sel ? 600 : 400, border: sel ? "1px solid var(--line)" : "1px solid var(--line-2)", cursor: "pointer" }}>{cfg.label}</button>
-                )
-              })}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-              <CentralButton onClick={handleSave} disabled={saving || !draft.title.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save prayer"}</CentralButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <JournalListSkeleton />
@@ -383,19 +327,18 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
               <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
-                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null); setStatusMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <h3 style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
-                      <div onClick={e => e.stopPropagation()}><StatusBadge status={entry.status} entryId={entry.id} /></div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id); setStatusMenuId(null) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -466,6 +409,23 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
 
+  if (showEditor) {
+    return (
+      <JournalEditorShell
+        eyebrow={editingEntry ? "Edit verse" : "New verse"}
+        onCancel={() => { setShowEditor(false); setEditingEntry(null) }}
+        onSave={handleSave}
+        saving={saving}
+        canSave={!!draft.reference.trim() && !!draft.verse_text.trim()}
+        saveLabel={editingEntry ? "Update" : "Save verse"}
+      >
+        <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 24, color: "var(--plum)", marginBottom: 14, letterSpacing: "-0.01em" }} />
+        <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, color: "var(--ink)", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid var(--line)", outline: "none", resize: "none", marginBottom: 18, paddingBottom: 14 }} />
+        <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={8} style={{ display: "block", width: "100%", fontSize: 15, color: "var(--body)", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", minHeight: 200, fontFamily: "inherit" }} />
+      </JournalEditorShell>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
@@ -473,22 +433,10 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
           <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
         </div>
-        <CentralButton onClick={openNew} style={{ padding: "9px 16px", fontSize: 13, borderRadius: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+        <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />Add verse
         </CentralButton>
       </div>
-
-      {showEditor && (
-        <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", padding: "26px 26px 20px", marginBottom: 20 }}>
-          <input type="text" placeholder="Reference (e.g. John 3:16)" value={draft.reference} onChange={e => setDraft(d => ({ ...d, reference: e.target.value }))} autoFocus style={{ ...inputBase, fontFamily: "var(--serif)", fontSize: 20, color: "var(--plum)", marginBottom: 12, letterSpacing: "-0.01em" }} />
-          <textarea placeholder="Verse text…" value={draft.verse_text} onChange={e => setDraft(d => ({ ...d, verse_text: e.target.value }))} rows={3} style={{ display: "block", width: "100%", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", lineHeight: 1.7, background: "transparent", border: "none", borderBottom: "1px solid var(--line)", outline: "none", resize: "none", marginBottom: 16, paddingBottom: 12 }} />
-          <textarea placeholder="Why this verse convicted you…" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} rows={4} style={{ display: "block", width: "100%", fontSize: 14, color: "var(--body)", lineHeight: 1.8, background: "transparent", border: "none", outline: "none", resize: "vertical", marginBottom: 16, fontFamily: "inherit" }} />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <CentralButton variant="secondary" onClick={() => { setShowEditor(false); setEditingEntry(null) }} style={{ padding: "7px 14px", fontSize: 13 }}>Cancel</CentralButton>
-            <CentralButton onClick={handleSave} disabled={saving || !draft.reference.trim() || !draft.verse_text.trim()} style={{ padding: "7px 14px", fontSize: 13 }}>{saving ? "Saving…" : editingEntry ? "Update" : "Save verse"}</CentralButton>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <JournalListSkeleton />
@@ -517,10 +465,10 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
                       <div style={{ position: "relative" }}>
-                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }} style={{ width: 26, height: 26, borderRadius: 6, background: menuOpen ? "var(--ivory)" : "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted-text)" }}><MoreHorizontal size={15} /></button>
+                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Edit3 size={13} />Edit</button>
+                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
@@ -552,6 +500,59 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   )
 }
 
+// Full-body editor sub-page shell — header (eyebrow + Cancel/Save) over the editor
+// body. Each journal tab early-returns this in place of its list while adding/editing.
+function JournalEditorShell({ eyebrow, onCancel, onSave, saving, canSave, saveLabel, children }: {
+  eyebrow: string
+  onCancel: () => void
+  onSave: () => void
+  saving: boolean
+  canSave: boolean
+  saveLabel: string
+  children: React.ReactNode
+}) {
+  return (
+    <div style={{ paddingBottom: 52 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 24 }}>
+        <p style={{ ...MONO_STYLE, margin: 0 }}>{eyebrow}</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <CentralButton variant="secondary" size="sm" onClick={onCancel}>Cancel</CentralButton>
+          <CentralButton size="sm" onClick={onSave} disabled={saving || !canSave}>{saving ? "Saving…" : saveLabel}</CentralButton>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// Self-contained gear + display-settings popover, rendered in the Journal header.
+function JournalSettingsMenu({ showEntries, showStreak, onToggleEntries, onToggleStreak }: {
+  showEntries: boolean
+  showStreak: boolean
+  onToggleEntries: (v: boolean) => void
+  onToggleStreak: (v: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <IconButton active={open} onClick={() => setOpen(v => !v)}><Settings size={14} /></IconButton>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
+          <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
+            <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>
+            <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
+            <span style={{ fontSize: 13, color: "var(--ink)" }}>Show streak</span>
+            <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Journal Section ───────────────────────────────────────────────────────────
 
 export function JournalSection({
@@ -573,7 +574,6 @@ export function JournalSection({
   const [entryCount, setEntryCount] = useState(0)
   const [entryDates, setEntryDates] = useState<string[]>([])
   const [prayerCount, setPrayerCount] = useState(0)
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [homeVerse, setHomeVerse] = useState<{ reference: string; text: string } | null>(null)
 
   useEffect(() => {
@@ -626,37 +626,17 @@ export function JournalSection({
 
   return (
     <>
-      {/* Settings gear + stats bar */}
-      <div style={{ position: "relative", paddingTop: 4 }}>
-        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
-          <button onClick={() => setShowSettingsMenu(v => !v)} style={{ width: 28, height: 28, borderRadius: 7, background: showSettingsMenu ? "var(--ivory)" : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
-            <Settings size={14} />
-          </button>
-          {showSettingsMenu && (
-            <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
-              <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>
-                <input type="checkbox" checked={showEntries} onChange={e => onToggleEntries(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
-              </label>
-              <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer" }}>
-                <span style={{ fontSize: 13, color: "var(--ink)" }}>Show streak</span>
-                <input type="checkbox" checked={showStreak} onChange={e => onToggleStreak(e.target.checked)} style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--plum)" }} />
-              </label>
+      {/* Stats bar (the display-settings gear now lives in the Journal header) */}
+      {showStats && (
+        <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+          {statsItems.map((item, i) => (
+            <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
+              <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
+              <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
             </div>
-          )}
+          ))}
         </div>
-        {showStats && (
-          <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
-            {statsItems.map((item, i) => (
-              <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
-                <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
-                <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Mobile: tab strip + single column */}
       <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
@@ -673,12 +653,16 @@ export function JournalSection({
         <VerseCard />
       </div>
 
-      {/* Desktop: two-column */}
-      <div className="hidden md:block">
-        <div style={{ display: "grid", paddingTop: showStats ? 0 : 28, paddingBottom: 52, gridTemplateColumns: "1fr 320px", gap: 28, alignItems: "start" }}>
-          <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />
-          <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />
+      {/* Desktop: tab strip + single full-width column. The strip breaks out of the
+          parent px-14 wrapper (-mx-14) so it runs full-bleed and its internal md:pl-14
+          re-insets the labels to align with the px-14 content below (§4.2 / convention #16). */}
+      <div className="hidden md:block" style={{ paddingTop: showStats ? 0 : 4, paddingBottom: 52 }}>
+        <div className="-mx-14" style={{ marginBottom: 28 }}>
+          <PlanSubTabStrip tabs={JOURNAL_TABS} active={journalTab} onChange={k => setJournalTab(k as JournalTabId)} />
         </div>
+        {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
+        {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
+        {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
         <VerseCard />
       </div>
     </>
@@ -1009,18 +993,20 @@ export function ProfileTab({
 
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
-          {/* Mobile header */}
-          <div className="md:hidden px-5 pt-14 pb-5">
-            <p style={{ ...MONO_STYLE, marginBottom: 6 }}>Your Journal</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Journal</h1>
-            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Your prayers, reflections, and devotionals.</p>
+          {/* Mobile header — compact, gear inline right.
+              NB: Tailwind flex CLASSES, not inline display:flex — an inline display
+              would override md:hidden and leak the mobile header onto desktop. */}
+          <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-14 pb-3">
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Journal</h1>
+            <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
 
-          {/* Desktop header */}
+          {/* Desktop header — compact, gear in the right slot */}
           <TabPageHeader>
-            <PageTitle eyebrow="Your Journal" title="Journal">
-              <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>Your prayers, reflections, and devotionals.</p>
-            </PageTitle>
+            <PageTitle title="Journal" compact />
+            <div style={{ marginLeft: "auto" }}>
+              <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
+            </div>
           </TabPageHeader>
 
           <div className="px-5 md:px-14">
@@ -1077,7 +1063,7 @@ export function ProfileTab({
               <CentralButton onClick={saveEdit} disabled={saving} style={{ fontSize: 13 }}><Check size={12} />{saving ? "Saving…" : "Save"}</CentralButton>
             </div>
           ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Edit3 size={13} />Edit profile</CentralButton>
+            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Pencil size={13} />Edit profile</CentralButton>
           )}
         </div>
 
@@ -1110,7 +1096,7 @@ export function ProfileTab({
               <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
             </div>
           ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Edit3 size={13} />Edit profile</CentralButton>
+            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
           )}
         </TabPageHeader>
 
