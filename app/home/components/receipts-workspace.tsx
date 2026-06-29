@@ -91,19 +91,16 @@ export function ReceiptsWorkspace({
           title="Receipts"
           compact
         />
-        {teamId && (
-          <div className="ml-auto flex items-center gap-2">
-            {onOpenTeamSettings && (
-              <button
-                onClick={onOpenTeamSettings}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
-                title="Team settings"
-              >
-                <Settings className="w-4 h-4 text-[var(--body)]" />
-              </button>
-            )}
-            <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
-          </div>
+        {/* Zone B (DESIGN_SYSTEM §3.2): manage-the-object action by the title.
+            Create ("Add category") lives in the Categories content header below. */}
+        {teamId && onOpenTeamSettings && (
+          <button
+            onClick={onOpenTeamSettings}
+            className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+            title="Team settings"
+          >
+            <Settings className="w-4 h-4 text-[var(--body)]" />
+          </button>
         )}
       </TabPageHeader>
 
@@ -134,6 +131,16 @@ export function ReceiptsWorkspace({
               </button>
             )
           })}
+        </div>
+      )}
+
+      {/* Categories content header (DESIGN_SYSTEM §3.2 Zone C): the create action
+          for the collection lives by the collection's header, not the page title.
+          Renders whenever a team is selected — even with zero categories. */}
+      {teamId && (
+        <div className="flex items-center justify-between gap-3 px-5 md:px-14 pt-1 pb-3">
+          <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
+          <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
         </div>
       )}
 
