@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -9,6 +8,7 @@ import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
+import { useNavState } from "../nav-state"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
 
@@ -677,7 +677,7 @@ function InlineEditFields({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   // Read ?compose= once on mount so the editor can restore on refresh/deep-link.
   const [initialCompose] = useState(() =>
     typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("compose") : null
@@ -693,10 +693,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   // One atomic compose-param write (Convention #5).
   function setComposeParam(value: string | null) {
-    const params = new URLSearchParams(window.location.search)
-    if (value === null) params.delete("compose")
-    else params.set("compose", value)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+    setParam("compose", value)
   }
 
   function openCreate() {
