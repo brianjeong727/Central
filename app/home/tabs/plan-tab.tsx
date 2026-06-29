@@ -1970,9 +1970,11 @@ export function PlanTab({
             the no-team picker screen, and the Receipts sentinel (ReceiptsWorkspace owns its own header) */}
         {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && (
           <TabPageHeader>
+            {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow.
+                Shared by every non-section workspace kind (praise, finance, etc.). */}
             <PageTitle
-              eyebrow={`PLANNING · ${ministryName.toUpperCase()}`}
               title={activeTeamName}
+              compact
             />
             {activeTeamFull && canOpenTeamSettings && (
               <button

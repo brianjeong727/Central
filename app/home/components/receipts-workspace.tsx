@@ -81,9 +81,10 @@ export function ReceiptsWorkspace({
     <>
       {/* Desktop header (TabPageHeader is hidden on mobile) */}
       <TabPageHeader>
+        {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow. */}
         <PageTitle
-          eyebrow={activeTeam ? `RECEIPTS · ${activeTeam.name.toUpperCase()}` : "RECEIPTS"}
           title="Receipts"
+          compact
         />
         {teamId && (
           <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
