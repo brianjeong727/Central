@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
@@ -14,6 +14,7 @@ import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } f
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
+import { fetchChatList } from "../chat-list"
 
 // emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
 // Picker component and its data lazily — only when a picker actually opens — so
@@ -1033,6 +1034,32 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
 export function ChatScreen({ groupId, groupName, userId, userName, ministryId, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
+  const { mutate: mutateGlobal } = useSWRConfig()
+
+  // Optimistic chat-list patch for the sender's OWN message: move this group to the
+  // top, refresh its preview/timestamp to now, never add an unread (the sender is
+  // reading it). Patches the SAME shared key the sidebar reads, so the row jumps
+  // instantly with no round-trip. The home-app realtime refetch later reconciles
+  // from get_chat_list (and re-forces this open group to 0).
+  function bumpChatListForOwnSend(previewText: string) {
+    mutateGlobal(
+      ["chat-list", userId, ministryId],
+      (cur: ChatGroup[] | undefined) => {
+        if (!cur) return cur
+        const idx = cur.findIndex((g) => g.id === groupId)
+        if (idx === -1) return cur
+        const moved: ChatGroup = {
+          ...cur[idx],
+          last_message: previewText,
+          last_sender: userName,
+          last_message_time: new Date().toISOString(),
+          unread_count: cur[idx].unread_count, // own send adds no unread
+        }
+        return [moved, ...cur.filter((g) => g.id !== groupId)]
+      },
+      { revalidate: false },
+    )
+  }
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [inputText, setInputText] = useState("")
@@ -1949,6 +1976,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           attachment_type: pa.file.type, attachment_name: pa.file.name, attachment_size: pa.file.size,
         }
         setMessages(prev => [...prev, optimisticMsg])
+        bumpChatListForOwnSend(content || pa.file.name)
         const { data } = await supabase.from("messages").insert({
           group_id: groupId, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
@@ -1989,6 +2017,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       reply_to_sender: replyTarget?.sender_name ?? null,
     }
     setMessages((prev) => [...prev, optimisticMsg])
+    bumpChatListForOwnSend(content)
 
     const { data, error } = await supabase
       .from("messages")
@@ -3397,49 +3426,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     )}
     </>
   )
-}
-
-// ── Shared chat-list SWR fetcher ─────────────────────────────────────────────
-// Single DB round-trip via get_chat_list RPC (replaces load-groups + N+1 per-group
-// unread/last-message queries). Both ChatsTab (mobile) and ChatListPanel (desktop)
-// use the SAME stable key ["chat-list", userId, ministryId] + this fetcher, so SWR
-// dedupes them to one cache entry and revisits paint instantly from cache.
-// Pure: no side effects (onTotalUnreadChange lives in a component effect, not here).
-type ChatListRow = {
-  group_id: string; group_name: string; group_type: string
-  group_archived: boolean | null; last_read_at: string | null
-  last_msg_content: string | null; last_msg_sender_id: string | null
-  last_msg_sender_name: string | null; last_msg_at: string | null
-  last_msg_type: string | null; unread_count: number
-}
-
-async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
-  const supabase = createClient()
-  const { data } = await supabase.rpc("get_chat_list", {
-    p_user_id: userId,
-    p_ministry_id: ministryId,
-  })
-
-  const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
-    id: row.group_id,
-    name: row.group_name,
-    type: row.group_type,
-    archived: row.group_archived ?? false,
-    last_message: row.last_msg_content ?? null,
-    last_sender: row.last_msg_sender_name ?? null,
-    last_message_time: row.last_msg_at ?? null,
-    unread_count: Number(row.unread_count),
-  })) as ChatGroup[]
-
-  // Sort by most recent message first (nulls last)
-  groups.sort((a, b) => {
-    if (!a.last_message_time && !b.last_message_time) return 0
-    if (!a.last_message_time) return 1
-    if (!b.last_message_time) return -1
-    return b.last_message_time.localeCompare(a.last_message_time)
-  })
-
-  return groups
 }
 
 export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {

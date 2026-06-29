@@ -158,6 +158,14 @@ For pages without a hero banner:
 - Serif H1 (44–52px)
 - Optional 15px body sentence describing the page
 
+### 3.1 Workspace headers are compact
+
+**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. Right-slot actions (the settings gear, `HeaderActionButton`) sit in the same `TabPageHeader` row; `HeaderActionButton` is pinned to 28px to match the compact line box.
+
+The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
+
+**Carve-out:** event/identity drill-down headers are NOT workspace nav headers and keep the full 36px `PageTitle` + eyebrow — e.g. the Student Org and Small Group **event-detail** headers (eyebrow = `{EVENT_TYPE} · {DATE}`, title = the event name). Compact is for the workspace's own top-level header, not these earned identity moments.
+
 ---
 
 ## 4. Component library

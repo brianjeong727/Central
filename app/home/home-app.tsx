@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { SWRConfig } from "swr"
+import { SWRConfig, useSWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle, ArrowLeft } from "lucide-react"
 import { useSearchParams } from "next/navigation"
@@ -15,6 +15,7 @@ import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
+import { fetchChatList } from "./chat-list"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -55,6 +56,7 @@ const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m =
 export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const { mutate: globalMutate } = useSWRConfig()
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
@@ -74,16 +76,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Restore the open conversation from ?chat — but only when the chats tab is the
   // active tab, so the fullscreen overlay never leaks over another restored tab on
   // reload. Name is unknown at mount → init "" and backfill from recentChats below.
+  // Init from `searchParams` (useSearchParams), NOT window.location.search — the latter
+  // is undefined on the server, so SSR rendered the "no chat" branch while the client
+  // restored the chat → hydration mismatch. searchParams is SSR-consistent (same source
+  // as initialTab), so server and client agree on the first render.
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
-    if (typeof window === "undefined") return null
-    const chatId = new URLSearchParams(window.location.search).get("chat")
+    const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
   })
   // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
-  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null
-    return new URLSearchParams(window.location.search).get("ann")
-  })
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
+    searchParams.get("ann")
+  )
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -523,6 +527,44 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       .then(({ data }) => { if (data) setMinistryIsPublic(data.is_public ?? false) })
   }, [isAdmin, ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Latest open chat, read inside the realtime callback without re-subscribing.
+  const globalOpenChatRef = useRef(globalOpenChat)
+  useEffect(() => { globalOpenChatRef.current = globalOpenChat }, [globalOpenChat])
+
+  // Throttled refetch of the shared chat-list SWR cache (the Messages sidebar).
+  // Leading + trailing at 300ms: the first message in a burst refetches instantly,
+  // the last one is always captured by the trailing call so the final order/preview/
+  // unread land. We pass a FETCHER (not a bare key) to mutate so it never collides
+  // with the global dedupingInterval:5000 — provided data updates the cache directly
+  // instead of routing through the dedup-gated revalidation path. The fetcher also
+  // re-forces the currently-open chat to unread 0, so an incoming-while-open message
+  // can't resurrect a badge on the chat the user is actively reading (the open chat's
+  // ChatScreen writes last_read_at async, which could otherwise race get_chat_list).
+  const chatListThrottle = useRef<{ last: number; timer: ReturnType<typeof setTimeout> | null }>({ last: 0, timer: null })
+  const refetchChatList = useCallback(() => {
+    const run = () => {
+      chatListThrottle.current.last = Date.now()
+      globalMutate(
+        ["chat-list", userId, ministryId],
+        async () => {
+          const groups = await fetchChatList(["chat-list", userId, ministryId])
+          const openId = globalOpenChatRef.current?.id
+          return openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
+        },
+        { revalidate: false },
+      )
+    }
+    const elapsed = Date.now() - chatListThrottle.current.last
+    if (elapsed >= 300) {
+      run()
+    } else if (!chatListThrottle.current.timer) {
+      chatListThrottle.current.timer = setTimeout(() => {
+        chatListThrottle.current.timer = null
+        run()
+      }, 300 - elapsed)
+    }
+  }, [globalMutate, userId, ministryId])
+
   // Realtime: keep recentChats preview fresh as messages arrive
   useEffect(() => {
     const channel = supabase
@@ -532,6 +574,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
+          // Drive the Messages sidebar live (order, preview, unread badges).
+          refetchChatList()
           supabase
             .from("profiles")
             .select("name")
@@ -772,7 +816,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
+            right={activeTab === "plan" && (activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
               /* Team-agnostic back-to-picker button — shown for the receipts sentinel
                  AND any team workspace. Don't gate on a per-type flag or new team types
                  (finance, etc.) silently lose their way back. */
@@ -847,8 +891,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
+              {/* Gate the ChatScreen MOUNT on isDesktop (not just the CSS `hidden md:flex`):
+                  on a reload with ?chat=, globalOpenChat is set before isDesktop resolves,
+                  so without this gate BOTH this (CSS-hidden) ChatScreen and the mobile
+                  overlay below mount for the same group → duplicate realtime channel topic
+                  ("cannot add postgres_changes callbacks after subscribe()"). */}
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-                {globalOpenChat ? (
+                {isDesktop && globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.id}
                     groupId={globalOpenChat.id}
