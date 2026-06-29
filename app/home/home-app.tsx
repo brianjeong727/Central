@@ -76,16 +76,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // Restore the open conversation from ?chat — but only when the chats tab is the
   // active tab, so the fullscreen overlay never leaks over another restored tab on
   // reload. Name is unknown at mount → init "" and backfill from recentChats below.
+  // Init from `searchParams` (useSearchParams), NOT window.location.search — the latter
+  // is undefined on the server, so SSR rendered the "no chat" branch while the client
+  // restored the chat → hydration mismatch. searchParams is SSR-consistent (same source
+  // as initialTab), so server and client agree on the first render.
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
-    if (typeof window === "undefined") return null
-    const chatId = new URLSearchParams(window.location.search).get("chat")
+    const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
   })
   // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
-  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null
-    return new URLSearchParams(window.location.search).get("ann")
-  })
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
+    searchParams.get("ann")
+  )
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
