@@ -5,7 +5,7 @@ import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
+import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
 import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -953,22 +953,16 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         >
           <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>What the ministry is planning, praying for, and showing up to.</p>
         </PageTitle>
+        {/* Zone C (DESIGN_SYSTEM §3.2): the create primary is rightmost; list-level
+            helpers (the Cards/Compact view toggle) sit to its left. */}
         <div className="flex items-center gap-2 pb-1.5 ml-auto">
-          {isLeaderOrAdmin && (
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors"
-              style={{ background: "var(--ink)", color: "var(--cream)" }}
-              onMouseEnter={e => (e.currentTarget.style.background = "var(--plum-2)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "var(--ink)")}
-            >
-              <Plus className="w-3.5 h-3.5" />New announcement
-            </button>
-          )}
           <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
             <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
             <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
           </div>
+          {isLeaderOrAdmin && (
+            <HeaderActionButton label="New announcement" onClick={openCreate} />
+          )}
         </div>
       </TabPageHeader>
 

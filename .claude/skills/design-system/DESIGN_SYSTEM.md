@@ -164,7 +164,22 @@ For pages without a hero banner:
 
 The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
 
+The title-row right slot holds only the Zone-B manage action (the settings gear) — the create/add CTA lives in the content header per §3.2, not the title row.
+
 **Carve-out:** event/identity drill-down headers are NOT workspace nav headers and keep the full 36px `PageTitle` + eyebrow — e.g. the Student Org and Small Group **event-detail** headers (eyebrow = `{EVENT_TYPE} · {DATE}`, title = the event name). Compact is for the workspace's own top-level header, not these earned identity moments.
+
+### 3.2 Action placement — one home per button type
+
+Every action button has exactly one zone it's allowed to live in; its **scope** decides the zone, never the empty space on the page.
+
+- **Zone A — Wayfinding (breadcrumb / rail).** Back/origin. The breadcrumb is the back system (every crumb a link); the persistent "leave / switch workspace" action lives on the rail logo. **Never a standalone floating "back" / "All workspaces" pill.** *(The clickable-breadcrumb + rail-switcher rollout is in progress; until it lands, the existing back affordance stays.)*
+- **Zone B — Object header (by the page title).** Actions that configure *the object the page is about* — Settings, Rename, Members, Archive. Secondary weight: an **icon** button (the gear) right of the title. One → a gear; **3+ → collapse into a kebab (⋯)** whose first item is Settings.
+- **Zone C — Content header (by the collection).** The page's single **plum primary** create action ("Add entry", "Add category", "New question") sits right of the header for the collection it fills. List-level helpers (Export, Filter, a view toggle) are **ghost buttons to its left**.
+- **Kebab (⋯).** Only for low-frequency, destructive, or per-row actions (Duplicate, Move, Delete, Leave; per-row table actions). Never primary navigation or the main create.
+
+**Scale:** 1 action → direct button; 2 → side by side in the zone; 3+ → collapse to a kebab, keeping the single most-used action visible beside it.
+
+**Single-feed exception:** when the page title directly heads its one collection (the Announcements feed, the Congregation questions list), the create primary may sit in the title row's right slot — that slot *is* the content header. On **object + sub-collection** pages (Receipts → its *Categories*; Finance Team → its *Expense ledger*) the create moves off the title row down to the collection's own header, while the Zone-B gear stays by the title.
 
 ---
 
