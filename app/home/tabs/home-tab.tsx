@@ -648,9 +648,9 @@ export function HomeTab({
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {activeQuestion.options.map((opt) => (
+                          {activeQuestion.options.map((opt, i) => (
                             <button
-                              key={opt}
+                              key={`${opt}-${i}`}
                               onClick={() => setPulseOption(opt)}
                               style={{
                                 padding: "9px 14px",
@@ -988,9 +988,9 @@ export function HomeTab({
 
                       {activeQuestion.question_type === "poll" && activeQuestion.options && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {activeQuestion.options.map((opt) => (
+                          {activeQuestion.options.map((opt, i) => (
                             <button
-                              key={opt}
+                              key={`${opt}-${i}`}
                               onClick={() => setPulseOption(opt)}
                               style={{
                                 padding: "10px 14px",
