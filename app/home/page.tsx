@@ -35,7 +35,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, grade, needs_grad_check, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id, avatar_url, school_id")
+    .select("id, name, email, graduation_year, grade, needs_grad_check, role, about_me, bible_verse, prayer_request, pray_for_me, ministry_id, avatar_url, school_id, seen_workspace_nav_hint")
     .eq("id", user.id)
     .single()
 
@@ -93,6 +93,21 @@ export default async function HomePage() {
       allowAdminMembers: !!t.allow_admin_members,
     }]
   })
+
+  // Member counts for the user's teams, so the workspace picker shows "N members"
+  // on first paint (the client loadUserTeams refetch is skip-guarded on mount).
+  const userTeamIds = initialUserTeams.map((t) => t.teamId)
+  if (userTeamIds.length > 0) {
+    const { data: memberRows } = await supabase
+      .from("team_members")
+      .select("team_id")
+      .in("team_id", userTeamIds)
+    const counts: Record<string, number> = {}
+    for (const row of (memberRows ?? []) as { team_id: string }[]) {
+      counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+    }
+    for (const ut of initialUserTeams) ut.memberCount = counts[ut.teamId] ?? 0
+  }
 
   // Active question + whether this user already responded (sequential — depends on question)
   // Global governance roster — defaults to "all admins govern" when unset.

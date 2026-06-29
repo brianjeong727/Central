@@ -1,10 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
-import { getInitials } from "../utils"
 import { DirectoryMemberListPanel } from "../tabs/directory-tab"
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
 
@@ -36,14 +34,35 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
       style={{ background: "transparent" }}
     >
       <div className="flex items-center gap-1.5 text-[12px]">
-        {crumbs.map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            <span style={{ color: i === crumbs.length - 1 ? INK : MUTED, fontWeight: i === crumbs.length - 1 ? 500 : 400 }}>
-              {c}
+        {crumbs.map((c, i) => {
+          const isLast = i === crumbs.length - 1
+          const clickable = !!c.onClick && !isLast
+          return (
+            <span key={i} className="flex items-center gap-1.5">
+              {clickable ? (
+                <button
+                  type="button"
+                  onClick={c.onClick}
+                  className="transition-colors"
+                  style={{
+                    fontFamily: "inherit", fontSize: "inherit", fontWeight: 400,
+                    color: MUTED, background: "transparent", border: "none",
+                    padding: 0, cursor: "pointer", textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = PLUM }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = MUTED }}
+                >
+                  {c.label}
+                </button>
+              ) : (
+                <span style={{ color: isLast ? INK : MUTED, fontWeight: isLast ? 500 : 400 }}>
+                  {c.label}
+                </span>
+              )}
+              {!isLast && <span style={{ color: "var(--line-2)", userSelect: "none" }}>/</span>}
             </span>
-            {i < crumbs.length - 1 && <span style={{ color: "var(--line-2)", userSelect: "none" }}>/</span>}
-          </span>
-        ))}
+          )
+        })}
       </div>
       {right}
     </div>
@@ -55,7 +74,7 @@ export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
 export function DesktopSidebar({
   activeTab, onTabChange, ministryName, chatsUnread, showPlan,
   userInitials, userAvatarUrl, recentChats, userTeams, onOpenChat,
-  activeGroupId, onLogout, isAdmin, isPastor, onCreateTeam, activeTeamId,
+  activeGroupId, onLogout, isAdmin, isPastor, isLeaderOrAdmin, onCreateTeam, activeTeamId,
   activeTeamName,
   onActiveTeamChange, profileSection, onProfileSectionChange,
   isTreasurer, isDGL,
@@ -65,13 +84,16 @@ export function DesktopSidebar({
   chatPanelContent,
   planContextContent,
   hideSidePanel,
+  onLogoClick,
+  showWorkspaceNavHint,
+  onDismissNavHint,
 }: DesktopSidebarProps) {
   const supabase = createClient()
 
   const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: "home",      label: "Home",        icon: Home },
     { id: "chats",     label: "Messages",  icon: MessageCircle },
-    ...(showPlan ? [{ id: "plan" as Tab, label: "Planning", icon: ClipboardList }] : []),
+    ...(showPlan ? [{ id: "plan" as Tab, label: "Workspace", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
     { id: "profile",   label: "You",       icon: User },
   ]
@@ -84,7 +106,7 @@ export function DesktopSidebar({
       case "plan": {
         // Prefer the shell-resolved name (covers gov-view teams the user isn't a member of),
         // then membership, then the generic fallback.
-        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Planning"
+        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Workspace"
       }
       case "directory":    return "People"
       case "congregation": return "Congregation"
@@ -192,7 +214,8 @@ export function DesktopSidebar({
       { label: "Overview",          tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
-      { label: "Forms",           tab: "forms" },
+      // Forms is a leader-only insights hub — members/visitors fill forms via Announcements.
+      ...(isLeaderOrAdmin ? [{ label: "Forms", tab: "forms" as const }] : []),
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
     ]
     const generalTabs  = ["home", "announcements", "give"] as const
@@ -228,17 +251,61 @@ export function DesktopSidebar({
         className="hidden md:flex flex-col w-[72px] flex-shrink-0 h-screen items-center py-4 gap-1"
         style={{ background: RAIL_BG, borderRight: `1px solid ${LINE}` }}
       >
-        {/* Logo — DO NOT TOUCH: exact original markup preserved */}
-        <a
-          href="/landing"
-          className="w-9 h-9 rounded-full flex items-center justify-center mb-3.5 flex-shrink-0 hover:opacity-90 transition-opacity"
-          style={{ background: PLUM, textDecoration: "none" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="#F6F4EF" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="#F6F4EF" />
-          </svg>
-        </a>
+        {/* Brand mark → contextual "back to Plan workspaces" control. On the Plan tab
+            for 2+-workspace users it returns to the workspace picker; everywhere else
+            it goes to /landing. RingCross mark preserved pixel-identical. A one-time
+            teaching hint pill appears the first time a 2+-workspace user reaches the
+            picker. */}
+        <div className="relative mb-3.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onLogoClick}
+            aria-label="Central"
+            className="relative w-9 h-9 rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
+            style={{ background: PLUM, border: "none", cursor: "pointer", padding: 0 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+              <path d="M70 28 A32 32 0 1 0 70 72" stroke="#F6F4EF" strokeWidth="8" strokeLinecap="round" />
+              <circle cx="50" cy="50" r="6" fill="#F6F4EF" />
+            </svg>
+          </button>
+          {showWorkspaceNavHint && (
+            <div
+              role="status"
+              style={{
+                position: "absolute", top: 0, left: "calc(100% + 10px)",
+                zIndex: 200,
+                display: "flex", alignItems: "center", gap: 8,
+                background: "var(--plum-2)", color: "var(--cream)",
+                fontFamily: "var(--sans)", fontSize: 11, lineHeight: 1,
+                padding: "6px 11px", borderRadius: 999,
+                boxShadow: "var(--shadow-modal)", whiteSpace: "nowrap",
+              }}
+            >
+              {/* Left-pointing caret */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute", left: -4, top: "50%", transform: "translateY(-50%) rotate(45deg)",
+                  width: 8, height: 8, background: "var(--plum-2)", borderRadius: 1,
+                }}
+              />
+              <span>← Back to all workspaces, anytime</span>
+              <button
+                type="button"
+                onClick={() => onDismissNavHint?.()}
+                aria-label="Dismiss"
+                style={{
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: "var(--cream)", fontSize: 13, lineHeight: 1, padding: 0,
+                  opacity: 0.8,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
 
         {navItems.map(({ id, label, icon: Icon }) => {
           const isActive =

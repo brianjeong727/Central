@@ -9,7 +9,7 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE } from "./shared"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, FilterDropdown } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
@@ -295,41 +295,22 @@ function ReimbursementInbox({
   )
   const shown = filter === "needs" ? needsAction : items
 
-  const segBtn = (key: InboxFilter, label: string, count: number) => {
-    const active = filter === key
-    return (
-      <button
-        onClick={() => setFilter(key)}
-        style={{
-          padding: "5px 12px", borderRadius: 999, border: "none", cursor: "pointer",
-          fontSize: 12.5, fontWeight: active ? 500 : 400, fontFamily: "var(--sans)",
-          background: active ? "var(--cream)" : "transparent",
-          color: active ? "var(--ink)" : "var(--muted-text)",
-          boxShadow: active ? "0 0 0 1px var(--line)" : "none",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {label}{count > 0 ? ` · ${count}` : ""}
-      </button>
-    )
-  }
-
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
-        <div>
-          <div style={EYEBROW_STYLE}>{`REIMBURSEMENT INBOX · ${items.length}`}</div>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 26, letterSpacing: -0.3, color: "var(--ink)", marginTop: 4 }}>
-            Receipts from teams
-          </div>
-          <div style={{ fontSize: 14, color: "var(--body)", marginTop: 6 }}>
-            Review, approve, and sign off on receipts submitted by team members.
-          </div>
-        </div>
-        <div style={{ display: "inline-flex", gap: 2, padding: 3, borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", flexShrink: 0 }}>
-          {segBtn("needs", "Needs action", needsAction.length)}
-          {segBtn("all", "All", 0)}
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, letterSpacing: -0.2, color: "var(--ink)", margin: 0 }}>
+          Reimbursements inbox
+          <span style={{ color: "var(--muted-text)", fontWeight: 400 }}>{` · ${items.length}`}</span>
+        </h2>
+        <FilterDropdown
+          options={[
+            { id: "needs", label: `Needs action${needsAction.length ? ` · ${needsAction.length}` : ""}` },
+            { id: "all", label: "All" },
+          ]}
+          value={filter}
+          onSelect={(id) => setFilter(id as InboxFilter)}
+          align="right"
+        />
       </div>
 
       {loading ? <Spinner /> : shown.length === 0 ? (
@@ -854,9 +835,9 @@ function generateYearOptions(): string[] {
   const fy = currentFiscalYear()
   const [startYear] = fy.split("-").map(Number)
   return [
-    `${startYear - 1}-${startYear}`,
     `${startYear}-${startYear + 1}`,
     `${startYear + 1}-${startYear + 2}`,
+    `${startYear + 2}-${startYear + 3}`,
   ]
 }
 
@@ -891,7 +872,6 @@ function AllocationSection({
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
 
   const yearOptions = generateYearOptions()
-  const isPastYear = fiscalYear !== currentFiscalYear()
   const canEdit = canEditProp
 
   // Include any orphaned categories that have allocations but aren't in the dynamic list
@@ -992,40 +972,16 @@ function AllocationSection({
   return (
     <div>
       {/* Section header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ ...EYEBROW_STYLE, marginBottom: 6 }}>
-            Annual Budget · {fiscalYear}
-          </p>
-          <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: -0.4 }}>
-            Annual Allocation
-          </h2>
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8, lineHeight: 1.6 }}>
-            Set per-fund targets for each spending category and track progress toward them.
-          </p>
-        </div>
-        {/* Year selector */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {yearOptions.map(y => (
-              <button
-                key={y}
-                onClick={() => setFiscalYear(y)}
-                style={{
-                  padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  background: fiscalYear === y ? "var(--plum)" : "var(--ivory)",
-                  color: fiscalYear === y ? "var(--cream)" : "var(--body)",
-                  border: fiscalYear === y ? "none" : "1px solid var(--line-2)",
-                }}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
-          {isPastYear && (
-            <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>Past year — read only</span>
-          )}
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: -0.2 }}>
+          Annual Allocation
+        </h2>
+        <FilterDropdown
+          options={yearOptions.map(y => ({ id: y, label: y }))}
+          value={fiscalYear}
+          onSelect={setFiscalYear}
+          align="right"
+        />
       </div>
 
       {loading ? (
@@ -1042,7 +998,7 @@ function AllocationSection({
               <div
                 key={card.label}
                 style={{
-                  padding: 22, borderRadius: 14,
+                  padding: 16, borderRadius: 14,
                   background: card.danger ? DANGER_TINT_BG : "var(--cream)",
                   border: `1px solid ${card.danger ? DANGER_TINT_BORDER : "var(--line)"}`,
                 }}
@@ -1050,7 +1006,7 @@ function AllocationSection({
                 <p style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
                   {card.label}
                 </p>
-                <p style={{ fontFamily: "var(--serif)", fontSize: 40, letterSpacing: -0.6, color: card.danger ? "var(--danger)" : "var(--ink)", margin: "10px 0 0" }}>
+                <p style={{ fontFamily: "var(--serif)", fontSize: 27, letterSpacing: -0.4, color: card.danger ? "var(--danger)" : "var(--ink)", margin: "8px 0 0" }}>
                   ${Math.abs(card.value).toFixed(2)}
                 </p>
                 <p style={{ fontSize: 13, color: card.danger ? "var(--danger)" : "var(--muted-text)", marginTop: 4 }}>
@@ -1069,13 +1025,6 @@ function AllocationSection({
               <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6 }}>
                 {pct.toFixed(0)}% of budget used{overBudget ? " — over budget" : ""}
               </p>
-            </div>
-          )}
-
-          {/* Past year banner */}
-          {isPastYear && (
-            <div style={{ padding: "10px 16px", background: "var(--body-bg)", border: "1px solid var(--line-2)", borderRadius: 10, marginBottom: 20, fontSize: 13, color: "var(--body)" }}>
-              Viewing {fiscalYear} — read only. Switch to {currentFiscalYear()} to edit.
             </div>
           )}
 
@@ -1114,7 +1063,7 @@ function AllocationSection({
                     {/* Category label + delete for custom */}
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 14, color: "var(--ink)" }}>{cat.label}</span>
-                      {!cat.isPermanent && canEdit && !isPastYear && (
+                      {!cat.isPermanent && canEdit && (
                         confirmDeleteCategory === cat.value ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                             <button
@@ -1162,9 +1111,9 @@ function AllocationSection({
                         <div
                           key={fund.value}
                           style={{ padding: "2px 8px 2px 0" }}
-                          title={isPastYear ? undefined : `Click to edit ${fund.label} allocation for ${cat.label}`}
+                          title={`Click to edit ${fund.label} allocation for ${cat.label}`}
                         >
-                          {canEdit && !isPastYear ? (
+                          {canEdit ? (
                             <div style={{ position: "relative" }}>
                               <span style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "var(--faint)", pointerEvents: "none", lineHeight: 1 }}>
                                 {draftVal !== "" || (cellKey in drafts) ? "$" : ""}
@@ -1230,7 +1179,7 @@ function AllocationSection({
                   {/* Notes row */}
                   {notesExpanded && (
                     <div style={{ padding: "8px 16px 12px 19px", borderTop: "1px dashed var(--line)", background: "var(--cream)" }}>
-                      {canEdit && !isPastYear ? (
+                      {canEdit ? (
                         <textarea
                           defaultValue={notes}
                           placeholder="Add context for this category (e.g. 'Church provides full retreat budget, CMU covers supplies')"
@@ -1274,7 +1223,7 @@ function AllocationSection({
           </div>
 
           {/* Add custom category */}
-          {canEdit && !isPastYear && (
+          {canEdit && (
             <div style={{ marginTop: 12 }}>
               {addingCategory ? (
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1331,7 +1280,7 @@ function AllocationSection({
           )}
 
           {/* Empty state hint */}
-          {totalAllocated === 0 && !isPastYear && (
+          {totalAllocated === 0 && (
             <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", marginTop: 20, fontStyle: "italic" }}>
               No budget set for {fiscalYear} yet. Click any Church, CMU, or Pitt cell to start allocating.
             </p>

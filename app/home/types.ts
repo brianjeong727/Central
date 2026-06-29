@@ -26,6 +26,7 @@ export interface Profile {
   school_id?: string | null
   show_journal_entries?: boolean
   show_journal_streak?: boolean
+  seen_workspace_nav_hint?: boolean
 }
 
 export interface Devotional {
@@ -612,8 +613,10 @@ export interface CommandPaletteProps {
   onOpenChat: (id: string, name: string, type?: string) => void
 }
 
+export type Crumb = { label: string; onClick?: () => void }
+
 export interface DesktopTopbarProps {
-  crumbs: string[]
+  crumbs: Crumb[]
   right?: React.ReactNode
 }
 
@@ -632,6 +635,8 @@ export interface DesktopSidebarProps {
   onLogout: () => void
   isAdmin?: boolean
   isPastor?: boolean
+  // Leader-tier (Convention #2, incl. pastor) — gates the Forms insights nav item.
+  isLeaderOrAdmin?: boolean
   onCreateTeam?: () => void
   activeTeamId: string | null
   // Resolved active-team name (membership OR allTeams fallback for gov-view) — drives the panel header
@@ -655,6 +660,13 @@ export interface DesktopSidebarProps {
   planContextContent?: ReactNode
   // When true, hides the cream context panel entirely (icon rail stays); used for full-width picker
   hideSidePanel?: boolean
+  // Rail brand mark — contextual "back to Plan workspaces" control (picker on Plan
+  // for 2+-workspace users; /landing otherwise).
+  onLogoClick: () => void
+  // One-time teaching hint shown on the rail mark the first time a 2+-workspace user
+  // reaches the plan picker.
+  showWorkspaceNavHint?: boolean
+  onDismissNavHint?: () => void
 }
 
 export interface HomeAppProps {

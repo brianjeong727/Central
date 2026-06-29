@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, Mo
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -35,6 +35,13 @@ const AUDIENCE_OPTIONS = [
 ]
 
 type FilterType = "all" | "events" | "forms" | "pinned"
+
+const FILTERS: { id: FilterType; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "events", label: "Events" },
+  { id: "forms", label: "Forms" },
+  { id: "pinned", label: "Pinned" },
+]
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -907,13 +914,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         ? [...(pinnedAnn?.has_form ? [pinnedAnn] : []), ...desktopList.filter(a => a.has_form)]
         : desktopList.filter(a => a.is_sub_pinned) // "pinned" chip = For You items; hero already shows the pinned one
 
-  const FILTERS: { id: FilterType; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "events", label: "Events" },
-    { id: "forms", label: "Forms" },
-    { id: "pinned", label: "Pinned" },
-  ]
-
   // Body swap: compose page replaces the list (DirectoryTab pattern) — no overlay.
   if (showCreate || editingAnnouncement) {
     return (
@@ -953,16 +953,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         >
           <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>What the ministry is planning, praying for, and showing up to.</p>
         </PageTitle>
-        {/* Zone C (DESIGN_SYSTEM §3.2): the create primary is rightmost; list-level
-            helpers (the Cards/Compact view toggle) sit to its left. */}
+        {/* Header right slot now holds only the Cards/Compact view toggle; the
+            create CTA moved into the body toolbar row (Filter ↔ New). */}
         <div className="flex items-center gap-2 pb-1.5 ml-auto">
           <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
             <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
             <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
           </div>
-          {isLeaderOrAdmin && (
-            <HeaderActionButton label="New announcement" onClick={openCreate} />
-          )}
         </div>
       </TabPageHeader>
 
@@ -999,11 +996,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
           {/* Desktop layout */}
           <div className="hidden md:block px-14 py-7">
-            {/* Filter chips */}
-            <div className="flex gap-2 mb-6">
-              {FILTERS.map((f) => (
-                <button key={f.id} onClick={() => setFilter(f.id)} style={{ padding: "7px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 500, border: filter === f.id ? "1px solid var(--ink)" : "1px solid var(--line)", background: filter === f.id ? "var(--ink)" : "transparent", color: filter === f.id ? "var(--cream)" : "var(--ink)", cursor: "pointer" }}>{f.label}</button>
-              ))}
+            {/* Toolbar row: filter dropdown (left) · create CTA (right) */}
+            <div className="flex items-center justify-between mb-6">
+              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
+              {isLeaderOrAdmin && (
+                <HeaderActionButton label="New announcement" onClick={openCreate} />
+              )}
             </div>
 
             {/* Pinned hero strip — UpNextCard emphasis treatment */}

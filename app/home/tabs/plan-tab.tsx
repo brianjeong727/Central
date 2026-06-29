@@ -2123,7 +2123,7 @@ export function PlanTab({
               <div style={{ width: "100%", maxWidth: 760 }}>
                 {/* Header */}
                 <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px", textAlign: "center" }}>
-                  PLANNING · {ministryName.toUpperCase()}
+                  WORKSPACE · {ministryName.toUpperCase()}
                 </p>
                 <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
                   Which workspace are you entering?
@@ -2159,11 +2159,13 @@ export function PlanTab({
                             />
                           )
                         })}
-                        {/* Receipts — a shared surface, not a team (no member count) */}
+                        {/* Receipts — a shared surface across your teams (not a team itself),
+                            so its subtitle counts the teams you can file receipts for. */}
                         <WsTile
                           initials="RE"
                           badge={<WsBadge tone="member" label="Member" />}
                           name="Receipts"
+                          sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
                           onClick={() => onTeamSelect?.("receipts")}
                         />
                         {isAdmin && <WsAddTile onClick={() => setShowCreateTeam(true)} />}
