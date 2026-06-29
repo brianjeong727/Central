@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
@@ -37,12 +38,12 @@ export default function PickMinistryPage() {
     <div style={{ minHeight: "100svh", background: "#FBF8F2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
 
       {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+      <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 9, marginBottom: 8, textDecoration: "none", color: "inherit" }}>
         <RingCrossLogo size={28} />
         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
           Central
         </span>
-      </div>
+      </Link>
       <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 40 }}>College ministry community</p>
 
       <div style={{ width: "100%", maxWidth: 420 }}>
