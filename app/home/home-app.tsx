@@ -556,6 +556,10 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const refetchChatList = useCallback(() => {
     const run = () => {
       chatListThrottle.current.last = Date.now()
+      // The updater throws if fetchChatList rejects (transient RPC failure); SWR
+      // keeps the PREVIOUS cached data on a rejected mutate rather than writing `[]`.
+      // We .catch() the returned promise so that rejection never surfaces as an
+      // unhandled rejection — a failed realtime-triggered refetch is a safe no-op.
       globalMutate(
         ["chat-list", userId, ministryId],
         async () => {
@@ -564,7 +568,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           return openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
         },
         { revalidate: false },
-      )
+      ).catch(() => {})
     }
     const elapsed = Date.now() - chatListThrottle.current.last
     if (elapsed >= 300) {
@@ -624,7 +628,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
     return () => { supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId])
+  }, [userId, refetchChatList])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {

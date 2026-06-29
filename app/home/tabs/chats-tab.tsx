@@ -3492,7 +3492,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
   // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
-  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+  const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
     userId && ministryId ? ["chat-list", userId, ministryId] : null,
     fetchChatList,
   )
@@ -3501,7 +3501,10 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
-  const loading = isLoading
+  // Treat "errored with no usable data" as still-loading so a poisoned/failed
+  // fetch shows the spinner, never the "No chats" empty state. If stale data
+  // exists (keepPreviousData), fall through and render it (stale > empty).
+  const loading = isLoading || (!!error && allGroups.length === 0)
 
   // Optimistic unread-clear on the shared cache key (survives revalidation timing).
   function clearUnread(groupId: string) {
@@ -3853,7 +3856,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
 
   // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
   // entry; revisits paint instantly from cache (no skeleton).
-  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+  const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
     userId && ministryId ? ["chat-list", userId, ministryId] : null,
     fetchChatList,
   )
@@ -3862,7 +3865,10 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
-  const loading = isLoading
+  // Treat "errored with no usable data" as still-loading so a poisoned/failed
+  // fetch shows the spinner, never the "No chats" empty state. Stale data
+  // (keepPreviousData) falls through and renders (stale > empty).
+  const loading = isLoading || (!!error && allGroups.length === 0)
 
   // Optimistic unread-clear on the shared cache key.
   function clearUnread(groupId: string) {
