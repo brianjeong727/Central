@@ -72,8 +72,19 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   const { setParam, setParams, clearTabParams } = useNavState()
   // Thin alias preserves every existing `replaceParam(key, value)` call site.
   const replaceParam = setParam
-  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(null)
-  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(null)
+  // Restore the open conversation from ?chat — but only when the chats tab is the
+  // active tab, so the fullscreen overlay never leaks over another restored tab on
+  // reload. Name is unknown at mount → init "" and backfill from recentChats below.
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
+    if (typeof window === "undefined") return null
+    const chatId = new URLSearchParams(window.location.search).get("chat")
+    return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
+  })
+  // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
+  const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return new URLSearchParams(window.location.search).get("ann")
+  })
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   )
@@ -555,7 +566,11 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 
-  // On desktop, auto-select the most recent chat when arriving at the chats tab
+  // On desktop, auto-select the most recent chat when arriving at the chats tab.
+  // This is the master-detail DEFAULT for the empty state only — it writes NO URL
+  // (Convention #5: avoid racing the nav's setParams). An explicitly-opened chat
+  // owns ?chat via handleOpenChat; `!globalOpenChat` already prevents overriding a
+  // URL-restored conversation (the lazy-init sets it before this effect runs).
   useEffect(() => {
     if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats.length > 0) {
       const top = recentChats[0]
@@ -564,13 +579,35 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop, activeTab, recentChats])
 
+  // Backfill the header name for a URL-restored chat once recentChats loads.
+  useEffect(() => {
+    if (!globalOpenChat || globalOpenChat.name !== "") return
+    const match = recentChats.find((c) => c.id === globalOpenChat.id)
+    if (match) setGlobalOpenChat((prev) => prev && prev.name === "" ? { ...prev, name: match.groupName } : prev)
+  }, [globalOpenChat, recentChats])
+
+  // Opening a chat is atomic: switch to the chats tab AND mirror ?chat in one replace.
   function handleOpenChat(id: string, name: string) {
+    setActiveTabState("chats")
     setGlobalOpenChat({ id, name })
+    setParams({ tab: "chats", chat: id })
   }
 
   function handleChatClose() {
     setGlobalOpenChat(null)
     setChatRefreshKey((k) => k + 1)
+    setParam("chat", null)
+  }
+
+  // Announcement detail open/close mirror ?ann (read view, persists on reload).
+  function handleOpenAnnouncement(id: string) {
+    setOpenAnnouncementId(id)
+    setParam("ann", id)
+  }
+
+  function handleCloseAnnouncement() {
+    setOpenAnnouncementId(null)
+    setParam("ann", null)
   }
 
   function handleChatNameChange(name: string) {
@@ -584,14 +621,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   // clicking a different tab SWITCHES while leaving other tabs' params intact
   // (resume-where-left-off). One atomic replace per logical navigation (Convention #5).
   function handleNavClick(tab: Tab) {
-    // Global overlays close on every nav action.
-    setGlobalOpenChat(null)
+    // The announcement detail overlay is transient — it closes on every nav action.
     setOpenAnnouncementId(null)
 
     if (tab === activeTab) {
       // RESET: also clear the shell-owned, plain-state transients for this tab so
       // re-clicking truly lands on the tab's first view (URL params alone aren't
       // enough — these states lazy-init from the URL only on mount).
+      setGlobalOpenChat(null)
       if (tab === "plan") {
         setActiveTeamId(null)
         setActiveReceiptsTeamId(null)
@@ -608,11 +645,23 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       // (CongregationTab's view, chats list, journal subtab, …) re-init from the
       // cleared URL and land on their first view — no per-tab controlled props.
       setNavResetKey(k => k + 1)
-      clearTabParams(tab, { tab })   // one atomic replace: delete tab's params, keep ?tab=
+      // clearTabParams drops this tab's owned params (?chat on chats, ?ann on
+      // announcements, …); also clear ?ann unconditionally since the detail
+      // overlay can sit over any tab.
+      clearTabParams(tab, { tab, ann: null })
     } else {
-      // SWITCH: leave other tabs' params untouched — only ?tab= changes.
+      // SWITCH: leave other tabs' params untouched — only ?tab changes (+ clear the
+      // transient ?ann overlay). ?chat is PRESERVED so the chats tab resumes its
+      // open conversation; we re-derive the overlay only when entering chats and
+      // null it otherwise (so the fullscreen overlay never leaks over another tab).
       setActiveTabState(tab)
-      setParam("tab", tab)
+      if (tab === "chats") {
+        const chatId = new URLSearchParams(window.location.search).get("chat")
+        setGlobalOpenChat(chatId ? { id: chatId, name: "" } : null)
+      } else {
+        setGlobalOpenChat(null)
+      }
+      setParams({ tab, ann: null })
     }
   }
 
@@ -728,7 +777,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onSeeAnnouncements={() => handleNavClick("announcements")}
                 onOpenChat={handleOpenChat}
                 onGoToProfile={() => handleNavClick("profile")}
-                onOpenAnnouncement={(id) => setOpenAnnouncementId(id)}
+                onOpenAnnouncement={handleOpenAnnouncement}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -739,7 +788,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={(id) => setOpenAnnouncementId(id)} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={handleOpenAnnouncement} />
             </div>
           )}
 
@@ -810,7 +859,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 onShowCreateTeam={setShowCreateTeam}
                 activeTeamId={activeTeamId}
                 onTeamCreated={(teamId) => { loadUserTeams(); loadAllTeams(); handleTeamChange(teamId) }}
-                onOpenChat={(id, name) => { handleNavClick("chats"); handleOpenChat(id, name) }}
+                onOpenChat={handleOpenChat}
                 onTeamSelect={handleTeamChange}
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
@@ -845,10 +894,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                 selectedMember={selectedDirectoryMember}
                 onMemberSelect={handleMemberSelect}
                 onBack={() => handleNavClick("chats")}
-                onOpenChat={(id, name) => {
-                  handleNavClick("chats")
-                  handleOpenChat(id, name)
-                }}
+                onOpenChat={handleOpenChat}
               />
             </div>
           )}
@@ -948,7 +994,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           ministryId={ministryId}
           userRole={initialProfile.role}
           userName={initialProfile.name}
-          onClose={() => setOpenAnnouncementId(null)}
+          onClose={handleCloseAnnouncement}
         />
       )}
 

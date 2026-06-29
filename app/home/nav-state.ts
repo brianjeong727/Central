@@ -11,14 +11,14 @@ import type { Tab } from "./types"
 // sync with the lazy-init reads scattered across the tab files.
 export const TAB_PARAMS: Record<Tab, string[]> = {
   home: [],
-  announcements: [],
-  chats: ["chats"],
-  plan: ["team", "sotab", "ptab", "sgltab", "evtab", "fsec", "rteam"],
+  announcements: ["ann"],
+  chats: ["chats", "chat"],
+  plan: ["team", "sotab", "ptab", "sgltab", "evtab", "fsec", "rteam", "week"],
   directory: ["member"],
   give: [],
-  profile: ["section"],
+  profile: ["section", "jtab"],
   settings: ["stab"],
-  forms: [],
+  forms: ["fresp"],
   congregation: ["cq"],
 }
 
