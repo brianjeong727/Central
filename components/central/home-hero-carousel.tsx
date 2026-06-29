@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, CSSProperties, ReactNode } from "react"
+import { useState, useRef, useEffect, CSSProperties, ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { UpNextCard, UpNextEventDetail } from "./up-next-card"
 
@@ -45,6 +45,19 @@ const PANEL_FALLBACK_RGB = "27, 10, 30"
 // Tall side-pill arrow width — component constant (no spacing token for chrome width).
 const ARROW_W = 54
 
+// ── Option A photo-slide treatment (desktop) ──────────────────────────────────
+// "Light ramp + soft broad scrim, no solid panel." The clamped panel_color makes a
+// LIGHT mood ramp that fades out by ~70% (photo reads through nearly everywhere); a
+// separate soft radial SCRIM of near-black hugs the text for legibility. The near-
+// black (#0c0a10 backdrop, 8,6,10 scrim) is intentionally darker than --ink — a true
+// floor under cream text over a photo. Kept inline: one component's internal curve.
+const PHOTO_BACKDROP = "#0c0a10"
+const SCRIM = "8, 6, 10"
+const rampBg = (c: string) =>
+  `linear-gradient(90deg, rgb(${c}) 0%, rgba(${c},0.9) 4%, rgba(${c},0.46) 22%, rgba(${c},0.13) 48%, rgba(${c},0) 70%)`
+const SCRIM_BG = `radial-gradient(135% 105% at 0% 52%, rgba(${SCRIM},0.5) 0%, rgba(${SCRIM},0.24) 36%, rgba(${SCRIM},0) 64%)`
+const CAP_SHADOW = `0 1px 10px rgba(${SCRIM},0.28)`
+
 // "#rrggbb" → "r, g, b" for building the clamped-color gradient stops.
 function rgbFromHex(hex?: string | null): string {
   if (!hex) return PANEL_FALLBACK_RGB
@@ -60,15 +73,18 @@ function rgbFromHex(hex?: string | null): string {
 // ── Shared frame: single source of truth for height/radius/border/clip ───────
 // Owns the border, radius (--r-hero), and overflow so every slide interior fills
 // the same --hero-h frame. Used by the carousel AND the home-tab fallback.
-export function HeroFrame({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+// `bare` mode (photo slides): the frame is just the fixed-height footprint and
+// centers a floating card — the card itself owns border/radius/clip so it can be
+// sized to the image's aspect (see PhotoSlide desktop).
+export function HeroFrame({ children, style, bare = false }: { children: ReactNode; style?: CSSProperties; bare?: boolean }) {
   return (
     <div
       style={{
         position: "relative",
         height: "var(--hero-h)",
-        borderRadius: "var(--r-hero)",
-        overflow: "hidden",
-        border: "1px solid var(--line-2)",
+        ...(bare
+          ? { display: "flex", alignItems: "center", justifyContent: "center" }
+          : { borderRadius: "var(--r-hero)", overflow: "hidden", border: "1px solid var(--line-2)" }),
         ...style,
       }}
     >
@@ -136,8 +152,43 @@ interface PhotoSlideProps {
 // Photo interior — full-height image with an adaptive dark panel on the left.
 // The panel is filled with the STORED clamped color (panel_color), not a live
 // blur; an ink-based scrim sits on top purely for cream-text legibility.
+// Card aspect-ratio (w/h) is clamped to this band. Inside the band the card takes the
+// image's true aspect so the photo shows IN FULL (cover with matching aspect = no crop);
+// outside it (extreme pano / very tall) the card clamps and cover trims to the bound.
+// These two numbers + --hero-h are the dials for the size/crop tradeoff.
+const CARD_AR_MIN = 0.8 // portrait floor (~4:5)
+const CARD_AR_MAX = 2.1 // landscape cap (~21:10)
+const CARD_AR_FALLBACK = 16 / 9 // before the image reports its natural size
+
 function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, mobile = false }: PhotoSlideProps) {
   const panel = panelColor || PANEL_FALLBACK
+
+  // Desktop: measure the fixed footprint + read the image's natural aspect, then size a
+  // centered card that fits inside it (contain) so the whole image is visible.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  const [naturalAR, setNaturalAR] = useState<number | null>(null)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const cardAR = Math.min(CARD_AR_MAX, Math.max(CARD_AR_MIN, naturalAR ?? CARD_AR_FALLBACK))
+  // Fit a cardAR box inside the measured footprint (contain). Falls back to filling the
+  // frame until measured (avoids a 0-size flash on first paint / SSR).
+  let cardW: number | string = "100%"
+  let cardH: number | string = "100%"
+  if (box.w > 0 && box.h > 0) {
+    let w = box.w
+    let h = box.w / cardAR
+    if (h > box.h) { h = box.h; w = box.h * cardAR }
+    cardW = Math.round(w)
+    cardH = Math.round(h)
+  }
 
   if (mobile) {
     return (
@@ -198,48 +249,39 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
     )
   }
 
-  // Desktop: full-bleed photo; the clamped panel_color fades to transparent
-  // across the seam (Option B) over a left-anchored ink legibility scrim, so the
-  // image emerges out of the color with no hard slab edge. The solid-vs-clear
-  // ratio is the single --hero-panel-fade knob. Pure static CSS — SSR-safe, no blur.
+  // Desktop: full-bleed photo (Option A — "light ramp + soft broad scrim, no solid
+  // panel"). The clamped panel_color becomes a LIGHT mood ramp that fades out by ~70%
+  // so the photo reads through almost everywhere; a SEPARATE soft radial near-black
+  // scrim hugs the text for legibility. No solid slab, no seam. Pure static CSS — SSR-safe.
   const c = rgbFromHex(panelColor)
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%", background: panel }}>
-      <img
-        src={imageUrl}
-        alt=""
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "75% center", display: "block" }}
-      />
-      {/* ink legibility scrim — left-anchored, --ink-token based (the hard floor) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(90deg, color-mix(in srgb, var(--ink) 72%, transparent) 0%, color-mix(in srgb, var(--ink) 50%, transparent) 34%, transparent 60%)",
-        }}
-      />
-      {/* clamped panel_color → transparent across the seam (Option B) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `linear-gradient(90deg, rgba(${c}, 0.96) 0%, rgba(${c}, 0.88) var(--hero-panel-fade), rgba(${c}, 0) 100%)`,
-        }}
-      />
+    <div ref={boxRef} style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {/* card sized to the image's aspect (clamped), centered in the fixed footprint — shows the whole image */}
+      <div style={{ position: "relative", width: cardW, height: cardH, flexShrink: 0, borderRadius: "var(--r-hero)", overflow: "hidden", border: "1px solid var(--line-2)", background: PHOTO_BACKDROP }}>
+        <img
+          src={imageUrl}
+          alt=""
+          onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setNaturalAR(t.naturalWidth / t.naturalHeight) }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+        />
+      {/* light clamped-color mood ramp — fades out by ~70%, photo reads through */}
+      <div style={{ position: "absolute", inset: 0, background: rampBg(c) }} />
+      {/* soft broad radial ink scrim — hugs the text for legibility, never a panel */}
+      <div style={{ position: "absolute", inset: 0, background: SCRIM_BG }} />
       {/* content */}
-      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-10)", display: "flex", flexDirection: "column", zIndex: 1 }}>
+      <div style={{ position: "absolute", inset: 0, width: "44%", padding: "var(--space-9)", display: "flex", flexDirection: "column", zIndex: 1 }}>
         <Eyebrow text={eyebrow} />
         <div
           style={{
             fontFamily: "var(--serif)",
             fontSize: event ? 46 : 34,
             fontWeight: 600,
-            letterSpacing: "-0.015em",
+            letterSpacing: "-0.02em",
             lineHeight: event ? 1.02 : 1.1,
             color: "var(--cream)",
             marginTop: "var(--space-7)",
             maxWidth: "92%",
+            textShadow: CAP_SHADOW,
           }}
         >
           {title}
@@ -250,7 +292,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           </p>
         )}
         {meta && !event && (
-          <div style={{ marginTop: "auto", fontSize: 14, color: "var(--cream)", opacity: 0.62 }}>{meta}</div>
+          <div style={{ marginTop: "auto", fontSize: 12, color: "var(--cream)", opacity: 0.72 }}>{meta}</div>
         )}
       </div>
       {/* event glass chip — surgical backdrop-blur material (contained to this chip) */}
@@ -299,6 +341,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -326,7 +369,9 @@ function Eyebrow({ text }: { text: string }) {
 }
 
 // Tall flanking nav pill (desktop) — cream/line tokens, hover → ivory/plum-2.
-function TallArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void }) {
+// `onPhoto` keeps the darker cream-2 against image slides; ivory reference slides
+// pass false so the resting fill matches the lighter --cream page background.
+function TallArrow({ dir, disabled, onClick, onPhoto }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void; onPhoto: boolean }) {
   const [hover, setHover] = useState(false)
   const Icon = dir === "prev" ? ChevronLeft : ChevronRight
   return (
@@ -342,7 +387,7 @@ function TallArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled:
         width: ARROW_W,
         alignSelf: "stretch",
         border: "1px solid var(--line-2)",
-        background: !disabled && hover ? "var(--ivory)" : "var(--cream-2)",
+        background: !disabled && hover ? "var(--ivory)" : onPhoto ? "var(--cream-2)" : "var(--cream)",
         color: !disabled && hover ? "var(--plum-2)" : "var(--body)",
         borderRadius: "var(--r-pill-lg)",
         cursor: disabled ? "default" : "pointer",
@@ -536,9 +581,9 @@ export function HomeHeroCarousel({
   return (
     <div style={style}>
       <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
-        {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} />}
-        <HeroFrame style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
-        {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} />}
+        {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} onPhoto={usePhoto} />}
+        <HeroFrame bare={usePhoto} style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
+        {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} onPhoto={usePhoto} />}
       </div>
       {multi && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: "var(--space-7)" }}>
