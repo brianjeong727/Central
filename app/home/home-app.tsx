@@ -757,7 +757,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
           <DesktopTopbar
             crumbs={getShellCrumbs()}
-            right={(activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
+            right={activeTab === "plan" && (activeTeamId === "receipts" || (activeTeamId && (userTeams.length > 1 || govTeamCount > 0))) ? (
               /* Team-agnostic back-to-picker button — shown for the receipts sentinel
                  AND any team workspace. Don't gate on a per-type flag or new team types
                  (finance, etc.) silently lose their way back. */
