@@ -254,7 +254,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   }
 
   // Congregation sub-view — lifted so shell can build accurate crumbs
-  const [congregationView, setCongregationView] = useState<"ask" | "responses" | "archive">("ask")
+  const [congregationView, setCongregationView] = useState<"list" | "create" | "detail">("list")
 
   // Compute whether the student org board is the active team on desktop (drives sidebar + breadcrumb).
   // Resolve from membership first, then from allTeams — a governance admin may be viewing a team
@@ -311,7 +311,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   // Shell breadcrumb computation — derived from shell-known state, no tab props needed
   function getShellCrumbs(): string[] {
-    const congregationLabels: Record<string, string> = { ask: "Ask", responses: "Responses", archive: "Archive" }
+    const congregationLabels: Record<string, string> = { list: "", create: "New question", detail: "Responses" }
     switch (activeTab) {
       case "home":          return ["Central", "Home"]
       case "announcements": return ["Central", "Announcements"]
@@ -329,7 +329,9 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       }
       case "directory":     return ["Central", "Directory"]
       case "profile":       return profileSection === "journal" ? ["Central", "Journal"] : ["Central", "Profile"]
-      case "congregation":  return ["Central", "Congregation", congregationLabels[congregationView]]
+      case "congregation":  return congregationLabels[congregationView]
+        ? ["Central", "Congregation", congregationLabels[congregationView]]
+        : ["Central", "Congregation"]
       default:              return ["Central"]
     }
   }

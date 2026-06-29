@@ -219,3 +219,9 @@ This repo commits BOTH `package-lock.json` (npm) and `pnpm-lock.yaml` (pnpm), bu
 - A fast Vercel failure (a few seconds, before compilation) is almost always the **install step** (lockfile/peer mismatch), NOT a code/type error. A passing local `npm run build` does NOT prove the Vercel install will succeed if the two package managers' lockfiles diverge.
 - Diagnose Vercel failures from the actual build log (`mcp__vercel__get_deployment_build_logs`, errorsOnly) before guessing.
 - To verify before pushing, run the exact thing Vercel runs: `pnpm install --frozen-lockfile` (exit 0 = good).
+
+## Dev server vs `npm run build` share `.next` in a worktree slot
+- Running `npm run build` (production) in a session worktree while that slot's `next dev` is live writes into the SAME `.next` directory and corrupts Turbopack's cache — the dev server then hangs (`curl` → 000) or 500s with `ENOENT .next/.../build-manifest.json` / "Unable to open static sorted file ...sst". The code is fine; only the cache is wrecked.
+- Do NOT `rm -rf .next` while the dev server is running — it yanks the directory out from under the live process (same failure).
+- To type-check/verify WITHOUT disturbing a live dev server, use `npx tsc --noEmit` (doesn't touch `.next`). Reserve `npm run build` for when dev is stopped.
+- Recovery: `lsof -tiTCP:<port> | xargs kill -9` (kill ALL listeners — a half-killed old process causes EADDRINUSE on restart), `rm -rf .next`, then relaunch ONE `next dev`. Confirm a single listener before polling.
