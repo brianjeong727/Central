@@ -991,8 +991,10 @@ export function ProfileTab({
 
       {activeSection === "journal" && (
         <div className="pb-28 md:pb-0">
-          {/* Mobile header — compact, gear inline right */}
-          <div className="md:hidden px-5 pt-14 pb-3" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          {/* Mobile header — compact, gear inline right.
+              NB: use Tailwind flex CLASSES, not inline display:flex — an inline
+              `display` would override `md:hidden` and leak the mobile header onto desktop. */}
+          <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-14 pb-3">
             <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Journal</h1>
             <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
