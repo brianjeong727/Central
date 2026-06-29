@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR from "swr"
 import {
@@ -1752,6 +1752,106 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   )
 }
 
+// ── Workspace picker primitives ─────────────────────────────────────────────
+// Initials for a team monogram: first letters of the first two words, uppercase;
+// one-word names → first two letters (e.g. "Finance Team"→"FT", "Receipts"→"RE").
+function teamInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return "?"
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return (words[0][0] + words[1][0]).toUpperCase()
+}
+
+// Adaptive column count for a picker section — avoids skinny cards / lone orphans.
+function wsCols(n: number): 2 | 3 {
+  return (n <= 2 || n === 4) ? 2 : 3
+}
+
+// Role badge pill (§4.7 tokens). tone: lead | member | admin.
+function WsBadge({ tone, label }: { tone: "lead" | "member" | "admin"; label: string }) {
+  const toneStyle =
+    tone === "admin"
+      ? { background: "var(--plum-2)", color: "var(--cream)", border: "1px solid transparent" }
+      : tone === "lead"
+      ? { background: "var(--ivory)", color: "var(--plum)", border: "1px solid var(--line-2)" }
+      : { background: "var(--ivory)", color: "var(--muted-text)", border: "1px solid var(--line-2)" }
+  return (
+    <span style={{ ...toneStyle, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 500, fontFamily: "var(--sans)", whiteSpace: "nowrap", flexShrink: 0 }}>
+      {label}
+    </span>
+  )
+}
+
+// Carried-forward "Needs a president" indicator — identical styling to the prior
+// picker pill; shown in the badge slot in place of the role badge.
+function NeedsPresidentPill() {
+  return (
+    <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px", whiteSpace: "nowrap", flexShrink: 0 }}>
+      Needs a president
+    </span>
+  )
+}
+
+// A workspace tile: monogram + badge toprow, name + optional sub at the bottom.
+function WsTile({ initials, badge, name, sub, onClick }: {
+  initials: string
+  badge: ReactNode
+  name: string
+  sub?: string
+  onClick: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", flexDirection: "column", gap: 14, textAlign: "left",
+        background: hover ? "var(--cream)" : "var(--cream-2)",
+        border: `1px solid ${hover ? "var(--plum)" : "var(--line-2)"}`,
+        borderRadius: "var(--r-card)", padding: 18, minHeight: 128, cursor: "pointer",
+        transform: hover ? "translateY(-2px)" : "translateY(0)",
+        transition: "border-color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 14, fontWeight: 600 }} />
+        {badge}
+      </div>
+      <div style={{ marginTop: "auto", minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {name}
+        </p>
+        {sub && <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0" }}>{sub}</p>}
+      </div>
+    </button>
+  )
+}
+
+// Dashed "Add workspace" tile (admin only) — last in the Your-workspaces grid.
+function WsAddTile({ onClick }: { onClick: () => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+        background: "transparent",
+        border: `1px dashed ${hover ? "var(--plum)" : "var(--dashed)"}`,
+        borderRadius: "var(--r-card)", padding: 18, minHeight: 128, cursor: "pointer",
+        color: hover ? "var(--plum)" : "var(--body)",
+        transition: "border-color var(--dur-fast), color var(--dur-fast)",
+      }}
+    >
+      <Plus style={{ width: 16, height: 16 }} strokeWidth={2.2} />
+      <span style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500 }}>Add workspace</span>
+    </button>
+  )
+}
+
 export function PlanTab({
   userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
   onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onOpenChat,
@@ -2021,136 +2121,87 @@ export function PlanTab({
             /* PICKER — full-width, no sidebar */
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "44px 48px 64px" }}>
               <div style={{ width: "100%", maxWidth: 760 }}>
-                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 14, textAlign: "center" }}>
+                {/* Header */}
+                <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px", textAlign: "center" }}>
                   PLANNING · {ministryName.toUpperCase()}
                 </p>
-                <h1 style={{ fontFamily: "var(--sans)", fontSize: 34, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
                   Which workspace are you entering?
                 </h1>
-                <p style={{ fontSize: 15, color: "var(--muted-text)", margin: "0 0 32px", lineHeight: 1.6, textAlign: "center" }}>
+                <p style={{ fontSize: 15, color: "var(--body)", margin: "0 0 32px", lineHeight: 1.6, textAlign: "center" }}>
                   Pick a workspace to enter.
                 </p>
-                {/* Workspaces — member teams + the shared Receipts surface, together */}
-                <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>
-                  Workspaces
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                  {userTeams.map(t => (
-                    <button
-                      key={t.teamId}
-                      onClick={() => handleWorkspaceCardClick(userTeamToTeam(t))}
-                      className="text-left transition-all hover:border-[var(--plum)]"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        background: "var(--ivory)",
-                        border: "1px solid var(--line)",
-                        borderRadius: 14,
-                        padding: "14px 16px",
-                        cursor: "pointer",
-                        width: "100%",
-                      }}
-                    >
-                      <PlanLineIcon iconKey={t.teamIcon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
-                          {/president/i.test(t.roleName) ? "President" : t.roleName}
-                        </p>
-                        <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {t.teamName}
-                        </p>
-                        {t.hasPresident === false && (
-                          <span style={{ display: "inline-block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px" }}>
-                            Needs a president
-                          </span>
-                        )}
+
+                {/* ── Your workspaces: member teams + Receipts + (Add, admin only) ── */}
+                {(() => {
+                  const n = userTeams.length + 1 + (isAdmin ? 1 : 0)
+                  const cols = wsCols(n)
+                  return (
+                    <>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>
+                        Your workspaces · {n}
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: cols === 2 ? "repeat(2, 264px)" : "repeat(3, 212px)", gap: 14, justifyContent: "center" }}>
+                        {userTeams.map(t => {
+                          const isLead = t.isPresident || !/^member$/i.test(t.roleName.trim())
+                          const badge = t.hasPresident === false
+                            ? <NeedsPresidentPill />
+                            : <WsBadge tone={isLead ? "lead" : "member"} label={t.isPresident ? "President" : (isLead ? t.roleName : "Member")} />
+                          const sub = t.memberCount != null ? `${t.memberCount} member${t.memberCount === 1 ? "" : "s"}` : undefined
+                          return (
+                            <WsTile
+                              key={t.teamId}
+                              initials={teamInitials(t.teamName)}
+                              badge={badge}
+                              name={t.teamName}
+                              sub={sub}
+                              onClick={() => handleWorkspaceCardClick(userTeamToTeam(t))}
+                            />
+                          )
+                        })}
+                        {/* Receipts — a shared surface, not a team (no member count) */}
+                        <WsTile
+                          initials="RE"
+                          badge={<WsBadge tone="member" label="Member" />}
+                          name="Receipts"
+                          onClick={() => onTeamSelect?.("receipts")}
+                        />
+                        {isAdmin && <WsAddTile onClick={() => setShowCreateTeam(true)} />}
                       </div>
-                    </button>
-                  ))}
-                  {/* Receipts workspace — a shared surface, not a team */}
-                  <button
-                    onClick={() => onTeamSelect?.("receipts")}
-                    className="text-left transition-all hover:border-[var(--plum)]"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      background: "var(--ivory)",
-                      border: "1px solid var(--line)",
-                      borderRadius: 14,
-                      padding: "14px 16px",
-                      cursor: "pointer",
-                      width: "100%",
-                    }}
-                  >
-                    <PlanLineIcon iconKey="dollar" bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
-                        Member
+                    </>
+                  )
+                })()}
+
+                {/* ── Admin access (governance, view-only) ── */}
+                {govTeams.length > 0 && (() => {
+                  const cols = wsCols(govTeams.length)
+                  return (
+                    <>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "28px 0 12px" }}>
+                        Admin access · view only · {govTeams.length}
                       </p>
-                      <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        Receipts
-                      </p>
-                    </div>
-                  </button>
-                </div>
-                {govTeams.length > 0 && (
-                  <>
-                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "28px 0 12px" }}>
-                      Admin access
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                      {govTeams.map(t => {
-                        const canWrite = t.admin_access === "write"
-                        return (
-                          <button
-                            key={t.id}
-                            onClick={() => handleWorkspaceCardClick(t)}
-                            className="text-left transition-all hover:border-[var(--plum)]"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 12,
-                              background: "var(--ivory)",
-                              border: "1px solid var(--line)",
-                              borderRadius: 14,
-                              padding: "14px 16px",
-                              cursor: "pointer",
-                              width: "100%",
-                            }}
-                          >
-                            <PlanLineIcon iconKey={t.icon ?? "users"} bg="var(--plum)" fg="var(--cream)" size={36} radius={10} />
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <p style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 3px" }}>
-                                {canWrite ? "Admin · can edit" : "Admin · view only"}
-                              </p>
-                              <p style={{ fontFamily: "var(--sans)", fontSize: 16, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.01em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {t.name}
-                              </p>
-                              {t.hasPresident === false && (
-                                <span style={{ display: "inline-block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", border: "1px solid var(--line)", borderRadius: 999, padding: "2px 7px" }}>
-                                  Needs a president
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-                {isAdmin && (
-                  <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
-                    <button
-                      onClick={() => setShowCreateTeam(true)}
-                      className="hover:bg-[var(--plum)] hover:text-[#FBF8F2] transition-colors"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "10px 20px", background: "transparent", color: "var(--plum)", border: "1px solid var(--plum)", borderRadius: 999, fontSize: 13, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                    >
-                      <Plus style={{ width: 13, height: 13 }} /> Add workspace
-                    </button>
-                  </div>
-                )}
+                      <div style={{ display: "grid", gridTemplateColumns: cols === 2 ? "repeat(2, 264px)" : "repeat(3, 212px)", gap: 14, justifyContent: "center" }}>
+                        {govTeams.map(t => {
+                          const canWrite = t.admin_access === "write"
+                          const badge = t.hasPresident === false
+                            ? <NeedsPresidentPill />
+                            : <WsBadge tone="admin" label={canWrite ? "Admin · can edit" : "Admin · view only"} />
+                          const sub = `${t.member_count} member${t.member_count === 1 ? "" : "s"}`
+                          return (
+                            <WsTile
+                              key={t.id}
+                              initials={teamInitials(t.name)}
+                              badge={badge}
+                              name={t.name}
+                              sub={sub}
+                              onClick={() => handleWorkspaceCardClick(t)}
+                            />
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           ) : (
@@ -2171,7 +2222,7 @@ export function PlanTab({
                 {isAdmin && (
                   <button
                     onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer" }}
                   >
                     <Plus style={{ width: 14, height: 14 }} /> Add a workspace
                   </button>
