@@ -301,6 +301,78 @@
   .content-enter { animation: none; opacity: 1; transform: none; }
 }
 
+/* ── Plan team Settings / Create-team overlays ──────────────────────────────
+   These overlays are portaled to <body> (so position:fixed is viewport-relative,
+   escaping the transformed .content-enter tab wrapper). Mobile keeps the
+   full-screen 390px column from Tailwind classes; on md+ the overlay is pinned
+   from the shell offset to the right viewport edge, filling the content body. */
+@media (min-width: 768px) {
+  .team-overlay-desktop {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--shell-offset);
+    max-width: none;
+    margin: 0;
+    background: var(--cream);
+  }
+}
+/* ── Home greeting "living accent" (Dir 3) ──────────────────────────────────
+   A slow light-sheen drifts across the greeting headline and the Featured dot
+   softly breathes — barely-there continuous life on the Home header, so it never
+   reads fully static. Tuned to stay quiet: 7s sheen, 3.4s breathe, low-contrast
+   highlight (--faint). Reduced-motion users get static ink/plum text + a still dot.
+   Per-segment: ink text uses .greeting-sheen; the plum role word adds
+   .greeting-sheen-plum. NOTE: .greeting-sheen-plum must re-declare background-clip
+   and color:transparent — its `background` shorthand resets background-clip to
+   border-box, which would otherwise render the gradient as a solid plum block. */
+@keyframes greeting-sheen {
+  0%        { background-position: 160% 0; }
+  55%, 100% { background-position: -60% 0; }
+}
+.greeting-sheen {
+  background: linear-gradient(100deg, var(--ink) 0%, var(--ink) 42%, var(--faint) 50%, var(--ink) 58%, var(--ink) 100%);
+  background-size: 280% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: greeting-sheen 7s var(--ease-in-out) infinite;
+}
+.greeting-sheen-plum {
+  background: linear-gradient(100deg, var(--plum) 0%, var(--plum) 42%, var(--plum-light) 50%, var(--plum) 58%, var(--plum) 100%);
+  background-size: 280% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes greeting-dot-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--plum) 32%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--plum) 0%, transparent); }
+}
+.greeting-dot-breathe { animation: greeting-dot-breathe 3.4s var(--ease-in-out) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .greeting-sheen {
+    animation: none;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: var(--ink);
+    -webkit-text-fill-color: var(--ink);
+  }
+  .greeting-sheen-plum { color: var(--plum); -webkit-text-fill-color: var(--plum); }
+  .greeting-dot-breathe { animation: none; }
+}
+
+/* ── Skeleton loading — static soft pulse (calm, no shimmer sweep) ───────── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.skeleton-pulse { animation: skeleton-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse { animation: none; opacity: 0.7; }
+}
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }

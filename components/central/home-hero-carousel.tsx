@@ -94,7 +94,7 @@ export function HeroFrame({ children, style, bare = false }: { children: ReactNo
 }
 
 // ── Constant section eyebrow above the hero ("Featured" + plum dot) ───────────
-export function HeroSectionLabel({ offsetForArrows = false }: { offsetForArrows?: boolean }) {
+export function HeroSectionLabel({ offsetForArrows = false, breathe = false }: { offsetForArrows?: boolean; breathe?: boolean }) {
   return (
     <div
       style={{
@@ -105,7 +105,7 @@ export function HeroSectionLabel({ offsetForArrows = false }: { offsetForArrows?
         paddingLeft: offsetForArrows ? `calc(${ARROW_W}px + var(--space-6))` : 0,
       }}
     >
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)" }} />
+      <span className={breathe ? "greeting-dot-breathe" : undefined} style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)" }} />
       <span
         style={{
           fontFamily: "var(--mono)",

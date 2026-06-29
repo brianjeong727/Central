@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "giving" | "give" | "profile" | "settings" | "forms" | "congregation"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"
 
 export interface Profile {
   id: string
@@ -322,10 +322,14 @@ export interface UserTeam {
   teamName: string
   teamIcon: string | null
   teamDescription: string | null
-  teamType: 'standard' | 'dg_praise' | 'one_time'
+  teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance'
   roleId: string
   roleName: string
   permissions: string[]
+  isPresident: boolean
+  allowCoPresidency: boolean
+  // Per-team override: when false (default), admin-tier users can't be team members.
+  allowAdminMembers: boolean
 }
 
 export interface Team {
@@ -335,7 +339,20 @@ export interface Team {
   description: string | null
   created_by: string
   member_count: number
-  team_type: 'standard' | 'dg_praise' | 'one_time'
+  team_type: 'standard' | 'dg_praise' | 'one_time' | 'finance'
+  allow_co_presidency: boolean
+  // Per-team admin governance matrix: what governing admins get on this team.
+  admin_access: 'none' | 'view' | 'write'
+  // Per-team override: when false (default), admin-tier users (admin/deacon/elder/pastor)
+  // can't be added as members. Admins govern from outside unless this is enabled.
+  allow_admin_members: boolean
+}
+
+// Global governance roster (ministries.governance_settings). When all_admins is
+// true every admin-tier user governs; otherwise only roster_ids govern.
+export interface GovernanceSettings {
+  all_admins: boolean
+  roster_ids: string[]
 }
 
 export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
@@ -415,6 +432,7 @@ export interface TeamRole {
   team_id: string
   name: string
   permissions: string[]
+  is_president: boolean
 }
 
 export interface TeamMemberDisplay {
@@ -428,6 +446,7 @@ export interface TeamMemberDisplay {
 export interface DraftRole {
   name: string
   permissions: string[]
+  is_president?: boolean
 }
 
 export interface RoleDescription {
@@ -468,6 +487,10 @@ export interface PlanTabProps {
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean
+  // Whether this user is on the governance roster (narrows raw isAdmin). Used for
+  // structural team-admin gates; equals isAdmin when governance is all_admins.
+  isGovernanceAdmin: boolean
+  governanceSettings: GovernanceSettings
   isDGL: boolean
   isPastor: boolean
   onTeamsChange: () => void
@@ -487,6 +510,12 @@ export interface PlanTabProps {
   // Lifted small group leaders state (for sidebar)
   sglSection?: string
   onSglSectionChange?: (s: string) => void
+  // Lifted finance team section state (for sidebar)
+  financeSection?: string
+  onFinanceSectionChange?: (s: string) => void
+  // Receipts workspace: team selected WITHIN receipts (synced to ?rteam)
+  activeReceiptsTeamId?: string | null
+  onReceiptsTeamChange?: (id: string) => void
 }
 
 export interface WorshipWeek {
@@ -595,11 +624,11 @@ export interface DesktopSidebarProps {
   isPastor?: boolean
   onCreateTeam?: () => void
   activeTeamId: string | null
+  // Resolved active-team name (membership OR allTeams fallback for gov-view) — drives the panel header
+  activeTeamName?: string
   onActiveTeamChange: (id: string) => void
   profileSection: "spiritual-profile" | "journal"
   onProfileSectionChange: (s: "spiritual-profile" | "journal") => void
-  financeSection: "give" | "reimbursements" | "budget" | "allocation"
-  onFinanceSectionChange: (s: "give" | "reimbursements" | "budget" | "allocation") => void
   isTreasurer: boolean
   isDGL: boolean
   canCreateTeam?: boolean
@@ -627,6 +656,7 @@ export interface HomeAppProps {
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null
   initialHasResponded?: boolean
+  initialGovernanceSettings?: GovernanceSettings
 }
 
 export type { ChatPreview }

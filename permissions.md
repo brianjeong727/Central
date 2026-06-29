@@ -6,22 +6,97 @@ Four tiers, stored in `profiles.role`. Always compare with `.toLowerCase()`.
 
 | Tier | Roles | Notes |
 |------|-------|-------|
-| **Admin** | `admin`, `pastor`, `deacon`, `elder` | Full ministry control. `pastor` additionally sees the Congregation tab. `deacon`/`elder` are excluded from the Plan tab. |
-| **Leader** | `leader` | Team leaders (DGLs, Student Org, Praise). Elevated via team membership. Cannot access Settings. |
+| **Admin** | `admin`, `pastor`, `deacon`, `elder` | Full ministry control. `pastor` additionally sees the Congregation tab. |
+| **Leader** | `leader` | Elevated via team membership (DGLs, Student Org, etc.). Cannot access Settings. |
 | **Member** | `member` | Standard membership. |
 | **Visitor** | `visitor` | Identical permissions to Member. Badge is outlined to distinguish. |
 
 ### Admin sub-roles
-All three share the full admin permission tier. Differences are UI-only:
-- **Pastor** — also sees the Congregation tab (pastoral oversight of spiritual profiles). Excluded from Plan tab alongside deacon/elder.
-- **Deacon / Elder** — excluded from the Plan tab (governance roles, not operational).
-- **Admin** (generic) — full access including Plan tab.
+All four share the full admin permission tier. Differences:
+- **Pastor** — also sees the Congregation tab (pastoral oversight of spiritual profiles).
+- **Deacon / Elder / Admin** — full access. **Note:** deacon/elder are **no longer excluded from Plan** — Plan now shows for anyone on a team or holding governance (see Plan Tab Visibility).
 
-### Leader sub-roles
-All share the leader permission tier. Capabilities come from team membership, not the role string alone.
-- **DGL (Discipleship Group Leader)** — identified by `can_create_dgs` or `can_view_dgs` team permission.
-- **Student Org President** — identified by team name matching "student org / board / leadership" or `can_plan_events` permission.
-- **Praise Team** — identified by team name matching "praise / worship" or `can_manage_worship_set` / `can_view_worship_set` / `can_manage_schedule` permission.
+### Team identity
+Team behavior is resolved by a single classifier, `app/home/team-type.ts` `classifyTeam(team)` → `finance | dgPraise | oneTime | studentOrg | dgl | praise | tech | standard`, **by `team_type` first, then name regex — never by permission**. (Permission-based type detection caused the Finance-mis-classified-as-StudentOrg bug.) Do not re-introduce name/permission guesses for *type*; classify, then check capability.
+
+---
+
+## The two permission planes
+
+The model has two independent planes — keep them distinct:
+
+1. **Domain write** ("do the team's work" — edit the budget, build the setlist, approve a receipt). Requires **team membership + a team role permission**. There is NO role-based default; being an admin does not grant domain write.
+2. **Governance** ("run/oversee a team" — create it, manage its roster, edit its settings, delete it, and read/view its content). An **admin** power. Viewing or running a team never makes you a member.
+
+---
+
+## Governance model
+
+### Who holds governance — the roster
+- A **global governance roster** lives in church settings. Defaults to **all admin-tier users**. Toggle it off to curate a roster of specific admins. Roster = who governs, ministry-wide. (`ministries.governance_settings = { all_admins, roster_ids }`; `governance.ts` `isGovernanceAdmin`.)
+
+### What they get, per team — the matrix
+- A **per-team admin matrix** (church settings) gives governance-admins **none / view / write** on each team. Default **view**.
+  - `none` — locked out; only the team's own members manage it.
+  - `view` — read content (read-only) **+ govern structure** (manage roster, edit team settings, delete the team).
+  - `write` — `view` + **domain write** (act on the team's work without being a member).
+- Roster (who) **×** matrix (what) compose. (`teams.admin_access`; `governance.ts` `teamAccessLevel` → `member | gov-write | gov-view | none`.)
+
+### Team settings-page access
+= governance-admins with **view+** on that team **+** the team's **president(s)**. NOT regular members.
+
+### Anti-lockout
+Church **Settings** (where the roster + matrix live) stays open to **all admin-tier** regardless of the governance roster, so a ministry can never lock itself out of its own controls.
+
+---
+
+## Teams
+
+- **Preset teams only** for now (Small Group Leaders, Student Org Board, Finance). Custom team creation is not built ("New team · coming soon").
+- **Universal president:** creating any team requires appointing a president; a team is born with ≥1 member (the president). `team_roles.is_president` (explicit flag, not name-matched).
+- **Co-presidency:** a per-team setting (`teams.allow_co_presidency`). When on, exactly **2** presidents are required. Adding a 3rd president is blocked; changing a president uses a "Replace a president?" flow.
+- **Admins can't be team members by default:** `teams.allow_admin_members` (default false). Admin-tier users are excluded from member/president pickers unless a team enables it. (Governance separation — admins govern from outside.)
+
+---
+
+## Plan Tab Visibility
+
+```
+showPlanTab = userTeams.length > 0 || isGovernanceAdmin
+```
+
+| Role | Sees Plan tab |
+|------|:------------:|
+| visitor / member / leader | Only if on a team |
+| deacon / elder | Only if on a team **or** holds governance |
+| admin / pastor | ✓ (governance-admin by default) |
+
+The Plan picker ("Which workspace are you entering?") groups: **Workspaces** (your member teams + the Receipts workspace) and **Admin access** (teams you govern but aren't a member of — view-only or can-edit per the matrix).
+
+---
+
+## Finance (a Plan team)
+
+Finance is **no longer a top-level tab** — it's a Plan team (`team_type='finance'`). Member-facing **Give** (Zelle) is a separate Home tab, congregation-wide and ungated.
+
+- **Roles: President + Member only.** President (the finance deacon) signs off reimbursements; Members (the treasurers operate + approve; plus any overseeing admins). No auto-add — the admin appoints the president like any other team.
+- **Budget / allocation / category edits:** allowed for a Finance-team member with `can_view_finances` **or** admin-tier. Enforced server-side in `app/actions/finance-auth.ts` (`getFinanceCapability`) — the budget-write actions (`upsertBudgetAllocation`, `addBudgetCategory`, `deleteBudgetCategory`) reject unauthorized callers.
+- All admins retain **view-only** access to Finance (and every workspace) via governance by default.
+
+---
+
+## Receipts & reimbursements
+
+The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-form receipts.
+
+- **Submit:** any team member opens the **Receipts** workspace (in Plan), picks a team → a per-team **category** → submits a receipt (inherits the category + fund). Categories are per-team; any team member can add one (`receipt_categories`, team-membership RLS).
+- **Approval chain** (Finance → Reimbursements inbox):
+  | Step | Who | Transition |
+  |------|-----|-----------|
+  | Submit | any team member | → `pending` |
+  | Approve / Reject | **Treasurer** (Finance member w/ `can_view_finances`, or admin-tier) | `pending` → `approved` / `rejected` |
+  | Sign off / Decline | **Finance President** (`is_president` on the finance team, or admin-tier) | `approved` → `reimbursed` / `declined` |
+  All transitions are server-authed + state-guarded (`app/actions/receipts.ts` via `finance-auth.ts`).
 
 ---
 
@@ -29,33 +104,23 @@ All share the leader permission tier. Capabilities come from team membership, no
 
 | Feature | Visitor | Member | Leader | Admin |
 |---------|:-------:|:------:|:------:|:-----:|
-| View announcements | ✓ | ✓ | ✓ | ✓ |
-| Create / edit / delete announcements | ✗ | ✗ | ✓ | ✓ |
-| RSVP to events | ✓ | ✓ | ✓ | ✓ |
+| View announcements / RSVP | ✓ | ✓ | ✓ | ✓ |
+| Create/edit/delete announcements | ✗ | ✗ | ✓ | ✓ |
 | View RSVP attendee list | ✗ | ✗ | ✓ | ✓ |
-| Toggle public attendee visibility | ✗ | ✗ | ✗ | ✓ |
 | View chats | ✓ | ✓ | ✓ | ✓ |
-| Create DM / personal group chats | ✓ | ✓ | ✓ | ✓ |
 | Create church chats | ✗ | ✗ | ✓ (team-based) | ✓ |
-| Archive / delete church chats | ✗ | ✗ | ✓ | ✓ |
-| View Plan tab | ✗ | ✓ (if on a team) | ✓ | ✓ (except deacon/elder) |
-| Create teams | ✗ | ✗ | ✓ (DGL/praise) | ✓ |
+| View Plan tab | on a team | on a team | on a team | ✓ (or governance) |
 | View directory | ✓ | ✓ | ✓ | ✓ |
-| View giving info (Zelle) | ✓ | ✓ | ✓ | ✓ |
-| Edit giving info | ✗ | ✗ | ✗ | ✓ |
-| View reimbursement forms | ✗ | ✗ | ✓ (assigned DGLs) | ✓ |
-| Submit / edit reimbursement forms | ✗ | ✗ | ✓ (assigned DGLs) | ✓ |
-| View budget | ✗ | ✗ | ✓ (treasurer permission) | ✓ |
+| View Give (Zelle) | ✓ | ✓ | ✓ | ✓ |
+| Edit Give info | ✗ | ✗ | ✗ | ✓ |
+| Submit a receipt | on a team | on a team | on a team | on a team / governance |
+| Approve / reject a receipt | ✗ | Finance member (`can_view_finances`) | ✗ | ✓ |
+| Sign off / decline a receipt | ✗ | Finance president | ✗ | ✓ |
+| Edit budget / allocation | ✗ | Finance member (`can_view_finances`) | ✗ | ✓ |
+| Govern a team (roster/settings/delete) | ✗ | ✗ | ✗ | per matrix (view+) |
+| Domain-write a non-member team | ✗ | ✗ | ✗ | per matrix (write) |
 | Access Settings tab | ✗ | ✗ | ✗ | ✓ |
-| Edit ministry name / university | ✗ | ✗ | ✗ | ✓ |
-| Toggle ministry public/private | ✗ | ✗ | ✗ | ✓ |
-| Change member roles | ✗ | ✗ | ✗ | ✓ |
-| Remove members | ✗ | ✗ | ✗ | ✓ |
-| Regenerate member invite code | ✗ | ✗ | ✗ | ✓ |
-| Regenerate staff invite code | ✗ | ✗ | ✗ | ✓ |
-| Manage schools | ✗ | ✗ | ✗ | ✓ |
-| Manage receipt limits | ✗ | ✗ | ✗ | ✓ |
-| Archive ministry | ✗ | ✗ | ✗ | ✓ |
+| Edit ministry / roles / members / codes / schools | ✗ | ✗ | ✗ | ✓ |
 | View Congregation tab | ✗ | ✗ | ✗ | Pastor only |
 
 ---
@@ -65,81 +130,31 @@ All share the leader permission tier. Capabilities come from team membership, no
 | Code | Who can use | Role assigned on join |
 |------|------------|----------------------|
 | **Member invite code** | Anyone (private ministries only) | `member` |
-| **Staff invite code** | Pastors, deacons, elders | Chosen during join flow: `pastor` / `deacon` / `elder` |
+| **Staff invite code** | Pastors, deacons, elders | Chosen during join: `pastor` / `deacon` / `elder` |
 
-Public ministries have no member invite code — anyone joins via browse. Both ministry types always have a staff invite code.
-
-If an admin-tier person accidentally joins via the member path, an existing admin can promote them in Settings → Members.
+Public ministries have no member invite code (join via browse). If an admin-tier person joins via the member path, an existing admin can promote them in Settings → Members.
 
 ---
 
 ## Key Implementation Constants
 
-These arrays must be kept in sync across all files:
-
+Role-check arrays (keep in sync across files — see CLAUDE.md Convention #2):
 ```
-Admin tier:  ["admin", "deacon", "elder", "pastor"]
-Leader tier: ["admin", "deacon", "elder", "pastor", "leader"]  ← for leader-and-above checks
+Admin tier:        ["admin", "deacon", "elder", "pastor"]
+Leader-and-above:  ["leader", "admin", "deacon", "elder", "pastor"]
 ```
-
-**Locations that use the admin-tier array:**
-- `app/home/home-app.tsx` — `isAdmin` flag (gates Settings tab, team creation, church chat creation)
-- `app/home/tabs/settings-tab.tsx` — `isAdmin` flag (gates all settings edit controls)
-- `app/actions/ministry.ts` — server-side guard on every ministry mutation
-- DB function `auth_is_admin_or_leader()` — used in 30+ RLS policies
-
-**Locations that use leader-and-above:**
-- `app/home/tabs/announcements-tab.tsx` — `isLeaderOrAdmin`
-- `app/home/tabs/chats-tab.tsx` — `isAdminOrLeader`
-- `app/actions/chat.ts` — group deletion guard
-- DB function `auth_is_admin_or_leader()` — also covers leaders for announcements, teams, etc.
-
----
-
-## Plan Tab Visibility Rules
-
-```
-showPlanTab = NOT (deacon OR elder) AND (isAdmin OR hasTeams)
-```
-
-| Role | Sees Plan tab |
-|------|:------------:|
-| visitor / member | Only if on a team |
-| leader | Only if on a team |
-| admin (generic) | ✓ always |
-| pastor | ✓ always |
-| deacon | ✗ never |
-| elder | ✗ never |
-
----
-
-## Reimbursements / Finance Access
-
-Finance access uses **team permissions** on top of the role tier:
-
-| Who | Access |
-|-----|--------|
-| Admin tier | Full access: all forms, budget, allocation |
-| `can_view_finances` permission (treasurer) | Full read + submit access |
-| Assigned DGL on a form (`assigned_dgl_ids`) | View + edit their own assigned forms only |
-| Everyone else | No access |
-
----
-
-## Congregation Tab
-
-Visible only to users with role `pastor`. Shows:
-- Congregation question management
-- Member spiritual profiles (bible verse, prayer requests, etc.)
+Finance/governance capability is NOT a role-array check — it routes through:
+- `app/actions/finance-auth.ts` — `getFinanceCapability` / `computeFinanceCapability` (can-approve = finance member w/ `can_view_finances` OR admin-tier; can-sign-off = finance president OR admin-tier). Single source of truth for receipt transitions + budget writes.
+- `app/home/governance.ts` — `isGovernanceAdmin`, `teamAccessLevel`.
+- `app/home/team-type.ts` — `classifyTeam`.
 
 ---
 
 ## RLS Enforcement
 
-All permissions are enforced at two layers:
-1. **UI** — components check role flags before rendering controls
-2. **Database RLS** — Supabase policies enforce the same rules server-side
+Two layers: UI flags + Supabase RLS. Central primitives (SECURITY DEFINER):
+- `auth_is_admin_or_leader()` — `true` for `admin`/`leader`/`deacon`/`elder`/`pastor`.
+- `auth_ministry_id()` — tenant isolation on every policy.
+- `auth_is_admin_or_leader()` + the `governance_settings`/`admin_access` columns back governance; `receipt_categories` writes gate on team membership; receipt/budget server actions gate via `finance-auth.ts`.
 
-The DB function `auth_is_admin_or_leader()` (SECURITY DEFINER) is the central RLS primitive. It returns `true` for roles: `admin`, `leader`, `deacon`, `elder`, `pastor`.
-
-`auth_ministry_id()` returns the current user's `ministry_id`, used to enforce tenant isolation on every policy.
+**Deferred to merge:** the hard DB enforcement triggers (max-president-count per team, governance write RLS) are intentionally NOT yet applied — the prod DB is shared with `main`, so they go in as the merge step to avoid breaking `main`'s live flows.

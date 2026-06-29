@@ -23,6 +23,8 @@ import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
+import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
+import type { GovernanceSettings } from "../types"
 import { getInitials } from "../utils"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader } from "@/components/central"
 
@@ -41,7 +43,14 @@ interface MinistryInfo {
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
-type ActiveSettingsTab = "general" | "people" | "automations" | "workspace" | "audit"
+type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "workspace" | "audit"
+
+interface GovTeamRow {
+  id: string
+  name: string
+  icon: string | null
+  admin_access: "none" | "view" | "write"
+}
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
   admin:   { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Admin"   },
@@ -93,7 +102,7 @@ export function SettingsTab({
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
     const p = new URLSearchParams(window.location.search).get("stab")
-    return (["general", "people", "automations", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
+    return (["general", "people", "governance", "automations", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
   })
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
@@ -226,17 +235,23 @@ export function SettingsTab({
   const [auditLogs, setAuditLogs] = useState<Array<{ id: string; actor_name: string; action: string; entity_type: string; entity_label: string | null; metadata: Record<string, unknown> | null; created_at: string }>>([])
   const [auditLoading, setAuditLoading] = useState(false)
 
+  // Governance
+  const [governanceSettings, setGovernanceSettings] = useState<GovernanceSettings>({ all_admins: true, roster_ids: [] })
+  const [govTeams, setGovTeams] = useState<GovTeamRow[]>([])
+  const [govError, setGovError] = useState<string | null>(null)
+
   // Loading
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses] = await Promise.all([
-        supabase.from("ministries").select("name, university, size, invite_code, staff_invite_code, is_public, automation_settings").eq("id", ministryId).maybeSingle(),
+      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }] = await Promise.all([
+        supabase.from("ministries").select("name, university, size, invite_code, staff_invite_code, is_public, automation_settings, governance_settings").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
         getHomeVerses(ministryId),
+        supabase.from("teams").select("id, name, icon, admin_access").eq("ministry_id", ministryId).order("name"),
       ])
 
       if (min) {
@@ -249,7 +264,12 @@ export function SettingsTab({
           setAutomationSettings(merged)
           setPendingAutomationSettings(merged)
         }
+        const gov = min.governance_settings as GovernanceSettings | null
+        if (gov && typeof gov.all_admins === "boolean") {
+          setGovernanceSettings({ all_admins: gov.all_admins, roster_ids: Array.isArray(gov.roster_ids) ? gov.roster_ids : [] })
+        }
       }
+      setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, icon: t.icon, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setReceiptLimits(limitsRes.data)
       setMembers(profiles ?? [])
@@ -575,6 +595,41 @@ export function SettingsTab({
     await reorderHomeVerses(ministryId, updated.map(v => v.id))
   }
 
+  // ── Governance handlers ──────────────────────────────────────────────────────
+  const adminMembers = members.filter(m => ["admin", "deacon", "elder", "pastor"].includes(m.role.toLowerCase()))
+
+  async function persistGovernance(next: GovernanceSettings, prev: GovernanceSettings) {
+    setGovError(null)
+    const { error } = await updateGovernanceSettings(next)
+    if (error) { setGovernanceSettings(prev); setGovError(error) }
+  }
+
+  function handleToggleAllAdmins() {
+    const prev = governanceSettings
+    const next = { ...prev, all_admins: !prev.all_admins }
+    setGovernanceSettings(next)
+    persistGovernance(next, prev)
+  }
+
+  function handleToggleRosterMember(memberId: string) {
+    const prev = governanceSettings
+    const inRoster = prev.roster_ids.includes(memberId)
+    const next = {
+      ...prev,
+      roster_ids: inRoster ? prev.roster_ids.filter(id => id !== memberId) : [...prev.roster_ids, memberId],
+    }
+    setGovernanceSettings(next)
+    persistGovernance(next, prev)
+  }
+
+  async function handleTeamAccessChange(teamId: string, access: "none" | "view" | "write") {
+    const prev = govTeams
+    setGovError(null)
+    setGovTeams(t => t.map(x => x.id === teamId ? { ...x, admin_access: access } : x))
+    const { error } = await updateTeamAdminAccess(teamId, access)
+    if (error) { setGovTeams(prev); setGovError(error) }
+  }
+
   const now = new Date()
   const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86_400_000)
   const todayVerseId = homeVerses.length > 0 ? homeVerses[dayOfYear % homeVerses.length]?.id : null
@@ -591,6 +646,7 @@ export function SettingsTab({
   const TABS: { key: ActiveSettingsTab; label: string }[] = [
     { key: "general", label: "General" },
     { key: "people", label: "People" },
+    ...(isAdmin ? [{ key: "governance" as ActiveSettingsTab, label: "Governance" }] : []),
     { key: "automations", label: "Automations" },
     { key: "workspace", label: "Workspace" },
     ...(isAdmin ? [{ key: "audit" as ActiveSettingsTab, label: "Audit Log" }] : []),
@@ -955,6 +1011,103 @@ export function SettingsTab({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ══════════════════ GOVERNANCE TAB ══════════════════ */}
+          {activeSettingsTab === "governance" && isAdmin && (
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+
+              {govError && (
+                <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <AlertTriangle style={{ width: 15, height: 15, color: "#F87171", flexShrink: 0 }} />
+                  <p style={{ fontSize: 13, color: "var(--body)", margin: 0 }}>{govError}</p>
+                </div>
+              )}
+
+              {/* ── Governance roster ── */}
+              <section>
+                <div style={{ marginBottom: 20 }}>
+                  <SectionHeader eyebrow="Governance" title="Who governs teams" titleSize={20} />
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Governance is oversight of teams they aren&apos;t members of — viewing or acting on a team&apos;s roster and work. Church Settings itself stays open to every admin regardless of this list.</p>
+                </div>
+
+                <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>All admins can govern teams</div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{governanceSettings.all_admins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
+                  </div>
+                </div>
+
+                {!governanceSettings.all_admins && (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Governing roster</p>
+                    <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                      {adminMembers.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No admin-tier members to choose from.</p>
+                      ) : adminMembers.map((m, i) => {
+                        const included = governanceSettings.roster_ids.includes(m.id)
+                        return (
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</div>
+                              <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
+                            </div>
+                            {roleBadge(m.role)}
+                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                              <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* ── Per-team admin access matrix ── */}
+              <section>
+                <div style={{ marginBottom: 20 }}>
+                  <SectionHeader eyebrow="Team Access" title="What governors get per team" titleSize={20} />
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>For admins who aren&apos;t on a team, this sets how much of it they can reach. Team members always keep full access.</p>
+                  <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+                    {[
+                      ["None", "Hidden from non-member admins."],
+                      ["View", "See and administer the team — roster and settings."],
+                      ["Write", "Everything in View, plus acting on the team’s work."],
+                    ].map(([k, d]) => (
+                      <p key={k} style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: 0 }}>
+                        <span style={{ fontWeight: 500, color: "var(--body)" }}>{k}</span> — {d}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  {govTeams.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No teams yet.</p>
+                  ) : govTeams.map((team, i) => (
+                    <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < govTeams.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{team.icon ?? "•"}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{team.name}</div>
+                      <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0 }}>
+                        {(["none", "view", "write"] as const).map(opt => {
+                          const active = team.admin_access === opt
+                          return (
+                            <button key={opt} onClick={() => handleTeamAccessChange(team.id, opt)} style={{ padding: "5px 14px", borderRadius: 999, border: "none", background: active ? "var(--plum)" : "transparent", color: active ? "#FBF8F2" : "var(--body)", fontSize: 12, fontWeight: active ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                              {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
 
