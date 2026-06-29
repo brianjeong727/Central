@@ -950,9 +950,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         <PageTitle
           eyebrow={`${announcements.length} total · ${announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread`}
           title="Announcements"
-        >
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>What the ministry is planning, praying for, and showing up to.</p>
-        </PageTitle>
+        />
         {/* Header right slot now holds only the Cards/Compact view toggle; the
             create CTA moved into the body toolbar row (Filter ↔ New). */}
         <div className="flex items-center gap-2 pb-1.5 ml-auto">
