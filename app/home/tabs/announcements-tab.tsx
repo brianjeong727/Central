@@ -8,7 +8,6 @@ import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
-import { useNavState } from "../nav-state"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
 
@@ -677,12 +676,9 @@ function InlineEditFields({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
-  const { setParam } = useNavState()
-  // Read ?compose= once on mount so the editor can restore on refresh/deep-link.
-  const [initialCompose] = useState(() =>
-    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("compose") : null
-  )
-  const [showCreate, setShowCreate] = useState(initialCompose === "new")
+  // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
+  // drops back to the underlying announcements list (Phase 2).
+  const [showCreate, setShowCreate] = useState(false)
   const [compact, setCompact] = useState(false)
   const [filter, setFilter] = useState<FilterType>("all")
 
@@ -691,27 +687,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
 
-  // One atomic compose-param write (Convention #5).
-  function setComposeParam(value: string | null) {
-    setParam("compose", value)
-  }
-
   function openCreate() {
     setEditingAnnouncement(null)
     setShowCreate(true)
-    setComposeParam("new")
   }
 
   function openEdit(ann: EnrichedAnnouncement) {
     setShowCreate(false)
     setEditingAnnouncement(ann)
-    setComposeParam(ann.id)
   }
 
   function closeCompose() {
     setShowCreate(false)
     setEditingAnnouncement(null)
-    setComposeParam(null)
   }
 
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
@@ -811,19 +799,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     ["announcements", ministryId, userId, isLeaderOrAdmin, userGradYear],
     loadAnnouncements
   )
-
-  // Restore the deep-linked editor once announcements load (?compose={id}).
-  const didRestoreCompose = useRef(false)
-  useEffect(() => {
-    if (didRestoreCompose.current) return
-    if (!initialCompose || initialCompose === "new") { didRestoreCompose.current = true; return }
-    if (announcements.length === 0) return
-    didRestoreCompose.current = true
-    const found = announcements.find((a) => a.id === initialCompose)
-    if (found) setEditingAnnouncement(found)
-    else setComposeParam(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [announcements, initialCompose])
 
   // True toggle: flips going state and count, optimistically updates the attendee
   // list, AND persists to the rsvps table. Used by the desktop RSVP buttons and

@@ -103,7 +103,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
   // Sub-page params that belong to a team workspace — cleared on every team switch
   // so the new team never inherits the previous team's deep-link state.
-  const TEAM_SUBPARAMS = { view: null, sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null } as const
+  const TEAM_SUBPARAMS = { sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null } as const
 
   function handleTeamChange(teamId: string) {
     setActiveTeamId(teamId)

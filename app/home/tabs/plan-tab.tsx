@@ -1855,8 +1855,6 @@ export function PlanTab({
     ?? allTeams.find(t => t.id === activeTeamId)?.name
     ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
-  const { setParam } = useNavState()
-  const replaceParam = setParam
   const supabase = createClient()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
@@ -1899,35 +1897,15 @@ export function PlanTab({
     return 3
   }
 
+  // Team settings overlay is ephemeral plain state — never in the URL. A reload
+  // while it's open drops back to the team workspace (Phase 2).
   function openSettings(team: Team) {
     setOpenTeam(team)
-    replaceParam("view", "settings")
   }
 
   function closeSettings() {
     setOpenTeam(null)
-    replaceParam("view", null)
   }
-
-  // Read the initial view param once so the auto-open effect is stable across re-renders.
-  const [initialViewParam] = useState(() =>
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null
-  )
-  const [didAutoOpen, setDidAutoOpen] = useState(false)
-
-  // Auto-open settings when page is refreshed with ?view=settings in the URL.
-  useEffect(() => {
-    if (didAutoOpen || initialViewParam !== 'settings' || !activeTeamId) return
-    const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
-      const ut = userTeams.find(t => t.teamId === activeTeamId)
-      if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency, admin_access: 'view', allow_admin_members: ut.allowAdminMembers } satisfies Team
-    })()
-    if (!team) return
-    setOpenTeam(team)
-    setDidAutoOpen(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTeams, userTeams, activeTeamId, didAutoOpen])
 
   // Reset internal component state when the user switches to a different team.
   // The sub-page URL params are cleared by home-app's handleTeamChange (one atomic
