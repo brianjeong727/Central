@@ -298,6 +298,7 @@ export interface ChatsTabProps {
   onOpenDirectory: () => void
   activeGroupId?: string | null
   canCreateChurchChat: boolean
+  fallbackChats?: ChatGroup[]
 }
 
 export interface DirectoryMember {

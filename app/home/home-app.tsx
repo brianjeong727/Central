@@ -10,7 +10,7 @@ import { BottomNav } from "@/components/ui/bottom-nav"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup } from "./types"
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
@@ -53,10 +53,23 @@ const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.Sett
 const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
 const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
 
-export function HomeApp({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
+function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const { mutate: globalMutate } = useSWRConfig()
+
+  // Reliable chat-list fetch from the MAIN bundle. ChatListPanel/ChatsTab are
+  // code-split (ssr:false) and their own useSWR for this key is unreliable on the
+  // initial mount across the chunk boundary — SWR can leave `data` undefined even
+  // when the fetcher resolves. So we DON'T use SWR here: a plain promise + useState
+  // guarantees the resolved groups reach the render. This state is passed down as
+  // fallbackChats so the panels render it directly regardless of their own hook.
+  const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(undefined)
+  const loadChatList = useCallback(() => {
+    if (!userId || !ministryId) return
+    fetchChatList(["chat-list", userId, ministryId]).then(setChatListData).catch(() => {})
+  }, [userId, ministryId])
+  useEffect(() => { loadChatList() }, [loadChatList])
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
@@ -592,6 +605,8 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
           // Drive the Messages sidebar live (order, preview, unread badges).
           refetchChatList()
+          // Also refresh the plain-fetch fallback that the panels render directly.
+          loadChatList()
           supabase
             .from("profiles")
             .select("name")
@@ -628,7 +643,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
 
     return () => { supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, refetchChatList])
+  }, [userId, refetchChatList, loadChatList])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {
@@ -775,7 +790,6 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     })
 
   return (
-    <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
     <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]">
 
       {/* Desktop sidebar — hidden on mobile */}
@@ -819,6 +833,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
             canCreateChurchChat={canCreateChurchChat}
             userProfile={initialProfile}
             userRole={initialProfile.role}
+            fallbackChats={chatListData}
           />
         }
         planContextContent={planContextContent}
@@ -904,6 +919,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                   onOpenDirectory={() => handleNavClick("directory")}
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
+                  fallbackChats={chatListData}
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
@@ -1143,6 +1159,13 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
         </div>
       )}
     </div>
+  )
+}
+
+export function HomeApp(props: HomeAppProps) {
+  return (
+    <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
+      <HomeAppInner {...props} />
     </SWRConfig>
   )
 }
