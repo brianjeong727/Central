@@ -14,7 +14,7 @@ export const TAB_PARAMS: Record<Tab, string[]> = {
   home: [],
   announcements: ["ann"],
   chats: ["chats", "chat"],
-  plan: ["team", "sotab", "ptab", "sgltab", "evtab", "fsec", "rteam", "week"],
+  plan: ["team", "sotab", "ptab", "sgltab", "evtab", "fsec", "rteam", "week", "notetab"],
   directory: ["member"],
   give: [],
   profile: ["section", "jtab"],
@@ -30,7 +30,7 @@ export const TAB_PARAMS: Record<Tab, string[]> = {
 // "sidebar-level" and persists across leave/return.
 export const TAB_FOLDED_PARAMS: Record<Tab, string[]> = {
   home: [], announcements: [], chats: [], give: [], directory: [],
-  plan: ["sotab", "ptab", "sgltab", "evtab", "week", "fsec"],
+  plan: ["sotab", "ptab", "sgltab", "evtab", "week", "fsec", "notetab"],
   profile: ["section", "jtab"],
   settings: ["stab"],
   forms: ["fresp"],
