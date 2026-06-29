@@ -1072,7 +1072,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   const [searchMatchIndex, setSearchMatchIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null)
-  const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null } | null>(null)
+  const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null } | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
@@ -1163,6 +1163,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
+
+  function replyPreviewLabel(content?: string | null, attachmentType?: string | null, attachmentName?: string | null): string {
+    if (content && content.trim()) return content
+    if (attachmentType?.startsWith("image/")) return "Photo"
+    if (attachmentType) return attachmentName || "File"
+    return ""
+  }
 
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -1271,10 +1278,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
   function handlePointerUp(msg: Message) {
     if (msg.deleted) return
     if (longPressTimer.current !== null) {
-      // Timer still pending — this is a short tap, open emoji picker
+      // Timer still pending — this is a short tap
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
-      setEmojiPickerFor((prev) => (prev === msg.id ? null : msg.id))
+      if (msg.attachment_url) {
+        // Attachment: short tap opens it (image → lightbox, file → new tab)
+        if (msg.attachment_type?.startsWith("image/")) {
+          setLightboxUrl(msg.attachment_url)
+        } else {
+          window.open(msg.attachment_url, "_blank", "noopener,noreferrer")
+        }
+      } else {
+        // Text message: short tap opens the emoji picker
+        setEmojiPickerFor((prev) => (prev === msg.id ? null : msg.id))
+      }
     }
     // If timer already fired (long press), do nothing here
   }
@@ -1358,7 +1375,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     setContextMenuFor(null)
     const msg = messages.find(m => m.id === msgId)
     setPinnedMessageId(msgId)
-    if (msg) setPinnedMessage({ id: msg.id, content: msg.content, sender_name: msg.sender_name, attachment_url: msg.attachment_url ?? null, attachment_type: msg.attachment_type ?? null })
+    if (msg) setPinnedMessage({ id: msg.id, content: msg.content, sender_name: msg.sender_name, attachment_url: msg.attachment_url ?? null, attachment_type: msg.attachment_type ?? null, attachment_name: msg.attachment_name ?? null })
     await supabase.from("groups").update({ pinned_message_id: msgId }).eq("id", groupId).eq("ministry_id", ministryId)
     // Keep the SWR group-meta cache in sync so the pinned state survives re-open.
     mutateGroupMeta((cur) => cur ? { ...cur, pinned_message_id: msgId } : cur, { revalidate: false })
@@ -1556,14 +1573,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       setPinnedMessageId(groupMeta.pinned_message_id)
       supabase
         .from("messages")
-        .select("id, content, attachment_url, attachment_type, profiles!sender_id(name)")
+        .select("id, content, attachment_url, attachment_type, attachment_name, profiles!sender_id(name)")
         .eq("id", groupMeta.pinned_message_id)
         .maybeSingle()
         .then(({ data: pmsg }) => {
           if (pmsg) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const p = Array.isArray((pmsg as any).profiles) ? (pmsg as any).profiles[0] : (pmsg as any).profiles
-            setPinnedMessage({ id: pmsg.id, content: pmsg.content, sender_name: (p as { name: string } | null)?.name ?? "Unknown", attachment_url: (pmsg as { attachment_url?: string | null }).attachment_url ?? null, attachment_type: (pmsg as { attachment_type?: string | null }).attachment_type ?? null })
+            setPinnedMessage({ id: pmsg.id, content: pmsg.content, sender_name: (p as { name: string } | null)?.name ?? "Unknown", attachment_url: (pmsg as { attachment_url?: string | null }).attachment_url ?? null, attachment_type: (pmsg as { attachment_type?: string | null }).attachment_type ?? null, attachment_name: (pmsg as { attachment_name?: string | null }).attachment_name ?? null })
           }
         })
     }
@@ -1661,7 +1678,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1688,7 +1705,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
             content: m.content, created_at: m.created_at, sender_name: name,
             sender_avatar_url: avatarUrl,
             reply_to_id: m.reply_to_id ?? null,
-            reply_to_content: replyRaw?.content ?? null,
+            reply_to_content: replyPreviewLabel(replyRaw?.content, replyRaw?.attachment_type, replyRaw?.attachment_name),
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
             message_type: m.message_type ?? "user",
             is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
@@ -1776,16 +1793,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           if (raw.reply_to_id) {
             const cached = messagesRef.current.find((m) => m.id === raw.reply_to_id)
             if (cached) {
-              replyToContent = cached.content
+              replyToContent = replyPreviewLabel(cached.content, cached.attachment_type, cached.attachment_name)
               replyToSender = cached.sender_name
             } else {
               const { data: rMsg } = await supabase
                 .from("messages")
-                .select("content, profiles!sender_id(name)")
+                .select("content, attachment_type, attachment_name, profiles!sender_id(name)")
                 .eq("id", raw.reply_to_id)
                 .single()
               if (rMsg) {
-                replyToContent = rMsg.content
+                replyToContent = replyPreviewLabel(rMsg.content, rMsg.attachment_type, rMsg.attachment_name)
                 const rp = Array.isArray(rMsg.profiles) ? rMsg.profiles[0] : rMsg.profiles
                 replyToSender = (rp as { name: string } | null)?.name ?? null
               }
@@ -1943,7 +1960,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         const optimisticMsg: Message = {
           id: optimisticId, group_id: groupId, sender_id: userId,
           content: "", created_at: new Date().toISOString(), sender_name: userName,
-          reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget?.content ?? null,
+          reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
           reply_to_sender: replyTarget?.sender_name ?? null,
           message_type: "user", attachment_url: publicUrl,
           attachment_type: pa.file.type, attachment_name: pa.file.name, attachment_size: pa.file.size,
@@ -1985,7 +2002,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
       id: optimisticId, group_id: groupId, sender_id: userId, content,
       created_at: new Date().toISOString(), sender_name: userName,
       reply_to_id: replyTarget?.id ?? null,
-      reply_to_content: replyTarget?.content ?? null,
+      reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
       reply_to_sender: replyTarget?.sender_name ?? null,
     }
     setMessages((prev) => [...prev, optimisticMsg])
@@ -2282,7 +2299,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-[var(--plum)]">{pinnedMessage.sender_name}</p>
             <p className="text-[12px] text-[var(--body)] truncate">
-              {pinnedMessage.content || (pinnedMessage.attachment_type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")}
+              {replyPreviewLabel(pinnedMessage.content, pinnedMessage.attachment_type, pinnedMessage.attachment_name)}
             </p>
           </div>
           {canPin && (
@@ -2537,11 +2554,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        {fullReactionPickerFor === msg.id && (
-                          <div className={`absolute z-[161] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`} onPointerDown={(e) => e.stopPropagation()}>
-                            <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
-                          </div>
-                        )}
+                      </div>
+                    )}
+
+                    {/* Full reaction picker — independent of entry point (emoji bar or context menu) */}
+                    {fullReactionPickerFor === msg.id && (
+                      <div
+                        className={`absolute z-[161] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
                       </div>
                     )}
 
@@ -2552,6 +2574,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                         onPointerDown={(e) => e.stopPropagation()}
                       >
                         <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
+                          {!msg.deleted && (
+                            <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[#F3EDE6]">
+                              {REACTION_EMOJIS.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => { e.stopPropagation(); handleReact(msg.id, emoji); setContextMenuFor(null) }}
+                                  className="text-[20px] hover:scale-125 active:scale-95 transition-transform"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                              <button
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setFullReactionPickerFor(msg.id) }}
+                                className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
@@ -2578,7 +2621,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                               {pinnedMessageId === msg.id ? "Unpin" : "Pin"}
                             </button>
                           )}
-                          {isOwn && !msg.deleted && (
+                          {isOwn && !msg.deleted && msg.content && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content); setEditOriginalText(msg.content) }}
@@ -2713,8 +2756,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 {msg.attachment_url && msg.attachment_type?.startsWith("image/") && (
                                   <div
                                     className={msg.reply_to_id ? "mt-2 mb-0.5" : ""}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => { e.stopPropagation(); setLightboxUrl(msg.attachment_url!) }}
                                   >
                                     <img
                                       src={msg.attachment_url}
@@ -2727,14 +2768,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
                                 {msg.attachment_url && msg.attachment_type && !msg.attachment_type.startsWith("image/") && (
                                   <div
                                     className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1 cursor-pointer"
-                                    onPointerUp={(e) => {
-                                      e.stopPropagation()
-                                      if (longPressTimer.current !== null) {
-                                        clearTimeout(longPressTimer.current)
-                                        longPressTimer.current = null
-                                        window.open(msg.attachment_url!, "_blank", "noopener,noreferrer")
-                                      }
-                                    }}
                                   >
                                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[var(--ivory)]"}`}>
                                       <FileDown className="w-4 h-4" />
@@ -2883,7 +2916,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
               {replyingTo.sender_name}
             </p>
-            <p className="text-[12px] text-[var(--muted-text)] truncate">{replyingTo.content.slice(0, 60)}</p>
+            <p className="text-[12px] text-[var(--muted-text)] truncate">{replyPreviewLabel(replyingTo.content, replyingTo.attachment_type, replyingTo.attachment_name).slice(0, 60)}</p>
           </div>
           <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
             <X className="w-4 h-4" />
@@ -3351,7 +3384,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
               )}
             </div>
             <div className="px-5 py-3 border-t border-[#F0EEF8]">
-              <p className="text-[11px] text-[var(--muted-text)] truncate">"{forwardingMsg.content.slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
+              <p className="text-[11px] text-[var(--muted-text)] truncate">"{replyPreviewLabel(forwardingMsg.content, forwardingMsg.attachment_type, forwardingMsg.attachment_name).slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
             </div>
           </div>
         </div>
