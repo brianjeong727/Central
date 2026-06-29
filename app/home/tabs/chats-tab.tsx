@@ -314,7 +314,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   )
 }
 
-export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, ministryName, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [displayGroupName, setDisplayGroupName] = useState(groupName)
@@ -340,11 +340,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
+  // The ministry-wide central chat is identified by the naming convention used in
+  // auto-chats.ts (`${ministryName} Chat`). It must never be renamed, archived, or
+  // deleted — renaming it would silently break the auto-enroll trigger.
+  const isCentralChat = isChurch && groupName === `${ministryName} Chat`
   const canManage = (isChurch && isAdminOrLeader) || isMy
   const canLeave = isMy || isDM
-  const canArchive = isChurch && isAdminOrLeader && !groupArchived
+  const canArchive = isChurch && isAdminOrLeader && !groupArchived && !isCentralChat
   const canUnarchive = isChurch && isAdminOrLeader && groupArchived
-  const canDelete = isChurch && isAdminOrLeader
+  const canDelete = isChurch && isAdminOrLeader && !isCentralChat
 
   // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
   // local state is populated via the effect below so re-opening a chat paints from cache.
@@ -406,6 +410,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleRename() {
+    if (isCentralChat) { setRenaming(false); return }
     const trimmed = newName.trim()
     if (!trimmed || trimmed === displayGroupName) { setRenaming(false); return }
     setSaving(true)
@@ -677,11 +682,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           ) : (
             <div
               className="group flex items-center gap-2"
-              style={{ cursor: canManage ? "text" : "default" }}
-              onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
+              style={{ cursor: canManage && !isCentralChat ? "text" : "default" }}
+              onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
             >
               <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", lineHeight: 1.05, fontWeight: 400 }}>{displayGroupName}</h2>
-              {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 4 }} />}
+              {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 4 }} />}
             </div>
           )}
           <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
@@ -841,6 +846,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
             {/* Danger */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {isCentralChat && (
+                <p className="text-[12px] text-[var(--muted-text)]" style={{ lineHeight: 1.5, margin: 0 }}>
+                  Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.
+                </p>
+              )}
               {canArchive && (
                 <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "var(--body)", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer" }}>
                   Archive chat
@@ -907,11 +917,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 ) : (
                   <div
                     className="group flex items-center gap-1.5"
-                    style={{ cursor: canManage ? "text" : "default" }}
-                    onClick={canManage ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
+                    style={{ cursor: canManage && !isCentralChat ? "text" : "default" }}
+                    onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
                   >
                     <h3 className="text-[16px] font-bold text-[var(--ink)] tracking-tight">{displayGroupName}</h3>
-                    {canManage && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
+                    {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
                   </div>
                 )}
                 <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length + pendingAddMembers.length - pendingRemoveIds.size} member{members.length + pendingAddMembers.length - pendingRemoveIds.size !== 1 ? "s" : ""}</p>
@@ -997,6 +1007,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </div>
             </div>
           )}
+          {isCentralChat && (
+            <div className="px-5 pb-10">
+              <p className="text-[12px] text-[var(--muted-text)]" style={{ lineHeight: 1.5, margin: 0 }}>
+                Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.
+              </p>
+            </div>
+          )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="px-5 pb-10 flex flex-col gap-3">
               {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Archive chat</button>}
@@ -1031,7 +1048,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
 }
 
-export function ChatScreen({ groupId, groupName, userId, userName, ministryId, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -3401,6 +3418,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, u
         userId={userId}
         userName={userName}
         ministryId={ministryId}
+        ministryName={ministryName}
         userRole={userRole}
         onBack={() => setShowSettings(false)}
         onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}

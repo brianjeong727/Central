@@ -739,6 +739,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
                     userId={userId}
                     userName={initialProfile.name}
                     ministryId={ministryId}
+                    ministryName={ministryName}
                     userRole={initialProfile.role}
                     onClose={handleChatClose}
                     onRead={recountTotalUnread}
@@ -901,6 +902,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
           userId={userId}
           userName={initialProfile.name}
           ministryId={ministryId}
+          ministryName={ministryName}
           userRole={initialProfile.role}
           onClose={handleChatClose}
           onRead={recountTotalUnread}

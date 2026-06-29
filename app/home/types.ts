@@ -264,6 +264,7 @@ export interface ChatSettingsProps {
   userId: string
   userName: string
   ministryId: string
+  ministryName: string
   userRole: string
   onBack: () => void
   onNameChange: (name: string) => void
@@ -277,6 +278,7 @@ export interface ChatScreenProps {
   userId: string
   userName: string
   ministryId: string
+  ministryName: string
   userRole: string
   onClose: () => void
   onRead?: () => void
