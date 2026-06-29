@@ -94,6 +94,21 @@ export default async function HomePage() {
     }]
   })
 
+  // Member counts for the user's teams, so the workspace picker shows "N members"
+  // on first paint (the client loadUserTeams refetch is skip-guarded on mount).
+  const userTeamIds = initialUserTeams.map((t) => t.teamId)
+  if (userTeamIds.length > 0) {
+    const { data: memberRows } = await supabase
+      .from("team_members")
+      .select("team_id")
+      .in("team_id", userTeamIds)
+    const counts: Record<string, number> = {}
+    for (const row of (memberRows ?? []) as { team_id: string }[]) {
+      counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+    }
+    for (const ut of initialUserTeams) ut.memberCount = counts[ut.teamId] ?? 0
+  }
+
   // Active question + whether this user already responded (sequential — depends on question)
   // Global governance roster — defaults to "all admins govern" when unset.
   const rawGov = (ministryResult.data as { governance_settings?: unknown } | null)?.governance_settings as

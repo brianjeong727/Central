@@ -2123,7 +2123,7 @@ export function PlanTab({
               <div style={{ width: "100%", maxWidth: 760 }}>
                 {/* Header */}
                 <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px", textAlign: "center" }}>
-                  PLANNING · {ministryName.toUpperCase()}
+                  WORKSPACE · {ministryName.toUpperCase()}
                 </p>
                 <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
                   Which workspace are you entering?
