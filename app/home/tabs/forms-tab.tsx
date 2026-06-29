@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Check, ChevronDown, ChevronRight, FileText, X } from "lucide-react"
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -349,123 +349,149 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
     return { field: f, counts, textAnswers, maxCount: Math.max(...Object.values(counts), 1) }
   })
 
+  const SUBTABS = [
+    { key: 'responses', label: 'Responses' },
+    { key: 'summary', label: 'Summary' },
+  ] as const
+
+  const backBtnStyle: React.CSSProperties = {
+    width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)",
+    background: "transparent", display: "flex", alignItems: "center",
+    justifyContent: "center", cursor: "pointer", flexShrink: 0,
+  }
+
   return (
-    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-      <div className="flex-shrink-0 border-b border-[var(--line)]">
-        <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-5 md:px-10">
-          <div>
-            <p style={MONO_STYLE}>Responses · {loading ? '…' : respondents.length}</p>
-            <p className="text-[15px] font-semibold text-[var(--ink)] mt-0.5 line-clamp-1">{announcementTitle}</p>
-          </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-            <X className="w-3.5 h-3.5 text-[var(--body)]" />
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 20, paddingLeft: 20, paddingRight: 20 }} className="md:!px-10">
-          {(['responses', 'summary'] as const).map(t => (
-            <button key={t} onClick={() => setSubTab(t)} style={{
-              padding: '8px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              background: 'transparent', border: 'none',
-              borderBottom: subTab === t ? '2px solid var(--plum)' : '2px solid transparent',
-              color: subTab === t ? 'var(--ink)' : 'var(--muted-text)', transition: 'all 0.15s',
-              textTransform: 'capitalize',
-            }}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
-        </div>
+    <>
+      {/* Mobile header — compact, with back */}
+      <div className="md:hidden px-5 pt-14 pb-3">
+        <button
+          onClick={onClose}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--body)', fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 10 }}
+        >
+          <ChevronLeft className="w-4 h-4" /> Back
+        </button>
+        <p style={MONO_STYLE}>Responses · {loading ? '…' : respondents.length}</p>
+        <h1 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "8px 0 0" }}>
+          {announcementTitle}
+        </h1>
       </div>
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center"><Spinner /></div>
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          {subTab === 'responses' ? (
-            <div className="max-w-[640px] mx-auto px-5 md:px-10 py-6">
-              {respondents.length === 0 ? (
-                <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {respondents.map(resp => {
-                    const isExpanded = expandedUserId === resp.userId
-                    return (
-                      <div key={resp.userId} style={{ border: '1px solid var(--line)', borderRadius: 12, background: '#FBF8F2', overflow: 'hidden' }}>
-                        <button
-                          onClick={() => setExpandedUserId(isExpanded ? null : resp.userId)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-                          }}
-                        >
-                          <div>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', margin: 0 }}>{resp.userName}</p>
-                            <p style={{ fontSize: 11, color: 'var(--muted-text)', margin: '2px 0 0' }}>{new Date(resp.submittedAt).toLocaleDateString()}</p>
-                          </div>
-                          <ChevronDown style={{ width: 16, height: 16, color: 'var(--muted-text)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
-                        </button>
-                        {isExpanded && (
-                          <div style={{ borderTop: '1px solid #EFEAE0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {fields.map(f => {
-                              const ans = resp.answers.find(a => a.field_id === f.id)
-                              const display = f.type === 'checkbox'
-                                ? (ans?.values ?? []).join(', ') || '—'
-                                : ans?.value || '—'
-                              return (
-                                <div key={f.id}>
-                                  <p style={{ fontSize: 10, color: 'var(--muted-text)', marginBottom: 3, letterSpacing: '0.8px', textTransform: 'uppercase' }}>{f.label}</p>
-                                  <p style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>{display}</p>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="max-w-[640px] mx-auto px-5 md:px-10 py-6" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-              {respondents.length === 0 ? (
-                <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
-              ) : summaryByField.map(({ field, counts, textAnswers, maxCount }) => (
-                <div key={field.id}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>
-                  {field.type === 'text' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {textAnswers.length === 0 ? (
-                        <p style={{ fontSize: 13, color: 'var(--muted-text)' }}>No text responses</p>
-                      ) : textAnswers.map((ans, i) => (
-                        <div key={i} style={{ padding: '8px 12px', background: '#F4F1E8', borderRadius: 8, fontSize: 13, color: 'var(--body)', lineHeight: 1.5 }}>{ans}</div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {field.options.map(opt => {
-                        const count = counts[opt] ?? 0
-                        const pct = respondents.length > 0 ? (count / respondents.length) * 100 : 0
-                        return (
-                          <div key={opt}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                              <span style={{ fontSize: 13, color: 'var(--ink)' }}>{opt}</span>
-                              <span style={{ fontSize: 12, color: 'var(--muted-text)', fontWeight: 500 }}>{count} / {respondents.length}</span>
-                            </div>
-                            <div style={{ height: 8, borderRadius: 999, background: '#EFEAE0', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--plum)', borderRadius: 999, transition: 'width 0.4s ease' }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Desktop header — own header with back affordance + form title */}
+      <TabPageHeader>
+        <button onClick={onClose} aria-label="Back to forms" style={backBtnStyle}>
+          <ChevronLeft className="w-4 h-4 text-[var(--body)]" />
+        </button>
+        <div style={{ marginLeft: 14, minWidth: 0 }}>
+          <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={announcementTitle} compact />
         </div>
-      )}
-    </AnimateIn>
+      </TabPageHeader>
+
+      {/* Subtabs — desktop (root sibling, outside the padded content wrapper) */}
+      <div className="hidden md:block">
+        <PlanSubTabStrip
+          tabs={SUBTABS}
+          active={subTab}
+          onChange={k => setSubTab(k as 'responses' | 'summary')}
+        />
+      </div>
+
+      <div className="md:flex-1 md:overflow-y-auto">
+        {/* Subtabs — mobile (inside the content wrapper; no md:pl-14 applies) */}
+        <div className="md:hidden px-5 pt-1">
+          <PlanSubTabStrip
+            tabs={SUBTABS}
+            active={subTab}
+            onChange={k => setSubTab(k as 'responses' | 'summary')}
+          />
+        </div>
+
+        {loading ? (
+          <div className="px-5 md:px-14 py-6 flex items-center justify-center"><Spinner /></div>
+        ) : subTab === 'responses' ? (
+          <div className="px-5 md:px-14 py-6">
+            {respondents.length === 0 ? (
+              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {respondents.map(resp => {
+                  const isExpanded = expandedUserId === resp.userId
+                  return (
+                    <div key={resp.userId} style={{ border: '1px solid var(--line)', borderRadius: 12, background: 'var(--cream)', overflow: 'hidden' }}>
+                      <button
+                        onClick={() => setExpandedUserId(isExpanded ? null : resp.userId)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+                        }}
+                      >
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', margin: 0 }}>{resp.userName}</p>
+                          <p style={{ fontSize: 11, color: 'var(--muted-text)', margin: '2px 0 0' }}>{new Date(resp.submittedAt).toLocaleDateString()}</p>
+                        </div>
+                        <ChevronDown style={{ width: 16, height: 16, color: 'var(--muted-text)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                      </button>
+                      {isExpanded && (
+                        <div style={{ borderTop: '1px solid var(--line)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {fields.map(f => {
+                            const ans = resp.answers.find(a => a.field_id === f.id)
+                            const display = f.type === 'checkbox'
+                              ? (ans?.values ?? []).join(', ') || '—'
+                              : ans?.value || '—'
+                            return (
+                              <div key={f.id}>
+                                <p style={{ fontSize: 10, color: 'var(--muted-text)', marginBottom: 3, letterSpacing: '0.8px', textTransform: 'uppercase' }}>{f.label}</p>
+                                <p style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>{display}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-5 md:px-14 py-6" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {respondents.length === 0 ? (
+              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
+            ) : summaryByField.map(({ field, counts, textAnswers, maxCount }) => (
+              <div key={field.id}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>
+                {field.type === 'text' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {textAnswers.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--muted-text)' }}>No text responses</p>
+                    ) : textAnswers.map((ans, i) => (
+                      <div key={i} style={{ padding: '8px 12px', background: 'var(--body-bg)', borderRadius: 8, fontSize: 13, color: 'var(--body)', lineHeight: 1.5 }}>{ans}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {field.options.map(opt => {
+                      const count = counts[opt] ?? 0
+                      const pct = respondents.length > 0 ? (count / respondents.length) * 100 : 0
+                      return (
+                        <div key={opt}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                            <span style={{ fontSize: 13, color: 'var(--ink)' }}>{opt}</span>
+                            <span style={{ fontSize: 12, color: 'var(--muted-text)', fontWeight: 500 }}>{count} / {respondents.length}</span>
+                          </div>
+                          <div style={{ height: 8, borderRadius: 999, background: 'var(--line)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: 'var(--plum)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -543,53 +569,57 @@ export function FormsTab({ ministryId }: FormsTabProps) {
 
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header — compact */}
-      <div className="md:hidden px-5 pt-14 pb-5">
-        <p style={MONO_STYLE}>Forms</p>
-        <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
-      </div>
-
-      <TabPageHeader>
-        <PageTitle title="Forms" compact />
-      </TabPageHeader>
-
-      <div className="md:flex-1 md:overflow-y-auto">
-        {loading ? (
-          <div className="px-5 md:px-14"><Spinner /></div>
-        ) : items.length === 0 ? (
-          <div className="px-5 md:px-14">
-            <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Forms you attach to announcements will show here with their responses." />
-          </div>
-        ) : (
-          <div className="px-5 md:px-14 py-6 flex flex-col gap-3">
-            {items.map(item => (
-              <button
-                key={item.id}
-                onClick={() => openResponses(item.form_id, item.title)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, width: '100%', textAlign: 'left',
-                  border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', cursor: 'pointer',
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
-                  <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 6 }}>
-                    {item.response_count} response{item.response_count !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <ChevronRight style={{ width: 18, height: 18, color: 'var(--muted-text)', flexShrink: 0 }} />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {responsesState && (
+      {responsesState ? (
+        /* ── DETAIL: responses fill the content body (navigate-to, not overlay) ── */
         <FormResponsesView
           formId={responsesState.formId}
           announcementTitle={responsesState.title}
           onClose={closeResponses}
         />
+      ) : (
+        /* ── LIST ── */
+        <>
+          {/* Mobile header — compact */}
+          <div className="md:hidden px-5 pt-14 pb-5">
+            <p style={MONO_STYLE}>Forms</p>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
+          </div>
+
+          <TabPageHeader>
+            <PageTitle title="Forms" compact />
+          </TabPageHeader>
+
+          <div className="md:flex-1 md:overflow-y-auto">
+            {loading ? (
+              <div className="px-5 md:px-14"><Spinner /></div>
+            ) : items.length === 0 ? (
+              <div className="px-5 md:px-14">
+                <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Forms you attach to announcements will show here with their responses." />
+              </div>
+            ) : (
+              <div className="px-5 md:px-14 py-6 flex flex-col gap-3">
+                {items.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => openResponses(item.form_id, item.title)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, width: '100%', textAlign: 'left',
+                      border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
+                      <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 6 }}>
+                        {item.response_count} response{item.response_count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <ChevronRight style={{ width: 18, height: 18, color: 'var(--muted-text)', flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   )
