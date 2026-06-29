@@ -1350,9 +1350,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   async function handleDeleteMessage(msgId: string) {
     setDeletingId(null)
     setContextMenuFor(null)
-    setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "" } : m))
+    setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
-    await supabase.from("messages").delete().eq("id", msgId).eq("sender_id", userId)
+    await supabase.from("messages").update({ deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null }).eq("id", msgId).eq("sender_id", userId)
+    await supabase.from("message_reactions").delete().eq("message_id", msgId)
   }
 
   async function handleDeletePoll(msgId: string, pollId: string) {
@@ -1722,7 +1723,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))")
+        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))")
         .eq("group_id", groupId)
         .order("created_at", { ascending: true })
         .limit(50)
@@ -1753,6 +1754,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
             message_type: m.message_type ?? "user",
             is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
+            deleted: (m as { deleted?: boolean }).deleted ?? false,
             attachment_url: (m as { attachment_url?: string | null }).attachment_url ?? null,
             attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
             attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
@@ -1878,6 +1880,22 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             .eq("group_id", groupId)
             .eq("user_id", userId)
             .then()
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
+        (payload) => {
+          const next = payload.new as { id: string; deleted?: boolean; content?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; is_edited?: boolean; edited_at?: string | null }
+          setMessages((prev) => prev.map((m) => m.id === next.id
+            ? { ...m, deleted: next.deleted ?? m.deleted, content: next.content ?? m.content,
+                attachment_url: next.attachment_url ?? null, attachment_type: next.attachment_type ?? null,
+                attachment_name: next.attachment_name ?? null, attachment_size: next.attachment_size ?? null,
+                is_edited: next.is_edited ?? m.is_edited, edited_at: next.edited_at ?? m.edited_at }
+            : m))
+          if (next.deleted) {
+            setReactions((prev) => { const r = { ...prev }; delete r[next.id]; return r })
+          }
         }
       )
       .subscribe()
@@ -2677,7 +2695,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                               Edit
                             </button>
                           )}
-                          {isOwn && (
+                          {isOwn && !msg.deleted && (
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setDeletingId(msg.id) }}
