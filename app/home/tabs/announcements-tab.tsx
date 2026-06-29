@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useSWR from "swr"
-import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
+import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye, SlidersHorizontal } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
@@ -35,6 +35,119 @@ const AUDIENCE_OPTIONS = [
 ]
 
 type FilterType = "all" | "events" | "forms" | "pinned"
+
+const FILTERS: { id: FilterType; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "events", label: "Events" },
+  { id: "forms", label: "Forms" },
+  { id: "pinned", label: "Pinned" },
+]
+
+// ── Filter dropdown (desktop toolbar) ─────────────────────────────────────────
+// Single trigger that surfaces the active filter label; opens an anchored
+// popover of the four categories. Dismisses on outside-click + Escape. Subtle
+// top-left-origin scale/opacity entrance per emil-design-eng.
+function FilterDropdown({ filter, onSelect }: { filter: FilterType; onSelect: (id: FilterType) => void }) {
+  const [open, setOpen] = useState(false)
+  const [shown, setShown] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const activeLabel = FILTERS.find((f) => f.id === filter)?.label ?? "All"
+
+  useEffect(() => {
+    if (!open) { setShown(false); return }
+    const raf = requestAnimationFrame(() => setShown(true))
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("keydown", onKey)
+    document.addEventListener("mousedown", onDown)
+    return () => {
+      cancelAnimationFrame(raf)
+      document.removeEventListener("keydown", onKey)
+      document.removeEventListener("mousedown", onDown)
+    }
+  }, [open])
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-2"
+        style={{
+          padding: "7px 12px",
+          borderRadius: "var(--r-input)",
+          fontSize: 12,
+          fontWeight: 500,
+          border: "1px solid var(--line)",
+          background: open ? "var(--cream-2)" : "transparent",
+          color: "var(--ink)",
+          cursor: "pointer",
+          transition: "background var(--dur-fast) var(--ease-out)",
+        }}
+      >
+        <SlidersHorizontal style={{ width: 14, height: 14, color: "var(--body)" }} />
+        <span>{activeLabel}</span>
+        <ChevronDown
+          style={{
+            width: 14, height: 14, color: "var(--body)",
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform var(--dur-fast) var(--ease-out)",
+          }}
+        />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 20,
+            minWidth: 168,
+            background: "var(--cream)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r-card)",
+            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
+            padding: 4,
+            transformOrigin: "top left",
+            transform: shown ? "scale(1)" : "scale(0.96)",
+            opacity: shown ? 1 : 0,
+            transition: "opacity 160ms var(--ease-out), transform 160ms var(--ease-out)",
+          }}
+        >
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={filter === f.id}
+              onClick={() => { onSelect(f.id); setOpen(false) }}
+              className="w-full flex items-center justify-between gap-6 text-left hover:bg-[var(--cream-2)]"
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--r-pill)",
+                fontSize: 13,
+                fontWeight: filter === f.id ? 500 : 400,
+                color: "var(--ink)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                transition: "background var(--dur-fast) var(--ease-out)",
+              }}
+            >
+              <span>{f.label}</span>
+              {filter === f.id && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -907,13 +1020,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         ? [...(pinnedAnn?.has_form ? [pinnedAnn] : []), ...desktopList.filter(a => a.has_form)]
         : desktopList.filter(a => a.is_sub_pinned) // "pinned" chip = For You items; hero already shows the pinned one
 
-  const FILTERS: { id: FilterType; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "events", label: "Events" },
-    { id: "forms", label: "Forms" },
-    { id: "pinned", label: "Pinned" },
-  ]
-
   // Body swap: compose page replaces the list (DirectoryTab pattern) — no overlay.
   if (showCreate || editingAnnouncement) {
     return (
@@ -953,16 +1059,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         >
           <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 560 }}>What the ministry is planning, praying for, and showing up to.</p>
         </PageTitle>
-        {/* Zone C (DESIGN_SYSTEM §3.2): the create primary is rightmost; list-level
-            helpers (the Cards/Compact view toggle) sit to its left. */}
+        {/* Header right slot now holds only the Cards/Compact view toggle; the
+            create CTA moved into the body toolbar row (Filter ↔ New). */}
         <div className="flex items-center gap-2 pb-1.5 ml-auto">
           <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
             <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
             <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
           </div>
-          {isLeaderOrAdmin && (
-            <HeaderActionButton label="New announcement" onClick={openCreate} />
-          )}
         </div>
       </TabPageHeader>
 
@@ -999,11 +1102,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
           {/* Desktop layout */}
           <div className="hidden md:block px-14 py-7">
-            {/* Filter chips */}
-            <div className="flex gap-2 mb-6">
-              {FILTERS.map((f) => (
-                <button key={f.id} onClick={() => setFilter(f.id)} style={{ padding: "7px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 500, border: filter === f.id ? "1px solid var(--ink)" : "1px solid var(--line)", background: filter === f.id ? "var(--ink)" : "transparent", color: filter === f.id ? "var(--cream)" : "var(--ink)", cursor: "pointer" }}>{f.label}</button>
-              ))}
+            {/* Toolbar row: filter dropdown (left) · create CTA (right) */}
+            <div className="flex items-center justify-between mb-6">
+              <FilterDropdown filter={filter} onSelect={setFilter} />
+              {isLeaderOrAdmin && (
+                <HeaderActionButton label="New announcement" onClick={openCreate} />
+              )}
             </div>
 
             {/* Pinned hero strip — UpNextCard emphasis treatment */}
