@@ -2159,11 +2159,13 @@ export function PlanTab({
                             />
                           )
                         })}
-                        {/* Receipts — a shared surface, not a team (no member count) */}
+                        {/* Receipts — a shared surface across your teams (not a team itself),
+                            so its subtitle counts the teams you can file receipts for. */}
                         <WsTile
                           initials="RE"
                           badge={<WsBadge tone="member" label="Member" />}
                           name="Receipts"
+                          sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
                           onClick={() => onTeamSelect?.("receipts")}
                         />
                         {isAdmin && <WsAddTile onClick={() => setShowCreateTeam(true)} />}
