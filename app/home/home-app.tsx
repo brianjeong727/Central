@@ -14,7 +14,7 @@ import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, 
 import { formatRelativeTime, getInitials } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
-import { useNavState } from "./nav-state"
+import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
 import { fetchChatList } from "./chat-list"
 
 // Components
@@ -123,7 +123,7 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
     // One atomic replace (Convention #5): set the new team AND clear all of the
     // previous team's sub-params in a single URL update. PlanTab no longer owns
     // this clear (its teamSwitchRef effect only does non-URL bookkeeping now).
-    setParams({ team: teamId, ...TEAM_SUBPARAMS })
+    setParams({ tab: "plan", team: teamId, ...TEAM_SUBPARAMS })
   }
 
   // Team selected WITHIN the Receipts workspace (sentinel activeTeamId === "receipts").
@@ -134,17 +134,18 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
   function handleReceiptsTeamChange(teamId: string) {
     setActiveReceiptsTeamId(teamId)
     // One atomic replace (Convention #5) via the shared nav-state module.
-    setParam("rteam", teamId)
+    // Assert the owning tab so a mount-fired write can't clobber ?tab (race fix).
+    setParams({ tab: "plan", rteam: teamId })
   }
 
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
     setProfileSection(section)
-    replaceParam("section", section === "spiritual-profile" ? null : section)
+    setParams({ tab: "profile", section: section === "spiritual-profile" ? null : section })
   }
 
   function handleMemberSelect(memberId: string | null) {
     setActiveMemberId(memberId)
-    replaceParam("member", memberId)
+    setParams({ tab: "directory", member: memberId })
   }
 
   function handleDirectoryMemberSelect(member: DirectoryMember) {
@@ -714,10 +715,14 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       // overlay can sit over any tab.
       clearTabParams(tab, { tab, ann: null })
     } else {
-      // SWITCH: leave other tabs' params untouched — only ?tab changes (+ clear the
-      // transient ?ann overlay). ?chat is PRESERVED so the chats tab resumes its
-      // open conversation; we re-derive the overlay only when entering chats and
-      // null it otherwise (so the fullscreen overlay never leaks over another tab).
+      // SWITCH: SIDEBAR-LEVEL params (plan's team/rteam, chats' chats/chat,
+      // directory's member) are PRESERVED so each tab resumes its last
+      // workspace/member; FOLDED-IN params (deep subtabs, settings sub-pages,
+      // drill-in detail) are CLEARED so returning lands on the section default.
+      // ?ann (transient detail overlay) is also cleared. One atomic replace.
+      // ?chat is PRESERVED so the chats tab resumes its open conversation; we
+      // re-derive the overlay only when entering chats and null it otherwise (so
+      // the fullscreen overlay never leaks over another tab).
       setActiveTabState(tab)
       if (tab === "chats") {
         const chatId = new URLSearchParams(window.location.search).get("chat")
@@ -725,7 +730,17 @@ export function HomeApp({ userId, initialProfile, ministryId, ministryName, init
       } else {
         setGlobalOpenChat(null)
       }
-      setParams({ tab, ann: null })
+      // Reset folded-in SHELL-OWNED transients (these live in React state and
+      // survive tab switches, so clearing the URL param alone won't reset them).
+      // Sidebar-level shell state (activeTeamId, activeReceiptsTeamId,
+      // activeMemberId, selectedDirectoryMember) is intentionally left untouched.
+      setProfileSection("spiritual-profile")
+      setStudentOrgPlanningEvent(null)
+      setStudentOrgSection("Events")
+      setSglSection("bible_study")
+      setFinanceTeamSection("reimbursements")
+      setCongregationView("list")
+      setParams({ tab, ann: null, ...Object.fromEntries(ALL_FOLDED_PARAMS.map((p) => [p, null])) })
     }
   }
 

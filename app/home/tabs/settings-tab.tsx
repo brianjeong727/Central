@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -27,6 +26,7 @@ import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/g
 import type { GovernanceSettings } from "../types"
 import { getInitials } from "../utils"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader } from "@/components/central"
+import { useNavState } from "../nav-state"
 
 interface MemberRow {
   id: string
@@ -96,7 +96,7 @@ export function SettingsTab({
   userName: string
 }) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
@@ -106,9 +106,7 @@ export function SettingsTab({
   })
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
-    const params = new URLSearchParams(window.location.search)
-    params.set("stab", t)
-    router.replace(`?${params.toString()}`, { scroll: false })
+    setParam("stab", t === "general" ? null : t)
   }
 
   // People tab state
