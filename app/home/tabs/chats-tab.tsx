@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -13,6 +12,7 @@ import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared
 import { MonogramChip } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
+import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 
 // emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
@@ -3443,7 +3443,7 @@ async function fetchChatList([, userId, ministryId]: [string, string, string]): 
 }
 
 export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
-  const router = useRouter()
+  const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
@@ -3552,9 +3552,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             onClick={() => {
               setSubTab(t)
               setSearch("")
-              const sp = new URLSearchParams(window.location.search)
-              sp.set("chats", t)
-              router.replace(`?${sp.toString()}`, { scroll: false })
+              setParam("chats", t === "church" ? null : t)
             }}
             style={{
               flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 600,
@@ -3596,9 +3594,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             onClick={() => {
               setSubTab(t)
               setSearch("")
-              const sp = new URLSearchParams(window.location.search)
-              sp.set("chats", t)
-              router.replace(`?${sp.toString()}`, { scroll: false })
+              setParam("chats", t === "church" ? null : t)
             }}
             className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
               subTab === t
@@ -3809,7 +3805,7 @@ export interface ChatListPanelProps {
 }
 
 export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole }: ChatListPanelProps) {
-  const router = useRouter()
+  const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
@@ -3899,9 +3895,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
               onClick={() => {
                 setSubTab(t)
                 setSearch("")
-                const sp = new URLSearchParams(window.location.search)
-                sp.set("chats", t)
-                router.replace(`?${sp.toString()}`, { scroll: false })
+                setParam("chats", t === "church" ? null : t)
               }}
               style={{
                 flex: 1,
