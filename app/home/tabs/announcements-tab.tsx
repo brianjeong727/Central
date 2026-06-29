@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useSWR from "swr"
-import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye, SlidersHorizontal } from "lucide-react"
+import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -42,112 +42,6 @@ const FILTERS: { id: FilterType; label: string }[] = [
   { id: "forms", label: "Forms" },
   { id: "pinned", label: "Pinned" },
 ]
-
-// ── Filter dropdown (desktop toolbar) ─────────────────────────────────────────
-// Single trigger that surfaces the active filter label; opens an anchored
-// popover of the four categories. Dismisses on outside-click + Escape. Subtle
-// top-left-origin scale/opacity entrance per emil-design-eng.
-function FilterDropdown({ filter, onSelect }: { filter: FilterType; onSelect: (id: FilterType) => void }) {
-  const [open, setOpen] = useState(false)
-  const [shown, setShown] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const activeLabel = FILTERS.find((f) => f.id === filter)?.label ?? "All"
-
-  useEffect(() => {
-    if (!open) { setShown(false); return }
-    const raf = requestAnimationFrame(() => setShown(true))
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
-    const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("keydown", onKey)
-    document.addEventListener("mousedown", onDown)
-    return () => {
-      cancelAnimationFrame(raf)
-      document.removeEventListener("keydown", onKey)
-      document.removeEventListener("mousedown", onDown)
-    }
-  }, [open])
-
-  return (
-    <div className="relative" ref={wrapRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex items-center gap-2"
-        style={{
-          padding: "7px 12px",
-          borderRadius: "var(--r-input)",
-          fontSize: 12,
-          fontWeight: 500,
-          border: "1px solid var(--line)",
-          background: open ? "var(--cream-2)" : "transparent",
-          color: "var(--ink)",
-          cursor: "pointer",
-          transition: "background var(--dur-fast) var(--ease-out)",
-        }}
-      >
-        <SlidersHorizontal style={{ width: 14, height: 14, color: "var(--body)" }} />
-        <span>{activeLabel}</span>
-        <ChevronDown
-          style={{
-            width: 14, height: 14, color: "var(--body)",
-            transform: open ? "rotate(180deg)" : "none",
-            transition: "transform var(--dur-fast) var(--ease-out)",
-          }}
-        />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 20,
-            minWidth: 168,
-            background: "var(--cream)",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--r-card)",
-            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
-            padding: 4,
-            transformOrigin: "top left",
-            transform: shown ? "scale(1)" : "scale(0.96)",
-            opacity: shown ? 1 : 0,
-            transition: "opacity 160ms var(--ease-out), transform 160ms var(--ease-out)",
-          }}
-        >
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={filter === f.id}
-              onClick={() => { onSelect(f.id); setOpen(false) }}
-              className="w-full flex items-center justify-between gap-6 text-left hover:bg-[var(--cream-2)]"
-              style={{
-                padding: "8px 12px",
-                borderRadius: "var(--r-pill)",
-                fontSize: 13,
-                fontWeight: filter === f.id ? 500 : 400,
-                color: "var(--ink)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                transition: "background var(--dur-fast) var(--ease-out)",
-              }}
-            >
-              <span>{f.label}</span>
-              {filter === f.id && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -1104,7 +998,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           <div className="hidden md:block px-14 py-7">
             {/* Toolbar row: filter dropdown (left) · create CTA (right) */}
             <div className="flex items-center justify-between mb-6">
-              <FilterDropdown filter={filter} onSelect={setFilter} />
+              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
               {isLeaderOrAdmin && (
                 <HeaderActionButton label="New announcement" onClick={openCreate} />
               )}
