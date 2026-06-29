@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState, HeaderActionButton } from "../components/shared"
@@ -51,32 +51,27 @@ const inputStyle: React.CSSProperties = {
 
 export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
 
-  // ── View + selection state, lazy-init from URL (Convention #12) ──
+  // ── View + selection state ──
+  // Only the detail/responses view is URL-synced (?cq=<id>) so it survives reload
+  // (Convention #12). The create view is ephemeral plain state — a reload mid-create
+  // drops back to the list (Phase 2). Absence of ?cq → list, never create.
   const [view, setViewState] = useState<View>(() => {
     if (typeof window === "undefined") return "list"
-    const p = new URLSearchParams(window.location.search)
-    if (p.get("cq")) return "detail"
-    if (p.get("cnew")) return "create"
-    return "list"
+    return new URLSearchParams(window.location.search).get("cq") ? "detail" : "list"
   })
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null
     return new URLSearchParams(window.location.search).get("cq")
   })
 
-  // Single atomic URL replace (Convention #5) — both params resolved at once.
+  // detail writes ?cq (read view, persists); list + create clear it (create adds no param).
   function goTo(v: View, questionId: string | null = null) {
     setViewState(v)
-    setSelectedQuestionId(questionId)
+    setSelectedQuestionId(v === "detail" ? questionId : null)
     onViewChange?.(v)
-    const params = new URLSearchParams(window.location.search)
-    params.delete("cq")
-    params.delete("cnew")
-    if (v === "detail" && questionId) params.set("cq", questionId)
-    else if (v === "create") params.set("cnew", "1")
-    router.replace(`/home?${params.toString()}`, { scroll: false })
+    setParam("cq", v === "detail" && questionId ? questionId : null)
   }
 
   // Propagate the URL-derived initial view to the shell breadcrumb on mount.

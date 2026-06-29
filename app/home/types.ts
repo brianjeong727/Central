@@ -204,7 +204,7 @@ export interface HomeTabProps {
   recentChats: ChatPreview[]
   onSeeChats: () => void
   onSeeAnnouncements: () => void
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
   avatarUrl?: string | null
@@ -290,7 +290,7 @@ export interface ChatsTabProps {
   userRole: string
   ministryId: string
   ministryName: string
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
   onOpenDirectory: () => void
@@ -498,7 +498,7 @@ export interface PlanTabProps {
   onShowCreateTeam: (v: boolean) => void
   activeTeamId: string | null
   onTeamCreated: (teamId: string) => void
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
   // Called when user clicks a team card in the picker (no-team-selected state)
   onTeamSelect?: (teamId: string) => void
   // Lifted student-org planning state (for breadcrumb + sidebar)
@@ -592,6 +592,8 @@ export interface PaletteItem {
   label: string
   sublabel?: string
   tab?: Tab
+  // For chat items: the group category (church/my/dm) → drives the Messages subtab.
+  chatType?: string
 }
 
 export interface CommandPaletteProps {
@@ -599,7 +601,7 @@ export interface CommandPaletteProps {
   onClose: () => void
   ministryId: string
   onTabChange: (tab: Tab) => void
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
 }
 
 export interface DesktopTopbarProps {
@@ -617,7 +619,7 @@ export interface DesktopSidebarProps {
   userAvatarUrl?: string | null
   recentChats: ChatPreview[]
   userTeams: UserTeam[]
-  onOpenChat: (id: string, name: string) => void
+  onOpenChat: (id: string, name: string, type?: string) => void
   activeGroupId?: string | null
   onLogout: () => void
   isAdmin?: boolean

@@ -11,6 +11,7 @@ import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { RoleDescriptionEditor } from "./plan-tab"
 import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton } from "@/components/central"
+import { useNavState } from "../nav-state"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
 const JOURNAL_TABS = [
@@ -570,7 +571,17 @@ export function JournalSection({
   onToggleEntries: (v: boolean) => void
   onToggleStreak: (v: boolean) => void
 }) {
-  const [journalTab, setJournalTab] = useState<JournalTabId>("devotionals")
+  const { setParam } = useNavState()
+  // Journal subtab is URL-synced (?jtab) so it persists across reload (Convention #12).
+  const [journalTab, setJournalTab] = useState<JournalTabId>(() => {
+    if (typeof window === "undefined") return "devotionals"
+    const p = new URLSearchParams(window.location.search).get("jtab")
+    return (["devotionals", "prayers", "verses"] as const).includes(p as JournalTabId) ? p as JournalTabId : "devotionals"
+  })
+  function changeJournalTab(t: JournalTabId) {
+    setJournalTab(t)
+    setParam("jtab", t === "devotionals" ? null : t)
+  }
   const [entryCount, setEntryCount] = useState(0)
   const [entryDates, setEntryDates] = useState<string[]>([])
   const [prayerCount, setPrayerCount] = useState(0)
@@ -644,7 +655,7 @@ export function JournalSection({
           <PlanSubTabStrip
             tabs={JOURNAL_TABS}
             active={journalTab}
-            onChange={k => setJournalTab(k as JournalTabId)}
+            onChange={k => changeJournalTab(k as JournalTabId)}
           />
         </div>
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
@@ -658,7 +669,7 @@ export function JournalSection({
           re-insets the labels to align with the px-14 content below (§4.2 / convention #16). */}
       <div className="hidden md:block" style={{ paddingTop: showStats ? 0 : 4, paddingBottom: 52 }}>
         <div className="-mx-14" style={{ marginBottom: 28 }}>
-          <PlanSubTabStrip tabs={JOURNAL_TABS} active={journalTab} onChange={k => setJournalTab(k as JournalTabId)} />
+          <PlanSubTabStrip tabs={JOURNAL_TABS} active={journalTab} onChange={k => changeJournalTab(k as JournalTabId)} />
         </div>
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
         {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}

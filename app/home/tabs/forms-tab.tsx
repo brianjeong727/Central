@@ -5,6 +5,7 @@ import { Check, ChevronDown, FileText, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle } from "@/components/central"
+import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
 interface FormFieldRow {
@@ -473,12 +474,36 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
 
 export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
   const supabase = createClient()
+  const { setParam } = useNavState()
+  const isAdmin = ['admin', 'leader', 'deacon', 'elder'].includes(userRole.toLowerCase())
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<AnnouncementWithForm[]>([])
+  // Fill-in is an input/edit surface — ephemeral, never URL-synced.
   const [fillState, setFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
-  const [responsesState, setResponsesState] = useState<{ formId: string; title: string } | null>(null)
+  // Admin "view responses" is a read view → restore from ?fresp on reload
+  // (admin-only; title is backfilled from items once they load).
+  const [responsesState, setResponsesState] = useState<{ formId: string; title: string } | null>(() => {
+    if (typeof window === "undefined" || !isAdmin) return null
+    const formId = new URLSearchParams(window.location.search).get("fresp")
+    return formId ? { formId, title: "" } : null
+  })
 
-  const isAdmin = ['admin', 'leader', 'deacon', 'elder'].includes(userRole.toLowerCase())
+  function openResponses(formId: string, title: string) {
+    setResponsesState({ formId, title })
+    setParam("fresp", formId)
+  }
+
+  function closeResponses() {
+    setResponsesState(null)
+    setParam("fresp", null)
+  }
+
+  // Backfill the responses-view title from items for a URL-restored ?fresp.
+  useEffect(() => {
+    if (!responsesState || responsesState.title !== "") return
+    const match = items.find((i) => i.form_id === responsesState.formId)
+    if (match) setResponsesState((prev) => prev && prev.title === "" ? { ...prev, title: match.title } : prev)
+  }, [responsesState, items])
 
   const load = useCallback(async () => {
     const { data: forms } = await supabase
@@ -582,7 +607,7 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>{item.response_count} response{item.response_count !== 1 ? 's' : ''}</span>
                     <button
-                      onClick={() => setResponsesState({ formId: item.form_id, title: item.title })}
+                      onClick={() => openResponses(item.form_id, item.title)}
                       style={{ fontSize: 13, fontWeight: 500, color: 'var(--plum)', background: 'transparent', border: 'none', cursor: 'pointer' }}
                     >
                       View responses →
@@ -614,7 +639,7 @@ export function FormsTab({ userId, userRole, ministryId }: FormsTabProps) {
         <FormResponsesView
           formId={responsesState.formId}
           announcementTitle={responsesState.title}
-          onClose={() => setResponsesState(null)}
+          onClose={closeResponses}
         />
       )}
     </div>

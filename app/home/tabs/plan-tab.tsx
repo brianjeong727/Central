@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import useSWR from "swr"
-import { useRouter } from "next/navigation"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
@@ -22,6 +21,7 @@ import { Color } from "@tiptap/extension-color"
 import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
+import { useNavState } from "../nav-state"
 
 function currentFiscalYear(): string {
   const now = new Date()
@@ -1239,14 +1239,14 @@ export function StudentOrgTeamHome({
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
   refreshSignal?: number
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
   desktopSection?: string
   isDesktopView?: boolean
   onCalEventsChange?: (events: CalendarEvent[]) => void
   onEditEvent?: () => void
 }) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   const [teamTab, setTeamTab] = useState<"General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
     return (["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations"
@@ -1254,9 +1254,7 @@ export function StudentOrgTeamHome({
 
   function setTeamTabAndUrl(tab: "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations") {
     setTeamTab(tab)
-    const sp = new URLSearchParams(window.location.search)
-    sp.set("sotab", tab)
-    router.replace(`?${sp.toString()}`, { scroll: false })
+    setParam("sotab", tab)
   }
 
   // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
@@ -1857,7 +1855,6 @@ export function PlanTab({
     ?? allTeams.find(t => t.id === activeTeamId)?.name
     ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
-  const router = useRouter()
   const supabase = createClient()
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
@@ -1900,60 +1897,25 @@ export function PlanTab({
     return 3
   }
 
-  function replaceParam(key: string, value: string | null) {
-    const params = new URLSearchParams(window.location.search)
-    if (value === null) params.delete(key)
-    else params.set(key, value)
-    router.replace(`/home?${params.toString()}`, { scroll: false })
-  }
-
+  // Team settings overlay is ephemeral plain state — never in the URL. A reload
+  // while it's open drops back to the team workspace (Phase 2).
   function openSettings(team: Team) {
     setOpenTeam(team)
-    replaceParam("view", "settings")
   }
 
   function closeSettings() {
     setOpenTeam(null)
-    replaceParam("view", null)
   }
 
-  // Read the initial view param once so the auto-open effect is stable across re-renders.
-  const [initialViewParam] = useState(() =>
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null
-  )
-  const [didAutoOpen, setDidAutoOpen] = useState(false)
-
-  // Auto-open settings when page is refreshed with ?view=settings in the URL.
-  useEffect(() => {
-    if (didAutoOpen || initialViewParam !== 'settings' || !activeTeamId) return
-    const team = allTeams.find(t => t.id === activeTeamId) ?? (() => {
-      const ut = userTeams.find(t => t.teamId === activeTeamId)
-      if (!ut) return null
-      return { id: ut.teamId, name: ut.teamName, icon: ut.teamIcon, description: ut.teamDescription, created_by: "", member_count: 0, team_type: ut.teamType, allow_co_presidency: ut.allowCoPresidency, admin_access: 'view', allow_admin_members: ut.allowAdminMembers } satisfies Team
-    })()
-    if (!team) return
-    setOpenTeam(team)
-    setDidAutoOpen(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allTeams, userTeams, activeTeamId, didAutoOpen])
-
-  // Clear sub-page URL params when the user switches to a different team.
+  // Reset internal component state when the user switches to a different team.
+  // The sub-page URL params are cleared by home-app's handleTeamChange (one atomic
+  // replace, set team + clear sub-params); this effect only does non-URL bookkeeping.
   const teamSwitchRef = useRef(false)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!teamSwitchRef.current) { teamSwitchRef.current = true; return }
     setOpenTeam(null)
     onStudentOrgPlanningEventChange?.(null)
-    // Atomic clear: remove all team-specific sub-page params in one replace call
-    const params = new URLSearchParams(window.location.search)
-    params.delete("view")
-    params.delete("sotab")
-    params.delete("ptab")
-    params.delete("sgltab")
-    params.delete("fsec")
-    params.delete("evtab")
-    params.delete("rteam")
-    router.replace(`/home?${params.toString()}`, { scroll: false })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
 
@@ -2785,7 +2747,7 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
 
 export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManageSchedule }: { teamId: string; ministryId: string; userId: string; canManage: boolean; canManageSchedule: boolean }) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   const validPTabs = ["schedule", "setlist", "availability"] as const
   const [subTab, setSubTab] = useState<"schedule" | "setlist" | "availability">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ptab") : null
@@ -2793,9 +2755,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   })
   function setSubTabAndUrl(t: "schedule" | "setlist" | "availability") {
     setSubTab(t)
-    const sp = new URLSearchParams(window.location.search)
-    sp.set("ptab", t)
-    router.replace(`/home?${sp.toString()}`, { scroll: false })
+    setParam("ptab", t)
   }
 
   // If navigated from DGL "Prepare →", highlight a specific week
@@ -5891,7 +5851,7 @@ export function MinistryCalendar({
   teamId: string | null
   userId: string
   canEdit: boolean
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
@@ -6152,10 +6112,10 @@ export function EventPlanWorkspace({
   onClose: () => void
   inline?: boolean
   teamId?: string | null
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   const cfg = getEventConfig(calendarEvent)
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
   const extraTabs = typeCfg.extraTabs
@@ -6187,9 +6147,7 @@ export function EventPlanWorkspace({
   })
   function setActiveSectionAndUrl(s: ActiveSection) {
     setActiveSection(s)
-    const sp = new URLSearchParams(window.location.search)
-    sp.set("evtab", s)
-    router.replace(`/home?${sp.toString()}`, { scroll: false })
+    setParam("evtab", s)
   }
 
   // Overview edit state
@@ -9723,7 +9681,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
   const [mounted, setMounted] = useState(false)
@@ -11553,13 +11511,13 @@ function SmallGroupLeadersTab({
   isPresident: boolean
   isPastor: boolean
   praiseTeamId?: string | null
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
   onTeamSettings?: () => void
   isDesktopView?: boolean
   desktopSection?: string
 }) {
   const supabase = createClient()
-  const router = useRouter()
+  const { setParam } = useNavState()
   // Unique per-mount ID so desktop + mobile instances don't collide on the same channel name
   const channelInstanceId = useRef(Math.random().toString(36).slice(2)).current
   type SGLTab = "home" | "schedule" | "bible_study"
@@ -11571,9 +11529,7 @@ function SmallGroupLeadersTab({
   })
   function setActiveSubTabAndUrl(t: SGLTab) {
     setActiveSubTab(t)
-    const sp = new URLSearchParams(window.location.search)
-    sp.set("sgltab", t)
-    router.replace(`/home?${sp.toString()}`, { scroll: false })
+    setParam("sgltab", t)
   }
   const [loading, setLoading] = useState(true)
   const [semester, setSemester] = useState(() => getSemesterLabel())
@@ -12890,7 +12846,7 @@ function BibleStudySubTab({
   userId: string
   isPastor: boolean
   isPresident: boolean
-  onOpenChat?: (id: string, name: string) => void
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
 
