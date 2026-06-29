@@ -187,6 +187,21 @@ Date: 2026-06-27
 - **Never let verification subagents run `git stash`** to diff against HEAD — concurrent stash/pop is a prime corruption source. Compare lint output by reading it, not by stashing.
 - Symptom of corruption: `Persisting failed: Unable to write SST file`, turbopack panics, missing `build-manifest.json`, or a persistent client-side exception that survives a `.next` clear. Recovery: kill ALL `next` processes, `rm -rf .next`, restart ONE server; your committed/pushed branches are the safe source of truth.
 
+## Worktree sessions: keep branches FRESH against origin/main (separate axis from isolation)
+Date: 2026-06-28
+
+Worktrees solve **file-collision isolation** (two sessions can't stomp each other's working dir). They do NOTHING for **branch staleness** — every worktree still merges into the same `main`, so each peer merge makes the other branches staler. Two independent problems; the worktree workflow only fixes the first.
+
+What this cost: a feature branch cut from a stale local `main` sat while peers merged **77 commits**. The eventual merge was a tangled semantic mess (same file rewritten on both sides) — had to abort and re-do the work on fresh `main`. Isolation was fine the whole time; freshness was the failure.
+
+**Rules:**
+- **Cut from `origin/main`, fetched — never a local `main`:** `git fetch origin && git worktree add ../central-<n> -b feat/x origin/main`. A bare `... main` uses a possibly-days-old local ref. (You can branch from `origin/main` from any worktree; the local `main` need not be checked out anywhere — only one worktree may hold it.)
+- **Refresh on every peer merge, and before any PR:** `git fetch && git merge origin/main` (reinstall if deps changed). Small frequent merges are trivial; one deferred 77-commit merge is a disaster — same conflicts, far worse to resolve.
+- **Keep branches short-lived.** The more parallel sessions, the faster `main` moves, the faster a long branch rots.
+- Helper: `~/.claude/scripts/refresh-worktree.sh` — fetch → merge origin/main → reinstall-if-deps-changed, run from inside the worktree (refuses on a dirty tree or on `main`; stops on conflicts for manual resolution).
+
+**One-liner:** worktrees make parallel *work* safe; a merge cadence makes parallel *branches* safe — you need both.
+
 ## Don't run `next build` and `next dev` in the same worktree at once
 Date: 2026-06-27
 
