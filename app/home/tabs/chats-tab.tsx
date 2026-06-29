@@ -3497,7 +3497,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3510,21 +3510,28 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
 
   // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
-  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+  const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
     userId && ministryId ? ["chat-list", userId, ministryId] : null,
     fetchChatList,
+    { fallbackData: fallbackChats },
   )
 
-  const allGroups = data ?? []
+  // Prefer this panel's own SWR data when it actually has items; otherwise fall
+  // back to fallbackChats (home-app's reliable plain-fetch state), which renders
+  // even when this code-split panel's SWR hook stays undefined.
+  const allGroups = (data && data.length > 0 ? data : fallbackChats) ?? data ?? []
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
-  const loading = isLoading
+  // Treat "errored with no usable data" as still-loading so a poisoned/failed
+  // fetch shows the spinner, never the "No chats" empty state. If stale data
+  // exists (keepPreviousData), fall through and render it (stale > empty).
+  const loading = isLoading || (!!error && allGroups.length === 0)
 
   // Optimistic unread-clear on the shared cache key (survives revalidation timing).
   function clearUnread(groupId: string) {
     mutate(
-      (current) => (current ?? []).map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)),
+      (current) => current ? current.map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)) : current,
       { revalidate: false },
     )
   }
@@ -3857,9 +3864,10 @@ export interface ChatListPanelProps {
   canCreateChurchChat: boolean
   userProfile: Profile
   userRole: string
+  fallbackChats?: ChatGroup[]
 }
 
-export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole }: ChatListPanelProps) {
+export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats }: ChatListPanelProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3871,21 +3879,28 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
 
   // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
   // entry; revisits paint instantly from cache (no skeleton).
-  const { data, isLoading, mutate } = useSWR<ChatGroup[]>(
+  const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
     userId && ministryId ? ["chat-list", userId, ministryId] : null,
     fetchChatList,
+    { fallbackData: fallbackChats },
   )
 
-  const allGroups = data ?? []
+  // Prefer this panel's own SWR data when it actually has items; otherwise fall
+  // back to fallbackChats (home-app's reliable plain-fetch state), which renders
+  // even when this code-split panel's SWR hook stays undefined.
+  const allGroups = (data && data.length > 0 ? data : fallbackChats) ?? data ?? []
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
-  const loading = isLoading
+  // Treat "errored with no usable data" as still-loading so a poisoned/failed
+  // fetch shows the spinner, never the "No chats" empty state. Stale data
+  // (keepPreviousData) falls through and renders (stale > empty).
+  const loading = isLoading || (!!error && allGroups.length === 0)
 
   // Optimistic unread-clear on the shared cache key.
   function clearUnread(groupId: string) {
     mutate(
-      (current) => (current ?? []).map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)),
+      (current) => current ? current.map((g) => (g.id === groupId ? { ...g, unread_count: 0 } : g)) : current,
       { revalidate: false },
     )
   }

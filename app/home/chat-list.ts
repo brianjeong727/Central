@@ -18,10 +18,14 @@ export type ChatListRow = {
 
 export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
   const supabase = createClient()
-  const { data } = await supabase.rpc("get_chat_list", {
+  const { data, error } = await supabase.rpc("get_chat_list", {
     p_user_id: userId,
     p_ministry_id: ministryId,
   })
+  // Propagate transient RPC failures so SWR enters its error/retry state and
+  // keepPreviousData keeps the last good list — instead of swallowing the error
+  // and caching `[]`, which poisons every consumer until a manual refresh.
+  if (error) throw error
 
   const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
     id: row.group_id,
