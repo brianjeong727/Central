@@ -265,7 +265,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 
 ### 4.4 Inputs
 - **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
-- **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 40px serif, letter-spacing -0.5.
+- **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 36px serif weight 600, letter-spacing -0.02em. Placeholder uses helper-text `--faint` (quiet guidance), not label `--muted-text`.
 - **Textarea body** (announcement, transition note): 19px serif, line-height 1.65, no border, transparent bg, vertical resize, min-height 540 for full-page editors.
 - **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#2D0F2E` bg, cream text.
 
