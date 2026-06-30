@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, CSSProperties, ReactNode } from "react"
+import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { UpNextCard, UpNextEventDetail } from "./up-next-card"
 
@@ -454,6 +454,21 @@ function Dots({ count, active, onPick }: { count: number; active: number; onPick
   )
 }
 
+// Auto-advance cadence — slow + unhurried to stay "calm, not playful".
+const AUTOPLAY_MS = 7000
+// Slide-transition motion — calm decelerate, no bounce ("calm, not playful").
+const SLIDE_MS = 600
+const SLIDE_EASE = "var(--ease-out)"
+
+// A photo slide (standalone photo, or an event whose linked entity carries a photo).
+function slideUsesPhoto(s: HeroSlide): boolean {
+  return s.kind === "photo" || (s.kind === "event" && !!s.imageUrl)
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+}
+
 interface HomeHeroCarouselProps {
   slides: HeroSlide[]
   mobile?: boolean
@@ -484,110 +499,256 @@ export function HomeHeroCarousel({
 }: HomeHeroCarouselProps) {
   // Ephemeral, manually-advanced index — intentionally NOT URL-synced.
   const [idx, setIdx] = useState(0)
+  // Auto-advance pauses while the user is hovering/focusing the carousel.
+  const [paused, setPaused] = useState(false)
+
+  // ── Slide-transition state machine ──
+  // `anim` holds the in-flight FROM→TO pair (+ direction). While it's set we render
+  // BOTH slides as a 2-cell track and translate it; on transitionend we commit the
+  // index and clear `anim` (back to a single resting slide). `started` gates the
+  // start→end transform flip via rAF so the transition actually runs. `frozenH` keeps
+  // the viewport height stable on mobile (where slides are content-height) during the
+  // slide — desktop uses the fixed --hero-h frame so it never needs it.
+  const [anim, setAnim] = useState<{ from: number; to: number; dir: "fwd" | "back" } | null>(null)
+  const [started, setStarted] = useState(false)
+  const [frozenH, setFrozenH] = useState<number>(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+
+  const safeIdx = Math.min(idx, Math.max(0, slides.length - 1))
+
+  // Start (or instantly perform, under reduced motion) a move to `to` in `dir`.
+  // Bounded + guarded: ignores no-ops, out-of-range targets, and triggers fired
+  // mid-transition (no queue — matches the "ignore" guard in the spec).
+  const go = (to: number, dir: "fwd" | "back") => {
+    if (to === safeIdx || to < 0 || to >= slides.length) return
+    if (anim) return
+    if (prefersReducedMotion()) {
+      setIdx(to)
+      return
+    }
+    if (mobile && viewportRef.current) setFrozenH(viewportRef.current.offsetHeight)
+    setStarted(false)
+    setAnim({ from: safeIdx, to, dir })
+  }
+
+  // Gentle auto-rotation: advance forward (looping) every AUTOPLAY_MS. Keyed on the
+  // resting index AND `anim`, so it never fires mid-transition and resets after every
+  // change (auto OR manual). Pauses on hover/focus, skipped under reduced motion. The
+  // wrap (last → first) is a normal forward move, so it slides forward — never rewinds.
+  useEffect(() => {
+    if (slides.length <= 1 || paused || anim) return
+    if (prefersReducedMotion()) return
+    const t = setTimeout(() => go((safeIdx + 1) % slides.length, "fwd"), AUTOPLAY_MS)
+    return () => clearTimeout(t)
+  }, [safeIdx, paused, slides.length, anim])
+
+  // Drive the start→end transform: render at the start position (no transition),
+  // then flip `started` on the next frame so the transition runs. Safety timeout
+  // commits even if `transitionend` never fires (e.g. unmount/interruption).
+  useEffect(() => {
+    if (!anim) return
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setStarted(true)))
+    const safety = setTimeout(() => {
+      setIdx(anim.to)
+      setAnim(null)
+      setStarted(false)
+    }, SLIDE_MS + 120)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(safety)
+    }
+  }, [anim])
 
   if (slides.length === 0) return null
 
-  const safeIdx = Math.min(idx, slides.length - 1)
-  const slide = slides[safeIdx]
   const multi = slides.length > 1
+  // The dots / arrow bounds track the TARGET of an in-flight move (resting index otherwise).
+  const displayIdx = anim ? anim.to : safeIdx
 
-  // The announcement this slide RSVPs through (event slides reuse their linked announcement).
-  const rsvpAnnId =
-    slide.kind === "announcement"
-      ? slide.isEvent
-        ? slide.announcementId
-        : null
-      : slide.kind === "event"
-        ? slide.linkedAnnouncementId
-        : null
+  // ── Build one slide's interior (+ whether it's a photo slide) ──
+  const renderSlide = (s: HeroSlide): { interior: ReactNode; usePhoto: boolean } => {
+    // The announcement this slide RSVPs through (events reuse their linked announcement).
+    const annId =
+      s.kind === "announcement"
+        ? s.isEvent
+          ? s.announcementId
+          : null
+        : s.kind === "event"
+          ? s.linkedAnnouncementId
+          : null
+    // Inline (not slideUsesPhoto) so TS narrows the discriminated union in the branches below.
+    const usePhoto = s.kind === "photo" || (s.kind === "event" && !!s.imageUrl)
+    const hasDetailTarget = s.kind === "announcement" || (s.kind === "event" && !!s.linkedAnnouncementId)
 
-  const usePhoto = slide.kind === "photo" || (slide.kind === "event" && !!slide.imageUrl)
-  const hasDetailTarget = slide.kind === "announcement" || (slide.kind === "event" && !!slide.linkedAnnouncementId)
+    let interior: ReactNode
+    if (usePhoto && s.kind === "photo") {
+      interior = (
+        <PhotoSlide
+          imageUrl={s.imageUrl}
+          panelColor={s.panelColor}
+          eyebrow={s.eyebrow}
+          title={s.caption}
+          meta={s.meta}
+          mobile={mobile}
+        />
+      )
+    } else if (usePhoto && s.kind === "event") {
+      interior = (
+        <PhotoSlide
+          imageUrl={s.imageUrl!}
+          panelColor={s.panelColor}
+          eyebrow="Up next"
+          title={s.title}
+          body={s.body}
+          mobile={mobile}
+          event={{
+            dateLabel: chipDate(s.eventDetail),
+            location: s.eventDetail.location,
+            userHasRsvped: annId ? rsvpedIds.has(annId) : false,
+            rsvping,
+            onRsvp: annId ? () => onRsvp(annId) : undefined,
+          }}
+        />
+      )
+    } else {
+      // Reference interior (ivory) — announcement, or event without a photo.
+      const isEvent = s.kind === "event" || (s.kind === "announcement" && s.isEvent)
+      const attendees = annId ? rsvpAttendees[annId] ?? [] : []
+      const showAttendees = !!annId && attendees.length > 0 && (isLeaderOrAdmin || showAttendeesIds.has(annId))
+      interior = (
+        <UpNextCard
+          fill
+          label={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
+          labelAccent={s.kind === "announcement" ? s.eyebrowAccent ?? true : true}
+          title={s.title}
+          body={s.body}
+          isEvent={isEvent}
+          eventDetail={s.kind === "event" ? s.eventDetail : undefined}
+          userHasRsvped={annId ? rsvpedIds.has(annId) : false}
+          rsvping={rsvping}
+          rsvpCount={annId ? rsvpCounts[annId] ?? 0 : 0}
+          attendees={attendees}
+          showAttendees={showAttendees}
+          onRsvp={annId ? () => onRsvp(annId) : undefined}
+          onDetails={hasDetailTarget ? () => onDetails(s) : undefined}
+          mobile={mobile}
+        />
+      )
+    }
+    return { interior, usePhoto }
+  }
 
-  // ── Build the interior for the active slide ──
-  let interior: ReactNode
-  if (usePhoto && slide.kind === "photo") {
-    interior = (
-      <PhotoSlide
-        imageUrl={slide.imageUrl}
-        panelColor={slide.panelColor}
-        eyebrow={slide.eyebrow}
-        title={slide.caption}
-        meta={slide.meta}
-        mobile={mobile}
-      />
-    )
-  } else if (usePhoto && slide.kind === "event") {
-    interior = (
-      <PhotoSlide
-        imageUrl={slide.imageUrl!}
-        panelColor={slide.panelColor}
-        eyebrow="Up next"
-        title={slide.title}
-        body={slide.body}
-        mobile={mobile}
-        event={{
-          dateLabel: chipDate(slide.eventDetail),
-          location: slide.eventDetail.location,
-          userHasRsvped: rsvpAnnId ? rsvpedIds.has(rsvpAnnId) : false,
-          rsvping,
-          onRsvp: rsvpAnnId ? () => onRsvp(rsvpAnnId) : undefined,
-        }}
-      />
-    )
-  } else {
-    // Reference interior (ivory) — announcement, or event without a photo.
-    const isEvent = slide.kind === "event" || (slide.kind === "announcement" && slide.isEvent)
-    const attendees = rsvpAnnId ? rsvpAttendees[rsvpAnnId] ?? [] : []
-    const showAttendees = !!rsvpAnnId && attendees.length > 0 && (isLeaderOrAdmin || showAttendeesIds.has(rsvpAnnId))
-    interior = (
-      <UpNextCard
-        fill
-        label={slide.kind === "announcement" ? slide.eyebrowLabel ?? "Up next" : "Up next"}
-        labelAccent={slide.kind === "announcement" ? slide.eyebrowAccent ?? true : true}
-        title={slide.title}
-        body={slide.body}
-        isEvent={isEvent}
-        eventDetail={slide.kind === "event" ? slide.eventDetail : undefined}
-        userHasRsvped={rsvpAnnId ? rsvpedIds.has(rsvpAnnId) : false}
-        rsvping={rsvping}
-        rsvpCount={rsvpAnnId ? rsvpCounts[rsvpAnnId] ?? 0 : 0}
-        attendees={attendees}
-        showAttendees={showAttendees}
-        onRsvp={rsvpAnnId ? () => onRsvp(rsvpAnnId) : undefined}
-        onDetails={hasDetailTarget ? () => onDetails(slide) : undefined}
-        mobile={mobile}
-      />
+  // One slide cell. Desktop wraps the interior in its own HeroFrame (border/radius/clip
+  // are per-slide — bare for photos); mobile renders the interior directly (it carries
+  // its own chrome), matching the previous mobile render.
+  const cellContent = (s: HeroSlide): ReactNode => {
+    const { interior, usePhoto } = renderSlide(s)
+    return mobile ? interior : (
+      <HeroFrame bare={usePhoto} style={{ height: "100%" }}>{interior}</HeroFrame>
     )
   }
 
-  // ── Mobile: interior + round arrows + dots below ──
+  // ── The 2-cell track inside an overflow-hidden viewport ──
+  // Cells are each one viewport wide and overflow to the right; the track itself stays
+  // one viewport wide, so translateX percentages are viewport-relative. Forward order
+  // is [from, to] sliding 0 → -100% (new enters from the right, old exits left); back
+  // order is [to, from] sliding -100% → 0 (mirror). One resting cell when idle.
+  const cellIdxs = !anim ? [safeIdx] : anim.dir === "fwd" ? [anim.from, anim.to] : [anim.to, anim.from]
+  const trackTransform = !anim
+    ? "translateX(0)"
+    : anim.dir === "fwd"
+      ? started ? "translateX(-100%)" : "translateX(0)"
+      : started ? "translateX(0)" : "translateX(-100%)"
+  // Only transition once we've flipped `started`; the initial start-position render
+  // must snap (no transition) so the back direction doesn't flash the wrong way.
+  const trackTransition = anim && started ? `transform ${SLIDE_MS}ms ${SLIDE_EASE}` : "none"
+
+  const onTrackTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || e.propertyName !== "transform") return
+    if (!anim) return
+    setIdx(anim.to)
+    setAnim(null)
+    setStarted(false)
+  }
+
+  const track = (
+    <div
+      ref={trackRef}
+      onTransitionEnd={onTrackTransitionEnd}
+      style={{
+        display: "flex",
+        height: mobile ? undefined : "100%",
+        alignItems: mobile ? "flex-start" : "stretch",
+        transform: trackTransform,
+        transition: trackTransition,
+        willChange: "transform",
+      }}
+    >
+      {cellIdxs.map((ci) => (
+        <div
+          key={slides[ci].key}
+          style={{ flex: "0 0 100%", width: "100%", minWidth: 0, ...(mobile ? {} : { height: "100%" }) }}
+        >
+          {cellContent(slides[ci])}
+        </div>
+      ))}
+    </div>
+  )
+
+  const viewport = (
+    <div
+      ref={viewportRef}
+      style={
+        mobile
+          ? { position: "relative", overflow: "hidden", width: "100%", height: anim ? frozenH : "auto" }
+          : { position: "relative", overflow: "hidden", flex: 1, minWidth: 0, height: "var(--hero-h)" }
+      }
+    >
+      {track}
+    </div>
+  )
+
+  // ── Mobile: viewport + round arrows + dots below ──
   if (mobile) {
     return (
-      <div style={style}>
-        {interior}
+      <div
+        style={style}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocusCapture={() => setPaused(true)}
+        onBlurCapture={() => setPaused(false)}
+      >
+        {viewport}
         {multi && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: "var(--space-6)" }}>
-            <RoundArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} />
-            <Dots count={slides.length} active={safeIdx} onPick={setIdx} />
-            <RoundArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} />
+            <RoundArrow dir="prev" disabled={displayIdx === 0} onClick={() => go(safeIdx - 1, "back")} />
+            <Dots count={slides.length} active={displayIdx} onPick={(i) => go(i, i > safeIdx ? "fwd" : "back")} />
+            <RoundArrow dir="next" disabled={displayIdx === slides.length - 1} onClick={() => go(safeIdx + 1, "fwd")} />
           </div>
         )}
       </div>
     )
   }
 
-  // ── Desktop: tall flanking arrows + framed interior + dots below ──
+  // ── Desktop: tall flanking arrows + framed viewport + dots below ──
+  const displayUsePhoto = slideUsesPhoto(slides[displayIdx])
   return (
-    <div style={style}>
+    <div
+      style={style}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
       <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
-        {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} onPhoto={usePhoto} />}
-        <HeroFrame bare={usePhoto} style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
-        {multi && <TallArrow dir="next" disabled={safeIdx === slides.length - 1} onClick={() => setIdx(safeIdx + 1)} onPhoto={usePhoto} />}
+        {multi && <TallArrow dir="prev" disabled={displayIdx === 0} onClick={() => go(safeIdx - 1, "back")} onPhoto={displayUsePhoto} />}
+        {viewport}
+        {multi && <TallArrow dir="next" disabled={displayIdx === slides.length - 1} onClick={() => go(safeIdx + 1, "fwd")} onPhoto={displayUsePhoto} />}
       </div>
       {multi && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: "var(--space-7)" }}>
-          <Dots count={slides.length} active={safeIdx} onPick={setIdx} />
+          <Dots count={slides.length} active={displayIdx} onPick={(i) => go(i, i > safeIdx ? "fwd" : "back")} />
         </div>
       )}
     </div>
