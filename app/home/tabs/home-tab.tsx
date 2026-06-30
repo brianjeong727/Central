@@ -192,8 +192,8 @@ export function HomeTab({
         ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
         : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
       slideAnnIds.length
-        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date").in("id", slideAnnIds).eq("ministry_id", ministryId)
-        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null }[] }),
+        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, created_at").in("id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; created_at: string }[] }),
       slideEvIds.length
         ? supabase
             .from("calendar_events")
@@ -262,6 +262,7 @@ export function HomeTab({
           imageUrl: a.image_url ?? null,
           hasForm: slideFormSet.has(a.id),
           eventDetail: a.is_event && a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined,
+          createdAt: a.created_at,
         })
       } else {
         const e = evMap.get(r.calendar_event_id ?? "")
@@ -584,6 +585,9 @@ export function HomeTab({
                   title={heroAnn.title}
                   body={heroAnn.body}
                   isEvent={heroAnn.is_event}
+                  imageUrl={heroAnn.image_url}
+                  postedDate={heroAnn.created_at}
+                  eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
                   userHasRsvped={userHasRsvped}
                   rsvping={rsvping}
                   rsvpCount={rsvpCount}
@@ -602,6 +606,8 @@ export function HomeTab({
                   title={latestAnn.title}
                   body={latestAnn.body}
                   isEvent={false}
+                  imageUrl={latestAnn.image_url}
+                  postedDate={latestAnn.created_at}
                   onDetails={() => onOpenAnnouncement(latestAnn.id)}
                 />
               </HeroFrame>
@@ -950,6 +956,9 @@ export function HomeTab({
                     title={heroAnn.title}
                     body={heroAnn.body}
                     isEvent={heroAnn.is_event}
+                    imageUrl={heroAnn.image_url}
+                    postedDate={heroAnn.created_at}
+                    eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
                     userHasRsvped={userHasRsvped}
                     rsvping={rsvping}
                     rsvpCount={rsvpCount}
@@ -966,6 +975,8 @@ export function HomeTab({
                     title={latestAnn.title}
                     body={latestAnn.body}
                     isEvent={false}
+                    imageUrl={latestAnn.image_url}
+                    postedDate={latestAnn.created_at}
                     onDetails={() => onOpenAnnouncement(latestAnn.id)}
                     mobile
                   />

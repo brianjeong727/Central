@@ -19,6 +19,7 @@ export type HeroSlide =
       imageUrl?: string | null
       hasForm?: boolean
       eventDetail?: UpNextEventDetail
+      createdAt?: string
     }
   | {
       kind: "event"
@@ -627,7 +628,10 @@ export function HomeHeroCarousel({
           title={s.title}
           body={s.body}
           isEvent={isEvent}
-          eventDetail={s.kind === "event" ? s.eventDetail : undefined}
+          eventDetail={s.kind === "event" ? s.eventDetail : s.kind === "announcement" ? s.eventDetail : undefined}
+          imageUrl={s.kind === "announcement" ? s.imageUrl : undefined}
+          hasForm={s.kind === "announcement" ? s.hasForm : undefined}
+          postedDate={s.kind === "announcement" ? s.createdAt : undefined}
           userHasRsvped={annId ? rsvpedIds.has(annId) : false}
           rsvping={rsvping}
           rsvpCount={annId ? rsvpCounts[annId] ?? 0 : 0}
