@@ -379,6 +379,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // carry destination closures, and the final/current crumb has no onClick.
   function getShellCrumbs(): Crumb[] {
     const root: Crumb = { label: ministryName, onClick: () => handleNavClick("home") }
+    // Announcement detail is a content swap that owns the whole content area; its
+    // canonical trail is always Central / Announcements / {title} regardless of the
+    // tab it was opened from (Home or Announcements). AnnouncementDetailView pushes
+    // the "Announcements" + title crumbs via SubpageShell — return just the root here
+    // so there's no duplicate "Announcements".
+    if (openAnnouncementId) return [root]
     const planningCrumb: Crumb = { label: "Workspace", onClick: () => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) } }
     const congregationLabels: Record<string, string> = { list: "", create: "New question", detail: "Responses" }
     switch (activeTab) {
@@ -743,15 +749,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     setParam("chat", null)
   }
 
-  // Announcement detail open/close mirror ?ann (read view, persists on reload).
+  // Announcement detail opens by mirroring ?ann (read view, persists on reload).
+  // It renders as an in-content subpage (content swap) that keeps the shell
+  // breadcrumb — there's no standalone close; the "Announcements" crumb (and
+  // mobile back) route to the list via handleNavClick, which clears ?ann.
   function handleOpenAnnouncement(id: string) {
     setOpenAnnouncementId(id)
     setParam("ann", id)
-  }
-
-  function handleCloseAnnouncement() {
-    setOpenAnnouncementId(null)
-    setParam("ann", null)
   }
 
   function handleChatNameChange(name: string) {
@@ -898,8 +902,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       <BreadcrumbProvider>
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
-        {/* Shell topbar — suppressed on chats and on planning team picker (picker has its own full-width header) */}
-        {activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId) && (
+        {/* Shell topbar — suppressed on chats and on planning team picker (picker has its
+            own full-width header). Always shown when the announcement detail subpage is
+            open (it swaps the whole content area and needs its breadcrumb back). */}
+        {(openAnnouncementId || (activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId))) && (
           <DesktopTopbar crumbs={getShellCrumbs()} />
         )}
 
@@ -915,6 +921,21 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               so the active tab re-inits from the cleared URL — it never changes on
               a plain switch, so resume-where-left-off is preserved. */}
           <div key={`${activeTab}-${navResetKey}`} className="content-enter md:h-full md:overflow-hidden">
+
+          {/* Announcement detail is an in-content subpage: when open it SWAPS the whole
+              active-tab content (the breadcrumb above stays and shows its trail). Opened
+              from Home or Announcements; closes via the breadcrumb (handleNavClick). */}
+          {openAnnouncementId ? (
+            <AnnouncementDetailView
+              announcementId={openAnnouncementId}
+              userId={userId}
+              ministryId={ministryId}
+              userRole={initialProfile.role}
+              userName={initialProfile.name}
+              onGoToList={() => handleNavClick("announcements")}
+            />
+          ) : (
+          <>
 
           {activeTab === "home" && (
             <div className="md:h-full md:overflow-y-auto">
@@ -1117,6 +1138,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </div>
           )}
 
+          </>
+          )}
+
           </div>
 
         </div>
@@ -1144,17 +1168,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           onClose={handleChatClose}
           onRead={recountTotalUnread}
           onNameChange={handleChatNameChange}
-        />
-      )}
-
-      {openAnnouncementId && (
-        <AnnouncementDetailView
-          announcementId={openAnnouncementId}
-          userId={userId}
-          ministryId={ministryId}
-          userRole={initialProfile.role}
-          userName={initialProfile.name}
-          onClose={handleCloseAnnouncement}
         />
       )}
 
