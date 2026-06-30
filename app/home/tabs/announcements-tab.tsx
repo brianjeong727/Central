@@ -218,20 +218,6 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         </div>
       </div>
 
-      {/* ── Desktop header — TabPageHeader + back arrow + actions ── */}
-      <div className="hidden md:block">
-        <TabPageHeader>
-          <button onClick={onClose} aria-label="Back to announcements" className="w-8 h-8 flex items-center justify-center rounded-lg mr-3 -ml-1 hover:bg-[var(--ivory)] transition-colors" style={{ flexShrink: 0 }}>
-            <ArrowLeft className="w-4 h-4" style={{ color: "var(--body)" }} />
-          </button>
-          <PageTitle title={titleText} compact />
-          <div className="flex items-center gap-2 ml-auto">
-            {DraftButton}
-            {PublishButton}
-          </div>
-        </TabPageHeader>
-      </div>
-
       {/* ── Mobile: scrollable single column on cream ── */}
       <div className="md:hidden flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
         {error && <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "rgba(62,21,64,0.08)" }}>{error}</div>}
@@ -239,12 +225,12 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         <div className="flex flex-col">
           <input
             type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A clear, scannable headline" required
-            className="placeholder:text-[var(--muted-text)]"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
+            className="placeholder:text-[var(--faint)]"
+            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
           />
           <textarea
             value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={8}
-            className="placeholder:text-[var(--muted-text)]"
+            className="placeholder:text-[var(--faint)]"
             style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%", marginTop: 16 }}
           />
         </div>
@@ -260,8 +246,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 key={opt.value} type="button" onClick={() => setAudience(opt.value)}
                 style={{
                   padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  border: `1px solid ${audience === opt.value ? "var(--plum)" : "var(--line-2)"}`,
-                  background: audience === opt.value ? "var(--plum)" : "transparent",
+                  border: `1px solid ${audience === opt.value ? "var(--plum)" : "var(--line)"}`,
+                  background: audience === opt.value ? "var(--plum)" : "var(--ivory)",
                   color: audience === opt.value ? "var(--cream)" : "var(--body)",
                   transition: "all 0.15s",
                 }}
@@ -322,7 +308,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       <div className="hidden md:flex flex-1 overflow-hidden min-h-0">
         {/* Writing surface */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0" style={{ borderRight: "1px solid var(--line)" }}>
-          <div className="flex-1 overflow-y-auto min-h-0 flex flex-col px-14 pt-8 pb-6">
+          <div className="flex-1 overflow-y-auto min-h-0 flex flex-col px-14 pt-5 pb-6">
             {error && <div className="mb-6 rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "rgba(62,21,64,0.08)" }}>{error}</div>}
             {/* Inline serif title — §4.4 */}
             <input
@@ -330,10 +316,10 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="A clear, scannable headline"
-              className="placeholder:text-[var(--muted-text)]"
+              className="placeholder:text-[var(--faint)]"
               style={{
-                fontFamily: "var(--font-instrument-serif)", fontSize: "40px",
-                letterSpacing: "-0.5px", color: "var(--ink)", lineHeight: 1.1,
+                fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 600,
+                letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.15,
                 background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)",
                 outline: "none", width: "100%", paddingBottom: "16px", flexShrink: 0,
               }}
@@ -343,11 +329,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write the full announcement here. Take all the space you need — share scripture, walk through logistics, link to sign-ups."
-              className="placeholder:text-[var(--muted-text)] flex-1"
+              className="placeholder:text-[var(--faint)] flex-1"
               style={{
                 fontFamily: "var(--font-instrument-serif)", fontSize: "19px", lineHeight: "1.65",
                 color: "var(--ink)", background: "transparent", border: "none", outline: "none",
-                resize: "none", width: "100%", marginTop: "20px", minHeight: "540px",
+                resize: "none", width: "100%", marginTop: "22px", minHeight: "540px",
               }}
             />
           </div>
@@ -366,8 +352,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                   onClick={() => setAudience(opt.value)}
                   style={{
                     padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                    border: `1px solid ${audience === opt.value ? "var(--plum-2)" : "var(--line-2)"}`,
-                    background: audience === opt.value ? "var(--plum-2)" : "transparent",
+                    border: `1px solid ${audience === opt.value ? "var(--plum-2)" : "var(--line)"}`,
+                    background: audience === opt.value ? "var(--plum-2)" : "var(--ivory)",
                     color: audience === opt.value ? "var(--cream)" : "var(--body)",
                     transition: "all 0.15s",
                   }}
@@ -378,7 +364,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid var(--line)" }} />
+          <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
           {/* Options — §4.9 toggles */}
           <div className="px-6 py-6 flex flex-col gap-5">
@@ -413,7 +399,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             )}
           </div>
 
-          <div style={{ borderTop: "1px solid var(--line)" }} />
+          <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
           {/* Attachment — §4.18 dashed placeholder */}
           <div className="px-6 py-6">
@@ -430,8 +416,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-7 rounded-[10px] bg-transparent flex flex-col items-center justify-center gap-2 text-[var(--body)] hover:bg-[var(--ivory)] transition-all"
-                style={{ border: "1px dashed var(--dashed)" }}
+                className="w-full rounded-[10px] bg-transparent flex flex-col items-center justify-center gap-2 text-[var(--body)] hover:bg-[var(--ivory)] transition-all"
+                style={{ border: "1px dashed var(--dashed)", paddingTop: 14, paddingBottom: 14 }}
               >
                 <ImageIcon className="w-4 h-4" />
                 <span className="text-[12px]">Add image or file</span>
@@ -440,7 +426,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
           </div>
 
-          <div style={{ borderTop: "1px solid var(--line)" }} />
+          <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
           {/* Form builder */}
           <div className="px-6 py-6">
@@ -552,6 +538,12 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             )}
           </div>
         </aside>
+      </div>
+
+      {/* ── Desktop footer — relocated Save draft + Publish actions ── */}
+      <div className="hidden md:flex items-center justify-end gap-3 px-14 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--line)" }}>
+        {DraftButton}
+        {PublishButton}
       </div>
     </div>
   )
