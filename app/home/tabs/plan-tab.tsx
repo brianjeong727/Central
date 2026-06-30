@@ -42,7 +42,7 @@ import { elevateToLeader } from "@/app/actions/ministry"
 import * as Y from "yjs"
 import Collaboration from "@tiptap/extension-collaboration"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
-import { getInitials } from "../utils"
+import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip } from "@/components/central"
@@ -650,7 +650,7 @@ function useNoteCollab(noteId: string, userId: string, userName: string) {
     // Live title broadcast
     channel.on("broadcast", { event: "title" }, ({ payload }: { payload: { title: string; userId: string } }) => {
       if (payload.userId === userId) return
-      // Emit a custom DOM event that MeetingNoteCard listens to
+      // Emit a custom DOM event that MeetingNoteDetail listens to
       window.dispatchEvent(new CustomEvent(`note-title-${noteId}`, { detail: { title: payload.title } }))
     })
 
@@ -827,48 +827,45 @@ export function MeetingNoteEditor({
   )
 }
 
-export function MeetingNoteCard({
+// Dedicated full-width note page. The Tiptap + Yjs collaborative editor
+// (MeetingNoteEditor + useNoteCollab + presence + autosave) is reused unchanged —
+// only its container moved from an expanded accordion card to this standalone page.
+export function MeetingNoteDetail({
   note,
-  isExpanded,
   userId,
   userName,
-  onToggle,
+  onBack,
   onSaveTitle,
   onSaveBody,
   canWrite = true,
 }: {
   note: MeetingNote
-  isExpanded: boolean
   userId: string
   userName: string
-  onToggle: () => void
+  onBack: () => void
   onSaveTitle: (id: string, title: string) => Promise<void>
   onSaveBody: (id: string, body: string) => Promise<void>
   canWrite?: boolean
 }) {
   const supabase = createClient()
   const [localTitle, setLocalTitle] = useState(note.title)
-  const titleChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLocalTitle(note.title) }, [note.id, note.title])
   const [noteEditor, setNoteEditor] = useState<Editor | null>(null)
 
-  // Listen for remote title changes when expanded
+  // Listen for remote title changes (live co-edit of the title via the collab channel).
   useEffect(() => {
-    if (!isExpanded) return
     const handler = (e: Event) => {
       const { title } = (e as CustomEvent).detail
       setLocalTitle(title)
     }
     window.addEventListener(`note-title-${note.id}`, handler)
     return () => window.removeEventListener(`note-title-${note.id}`, handler)
-  }, [isExpanded, note.id])
+  }, [note.id])
 
-  // Get channel ref from collab hook to broadcast title - we reuse the same channel name
+  // Broadcast title edits over the same meeting-note channel the collab hook uses.
   function broadcastTitle(title: string) {
-    // We broadcast via a temporary send - the hook's channel handles this
-    // Dispatch as CustomEvent so the useNoteCollab hook can pick it up (we go through the plan-tab channel)
     const ch = supabase.channel(`meeting-note-${note.id}`)
     ch.send({ type: "broadcast", event: "title", payload: { title, userId } }).catch(() => {})
   }
@@ -878,99 +875,77 @@ export function MeetingNoteCard({
     return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
   })()
 
-  if (!isExpanded) {
-    return (
-      <div
-        onClick={onToggle}
-        style={{
-          background: "white",
-          borderRadius: 12,
-          border: "1px solid var(--line)",
-          padding: "13px 18px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          boxShadow: "0 1px 3px rgba(19,16,26,0.04)",
-        }}
-      >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {note.title || "(Untitled)"}
-          </p>
-          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0" }}>{noteDateLabel}</p>
-        </div>
-        <ChevronRight size={14} style={{ color: "#C4C4C4", flexShrink: 0 }} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ background: "white", borderRadius: 16, border: "1px solid var(--line)", boxShadow: "0 2px 12px rgba(19,16,26,0.08)", overflow: "hidden" }}>
-      {/* Collapse strip */}
-      <div
-        onClick={onToggle}
-        style={{
-          padding: "11px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid #F0EDE8",
-          cursor: "pointer",
-          background: "#FDFBF7",
-        }}
+    <div>
+      {/* Back affordance */}
+      <button
+        onClick={onBack}
+        style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--muted-text)", fontSize: 13, cursor: "pointer", marginBottom: 16 }}
       >
-        <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-          {noteDateLabel}
-        </span>
-        <ChevronDown size={14} style={{ color: "#C4C4C4" }} />
-      </div>
+        <ArrowLeft style={{ width: 13, height: 13 }} /> Meeting Notes
+      </button>
 
-      {canWrite && <TiptapToolbar editor={noteEditor} />}
-
-      {/* Document body */}
-      <div style={{ padding: "28px 32px 0" }}>
-        <input
-          value={localTitle}
-          readOnly={!canWrite}
-          onChange={e => {
-            if (!canWrite) return
-            setLocalTitle(e.target.value)
-            if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current)
-            titleSaveTimer.current = setTimeout(() => {
-              broadcastTitle(e.target.value)
-              onSaveTitle(note.id, e.target.value)
-            }, 400)
-          }}
-          placeholder="Untitled"
+      <div style={{ background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", overflow: "hidden" }}>
+        {/* Date strip — inset tone to sit above the cream editor body */}
+        <div
           style={{
-            fontFamily: "var(--font-instrument-serif)",
-            fontSize: 26,
-            fontWeight: 400,
-            color: "var(--ink)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1.2,
-            width: "100%",
-            border: "none",
-            background: "transparent",
-            outline: "none",
-            padding: 0,
-            display: "block",
+            padding: "11px 20px",
+            display: "flex",
+            alignItems: "center",
+            borderBottom: "1px solid var(--line-3)",
+            background: "var(--cream-2)",
           }}
+        >
+          <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            {noteDateLabel}
+          </span>
+        </div>
+
+        {canWrite && <TiptapToolbar editor={noteEditor} />}
+
+        {/* Document body */}
+        <div style={{ padding: "28px 32px 0" }}>
+          <input
+            value={localTitle}
+            readOnly={!canWrite}
+            onChange={e => {
+              if (!canWrite) return
+              setLocalTitle(e.target.value)
+              if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current)
+              titleSaveTimer.current = setTimeout(() => {
+                broadcastTitle(e.target.value)
+                onSaveTitle(note.id, e.target.value)
+              }, 400)
+            }}
+            placeholder="Untitled"
+            style={{
+              fontFamily: "var(--font-instrument-serif)",
+              fontSize: 26,
+              fontWeight: 400,
+              color: "var(--ink)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.2,
+              width: "100%",
+              border: "none",
+              background: "transparent",
+              outline: "none",
+              padding: 0,
+              display: "block",
+            }}
+          />
+          <div style={{ height: 1, background: "var(--line-3)", margin: "18px 0 0" }} />
+        </div>
+        <MeetingNoteEditor
+          key={note.id}
+          noteId={note.id}
+          userId={userId}
+          userName={userName}
+          initialContent={note.body}
+          onSave={(html) => onSaveBody(note.id, html)}
+          onEditorReady={setNoteEditor}
+          canWrite={canWrite}
         />
-        <div style={{ height: 1, background: "#F0EDE8", margin: "18px 0 0" }} />
       </div>
-      <MeetingNoteEditor
-        key={note.id}
-        noteId={note.id}
-        userId={userId}
-        userName={userName}
-        initialContent={note.body}
-        onSave={(html) => onSaveBody(note.id, html)}
-        onEditorReady={setNoteEditor}
-        canWrite={canWrite}
-      />
     </div>
   )
 }
@@ -992,12 +967,16 @@ export function MeetingNotesSection({
   userName,
   canWrite,
   startNewTrigger,
+  openNoteId,
+  onOpenNote,
 }: {
   teamId: string | null
   userId: string
   userName: string
   canWrite: boolean
   startNewTrigger?: number
+  openNoteId: string | null
+  onOpenNote: (id: string | null) => void
 }) {
   const supabase = createClient()
   const { data: notesData, isLoading: loading, mutate: mutateNotes } = useSWR(
@@ -1006,17 +985,21 @@ export function MeetingNotesSection({
     { keepPreviousData: false },
   )
   const notes = useMemo(() => notesData ?? [], [notesData])
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
 
-  // Clear expansion when switching teams.
-  useEffect(() => { setExpandedIds(new Set()) }, [teamId])
-  // Auto-expand the most recent note once the list resolves (only if nothing is expanded yet).
+  // Resolve "last edited by" names: fetch profile names for every author referenced
+  // by the notes (updated_by preferred, created_by fallback).
+  const [names, setNames] = useState<Record<string, string>>({})
   useEffect(() => {
-    if (notesData && notesData.length > 0) {
-      setExpandedIds(prev => (prev.size === 0 ? new Set([notesData[0].id]) : prev))
-    }
-  }, [notesData])
+    const ids = Array.from(new Set(notes.flatMap(n => [n.updated_by, n.created_by].filter(Boolean) as string[])))
+    if (ids.length === 0) return
+    supabase.from("profiles").select("id, name").in("id", ids).then(({ data }) => {
+      const map: Record<string, string> = {}
+      for (const p of (data ?? []) as { id: string; name: string }[]) map[p.id] = p.name
+      setNames(map)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes])
 
   useEffect(() => {
     if (startNewTrigger) createNote()
@@ -1026,7 +1009,16 @@ export function MeetingNotesSection({
   async function createNote() {
     if (!teamId || creating) return
     setCreating(true)
-    const noteNumber = notes.length + 1
+    // Derive the next note_number server-side to avoid the stale-client-state race
+    // (two rapid creates collided on notes.length + 1).
+    const { data: lastRow } = await supabase
+      .from("meeting_notes")
+      .select("note_number")
+      .eq("team_id", teamId)
+      .order("note_number", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const noteNumber = ((lastRow?.note_number as number | undefined) ?? 0) + 1
     const today = new Date()
     const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     const title = `Meeting ${noteNumber} — ${dateStr}`
@@ -1039,56 +1031,93 @@ export function MeetingNotesSection({
     setCreating(false)
     if (!error && data) {
       const newNote = data as MeetingNote
-      setExpandedIds(prev => new Set([newNote.id, ...prev]))
       void mutateNotes(prev => [newNote, ...(prev ?? [])], { revalidate: false })
+      onOpenNote(newNote.id)
     }
   }
 
   async function saveTitle(id: string, title: string) {
-    await supabase.from("meeting_notes").update({ title }).eq("id", id)
-    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, title } : n), { revalidate: false })
+    const now = new Date().toISOString()
+    // Optimistic first (Convention #4): the list metadata updates immediately.
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, title, updated_by: userId, updated_at: now } : n), { revalidate: false })
+    const { error } = await supabase.from("meeting_notes").update({ title, updated_by: userId, updated_at: now }).eq("id", id)
+    if (error) void mutateNotes() // revert to server truth on failure
   }
 
   async function saveBody(id: string, body: string) {
-    await supabase.from("meeting_notes").update({ body }).eq("id", id)
-    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, body } : n), { revalidate: false })
+    const now = new Date().toISOString()
+    void mutateNotes(prev => (prev ?? []).map(n => n.id === id ? { ...n, body, updated_by: userId, updated_at: now } : n), { revalidate: false })
+    const { error } = await supabase.from("meeting_notes").update({ body, updated_by: userId, updated_at: now }).eq("id", id)
+    if (error) void mutateNotes()
   }
 
-  function toggleExpand(id: string) {
-    setExpandedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  // Detail view — dedicated full-width note page.
+  const openNote = openNoteId ? notes.find(n => n.id === openNoteId) ?? null : null
+  if (openNoteId && openNote) {
+    return (
+      <MeetingNoteDetail
+        note={openNote}
+        userId={userId}
+        userName={userName}
+        onBack={() => onOpenNote(null)}
+        onSaveTitle={saveTitle}
+        onSaveBody={saveBody}
+        canWrite={canWrite}
+      />
+    )
   }
 
+  // List view.
   return (
     <div>
-
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
       ) : notes.length === 0 ? (
         <div style={{ borderLeft: "1px solid var(--line)", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", margin: 0 }}>
+          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", margin: 0 }}>
             {canWrite ? "No notes yet — start a new one." : "No notes have been created yet."}
           </p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {notes.map(note => (
-            <MeetingNoteCard
-              key={note.id}
-              note={note}
-              isExpanded={expandedIds.has(note.id)}
-              userId={userId}
-              userName={userName}
-              onToggle={() => toggleExpand(note.id)}
-              onSaveTitle={saveTitle}
-              onSaveBody={saveBody}
-              canWrite={canWrite}
-            />
-          ))}
+          {notes.map(note => {
+            const noteDateLabel = (() => {
+              const d = new Date(note.date + "T12:00:00")
+              return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            })()
+            const editorId = note.updated_by ?? note.created_by
+            const editorName = names[editorId] ?? "Someone"
+            const editedAt = note.updated_at ?? note.created_at
+            return (
+              <div
+                key={note.id}
+                onClick={() => onOpenNote(note.id)}
+                className="hover:border-[var(--plum)] transition-colors"
+                style={{
+                  background: "var(--cream)",
+                  borderRadius: 12,
+                  border: "1px solid var(--line)",
+                  padding: "13px 18px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {note.title || "(Untitled)"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0" }}>{noteDateLabel}</p>
+                  <p style={{ fontSize: 11, color: "var(--faint)", margin: "3px 0 0" }}>
+                    Last edited by {editorName} · {formatRelativeTime(editedAt)}
+                  </p>
+                </div>
+                <ChevronRight size={14} style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -1200,6 +1229,30 @@ export function StudentOrgTeamHome({
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
   // Notes tab — trigger createNote from header button
   const [notesTrigger, setNotesTrigger] = useState(0)
+  // Meeting Notes — which note is open (URL-synced via ?notetab); null = list view.
+  const [openNoteId, setOpenNoteId] = useState<string | null>(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("notetab") : null,
+  )
+  function setOpenNoteAndUrl(id: string | null) {
+    setOpenNoteId(id)
+    setParam("notetab", id)
+  }
+  // Clear the open note when the team changes or the user leaves the Meeting Notes
+  // section. Skip the initial mount so a ?notetab deep-link/refresh is preserved.
+  const prevNoteTeamRef = useRef(teamId)
+  const noteSectionMountRef = useRef(false)
+  useEffect(() => {
+    if (prevNoteTeamRef.current !== teamId) {
+      prevNoteTeamRef.current = teamId
+      setOpenNoteAndUrl(null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId])
+  useEffect(() => {
+    if (!noteSectionMountRef.current) { noteSectionMountRef.current = true; return }
+    if (displaySection !== "Meeting Notes" && openNoteId) setOpenNoteAndUrl(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displaySection])
 
   // Side-effect (was inside the fetcher): notify the parent of the current event list.
   // Pass the sub-event-excluded list (calEvents) to keep parent consumers consistent
@@ -1365,7 +1418,7 @@ export function StudentOrgTeamHome({
               </span>
             )}
             {displaySection === "Meeting Notes" && canEdit && (
-              <HeaderActionButton label="Start new" onClick={() => setNotesTrigger(t => t + 1)} />
+              <HeaderActionButton label="New notes" onClick={() => setNotesTrigger(t => t + 1)} />
             )}
             {displaySection === "Groups" && canEdit && (
               <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
@@ -1427,7 +1480,7 @@ export function StudentOrgTeamHome({
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Meeting Notes</h2>
               </div>
             )}
-            <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} />
+            <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
           </div>
         )}
 

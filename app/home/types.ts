@@ -488,6 +488,8 @@ export interface MeetingNote {
   body: string
   created_by: string
   created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
 export interface PlanTabProps {
