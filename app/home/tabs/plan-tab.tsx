@@ -22,7 +22,7 @@ import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
-import { useBreadcrumbExtra } from "../breadcrumb-context"
+import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
   const now = new Date()
@@ -8105,6 +8105,9 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
     fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
+  // Back nav is the shell breadcrumb (§175) — "Groups" crumb returns to the list.
+  useSubpageCrumbs([{ label: "Groups", onClick: onBack }, { label: session.name }])
+
   useEffect(() => {
     async function load() {
       const { data: gData } = await supabase
@@ -8155,16 +8158,10 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <button
-          onClick={onBack}
-          style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)", flexShrink: 0 }}
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-        </button>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={mono}>Saved grouping</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, margin: "2px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>{session.name}</h2>
+          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, margin: "4px 0 0", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1 }}>{session.name}</h2>
         </div>
         <button
           onClick={exportCSV}
@@ -8656,29 +8653,35 @@ function GroupGeneratorWizard({
   const STEPS = ["Pick pool", "Configure", "Preview"]
   const stepIdx = step - 1
 
+  // Back/exit is the shell breadcrumb (§175) — "Groups" crumb closes the wizard.
+  useSubpageCrumbs([{ label: "Groups", onClick: onClose }, { label: "New grouping" }])
+
   return (
     <AnimateIn
       className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col"
       style={{ left: 0 }}
     >
-      {/* Header */}
-      <div style={{ padding: "20px 32px 0", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      {/* Header — full-bleed bar, inner content centered to the wizard column.
+          Back/X are mobile-only; on desktop the shell breadcrumb is the exit (§175). */}
+      <div style={{ padding: "22px 32px 0", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
+              className="md:hidden"
               onClick={step === 1 ? onClose : () => setStep(s => (s - 1) as 1 | 2 | 3)}
-              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)" }}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)", flexShrink: 0 }}
             >
               <ArrowLeft style={{ width: 14, height: 14 }} />
             </button>
             <div>
               <p style={mono}>Step {step} of {STEPS.length}</p>
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, margin: "2px 0 0", color: "var(--ink)", letterSpacing: "-0.01em" }}>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 600, margin: "4px 0 0", color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
                 {STEPS[stepIdx]}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)" }}>
+          <button className="md:hidden" onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--body)", flexShrink: 0 }}>
             <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
@@ -8700,14 +8703,15 @@ function GroupGeneratorWizard({
             </div>
           ))}
         </div>
+        </div>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px 40px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px 44px" }}>
 
         {/* ── Step 1: Pick pool ── */}
         {step === 1 && (
-          <div style={{ maxWidth: 560 }}>
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
             <p style={{ fontSize: 14, color: "var(--body)", marginBottom: 24 }}>
               Choose who to draw from. The algorithm will run on this set of people.
             </p>
@@ -8802,7 +8806,7 @@ function GroupGeneratorWizard({
 
         {/* ── Step 2: Configure ── */}
         {step === 2 && (
-          <div style={{ maxWidth: 520 }}>
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
             {/* Num groups — replaced by DGL count in SG mode */}
             {!(smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0) && (
               <div style={{ marginBottom: 28 }}>
@@ -8929,7 +8933,7 @@ function GroupGeneratorWizard({
 
         {/* ── Step 3: Preview & adjust ── */}
         {step === 3 && (
-          <div>
+          <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             {/* Non-blocking notice carried over from generation (e.g. empty leader groups) */}
             {genError && (
               <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 10 }}>
@@ -9096,13 +9100,25 @@ function GroupGeneratorWizard({
       </div>
 
       {/* Footer */}
-      <div style={{ borderTop: "1px solid var(--line)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: "#FBF8F2" }}>
-        <p style={{ fontSize: 12, color: "var(--muted-text)", margin: 0 }}>
-          {step === 1 && (poolCount != null ? `${poolCount} people in pool` : "")}
-          {step === 2 && "You can adjust individual assignments in the next step."}
-          {step === 3 && !sgConfirmResult && "Changes are not saved until you click below."}
-        </p>
-        <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ borderTop: "1px solid var(--line)", padding: "16px 32px", flexShrink: 0, background: "#FBF8F2" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          {step === 2 && (
+            <button
+              onClick={() => setStep(1)}
+              style={{ padding: "10px 16px", border: "1px solid var(--line-2)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit", flexShrink: 0 }}
+            >
+              <ArrowLeft style={{ width: 13, height: 13 }} />
+              Back
+            </button>
+          )}
+          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: 0 }}>
+            {step === 1 && (poolCount != null ? `${poolCount} people in pool` : "")}
+            {step === 2 && "You can adjust individual assignments in the next step."}
+            {step === 3 && !sgConfirmResult && "Changes are not saved until you click below."}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           {step === 3 && !sgConfirmResult && (
             <button
               onClick={() => { setStep(2); setGroups([]); setSgGroups([]) }}
@@ -9144,6 +9160,7 @@ function GroupGeneratorWizard({
               {saving ? "Saving…" : confirmingSG ? "Confirming…" : sgGroups.length > 0 ? "Confirm groups" : "Save grouping"}
             </button>
           )}
+        </div>
         </div>
       </div>
     </AnimateIn>
