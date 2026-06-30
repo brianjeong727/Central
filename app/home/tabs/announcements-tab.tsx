@@ -919,6 +919,30 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     )
   }
 
+  // Body swap: filling out a form replaces the feed (in-content subpage §4.18) —
+  // the "Announcements" crumb (and mobile back) returns to the feed.
+  if (formFillState) {
+    const closeFill = () => setFormFillState(null)
+    return (
+      <SubpageShell
+        crumbs={[{ label: "Announcements", onClick: closeFill }, { label: formFillState.title }]}
+        width="centered"
+        maxWidth={640}
+      >
+        <FormFillView
+          formId={formFillState.formId}
+          announcementId={formFillState.announcementId}
+          userId={userId}
+          ministryId={ministryId}
+          onSubmitted={() => {
+            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
+            setFormFillState(null)
+          }}
+        />
+      </SubpageShell>
+    )
+  }
+
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
@@ -1160,21 +1184,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         >
           <Plus className="w-6 h-6 text-[var(--cream)]" />
         </button>
-      )}
-
-      {formFillState && (
-        <FormFillView
-          formId={formFillState.formId}
-          announcementId={formFillState.announcementId}
-          announcementTitle={formFillState.title}
-          userId={userId}
-          ministryId={ministryId}
-          onClose={() => setFormFillState(null)}
-          onSubmitted={() => {
-            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
-            setFormFillState(null)
-          }}
-        />
       )}
     </div>
   )
@@ -1631,27 +1640,36 @@ export function AnnouncementDetailView({
   // In-content subpage (DESIGN_SYSTEM §4.18) — the shell breadcrumb is the back
   // affordance; no standalone X. The "Announcements" crumb routes to the list AND
   // closes the detail (one atomic URL update upstream). Cream-on-cream, no shadow.
-  const crumbs = [
-    { label: "Announcements", onClick: onGoToList },
-    { label: ann?.title || "Announcement" },
-  ]
+  // When the form is open, the SAME SubpageShell swaps its body to FormFillView and
+  // extends the trail with a "Form" crumb; the announcement-title crumb becomes the
+  // back into the detail (closeForm). The crumbs array is derived from formFillOpen,
+  // so useSubpageCrumbs re-pushes automatically on toggle — no nested SubpageShell.
+  const closeForm = () => setFormFillOpen(false)
+  const title = ann?.title || "Announcement"
+  const formOpen = formFillOpen && !!ann?.form_id
+  const crumbs = formOpen
+    ? [
+        { label: "Announcements", onClick: onGoToList },
+        { label: title, onClick: closeForm },
+        { label: "Form" },
+      ]
+    : [
+        { label: "Announcements", onClick: onGoToList },
+        { label: title },
+      ]
 
   return (
     <SubpageShell crumbs={crumbs} width="full">
-      <DetailContent />
-
-      {/* FormFillView stays a fixed overlay for now (migrated in a later batch);
-          it renders over the detail temporarily — accepted interim state. */}
-      {formFillOpen && ann?.form_id && (
+      {formOpen ? (
         <FormFillView
-          formId={ann.form_id}
-          announcementId={ann.id}
-          announcementTitle={ann.title}
+          formId={ann!.form_id!}
+          announcementId={ann!.id}
           userId={userId}
           ministryId={ministryId}
-          onClose={() => setFormFillOpen(false)}
           onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
         />
+      ) : (
+        <DetailContent />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
