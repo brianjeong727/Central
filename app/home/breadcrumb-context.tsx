@@ -1,7 +1,12 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from "react"
 import type { Crumb } from "./types"
+
+// Layout effect on the client (runs before paint, so a host page can suppress its
+// own header in the SAME commit the subpage mounts — no header flash); plain effect
+// on the server to avoid the SSR useLayoutEffect warning.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
 
 type Ctx = { extra: Crumb[]; setExtra: (c: Crumb[]) => void }
 
@@ -21,7 +26,7 @@ export function useBreadcrumbExtra(): Crumb[] {
 export function useSubpageCrumbs(crumbs: Crumb[]) {
   const ctx = useContext(C)
   const key = crumbs.map(c => c.label).join("›")
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     ctx?.setExtra(crumbs)
     return () => ctx?.setExtra([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
