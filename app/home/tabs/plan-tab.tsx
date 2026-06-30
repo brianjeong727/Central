@@ -22,6 +22,7 @@ import { Placeholder } from "@tiptap/extension-placeholder"
 import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
+import { useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
   const now = new Date()
@@ -1929,6 +1930,10 @@ export function PlanTab({
     ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const supabase = createClient()
+  // A subpage is open somewhere in the content area when it has pushed breadcrumb
+  // crumbs. §4.18: the subpage consumes the page header, so suppress the team
+  // TabPageHeader while one is active (e.g. the finance reimbursement detail).
+  const subpageActive = useBreadcrumbExtra().length > 0
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   // Finance section is lifted to home-app (drives the sidebar nav on desktop) and synced to ?fsec.
@@ -2140,8 +2145,9 @@ export function PlanTab({
       {/* Desktop section — shell pattern */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
         {/* Page header — hidden for student org board, DGL team (both use section-level headers),
-            the no-team picker screen, and the Receipts sentinel (ReceiptsWorkspace owns its own header) */}
-        {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && (
+            the no-team picker screen, the Receipts sentinel (ReceiptsWorkspace owns its own header),
+            and whenever a subpage is open (§4.18: the subpage consumes the page header). */}
+        {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && !subpageActive && (
           <TabPageHeader>
             {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow.
                 Shared by every non-section workspace kind (praise, finance, etc.). */}
@@ -2304,20 +2310,20 @@ export function PlanTab({
             onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
           />
         ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
-          /* Desktop: section nav lives in the sidebar (FinanceSectionNav) — no content strip here */
-          <div className="px-5 md:px-14 py-7">
-            <FinanceWorkspace
-              ministryId={ministryId}
-              userId={userId}
-              userName={userName}
-              userRole={activeUserTeam?.roleName ?? ""}
-              section={financeSection}
-              onSectionChange={setFinanceSection}
-              canEditBudget={financeCanEdit}
-              canAccessReimbursements={financeCanEdit}
-              readOnly={govView}
-            />
-          </div>
+          /* Desktop: section nav lives in the sidebar (FinanceSectionNav) — no content strip here.
+             Mounted BARE (no px wrapper): FinanceWorkspace owns its own inset internally so its
+             reimbursement-detail SubpageShell stays full-bleed (single inset). */
+          <FinanceWorkspace
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            userRole={activeUserTeam?.roleName ?? ""}
+            section={financeSection}
+            onSectionChange={setFinanceSection}
+            canEditBudget={financeCanEdit}
+            canAccessReimbursements={financeCanEdit}
+            readOnly={govView}
+          />
         ) : teamKind === "dgPraise" && activeTeamId ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
@@ -2408,17 +2414,11 @@ export function PlanTab({
       </div>
       </div>
 
-      {/* Mobile content */}
-      <div className="md:hidden px-5 pb-4">
-        {activeTeamId && govView && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
-            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
-            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
-              Viewing as admin · read-only
-            </span>
-          </div>
-        )}
-        {activeTeamId === "receipts" ? (
+      {/* Mobile content. Receipts + Finance render FULL-BLEED (no px-5 wrapper) so their
+          detail SubpageShell is the only horizontal inset; each supplies its own inset
+          internally. Every other team kind keeps the shared px-5 wrapper. */}
+      {activeTeamId === "receipts" ? (
+        <div className="md:hidden pb-4">
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
@@ -2428,28 +2428,51 @@ export function PlanTab({
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
             onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
           />
-        ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
-          <div>
-            <div style={{ marginBottom: 16 }}>
-              <PlanSubTabStrip
-                tabs={financeStripTabs}
-                active={financeSection}
-                onChange={k => setFinanceSection(k as FinanceSection)}
-              />
+        </div>
+      ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
+        <div className="md:hidden pb-4">
+          {/* govView banner + section strip each carry their own px-5 mobile inset;
+              FinanceWorkspace is bare so its detail SubpageShell stays full-bleed. */}
+          {govView && (
+            <div className="px-5">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
+                <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
+                <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
+                  Viewing as admin · read-only
+                </span>
+              </div>
             </div>
-            <FinanceWorkspace
-              ministryId={ministryId}
-              userId={userId}
-              userName={userName}
-              userRole={activeUserTeam?.roleName ?? ""}
-              section={financeSection}
-              onSectionChange={setFinanceSection}
-              canEditBudget={financeCanEdit}
-              canAccessReimbursements={financeCanEdit}
-              readOnly={govView}
+          )}
+          <div className="px-5" style={{ marginBottom: 16 }}>
+            <PlanSubTabStrip
+              tabs={financeStripTabs}
+              active={financeSection}
+              onChange={k => setFinanceSection(k as FinanceSection)}
             />
           </div>
-        ) : teamKind === "dgPraise" && activeTeamId ? (
+          <FinanceWorkspace
+            ministryId={ministryId}
+            userId={userId}
+            userName={userName}
+            userRole={activeUserTeam?.roleName ?? ""}
+            section={financeSection}
+            onSectionChange={setFinanceSection}
+            canEditBudget={financeCanEdit}
+            canAccessReimbursements={financeCanEdit}
+            readOnly={govView}
+          />
+        </div>
+      ) : (
+      <div className="md:hidden px-5 pb-4">
+        {activeTeamId && govView && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
+            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
+              Viewing as admin · read-only
+            </span>
+          </div>
+        )}
+        {teamKind === "dgPraise" && activeTeamId ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2558,6 +2581,7 @@ export function PlanTab({
           </>
         )}
       </div>
+      )}
 
       {showCreateTeam && (
         <AddWorkspaceModal

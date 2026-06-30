@@ -1,15 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { createPortal } from "react-dom"
 import { createClient } from "@/lib/supabase"
 import {
-  Plus, X, ArrowLeft,
+  Plus, X,
   Upload, Download, DollarSign, AlertTriangle,
   ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE } from "./shared"
-import { MonogramChip, FilterDropdown } from "@/components/central"
+import { MonogramChip, FilterDropdown, SubpageShell } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
@@ -295,8 +294,24 @@ function ReimbursementInbox({
   )
   const shown = filter === "needs" ? needsAction : items
 
+  // Detail consumes the surface as an in-content subpage (replaces the inbox list).
+  // Rendered FULL-BLEED (no px wrapper) so SubpageShell's px-5 md:px-14 is the only
+  // horizontal inset — the surrounding non-detail views supply their own inset below.
+  if (detail) {
+    return (
+      <InboxDetailOverlay
+        receipt={detail}
+        ministryId={ministryId}
+        canApprove={uiCanApprove}
+        canSignOff={uiCanSignOff}
+        onClose={() => setDetail(null)}
+        onActed={() => { setDetail(null); onRefetch() }}
+      />
+    )
+  }
+
   return (
-    <div>
+    <div className="px-5 md:px-14 py-7">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
         <h2 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, letterSpacing: -0.2, color: "var(--ink)", margin: 0 }}>
           Reimbursements inbox
@@ -321,17 +336,6 @@ function ReimbursementInbox({
             <InboxRow key={r.id} receipt={r} first={i === 0} onClick={() => setDetail(r)} />
           ))}
         </div>
-      )}
-
-      {detail && (
-        <InboxDetailOverlay
-          receipt={detail}
-          ministryId={ministryId}
-          canApprove={uiCanApprove}
-          canSignOff={uiCanSignOff}
-          onClose={() => setDetail(null)}
-          onActed={() => { setDetail(null); onRefetch() }}
-        />
       )}
     </div>
   )
@@ -358,9 +362,6 @@ function InboxDetailOverlay({
   onClose: () => void
   onActed: () => void
 }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
   const [mode, setMode] = useState<"idle" | "reject" | "decline">("idle")
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
@@ -395,27 +396,9 @@ function InboxDetailOverlay({
     border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
 
-  const overlay = (
-    <div className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 md:pt-5 pb-3.5 border-b border-[var(--line)]">
-        <button
-          onClick={onClose}
-          className="hover:bg-[#F2EDE0] transition-colors"
-          style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ivory)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-        >
-          <ArrowLeft size={16} color="var(--ink)" />
-        </button>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Reimbursement</p>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 19, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {r.event_name || r.category_name || r.category || "Receipt"}
-          </p>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "22px 20px 40px" }}>
+  return (
+    <SubpageShell crumbs={[{ label: "Reimbursements", onClick: onClose }, { label: r.event_name || r.category_name || r.category || "Receipt" }]} width="full">
+      <div>
         {/* Amount + status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
@@ -491,9 +474,9 @@ function InboxDetailOverlay({
         </div>
       </div>
 
-      {/* Action footer — role-gated */}
+      {/* Action footer — role-gated, inline (scrolls with the receipt body) */}
       {hasFooter && (
-        <div style={{ padding: "14px 20px 24px", borderTop: "1px solid var(--line)", background: "var(--cream)" }}>
+        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
           {error && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "0 0 10px" }}>{error}</p>}
 
           {mode === "reject" || mode === "decline" ? (
@@ -543,11 +526,8 @@ function InboxDetailOverlay({
           )}
         </div>
       )}
-    </div>
+    </SubpageShell>
   )
-
-  if (!mounted) return null
-  return createPortal(overlay, document.body)
 }
 
 // ── FinanceWorkspace ────────────────────────────────────────────────────────────
@@ -739,19 +719,22 @@ export function FinanceWorkspace({
       )}
 
       {/* ── Allocation ── */}
+      {/* Non-detail views own their inset (workspace is mounted full-bleed). */}
       {section === "allocation" && budgetAccess && (
-        <AllocationSection
-          ministryId={ministryId}
-          canEdit={canManage}
-          categories={dynamicCategories}
-          onAddCategory={handleAddCategory}
-          onDeleteCategory={handleDeleteCategory}
-        />
+        <div className="px-5 md:px-14 py-7">
+          <AllocationSection
+            ministryId={ministryId}
+            canEdit={canManage}
+            categories={dynamicCategories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        </div>
       )}
 
       {/* ── Budget ── */}
       {section === "budget" && budgetAccess && (
-        <div>
+        <div className="px-5 md:px-14 py-7">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Expense ledger</p>
             {canManage && (

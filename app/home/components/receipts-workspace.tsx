@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createPortal } from "react-dom"
-import { X, ArrowLeft, Plus, Image as ImageIcon, Settings } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip } from "@/components/central"
+import { X, Plus, Image as ImageIcon, Settings } from "lucide-react"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell } from "@/components/central"
 import { HeaderActionButton } from "./shared"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
@@ -58,6 +57,9 @@ export function ReceiptsWorkspace({
   const [categories, setCategories] = useState<ReceiptCategory[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
+  // Owns the read-only receipt detail subpage (lifted out of CategoryContent so it
+  // can render full-bleed, outside the padded content region — no double inset).
+  const [detail, setDetail] = useState<{ receipt: ReceiptRow; categoryName: string; teamName: string } | null>(null)
 
   const teamId = activeTeam?.id ?? null
 
@@ -84,7 +86,10 @@ export function ReceiptsWorkspace({
 
   return (
     <>
-      {/* Desktop header (TabPageHeader is hidden on mobile) */}
+      {/* Desktop header (TabPageHeader is hidden on mobile) — suppressed when a
+          detail subpage is open so the subpage consumes the page header (§4.18)
+          and the header doesn't add a ~52px sibling that double-scrolls the body. */}
+      {!detail && (
       <TabPageHeader>
         {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow. */}
         <PageTitle
@@ -103,10 +108,22 @@ export function ReceiptsWorkspace({
           </button>
         )}
       </TabPageHeader>
+      )}
 
-      {/* Mobile team selector — desktop selects teams from the sidebar */}
+      {detail ? (
+        <ReceiptDetailOverlay
+          receipt={detail.receipt}
+          categoryName={detail.categoryName}
+          teamName={detail.teamName}
+          onClose={() => setDetail(null)}
+        />
+      ) : (
+      <>
+      {/* Mobile team selector — desktop selects teams from the sidebar.
+          px-5: workspace is now mounted full-bleed (no parent px wrapper), so it
+          supplies its own mobile inset internally. */}
       {teams.length > 0 && (
-        <div className="flex md:hidden" style={{ gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
+        <div className="flex md:hidden px-5" style={{ gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
           {teams.map(t => {
             const isActive = t.id === activeReceiptsTeamId
             return (
@@ -138,23 +155,26 @@ export function ReceiptsWorkspace({
           for the collection lives by the collection's header, not the page title.
           Renders whenever a team is selected — even with zero categories. */}
       {teamId && (
-        <div className="flex items-center justify-between gap-3 px-5 md:px-14 pt-1 pb-3">
+        <div className="flex items-center justify-between gap-3 px-5 md:px-14 pt-7 pb-3">
           <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
           <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
         </div>
       )}
 
-      {/* Category strip — at component root per convention #16 (self-insets md:pl-14) */}
+      {/* Category strip — convention #16 (self-insets md:pl-14 on desktop). Mobile
+          inset comes from the px-5 wrapper (md:px-0 → no desktop double-inset). */}
       {teamId && categories.length > 0 && (
-        <PlanSubTabStrip
-          tabs={stripTabs}
-          active={activeCategoryId ?? ""}
-          onChange={setActiveCategoryId}
-        />
+        <div className="px-5 md:px-0">
+          <PlanSubTabStrip
+            tabs={stripTabs}
+            active={activeCategoryId ?? ""}
+            onChange={setActiveCategoryId}
+          />
+        </div>
       )}
 
       {/* Content region */}
-      <div className="md:px-14 py-7">
+      <div className="px-5 md:px-14 py-7">
         {!teamId ? (
           <EmptyBlock
             title="No teams yet."
@@ -178,8 +198,8 @@ export function ReceiptsWorkspace({
             ministryId={ministryId}
             userId={userId}
             teamId={teamId!}
-            teamName={activeTeam?.name ?? ""}
             category={activeCategory}
+            onOpenDetail={(receipt) => setDetail({ receipt, categoryName: activeCategory.name, teamName: activeTeam?.name ?? "" })}
           />
         ) : null}
       </div>
@@ -191,6 +211,8 @@ export function ReceiptsWorkspace({
           onClose={() => setShowAddCategory(false)}
           onCreated={handleCategoryCreated}
         />
+      )}
+      </>
       )}
     </>
   )
@@ -223,19 +245,18 @@ function fundLabel(fund?: string) {
 }
 
 function CategoryContent({
-  ministryId, userId, teamId, teamName, category,
+  ministryId, userId, teamId, category, onOpenDetail,
 }: {
   ministryId: string
   userId: string
   teamId: string
-  teamName: string
   category: ReceiptCategory
+  onOpenDetail: (receipt: ReceiptRow) => void
 }) {
   const supabase = createClient()
   const [receipts, setReceipts] = useState<ReceiptRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showSubmit, setShowSubmit] = useState(false)
-  const [detail, setDetail] = useState<ReceiptRow | null>(null)
 
   const refresh = useCallback(async () => {
     const { data } = await supabase
@@ -297,7 +318,7 @@ function CategoryContent({
                 key={r.id}
                 receipt={r}
                 first={i === 0}
-                onClick={() => setDetail(r)}
+                onClick={() => onOpenDetail(r)}
               />
             ))}
           </div>
@@ -313,15 +334,6 @@ function CategoryContent({
           categoryFund={category.fund}
           onClose={() => setShowSubmit(false)}
           onSubmitted={() => { setShowSubmit(false); refresh() }}
-        />
-      )}
-
-      {detail && (
-        <ReceiptDetailOverlay
-          receipt={detail}
-          categoryName={category.name}
-          teamName={teamName}
-          onClose={() => setDetail(null)}
         />
       )}
     </div>
@@ -389,9 +401,6 @@ function ReceiptDetailOverlay({
   teamName: string
   onClose: () => void
 }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
   const isNegative = receipt.status === "rejected" || receipt.status === "declined"
   // Where the receipt sits on the Submitted → Approved → Reimbursed path.
   const reachedIndex = receipt.status === "reimbursed" ? 2 : receipt.status === "approved" ? 1 : 0
@@ -402,27 +411,9 @@ function ReceiptDetailOverlay({
     return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
   })()
 
-  const overlay = (
-    <div className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 md:pt-5 pb-3.5 border-b border-[var(--line)]">
-        <button
-          onClick={onClose}
-          className="hover:bg-[#F2EDE0] transition-colors"
-          style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ivory)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-        >
-          <ArrowLeft size={16} color="var(--ink)" />
-        </button>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Receipt</p>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 19, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {receipt.event_name || "Receipt"}
-          </p>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "22px 20px 40px" }}>
+  return (
+    <SubpageShell crumbs={[{ label: categoryName, onClick: onClose }, { label: receipt.event_name || "Receipt" }]} width="full">
+      <div>
         {/* Amount + status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
@@ -497,11 +488,8 @@ function ReceiptDetailOverlay({
           )}
         </div>
       </div>
-    </div>
+    </SubpageShell>
   )
-
-  if (!mounted) return null
-  return createPortal(overlay, document.body)
 }
 
 function EmptyBlock({ title, subtitle }: { title: string; subtitle: string }) {
