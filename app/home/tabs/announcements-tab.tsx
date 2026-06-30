@@ -130,14 +130,20 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     let imageUrl: string | null = null
     if (imageFile) {
       const ext = imageFile.name.split(".").pop()
-      const fileName = `${Date.now()}.${ext}`
+      // Ministry-scoped path — matches the `announcement_images_insert` storage
+      // RLS policy (announcements/<ministry_id>/…). A bucket-root path is denied.
+      const fileName = `announcements/${ministryId}/${Date.now()}.${ext}`
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("announcement-images")
-        .upload(fileName, imageFile, { upsert: true })
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(uploadData.path)
-        imageUrl = publicUrl
+        .upload(fileName, imageFile, { upsert: false })
+      if (uploadError || !uploadData) {
+        // Surface the failure instead of silently publishing with no image.
+        setError(`Image upload failed: ${uploadError?.message ?? "unknown error"}`)
+        setSubmitting(false)
+        return
       }
+      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(uploadData.path)
+      imageUrl = publicUrl
     } else if (imagePreview) {
       imageUrl = imagePreview
     }
