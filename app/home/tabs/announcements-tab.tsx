@@ -5,8 +5,8 @@ import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, SubpageShell } from "@/components/central"
+import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, HeaderActionButton } from "../components/shared"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -24,6 +24,16 @@ interface DraftField {
 
 let _tempIdCounter = 0
 function newTempId() { return `draft-${++_tempIdCounter}` }
+
+// Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
+// <input type="datetime-local"> expects (local time, not UTC).
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const AUDIENCE_OPTIONS = [
   { value: "all", label: "Everyone" },
@@ -54,6 +64,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [body, setBody] = useState(existing?.body ?? "")
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
+  const [eventDate, setEventDate] = useState(isoToLocalInput(existing?.event_date))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
@@ -111,6 +122,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   async function handleSubmit(e: React.FormEvent, asDraft = false) {
     e.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
+    if (!asDraft && isEvent && !eventDate.trim()) { setError("Events need a date & time before publishing."); return }
     setSubmitting(true)
     setError(null)
     const status = asDraft ? "draft" : "published"
@@ -118,14 +130,20 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     let imageUrl: string | null = null
     if (imageFile) {
       const ext = imageFile.name.split(".").pop()
-      const fileName = `${Date.now()}.${ext}`
+      // Ministry-scoped path — matches the `announcement_images_insert` storage
+      // RLS policy (announcements/<ministry_id>/…). A bucket-root path is denied.
+      const fileName = `announcements/${ministryId}/${Date.now()}.${ext}`
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("announcement-images")
-        .upload(fileName, imageFile, { upsert: true })
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(uploadData.path)
-        imageUrl = publicUrl
+        .upload(fileName, imageFile, { upsert: false })
+      if (uploadError || !uploadData) {
+        // Surface the failure instead of silently publishing with no image.
+        setError(`Image upload failed: ${uploadError?.message ?? "unknown error"}`)
+        setSubmitting(false)
+        return
       }
+      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(uploadData.path)
+      imageUrl = publicUrl
     } else if (imagePreview) {
       imageUrl = imagePreview
     }
@@ -136,15 +154,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl, status })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
@@ -271,13 +289,22 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             </div>
           </div>
           {isEvent && (
-            <div className="flex items-start gap-3">
-              <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
-              </button>
-              <div>
-                <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
-                <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
+                <input
+                  type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                  style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                />
+              </div>
+              <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+                </div>
               </div>
             </div>
           )}
@@ -383,17 +410,26 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               </div>
             </div>
             {isEvent && (
-              <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAttendees((v) => !v)}
-                  style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
-                >
-                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
-                </button>
-                <div>
-                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
-                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
+                  <input
+                    type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                    style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                  />
+                </div>
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttendees((v) => !v)}
+                    style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                  >
+                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                  </button>
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
+                    <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -552,13 +588,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 // ── Inline Edit Form (shared across card types) ──────────────────────────────
 
 function InlineEditFields({
-  title, body, audience, isEvent, showAttendees,
-  onTitle, onBody, onAudience, onIsEvent, onShowAttendees,
+  title, body, audience, isEvent, eventDate, showAttendees,
+  onTitle, onBody, onAudience, onIsEvent, onEventDate, onShowAttendees,
   onSave, onCancel, saving, dark,
 }: {
-  title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean
+  title: string; body: string; audience: string; isEvent: boolean; eventDate: string; showAttendees: boolean
   onTitle: (v: string) => void; onBody: (v: string) => void
-  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void; onShowAttendees: (v: boolean) => void
+  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void; onEventDate: (v: string) => void; onShowAttendees: (v: boolean) => void
   onSave: () => void; onCancel: () => void
   saving: boolean; dark?: boolean
 }) {
@@ -629,7 +665,16 @@ function InlineEditFields({
           }} />
         </button>
       </div>
-      {/* Show attendees toggle — only relevant for events */}
+      {/* Event date + show attendees — only relevant for events */}
+      {isEvent && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+          <span style={{ fontSize: 12, color: fgMuted }}>Event date &amp; time</span>
+          <input
+            type="datetime-local" value={eventDate} onChange={(e) => onEventDate(e.target.value)} required
+            style={{ fontSize: 12, color: fg, background: "transparent", border: `1px solid ${borderColor}`, borderRadius: "var(--r-input)", padding: "7px 9px", outline: "none", width: "100%", fontFamily: "inherit" }}
+          />
+        </div>
+      )}
       {isEvent && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
           <span style={{ fontSize: 12, color: fgMuted }}>Show attendees publicly</span>
@@ -1407,11 +1452,26 @@ const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
 const DETAIL_MONO = EYEBROW_STYLE
 
+// ── Detail date-part helpers (sync, local) ───────────────────────────────────
+function detailWeekday(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { weekday: "long" })
+}
+function detailMonthDay(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+function detailTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+}
+function detailPosted(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 interface DetailAnnouncement {
   id: string
   title: string
   body: string
   created_at: string
+  event_date: string | null
   is_pinned: boolean
   is_event: boolean
   image_url: string | null
@@ -1533,104 +1593,117 @@ export function AnnouncementDetailView({
         <button onClick={onGoToList} className="text-[13px] text-[var(--body)] bg-transparent border-none cursor-pointer">← Back to announcements</button>
       </div>
     )
-    return (
-      <>
-        {/* ── Mobile: single column (SubpageShell owns scroll + horizontal inset) ── */}
-        <div className="md:hidden flex flex-col gap-5">
-          {ann.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ann.image_url} alt={ann.title} className="w-full h-48 object-cover rounded-xl" />
+    // Adaptive: an aside rail appears only when there's an event or a form.
+    const hasAside = ann.is_event || ann.has_form
+    // The form's button takes the loud (primary) fill only when it's the lone
+    // action; if an event already owns the primary RSVP, the form drops to outline.
+    const formIsPrimary = !ann.is_event
+    const eyebrowSrc = ann.is_event && ann.event_date ? ann.event_date : ann.created_at
+
+    const eyebrowRow = (
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span style={monoStyle}>{formatDate(eyebrowSrc)}</span>
+        {ann.audience && ann.audience !== "all" && (
+          <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+        )}
+        {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
+      </div>
+    )
+
+    // ── Aside modules (event / form / posted) — each flush, top hairline ──
+    const asideModules: React.ReactNode[] = []
+    if (ann.is_event) {
+      asideModules.push(
+        <div key="event">
+          <div style={{ ...monoStyle }}>Event</div>
+          {ann.event_date && (
+            <>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
+            </>
           )}
-          {/* Eyebrow */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span style={monoStyle}>{formatDate(ann.created_at)}</span>
-            {ann.audience && ann.audience !== "all" && (
-              <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
-            )}
-            {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
-          </div>
-          {/* Serif title */}
-          <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0 }}>{ann.title}</h1>
-          {/* Body — newlines preserved */}
-          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 16, lineHeight: 1.7, color: "#2D2836", whiteSpace: "pre-wrap" }}>{ann.body}</div>
-          {/* Divider + stats */}
-          <div style={{ height: 1, background: "var(--line)" }} />
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-            {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
-          </div>
-          {/* RSVP */}
-          {ann.is_event && (
-            <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
-              {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
-            </button>
-          )}
-          {/* Attendees */}
+          <CentralButton
+            variant={ann.user_has_rsvped ? "plum-outline" : "primary"}
+            onClick={handleRsvp}
+            disabled={rsvping}
+            style={{ width: "100%", marginTop: 18 }}
+          >
+            {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+          </CentralButton>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
-            <div>
-              <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
-              </div>
+            <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
             </div>
-          )}
-          {/* Form */}
-          {ann.has_form && (
-            ann.user_has_responded
-              ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-              : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
           )}
         </div>
+      )
+    }
+    if (ann.has_form) {
+      asideModules.push(
+        <div key="form">
+          <div style={{ ...monoStyle }}>Form</div>
+          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 600, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
+          {ann.user_has_responded ? (
+            <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C", marginTop: 14 }}><FileText className="w-3.5 h-3.5" />Form submitted</div>
+          ) : (
+            <CentralButton
+              variant={formIsPrimary ? "primary" : "plum-outline"}
+              onClick={() => setFormFillOpen(true)}
+              style={{ width: "100%", marginTop: 18 }}
+            >
+              <FileText style={{ width: 14, height: 14 }} />Fill out form
+            </CentralButton>
+          )}
+        </div>
+      )
+    }
+    asideModules.push(
+      <div key="posted">
+        <div style={{ ...monoStyle }}>Posted</div>
+        <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}>
+          {detailPosted(ann.created_at)}<br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+        </div>
+      </div>
+    )
 
-        {/* ── Desktop: full-width reading column (SubpageShell owns scroll + inset) ── */}
-        <div className="hidden md:flex md:flex-col">
-          {/* Image */}
-          {ann.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ann.image_url} alt={ann.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 12, marginBottom: 28, flexShrink: 0 }} />
-          )}
-          {/* Eyebrow */}
-          <div className="flex flex-wrap items-center gap-2.5 mb-3">
-            <span style={monoStyle}>{formatDate(ann.created_at)}</span>
-            {ann.audience && ann.audience !== "all" && (
-              <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
-            )}
-            {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
+    return (
+      // SubpageShell owns scroll + horizontal inset (px-5 md:px-14) + vertical
+      // padding. No own scroll wrapper / px inset here — that would double both.
+      <>
+        {/* Image banner — full-bleed: negate the shell's horizontal inset and
+            top padding so it hugs the edges; keeps its bottom hairline. */}
+        {ann.image_url && (
+          <div className="-mx-5 md:-mx-14 -mt-7" style={{ borderBottom: "1px solid var(--line)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ann.image_url} alt={ann.title} className="w-full h-48 md:h-[300px] object-cover block" />
           </div>
-          {/* Serif title — same sizing as edit modal's title input (40px) */}
-          <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "var(--ink)", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid var(--line-2)", flexShrink: 0 }}>{ann.title}</h1>
-          {/* Body — serif 19px, newlines preserved (matches edit modal body textarea) */}
-          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "var(--ink)", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
-          {/* Stats */}
-          <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--line)", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-            <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-            {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
-          </div>
-          {/* RSVP */}
-          {ann.is_event && (
-            <div style={{ marginTop: 20 }}>
-              <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "var(--cream)", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
-                {ann.user_has_rsvped ? <><Check style={{ width: 14, height: 14 }} />Going — click to undo</> : "RSVP"}
-              </button>
-            </div>
-          )}
-          {/* Attendees */}
-          {showAttendees && (
-            <div style={{ marginTop: 20 }}>
-              <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+        )}
+        {/* Body — single column, or 1.7fr / 1fr when an aside is present.
+            Horizontal inset comes from SubpageShell; keep only vertical py + gaps. */}
+        <div className={`py-6 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
+          {/* Main */}
+          <div className="min-w-0">
+            {eyebrowRow}
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 600, fontSize: "clamp(28px, 5vw, 46px)", letterSpacing: "-0.02em", lineHeight: 1.02, color: "var(--ink)", margin: "13px 0 0" }}>{ann.title}</h1>
+            <div style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            {/* No aside → posted/views anchor the bottom of the single column */}
+            {!hasAside && (
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--faint)" }}>
+                Posted {detailPosted(ann.created_at)} · {ann.view_count} {ann.view_count === 1 ? "view" : "views"}
               </div>
-            </div>
-          )}
-          {/* Form */}
-          {ann.has_form && (
-            <div style={{ marginTop: 20 }}>
-              {ann.user_has_responded
-                ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
-              }
-            </div>
+            )}
+          </div>
+          {/* Aside rail — event / form / posted modules */}
+          {hasAside && (
+            <aside className="flex flex-col">
+              {asideModules.map((mod, i) => (
+                <div key={i} style={{ padding: i === 0 ? "0 0 24px" : "24px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                  {mod}
+                </div>
+              ))}
+            </aside>
           )}
         </div>
       </>
