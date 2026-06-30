@@ -20,6 +20,7 @@ import { fetchChatList } from "./chat-list"
 // Components
 import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
+import { BreadcrumbProvider } from "./breadcrumb-context"
 
 // Tabs
 // HomeTab stays eager — it's the default landing tab. Every other tab (and the
@@ -891,7 +892,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         onDismissNavHint={() => setHintDismissed(true)}
       />
 
-      {/* Content + bottom nav wrapper */}
+      {/* Content + bottom nav wrapper — BreadcrumbProvider wraps both the topbar
+          and the scroll area so subpages rendered in the content can extend the
+          shell breadcrumb (see app/home/breadcrumb-context.tsx). */}
+      <BreadcrumbProvider>
       <div className="md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0">
 
         {/* Shell topbar — suppressed on chats and on planning team picker (picker has its own full-width header) */}
@@ -1125,6 +1129,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         />
 
       </div>
+      </BreadcrumbProvider>
 
       {/* Global ChatScreen overlay — mobile always, desktop only when not on chats tab */}
       {globalOpenChat && !(isDesktop && activeTab === "chats") && (

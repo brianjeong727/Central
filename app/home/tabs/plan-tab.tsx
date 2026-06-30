@@ -45,7 +45,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -876,15 +876,7 @@ export function MeetingNoteDetail({
   })()
 
   return (
-    <div>
-      {/* Back affordance */}
-      <button
-        onClick={onBack}
-        style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--muted-text)", fontSize: 13, cursor: "pointer", marginBottom: 16 }}
-      >
-        <ArrowLeft style={{ width: 13, height: 13 }} /> Meeting Notes
-      </button>
-
+    <SubpageShell crumbs={[{ label: "Meeting Notes", onClick: onBack }, { label: note.title || "Untitled" }]} width="full">
       <div style={{ background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", overflow: "hidden" }}>
         {/* Date strip — inset tone to sit above the cream editor body */}
         <div
@@ -946,7 +938,7 @@ export function MeetingNoteDetail({
           canWrite={canWrite}
         />
       </div>
-    </div>
+    </SubpageShell>
   )
 }
 
@@ -1089,13 +1081,17 @@ export function MeetingNotesSection({
             const editorName = names[editorId] ?? "Someone"
             const editedAt = note.updated_at ?? note.created_at
             return (
-              <div
+              <button
                 key={note.id}
+                type="button"
                 onClick={() => onOpenNote(note.id)}
+                aria-label={`View ${note.title || "note"}`}
                 className="hover:border-[var(--plum)] transition-colors"
                 style={{
+                  width: "100%",
+                  textAlign: "left",
                   background: "var(--cream)",
-                  borderRadius: 12,
+                  borderRadius: "var(--r-card)",
                   border: "1px solid var(--line)",
                   padding: "13px 18px",
                   cursor: "pointer",
@@ -1114,8 +1110,8 @@ export function MeetingNotesSection({
                     Last edited by {editorName} · {formatRelativeTime(editedAt)}
                   </p>
                 </div>
-                <ChevronRight size={14} style={{ color: "var(--faint)", flexShrink: 0 }} />
-              </div>
+                <ChevronRight size={14} aria-hidden style={{ color: "var(--faint)", flexShrink: 0 }} />
+              </button>
             )
           })}
         </div>
@@ -1367,6 +1363,13 @@ export function StudentOrgTeamHome({
   const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
   const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
 
+  // Note detail consumes the whole content body on BOTH viewports: the section
+  // header is suppressed and MeetingNotesSection (which early-returns the
+  // SubpageShell-wrapped detail) renders full-bleed, OUTSIDE the px-5 md:px-14
+  // wrapper — so SubpageShell's own padding is the only inset (no double-padding
+  // on mobile). The desktop TabPageHeader gate below still ANDs with isDesktopView.
+  const meetingNoteOpen = displaySection === "Meeting Notes" && openNoteId != null
+
   return (
     <>
     <div>
@@ -1399,8 +1402,8 @@ export function StudentOrgTeamHome({
         </div>
       )}
 
-      {/* Desktop section header — shared TabPageHeader + PageTitle */}
-      {isDesktopView && (() => {
+      {/* Desktop section header — shared TabPageHeader + PageTitle (suppressed when a note is open) */}
+      {isDesktopView && !meetingNoteOpen && (() => {
         const sectionMeta: Record<string, string> = {
           General: "General", "Meeting Notes": "Meeting Notes", Events: "Events",
           Resources: "Resources", Groups: "Groups", Rotations: "Rotations",
@@ -1446,6 +1449,10 @@ export function StudentOrgTeamHome({
       )}
 
       {/* ── Tab content ── */}
+      {/* Note detail goes full-bleed (SubpageShell supplies cream bg + padding); everything else stays in the padded wrapper. */}
+      {meetingNoteOpen ? (
+        <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
+      ) : (
       <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
 
         {/* GENERAL — calendar full-width + meeting notes */}
@@ -1639,6 +1646,7 @@ export function StudentOrgTeamHome({
           />
         )}
       </div>
+      )}
     </div>
 
     {showAddModal && (

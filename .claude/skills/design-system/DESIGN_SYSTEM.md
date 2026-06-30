@@ -355,12 +355,24 @@ Modals are reserved for *new-X* flows where context needs to be preserved (e.g. 
 - Panel: 520–600 wide, cream bg, 1px `#E2DDCF`, radius 18, shadow `0 30px 80px rgba(20,16,26,0.18)`.
 - Close button: 28 sq, radius 8, 1px `#E2DDCF`, top-right.
 
-### 4.18 Empty / placeholder state
+### 4.18 Triggered subpage
+A **subpage** is a body button opening a temporary view or action surface (a note detail, a record detail, a fill-out form, an editor). It is **not** a modal.
+- **Consumes the full content body AND the page's own header.** The originating page's `TabPageHeader` does NOT survive — the subpage replaces it.
+- **Content is full-width or centered** — never a small randomly-margined slice, never inline-within-the-parent's-padding. `width="full"` uses the standard `md:px-14` content inset; `width="centered"` uses a centered `maxWidth` column for small content.
+- **Cream-on-cream only.** Background is `--cream`; components inside use `--cream-2` / `--ivory` / `--line`. Never `bg-white`, never inverted/dark.
+- **No drop shadow** — a subpage is not a floating layer.
+- **The shell breadcrumb persists and IS the back.** The subpage appends its own crumb(s) via the breadcrumb context; the parent crumb's `onClick` is the back. There is **NO** standalone "← Back" / "All workspaces" button.
+- It renders **in the content area** — **never** a `fixed inset-0` portal.
+- **Mobile** has no breadcrumb (it's desktop-only), so `SubpageShell` renders a single `md:hidden` back row derived from the parent crumb. Desktop stays breadcrumb-only; mobile gets that one back affordance automatically — never hand-roll a second one.
+- Modals (scrim / centered, §4.17) are reserved for *tiny* confirmations only. Anything that could plausibly be a full-bleed page is a subpage.
+- **Canonical implementation:** `components/central/SubpageShell`.
+
+### 4.19 Empty / placeholder state
 - Use a dashed-border card (`1px dashed #C4C0B0`, radius 10–14, transparent bg) with body color text and a single `+` icon.
 - Voice: **descriptive, not chirpy.** "+ Assign someone", "+ Add image, file, or link". Never "Nothing here yet!" or emoji-led empty copy.
 - For full-section empty states, follow with one neutral guiding sentence in 13px `#8A8497`.
 
-### 4.19 Danger zone
+### 4.20 Danger zone
 Editorial inline rule, **not a red boxed callout**:
 ```
 hr-1px #E8E2D2  ──── DANGER ZONE (mono, color #9F3030) ──── hr-1px #E8E2D2

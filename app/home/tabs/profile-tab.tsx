@@ -723,7 +723,7 @@ const PROFILE_SECTIONS: {
   },
 ]
 
-// ── Danger Zone (§4.19 editorial inline rule) ─────────────────────────────────
+// ── Danger Zone (§4.20 editorial inline rule) ─────────────────────────────────
 
 function DangerZone({
   ministryName,
