@@ -399,13 +399,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       case "plan": {
         if (activeTeamId === "receipts") return [root, planningCrumb, { label: "Receipts" }]
         if (!activeTeamId || !activeTeamNameForPlan) return [root, { label: "Workspace" }]
-        if (isStudentOrgActive && studentOrgPlanningEvent) {
-          return [
-            root, planningCrumb,
-            { label: activeTeamNameForPlan, onClick: () => { setStudentOrgPlanningEvent(null); setParam("evtab", null) } },
-            { label: studentOrgPlanningEvent.title },
-          ]
-        }
+        // When a student-org event plan is open, its SubpageShell pushes
+        // [teamName(closes event), eventTitle] — so omit teamName here to avoid a
+        // duplicate (and so SubpageShell has a crumb-with-onClick for the mobile back row).
+        if (isStudentOrgActive && studentOrgPlanningEvent) return [root, planningCrumb]
         return [root, planningCrumb, { label: activeTeamNameForPlan }]
       }
       case "directory":     return [root, { label: "Directory" }]

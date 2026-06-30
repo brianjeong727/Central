@@ -365,7 +365,13 @@ A **subpage** is a body button opening a temporary view or action surface (a not
 - It renders **in the content area** — **never** a `fixed inset-0` portal.
 - **Mobile** has no breadcrumb (it's desktop-only), so `SubpageShell` renders a single `md:hidden` back row derived from the parent crumb. Desktop stays breadcrumb-only; mobile gets that one back affordance automatically — never hand-roll a second one.
 - Modals (scrim / centered, §4.17) are reserved for *tiny* confirmations only. Anything that could plausibly be a full-bleed page is a subpage.
-- **Canonical implementation:** `components/central/SubpageShell`.
+- **VERTICAL RHYTHM — HARD RULE (mirror top-level pages exactly; never hand-roll or eyeball these gaps):** a subpage's header/strip/body spacing is FIXED and identical to a `TabPageHeader` + `PlanSubTabStrip` + body composition. Do NOT add ad-hoc `marginTop`/`marginBottom` between the breadcrumb, header, strip, and body — they stack and drift.
+  - **Header:** pass `title` to `SubpageShell` (never hand-roll an `<h1>` in the body). It renders `InsetHairline → var(--space-8) (22px) → PageTitle compact (25px serif) → var(--space-8) (22px) → InsetHairline`, butting the breadcrumb with **no top gap**.
+  - **Header → section strip:** nothing. The `PlanSubTabStrip` owns its `12px` button top-padding; the strip wrapper gets **no** `marginTop`/`marginBottom`.
+  - **Strip → body content:** the content wrapper's `paddingTop: 24` is the ONLY gap (the strip already ends in its own `InsetHairline`).
+  - **No strip → body content (header straight to body):** body wrapper `paddingTop: 24`.
+  - Spacing tokens only (`--space-*`, the 4/6/8/10/12/14/18/22/28/40/56 scale); `12`/`24` here are the existing strip/body constants — match them, don't invent in-betweens.
+- **Canonical implementation:** `components/central/SubpageShell` (use its `title` prop — see the Student Org event page as the reference).
 
 ### 4.19 Empty / placeholder state
 - Use a dashed-border card (`1px dashed #C4C0B0`, radius 10–14, transparent bg) with body color text and a single `+` icon.

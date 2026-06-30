@@ -46,7 +46,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1304,59 +1304,29 @@ export function StudentOrgTeamHome({
   }
 
   if (planningEvent) {
-    if (isDesktopView) {
-      const evStart = new Date(planningEvent.start_date)
-      const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()
-      const evCfg = getEventConfig(planningEvent)
-      return (
-        <div>
-          <TabPageHeader>
-            <PageTitle
-              eyebrow={`${evCfg.label.toUpperCase()} · ${evDateStr}`}
-              title={planningEvent.title}
-            >
-              {(planningEvent.description || planningEvent.location) && (
-                <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-text)" }}>
-                  {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
-                </p>
-              )}
-            </PageTitle>
-            {canEdit && onEditEvent && (
-              <button
-                onClick={onEditEvent}
-                style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, border: "1px solid var(--line)", background: "var(--cream)", cursor: "pointer", flexShrink: 0, marginLeft: "auto", alignSelf: "flex-start", marginTop: 4 }}
-                title="Edit event"
-              >
-                <Pencil style={{ width: 14, height: 14, color: "var(--muted-text)" }} />
-              </button>
-            )}
-          </TabPageHeader>
-          <EventPlanWorkspace
-            inline
-            calendarEvent={planningEvent}
-            ministryId={ministryId}
-            userId={userId}
-            canEdit={canEdit}
-            canEditBudget={canEditBudget}
-            teamId={teamId}
-            onClose={() => onPlanningEventChange(null)}
-            onOpenChat={onOpenChat}
-          />
-        </div>
-      )
-    }
+    // Single render for both viewports. SubpageShell consumes the page body
+    // (cream, in-content) and supplies the only horizontal inset + the mobile
+    // back row. It pushes [team (closes the event), event title]; getShellCrumbs
+    // omits the team crumb while an event is open so the desktop trail stays
+    // Central / Workspace / {team} / {event} with no duplicate — and the team
+    // crumb's onClick gives the mobile back row a "← {team}" target.
+    // EventPlanWorkspace runs `bare` so its own px doesn't double-pad under the shell.
     return (
-      <EventPlanWorkspace
-        inline
-        calendarEvent={planningEvent}
-        ministryId={ministryId}
-        userId={userId}
-        canEdit={canEdit}
-        canEditBudget={canEditBudget}
-        teamId={teamId}
-        onClose={() => onPlanningEventChange(null)}
-        onOpenChat={onOpenChat}
-      />
+      <SubpageShell crumbs={[{ label: teamName, onClick: () => onPlanningEventChange(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
+        <EventPlanWorkspace
+          inline
+          bare
+          calendarEvent={planningEvent}
+          ministryId={ministryId}
+          userId={userId}
+          canEdit={canEdit}
+          canEditBudget={canEditBudget}
+          teamId={teamId}
+          onClose={() => onPlanningEventChange(null)}
+          onOpenChat={onOpenChat}
+          onEditEvent={onEditEvent}
+        />
+      </SubpageShell>
     )
   }
 
@@ -6193,8 +6163,10 @@ export function EventPlanWorkspace({
   canEditBudget = false,
   onClose,
   inline = false,
+  bare = false,
   teamId,
   onOpenChat,
+  onEditEvent,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -6203,8 +6175,13 @@ export function EventPlanWorkspace({
   canEditBudget?: boolean
   onClose: () => void
   inline?: boolean
+  // Strips EventPlanWorkspace's own px-5 md:px-14 from the status row, the section
+  // strip wrapper, and the content body — used under SubpageShell, which supplies
+  // the single horizontal inset. Keeps vertical rhythm.
+  bare?: boolean
   teamId?: string | null
   onOpenChat?: (id: string, name: string, type?: string) => void
+  onEditEvent?: () => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -6228,8 +6205,6 @@ export function EventPlanWorkspace({
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
   const [planChatError, setPlanChatError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [savingStatus, setSavingStatus] = useState(false)
-  const [eventStatus, setEventStatus] = useState<'planning' | 'active' | 'complete'>(calendarEvent.status ?? 'planning')
   const [rsvpCount, setRsvpCount] = useState<number | null>(null)
   const [ministryBudget, setMinistryBudget] = useState<{ total: number; byFund: Record<string, number> } | null>(null)
 
@@ -6417,13 +6392,6 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
-  async function handleStatusChange(newStatus: 'planning' | 'active' | 'complete') {
-    setEventStatus(newStatus)
-    setSavingStatus(true)
-    await supabase.from("calendar_events").update({ status: newStatus }).eq("id", calendarEvent.id)
-    setSavingStatus(false)
-  }
-
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
@@ -6594,12 +6562,6 @@ export function EventPlanWorkspace({
         { key: "followup", label: "Follow-up" },
       ]
 
-  const statusColors: Record<string, { bg: string; text: string; border: string }> = {
-    planning: { bg: "#F4F1E8", text: "var(--body)", border: "var(--line-2)" },
-    active:   { bg: "#EEF4F1", text: "#2D5445", border: "#BFD9CF" },
-    complete: { bg: "#EDE5F0", text: "var(--plum)", border: "#C9B3CC" },
-  }
-
   const inputStyle: React.CSSProperties = {
     background: "#FBF8F2",
     border: "1px solid #E5E0D2",
@@ -6656,32 +6618,13 @@ export function EventPlanWorkspace({
       }
       className={inline ? "" : "md:left-[var(--shell-offset)]"}
     >
-      {/* Event status selector — cream surface (planning / active / complete) */}
-      <div className="px-5 md:px-14" style={{ paddingTop: 18, display: "flex", gap: 6 }}>
-        {(['planning', 'active', 'complete'] as const).map(s => {
-          const sc = statusColors[s]
-          const on = eventStatus === s
-          return (
-            <button
-              key={s}
-              onClick={() => handleStatusChange(s)}
-              disabled={savingStatus}
-              style={{
-                padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                background: on ? sc.bg : "#FBF8F2",
-                color: on ? sc.text : "var(--body)",
-                border: on ? `1px solid ${sc.border}` : "1px solid var(--line-2)",
-                transition: "all 0.15s",
-              }}
-            >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          )
-        })}
-      </div>
+      {/* Event-name header is provided by SubpageShell's `title` prop (canonical
+          TabPageHeader rhythm) — no hand-rolled header here. */}
 
-      {/* Underline section tabs */}
-      <div style={{ marginTop: 0, marginBottom: 24 }}>
+      {/* Underline section tabs. Under SubpageShell (bare) the strip bleeds the
+          shell's md:px-14 via md:-mx-14 so its own md:pl-14 self-inset lands at the
+          same 56px edge as the siblings (convention #16 — one effective inset). */}
+      <div className={bare ? "md:-mx-14" : ""}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
@@ -6690,24 +6633,25 @@ export function EventPlanWorkspace({
       </div>
 
       {/* Content */}
-      <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 80 }}>
+      <div className={bare ? "" : "px-5 md:px-14"} style={{ paddingTop: 24, paddingBottom: 80 }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
         ) : (
           <>
             {/* ── Overview ── */}
             {activeSection === 'overview' && (
-              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start" }} className="max-md:!block">
-                {/* Left: planning details */}
+              <>
+              <ContentHeader
+                label="Overview"
+                action={canEdit && onEditEvent ? (
+                  <ContentActionButton variant="ghost" icon={<Pencil style={{ width: 14, height: 14 }} />} label="Edit event" onClick={onEditEvent} />
+                ) : undefined}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start", marginTop: 24 }} className="max-md:!block">
+                {/* Left: planning details (section header is the ContentHeader above) */}
                 <section>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 0 }}>
-                    Event Brief
-                  </p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>
-                    Planning Details
-                  </h2>
                   {calendarEvent.description && (
-                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, marginTop: 16, maxWidth: 540 }}>
+                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, maxWidth: 540 }}>
                       {calendarEvent.description}
                     </p>
                   )}
@@ -6745,7 +6689,7 @@ export function EventPlanWorkspace({
                 {/* Right: stat cards */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
                   {/* Expected Turnout */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
+                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Expected Turnout</p>
                     {canEdit ? (
                       <input
@@ -6767,7 +6711,7 @@ export function EventPlanWorkspace({
                     )}
                   </div>
                   {/* Budget */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
+                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
@@ -6840,6 +6784,7 @@ export function EventPlanWorkspace({
                   })()}
                 </aside>
               </div>
+              </>
             )}
 
             {/* ── Checklist ── */}
@@ -6977,13 +6922,11 @@ export function EventPlanWorkspace({
             {/* ── Roles & Leads ── */}
             {activeSection === 'roles' && (
               <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                  <div>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{"Who's Responsible"}</p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Roles &amp; Leads</h2>
-                  </div>
-                  {canEdit && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ContentHeader
+                  eyebrow="Who's Responsible"
+                  label="Roles"
+                  action={canEdit ? (
+                    <>
                       {planningGroupId ? (
                         <button
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
@@ -7002,15 +6945,15 @@ export function EventPlanWorkspace({
                           {creatingPlanChat ? "Creating…" : "Create planning chat"}
                         </button>
                       )}
-                      <button
+                      <ContentActionButton
+                        variant="primary"
+                        icon={<Plus style={{ width: 13, height: 13 }} />}
+                        label="Add role"
                         onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
-                        style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}
-                      >
-                        + Add role
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      />
+                    </>
+                  ) : undefined}
+                />
                 {planChatError && <p style={{ fontSize: 12, color: "#C44B4B", marginTop: 8 }}>{planChatError}</p>}
 
                 {/* Roles rows */}
@@ -7282,16 +7225,14 @@ function SubEventsTab({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Welcome Week</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Sub-events</h2>
-        </div>
-        {canEdit && (
-          <button onClick={() => setShowAdd(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
-            + Add sub-event
-          </button>
-        )}
+      <div style={{ marginBottom: 28 }}>
+        <ContentHeader
+          eyebrow="Welcome Week"
+          label="Sub-events"
+          action={canEdit ? (
+            <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
+          ) : undefined}
+        />
       </div>
 
       {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
@@ -7307,7 +7248,7 @@ function SubEventsTab({
             <button
               key={ev.id}
               onClick={() => setPlanningChild(ev)}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "#FBF8F2", cursor: "pointer", textAlign: "left", width: "100%" }}
+              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--ivory)", cursor: "pointer", textAlign: "left", width: "100%" }}
             >
               <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
