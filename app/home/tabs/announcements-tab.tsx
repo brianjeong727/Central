@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, Mo
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -1437,11 +1437,26 @@ const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
 const DETAIL_MONO = EYEBROW_STYLE
 
+// ── Detail date-part helpers (sync, local) ───────────────────────────────────
+function detailWeekday(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { weekday: "long" })
+}
+function detailMonthDay(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+function detailTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+}
+function detailPosted(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 interface DetailAnnouncement {
   id: string
   title: string
   body: string
   created_at: string
+  event_date: string | null
   is_pinned: boolean
   is_event: boolean
   image_url: string | null
@@ -1561,113 +1576,116 @@ export function AnnouncementDetailView({
         <button onClick={onClose} className="text-[13px] text-[var(--body)] bg-transparent border-none cursor-pointer">← Close</button>
       </div>
     )
-    return (
-      <>
-        {/* ── Mobile: single scrollable column (matches edit modal mobile layout) ── */}
-        <div className="md:hidden flex-1 overflow-y-auto min-h-0">
-          {ann.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ann.image_url} alt={ann.title} className="w-full h-48 object-cover" />
-          )}
-          <div className="px-5 py-5 flex flex-col gap-5">
-            {/* Eyebrow */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span style={monoStyle}>{formatDate(ann.created_at)}</span>
-              {ann.audience && ann.audience !== "all" && (
-                <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
-              )}
-              {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
-            </div>
-            {/* Serif title */}
-            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 28, lineHeight: 1.1, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0 }}>{ann.title}</h1>
-            {/* Body — newlines preserved */}
-            <div style={{ fontFamily: DETAIL_SERIF, fontSize: 16, lineHeight: 1.7, color: "#2D2836", whiteSpace: "pre-wrap" }}>{ann.body}</div>
-            {/* Divider + stats */}
-            <div style={{ height: 1, background: "var(--line)" }} />
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-              {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
-            </div>
-            {/* RSVP */}
-            {ann.is_event && (
-              <button onClick={handleRsvp} disabled={rsvping} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
-                {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
-              </button>
-            )}
-            {/* Attendees */}
-            {showAttendees && (
-              <div>
-                <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
-                </div>
-              </div>
-            )}
-            {/* Form */}
-            {ann.has_form && (
-              ann.user_has_responded
-                ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-                : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
-            )}
-          </div>
-        </div>
+    // Adaptive: an aside rail appears only when there's an event or a form.
+    const hasAside = ann.is_event || ann.has_form
+    // The form's button takes the loud (primary) fill only when it's the lone
+    // action; if an event already owns the primary RSVP, the form drops to outline.
+    const formIsPrimary = !ann.is_event
+    const eyebrowSrc = ann.is_event && ann.event_date ? ann.event_date : ann.created_at
 
-        {/* ── Desktop: full-width reading column (mirrors edit modal writing surface) ── */}
-        <div className="hidden md:flex flex-1 overflow-hidden">
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto flex flex-col px-10 pt-8 pb-8">
-              {/* Image */}
-              {ann.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ann.image_url} alt={ann.title} style={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 12, marginBottom: 28, flexShrink: 0 }} />
-              )}
-              {/* Eyebrow */}
-              <div className="flex flex-wrap items-center gap-2.5 mb-3">
-                <span style={monoStyle}>{formatDate(ann.created_at)}</span>
-                {ann.audience && ann.audience !== "all" && (
-                  <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
-                )}
-                {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
-              </div>
-              {/* Serif title — same sizing as edit modal's title input (40px) */}
-              <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 400, fontSize: 40, letterSpacing: "-0.5px", color: "var(--ink)", lineHeight: 1.1, margin: 0, paddingBottom: 16, borderBottom: "1px solid var(--line-2)", flexShrink: 0 }}>{ann.title}</h1>
-              {/* Body — serif 19px, newlines preserved (matches edit modal body textarea) */}
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, lineHeight: 1.65, color: "var(--ink)", marginTop: 20, whiteSpace: "pre-wrap", flexShrink: 0 }}>{ann.body}</div>
-              {/* Stats */}
-              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--line)", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-                <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Eye className="w-3 h-3" />{ann.view_count} views</span>
-                {ann.is_event && <span className="flex items-center gap-1.5 text-[12px] text-[var(--muted-text)]"><Users className="w-3 h-3" />{ann.rsvp_count} going</span>}
-              </div>
-              {/* RSVP */}
-              {ann.is_event && (
-                <div style={{ marginTop: 20 }}>
-                  <button onClick={handleRsvp} disabled={rsvping} style={{ padding: "12px 24px", borderRadius: 10, border: "none", cursor: rsvping ? "not-allowed" : "pointer", fontFamily: DETAIL_SANS, fontSize: 14, fontWeight: 500, background: ann.user_has_rsvped ? "var(--ivory)" : "var(--plum-2)", color: ann.user_has_rsvped ? "var(--plum)" : "#FBF8F2", display: "flex", alignItems: "center", gap: 8, opacity: rsvping ? 0.7 : 1 }}>
-                    {ann.user_has_rsvped ? <><Check style={{ width: 14, height: 14 }} />Going — click to undo</> : "RSVP"}
-                  </button>
-                </div>
-              )}
-              {/* Attendees */}
-              {showAttendees && (
-                <div style={{ marginTop: 20 }}>
-                  <p style={{ ...monoStyle, marginBottom: 8 }}>Going · {ann.rsvp_count}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
-                  </div>
-                </div>
-              )}
-              {/* Form */}
-              {ann.has_form && (
-                <div style={{ marginTop: 20 }}>
-                  {ann.user_has_responded
-                    ? <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C" }}><FileText className="w-3.5 h-3.5" />Form submitted</span>
-                    : <button onClick={() => setFormFillOpen(true)} style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontFamily: DETAIL_SANS, fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><FileText style={{ width: 13, height: 13 }} />Fill out form →</button>
-                  }
-                </div>
-              )}
+    const eyebrowRow = (
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span style={monoStyle}>{formatDate(eyebrowSrc)}</span>
+        {ann.audience && ann.audience !== "all" && (
+          <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+        )}
+        {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
+      </div>
+    )
+
+    // ── Aside modules (event / form / posted) — each flush, top hairline ──
+    const asideModules: React.ReactNode[] = []
+    if (ann.is_event) {
+      asideModules.push(
+        <div key="event">
+          <div style={{ ...monoStyle }}>Event</div>
+          {ann.event_date && (
+            <>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
+            </>
+          )}
+          <CentralButton
+            variant={ann.user_has_rsvped ? "plum-outline" : "primary"}
+            onClick={handleRsvp}
+            disabled={rsvping}
+            style={{ width: "100%", marginTop: 18 }}
+          >
+            {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+          </CentralButton>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
+          {showAttendees && (
+            <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
             </div>
-          </div>
+          )}
         </div>
-      </>
+      )
+    }
+    if (ann.has_form) {
+      asideModules.push(
+        <div key="form">
+          <div style={{ ...monoStyle }}>Form</div>
+          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 600, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
+          {ann.user_has_responded ? (
+            <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C", marginTop: 14 }}><FileText className="w-3.5 h-3.5" />Form submitted</div>
+          ) : (
+            <CentralButton
+              variant={formIsPrimary ? "primary" : "plum-outline"}
+              onClick={() => setFormFillOpen(true)}
+              style={{ width: "100%", marginTop: 18 }}
+            >
+              <FileText style={{ width: 14, height: 14 }} />Fill out form
+            </CentralButton>
+          )}
+        </div>
+      )
+    }
+    asideModules.push(
+      <div key="posted">
+        <div style={{ ...monoStyle }}>Posted</div>
+        <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}>
+          {detailPosted(ann.created_at)}<br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+        </div>
+      </div>
+    )
+
+    return (
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Image banner — full width, bottom hairline */}
+        {ann.image_url && (
+          <div style={{ borderBottom: "1px solid var(--line)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ann.image_url} alt={ann.title} className="w-full h-48 md:h-[300px] object-cover block" />
+          </div>
+        )}
+        {/* Body — single column, or 1.7fr / 1fr when an aside is present */}
+        <div className={`px-5 py-6 md:px-14 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
+          {/* Main */}
+          <div className="min-w-0">
+            {eyebrowRow}
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 600, fontSize: "clamp(28px, 5vw, 46px)", letterSpacing: "-0.02em", lineHeight: 1.02, color: "var(--ink)", margin: "13px 0 0" }}>{ann.title}</h1>
+            <div style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            {/* No aside → posted/views anchor the bottom of the single column */}
+            {!hasAside && (
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--faint)" }}>
+                Posted {detailPosted(ann.created_at)} · {ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+              </div>
+            )}
+          </div>
+          {/* Aside rail — event / form / posted modules */}
+          {hasAside && (
+            <aside className="flex flex-col">
+              {asideModules.map((mod, i) => (
+                <div key={i} style={{ padding: i === 0 ? "0 0 24px" : "24px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                  {mod}
+                </div>
+              ))}
+            </aside>
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -1679,8 +1697,8 @@ export function AnnouncementDetailView({
         <div className="flex-shrink-0 border-b border-[var(--line)] bg-[#FBF8F2]">
           <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
             <p style={monoStyle}>Announcement</p>
-            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X className="w-3.5 h-3.5 text-[var(--body)]" />
+            <button onClick={onClose} style={{ width: 38, height: 38, borderRadius: "var(--r-chip)", border: "1px solid var(--line-2)", background: "var(--cream)", color: "var(--body)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>

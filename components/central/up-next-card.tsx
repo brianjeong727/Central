@@ -1,9 +1,8 @@
 "use client"
 
 import { CSSProperties, ReactNode } from "react"
-import { CalendarDays, MapPin, ClipboardList } from "lucide-react"
+import { ClipboardList } from "lucide-react"
 import { CentralButton } from "./button"
-import { EYEBROW_STYLE } from "@/app/home/components/shared"
 
 // Live event-detail data, pulled from a referenced calendar_events row.
 // When provided, the reference slide shows a real two-column detail panel; when
@@ -14,14 +13,6 @@ export interface UpNextEventDetail {
   endDate: string
   allDay: boolean
   location: string | null
-}
-
-function formatEventWhen(detail: UpNextEventDetail): string {
-  const start = new Date(detail.startDate)
-  const dateStr = start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-  if (detail.allDay) return `${dateStr} · All day`
-  const timeStr = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-  return `${dateStr} · ${timeStr}`
 }
 
 // Structured date parts for the BIG serif anchor in the 40% detail slot.
@@ -35,238 +26,79 @@ function dateParts(iso: string) {
   }
 }
 
-// Mono micro-label for the detail-panel cards ("Event", "Form", "Posted").
-const MONO_LABEL: CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 10,
-  letterSpacing: "1.2px",
-  color: "var(--muted-text)",
-  textTransform: "uppercase",
+// Compact "Mon DD · time" line used for the demoted event meta-row value.
+function eventWhenCompact(detail: UpNextEventDetail): string {
+  const p = dateParts(detail.startDate)
+  return detail.allDay ? `${p.monthDay} · All day` : `${p.monthDay} · ${p.time}`
 }
 
-// Big serif date numeral — the visual anchor of the 40% slot. Stat-number role
-// per DESIGN_SYSTEM §1.3 (serif, weight 400, tight tracking). fontSize set per
-// call site (desktop 40 / mobile 34, within the 28–40 numeric band).
-const BIG_SERIF_DATE: CSSProperties = {
-  fontFamily: "var(--serif)",
-  fontWeight: 400,
-  letterSpacing: "-0.5px",
-  lineHeight: 1.0,
-  color: "var(--ink)",
+// ── Direction A typography tokens for the 40% panel + demoted meta-list ───────
+// Mono micro-label inside the 40% panel ("Event" / "Form" / "Posted").
+const MONO_RPANEL: CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: 11,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "var(--muted-text)",
+}
+
+// Mono micro-label inside a demoted meta-row.
+const MONO_DEM: CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: 10,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "var(--muted-text)",
 }
 
 // Weekday line above the big date.
-const DATE_WEEKDAY: CSSProperties = {
+const EV_WK: CSSProperties = {
   fontFamily: "var(--sans)",
-  fontSize: 13,
-  fontWeight: 500,
-  letterSpacing: "0.02em",
-  color: "var(--body)",
-}
-
-// Year / secondary line beneath the big date.
-const DATE_YEAR: CSSProperties = {
-  fontFamily: "var(--sans)",
-  fontSize: 14,
-  fontWeight: 400,
-  color: "var(--muted-text)",
-}
-
-// Event time — editorial serif, sits below the big date as a secondary focal point.
-const EVENT_TIME: CSSProperties = {
-  fontFamily: "var(--serif)",
-  fontSize: 20,
-  fontWeight: 400,
-  letterSpacing: "-0.01em",
+  fontSize: 16,
+  fontWeight: 600,
   color: "var(--ink)",
 }
 
-// Quiet plum text affordance (demoted links). No chrome.
-const QUIET_LINK: CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: 0,
-  margin: 0,
-  color: "var(--plum)",
-  fontWeight: 500,
-  fontSize: 13,
-  cursor: "pointer",
+// Big serif date anchor — the focal point of the 40% slot. Serif weight 600 is
+// the approved §1.3 "Date anchor" exception (scoped to this featured card).
+const BIG_SERIF_DATE: CSSProperties = {
+  fontFamily: "var(--serif)",
+  fontSize: 46,
+  fontWeight: 600,
+  letterSpacing: "-0.02em",
+  lineHeight: 1,
+  color: "var(--ink)",
+}
+
+// Event time — sits below the big date.
+const EV_TIME: CSSProperties = {
   fontFamily: "var(--sans)",
-  textAlign: "left",
-  alignSelf: "flex-start",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
+  fontSize: 22,
+  color: "var(--ink)",
 }
 
-// Prominent plum affordance for the PRIMARY 40% form slot (bigger than QUIET_LINK).
-const PRIMARY_LINK: CSSProperties = {
-  ...QUIET_LINK,
+// Form headline — serif display, weight 600 (heading-tier emphasis).
+const FORM_H: CSSProperties = {
+  fontFamily: "var(--serif)",
+  fontSize: 22,
+  fontWeight: 600,
+  lineHeight: 1.1,
+  color: "var(--ink)",
+}
+
+// Year line beneath the posted date.
+const POSTED_YR: CSSProperties = {
+  fontFamily: "var(--sans)",
   fontSize: 15,
+  color: "var(--faint)",
 }
 
-// ── The 40% detail-slot cards (desktop) ──────────────────────────────────────
-// One shared cream frame keeps every slot type reading as the same right panel,
-// so the 60/40 structure stays consistent no matter which detail wins.
-// `auto` = mobile stacked use: size to content (no fixed-height frame to center in).
-function DetailFrame({ children, auto = false }: { children: ReactNode; auto?: boolean }) {
-  return (
-    <div
-      style={{
-        background: "var(--cream)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-input)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: auto ? "flex-start" : "center",
-        gap: "var(--space-7)",
-        padding: "var(--space-9) var(--space-8)",
-        height: auto ? "auto" : "100%",
-        boxSizing: "border-box",
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-// Image slot — rounded cover image filling the slot height.
-function ImageSlot({ url, mobile = false }: { url: string; mobile?: boolean }) {
-  return (
-    <div
-      style={{
-        height: mobile ? 180 : "100%",
-        borderRadius: "var(--r-input)",
-        overflow: "hidden",
-        border: "1px solid var(--line)",
-        background: "var(--cream-2)",
-      }}
-    >
-      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-    </div>
-  )
-}
-
-// Event slot — a calendar block: big serif day/date is the hero, time prominent
-// beneath, location, then the RSVP control travelling with it. `mobile` sizes the
-// numeral down and lets the frame grow to content (stacked card).
-function EventDetailCard({
-  detail,
-  rsvp,
-  mobile = false,
-}: {
-  detail: UpNextEventDetail
-  rsvp?: ReactNode
-  mobile?: boolean
-}) {
-  const p = dateParts(detail.startDate)
-  return (
-    <DetailFrame auto={mobile}>
-      <div style={MONO_LABEL}>Event</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={DATE_WEEKDAY}>{p.weekday}</div>
-        <div style={{ ...BIG_SERIF_DATE, fontSize: mobile ? 34 : 40 }}>{p.monthDay}</div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={EVENT_TIME}>{detail.allDay ? "All day" : p.time}</div>
-        {detail.location && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <MapPin style={{ width: 15, height: 15, color: "var(--plum)", flexShrink: 0 }} />
-            <span style={{ fontSize: 14, color: "var(--body)" }}>{detail.location}</span>
-          </div>
-        )}
-      </div>
-      {rsvp && <div style={{ marginTop: 2 }}>{rsvp}</div>}
-    </DetailFrame>
-  )
-}
-
-// Form slot — prominent icon + label "Includes a form" + a "View / Fill out →" CTA.
-function FormDetailCard({ onDetails, mobile = false }: { onDetails?: () => void; mobile?: boolean }) {
-  return (
-    <DetailFrame auto={mobile}>
-      <div style={MONO_LABEL}>Form</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <ClipboardList style={{ width: 28, height: 28, color: "var(--plum)", flexShrink: 0 }} />
-        <span
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: 20,
-            fontWeight: 400,
-            letterSpacing: "-0.01em",
-            color: "var(--ink)",
-          }}
-        >
-          Includes a form
-        </span>
-      </div>
-      {onDetails && (
-        <button onClick={onDetails} style={PRIMARY_LINK}>
-          View / Fill out →
-        </button>
-      )}
-    </DetailFrame>
-  )
-}
-
-// Posted-date slot — big serif "Mon DD" anchor + year beneath. Keeps the 40%
-// structure when there is nothing else to show.
-function PostedDetailCard({ date, mobile = false }: { date?: string; mobile?: boolean }) {
-  const big = mobile ? 34 : 40
-  return (
-    <DetailFrame auto={mobile}>
-      <div style={MONO_LABEL}>Posted</div>
-      {date ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ ...BIG_SERIF_DATE, fontSize: big }}>{dateParts(date).monthDay}</div>
-          <div style={DATE_YEAR}>{dateParts(date).year}</div>
-        </div>
-      ) : (
-        <div style={{ ...BIG_SERIF_DATE, fontSize: big, color: "var(--faint)" }}>—</div>
-      )}
-    </DetailFrame>
-  )
-}
-
-// ── Demoted compact pieces (bottom of the 60% column) ────────────────────────
-function DemotedEventRow({ detail, rsvp }: { detail: UpNextEventDetail; rsvp?: ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <CalendarDays style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
-        <span style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>{formatEventWhen(detail)}</span>
-      </div>
-      {rsvp}
-    </div>
-  )
-}
-
-function DemotedFormLink({ onDetails }: { onDetails?: () => void }) {
-  if (!onDetails) return null
-  return (
-    <button onClick={onDetails} style={QUIET_LINK}>
-      <ClipboardList style={{ width: 14, height: 14 }} />
-      Form →
-    </button>
-  )
-}
-
-// Mobile inline event details — compact stacked rows (mobile card is single-column).
-function EventDetailInline({ detail }: { detail: UpNextEventDetail }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <CalendarDays style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
-        <span style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>{formatEventWhen(detail)}</span>
-      </div>
-      {detail.location && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <MapPin style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: "var(--body)" }}>{detail.location}</span>
-        </div>
-      )}
-    </div>
-  )
+// Demoted meta-row value (left of the plum-outline action).
+const DEM_VAL: CSSProperties = {
+  fontFamily: "var(--sans)",
+  fontSize: 14,
+  fontWeight: 500,
+  color: "var(--ink)",
 }
 
 interface UpNextCardProps {
@@ -298,8 +130,10 @@ interface UpNextCardProps {
 }
 
 export function UpNextCard({
-  label,
-  labelAccent = true,
+  // label / labelAccent are retained for the API but the inner eyebrow is gone —
+  // the carousel's "Featured" section label is the single accent and the title leads.
+  label: _label,
+  labelAccent: _labelAccent = true,
   title,
   body,
   isEvent,
@@ -318,42 +152,35 @@ export function UpNextCard({
   fill = false,
   style,
 }: UpNextCardProps) {
+  void _label
+  void _labelAccent
   const maxAttendees = mobile ? 6 : 8
   const bodyText = body ? body.replace(/\n+/g, " ") : null
 
   // fill mode (carousel slide): ivory surface fills the HeroFrame, which owns the
-  // border/radius/clip. Standalone mode keeps its own soft-callout chrome.
+  // border/radius/clip. Standalone mode keeps its own soft-callout chrome (--r-hero).
   const cardBase: CSSProperties = fill
     ? { background: "var(--ivory)", height: "100%", boxSizing: "border-box", ...style }
     : {
         background: "var(--ivory)",
         border: "1px solid var(--line-2)",
-        borderRadius: "var(--r-callout)",
+        borderRadius: "var(--r-hero)",
         ...style,
       }
 
-  const eyebrow = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {labelAccent && (
-        <div
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "var(--plum)",
-            flexShrink: 0,
-          }}
-        />
-      )}
-      <div style={labelAccent ? { ...EYEBROW_STYLE, color: "var(--plum)" } : EYEBROW_STYLE}>{label}</div>
-    </div>
-  )
+  // ── Buttons (SNAP to CentralButton) ─────────────────────────────────────────
+  // Primary "See details" = plum fill. RSVP / form / demoted actions = plum-outline.
+  const detailsButton = onDetails ? (
+    <CentralButton variant="primary" onClick={onDetails}>
+      {isEvent ? "See details" : "See announcement"}
+    </CentralButton>
+  ) : null
 
-  // RSVP control — button + "N going" count. Travels WITH the event detail.
-  const rsvpNode = (size: "sm" | "md" = "md"): ReactNode =>
+  // RSVP with "N going" count — used in the 40% event panel where there's room.
+  const rsvpFull = (size: "sm" | "md"): ReactNode =>
     isEvent && onRsvp ? (
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <CentralButton size={size} variant="secondary" onClick={onRsvp} disabled={rsvping}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+        <CentralButton size={size} variant="plum-outline" onClick={onRsvp} disabled={rsvping}>
           {userHasRsvped ? "Going ✓" : "RSVP"}
         </CentralButton>
         {rsvpCount > 0 && (
@@ -362,11 +189,20 @@ export function UpNextCard({
       </div>
     ) : null
 
-  const detailsButton = onDetails ? (
-    <CentralButton variant="primary" onClick={onDetails}>
-      {isEvent ? "See details" : "See announcement"}
-    </CentralButton>
-  ) : null
+  // RSVP button only — used in the tight demoted meta-row.
+  const rsvpCompact = (size: "sm" | "md"): ReactNode =>
+    isEvent && onRsvp ? (
+      <CentralButton size={size} variant="plum-outline" onClick={onRsvp} disabled={rsvping}>
+        {userHasRsvped ? "Going ✓" : "RSVP"}
+      </CentralButton>
+    ) : null
+
+  const formBtn = (size: "sm" | "md"): ReactNode =>
+    onDetails ? (
+      <CentralButton size={size} variant="plum-outline" onClick={onDetails}>
+        View / Fill out
+      </CentralButton>
+    ) : null
 
   const attendeeChips =
     showAttendees && attendees.length > 0 ? (
@@ -404,44 +240,131 @@ export function UpNextCard({
         ? "form"
         : "posted"
 
-  // Legacy single-column actions block — only used by the non-fill, non-mobile
-  // standalone fallback branches below (no current caller hits these).
-  const legacyActions = (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {detailsButton}
-        {rsvpNode("md")}
+  // 40% panel content (shared by desktop seam-panel + mobile stacked section).
+  const detailContent = (): ReactNode => {
+    if (primary === "event" && eventDetail) {
+      const p = dateParts(eventDetail.startDate)
+      const r = rsvpFull("md")
+      return (
+        <>
+          <div style={MONO_RPANEL}>Event</div>
+          <div style={{ ...EV_WK, marginTop: "var(--space-7)" }}>{p.weekday}</div>
+          <div style={{ ...BIG_SERIF_DATE, marginTop: "var(--space-2)" }}>{p.monthDay}</div>
+          <div style={{ ...EV_TIME, marginTop: "var(--space-4)" }}>
+            {eventDetail.allDay ? "All day" : p.time}
+          </div>
+          {r && <div style={{ marginTop: "var(--space-8)" }}>{r}</div>}
+        </>
+      )
+    }
+    if (primary === "form") {
+      const b = formBtn("md")
+      return (
+        <>
+          <div style={MONO_RPANEL}>Form</div>
+          <ClipboardList
+            style={{ width: 30, height: 30, color: "var(--plum-2)", marginTop: "var(--space-7)", flexShrink: 0 }}
+          />
+          <div style={{ ...FORM_H, marginTop: "var(--space-5)" }}>Includes a form</div>
+          {b && <div style={{ marginTop: "var(--space-8)" }}>{b}</div>}
+        </>
+      )
+    }
+    // posted
+    return (
+      <>
+        <div style={MONO_RPANEL}>Posted</div>
+        {postedDate ? (
+          <>
+            <div style={{ ...BIG_SERIF_DATE, marginTop: "var(--space-7)" }}>
+              {dateParts(postedDate).monthDay}
+            </div>
+            <div style={{ ...POSTED_YR, marginTop: "var(--space-3)" }}>{dateParts(postedDate).year}</div>
+          </>
+        ) : (
+          <div style={{ ...BIG_SERIF_DATE, marginTop: "var(--space-7)", color: "var(--faint)" }}>—</div>
+        )}
+      </>
+    )
+  }
+
+  // ── Demoted meta-list (whatever priority didn't win) ─────────────────────────
+  const demRow = (key: string, label: string, value: string, action: ReactNode): ReactNode => (
+    <div
+      key={key}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-7)",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={MONO_DEM}>{label}</div>
+        <div style={{ ...DEM_VAL, marginTop: "var(--space-1)" }}>{value}</div>
       </div>
-      {attendeeChips && <div style={{ marginTop: 12 }}>{attendeeChips}</div>}
+      {action}
     </div>
   )
 
-  // ── Mobile: single column, detail stacked below the editorial content ────────
-  if (mobile) {
-    let mobilePrimary: ReactNode = null
-    if (primary === "image" && imageUrl) mobilePrimary = <ImageSlot url={imageUrl} mobile />
-    else if (primary === "event" && eventDetail)
-      mobilePrimary = <EventDetailCard detail={eventDetail} rsvp={rsvpNode("sm")} mobile />
-    else if (primary === "form") mobilePrimary = <FormDetailCard onDetails={onDetails} mobile />
-    else mobilePrimary = postedDate ? <PostedDetailCard date={postedDate} mobile /> : null
+  const demRows: ReactNode[] = []
+  if (primary === "image") {
+    if (eventDetail) demRows.push(demRow("ev", "Event", eventWhenCompact(eventDetail), rsvpCompact("sm")))
+    if (hasForm) demRows.push(demRow("form", "Form", "Sign-up form", formBtn("sm")))
+  } else if (primary === "event") {
+    if (hasForm) demRows.push(demRow("form", "Form", "Sign-up form", formBtn("sm")))
+  }
 
-    const mobileDemoted: ReactNode[] = []
-    if (primary === "image") {
-      if (eventDetail)
-        mobileDemoted.push(
-          <div key="ev" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <EventDetailInline detail={eventDetail} />
-            {rsvpNode("sm")}
-          </div>
-        )
-      if (hasForm) mobileDemoted.push(<DemotedFormLink key="form" onDetails={onDetails} />)
-    } else if (primary === "event") {
-      if (hasForm) mobileDemoted.push(<DemotedFormLink key="form" onDetails={onDetails} />)
-    }
+  const demotedBlock =
+    demRows.length > 0 ? (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-6)",
+          marginBottom: "var(--space-8)",
+          paddingTop: "var(--space-7)",
+          borderTop: "1px solid var(--line)",
+        }}
+      >
+        {demRows}
+      </div>
+    ) : null
+
+  // ── Mobile: single column — title leads, 40% detail + demoted list stacked ────
+  if (mobile) {
+    const mobilePrimary: ReactNode =
+      primary === "image" && imageUrl ? (
+        <div
+          style={{
+            height: 180,
+            borderRadius: "var(--r-input)",
+            overflow: "hidden",
+            border: "1px solid var(--line)",
+          }}
+        >
+          <img
+            src={imageUrl}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+          {detailContent()}
+        </div>
+      )
 
     return (
-      <div style={{ ...cardBase, padding: "24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {eyebrow}
+      <div
+        style={{
+          ...cardBase,
+          padding: "var(--space-8)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-6)",
+        }}
+      >
         <div>
           <h2
             style={{
@@ -466,8 +389,8 @@ export function UpNextCard({
           )}
         </div>
         {mobilePrimary}
-        {mobileDemoted}
-        {isEvent && onRsvp && !eventDetail && rsvpNode("md")}
+        {demotedBlock}
+        {isEvent && onRsvp && !eventDetail && rsvpFull("md")}
         {detailsButton}
         {attendeeChips}
       </div>
@@ -491,86 +414,55 @@ export function UpNextCard({
     </h2>
   )
 
-  // Carousel detail mode (fill): the 60/40 split — editorial left, priority detail
-  // right; lower-priority details demote into the bottom of the 60%.
+  // Carousel detail mode (fill): 60/40 flex split — editorial left, priority detail
+  // right (flush against a hairline seam, no nested box; image case full-bleed).
   if (fill) {
-    let slot40: ReactNode
-    if (primary === "image" && imageUrl) slot40 = <ImageSlot url={imageUrl} />
-    else if (primary === "event" && eventDetail)
-      slot40 = <EventDetailCard detail={eventDetail} rsvp={rsvpNode("md")} />
-    else if (primary === "form") slot40 = <FormDetailCard onDetails={onDetails} />
-    else slot40 = <PostedDetailCard date={postedDate} />
-
-    const demoted: ReactNode[] = []
-    if (primary === "image") {
-      if (eventDetail)
-        demoted.push(<DemotedEventRow key="ev" detail={eventDetail} rsvp={rsvpNode("sm")} />)
-      if (hasForm) demoted.push(<DemotedFormLink key="form" onDetails={onDetails} />)
-    } else if (primary === "event") {
-      if (hasForm) demoted.push(<DemotedFormLink key="form" onDetails={onDetails} />)
-    }
-
-    return (
-      <div
-        style={{
-          ...cardBase,
-          padding: "var(--space-10) var(--space-11)",
-          display: "grid",
-          gridTemplateColumns: "1.5fr 1fr",
-          gap: "var(--space-11)",
-          alignItems: "stretch",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-          {eyebrow}
-          <div style={{ marginTop: "var(--space-7)" }}>
-            {titleEl}
-            {bodyText && (
-              <p
-                className="line-clamp-2"
-                style={{ fontSize: 15, color: "var(--body)", marginTop: "var(--space-5)", lineHeight: 1.6 }}
-              >
-                {bodyText}
-              </p>
-            )}
-          </div>
+    const rightRegion: ReactNode =
+      primary === "image" && imageUrl ? (
+        <div style={{ flex: 1, minWidth: 0, position: "relative", display: "flex" }}>
+          <img
+            src={imageUrl}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            position: "relative",
+            display: "flex",
+            borderLeft: "1px solid var(--line)",
+          }}
+        >
           <div
             style={{
-              marginTop: "auto",
-              paddingTop: "var(--space-9)",
+              flex: 1,
               display: "flex",
               flexDirection: "column",
-              gap: "var(--space-6)",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              padding: "var(--space-10)",
             }}
           >
-            {demoted}
-            {isEvent && onRsvp && !eventDetail && rsvpNode("md")}
-            {detailsButton}
-            {attendeeChips}
+            {detailContent()}
           </div>
         </div>
-        {slot40}
-      </div>
-    )
-  }
+      )
 
-  // ── Non-fill standalone fallbacks (no current caller) ────────────────────────
-  // Two-column: real event detail present → editorial left + detail card right.
-  if (eventDetail) {
     return (
-      <div
-        style={{
-          ...cardBase,
-          padding: "var(--space-10) var(--space-11)",
-          display: "grid",
-          gridTemplateColumns: "1.5fr 1fr",
-          gap: "var(--space-11)",
-          alignItems: "stretch",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-          {eyebrow}
-          <div style={{ marginTop: "var(--space-7)" }}>
+      <div style={{ ...cardBase, display: "flex", minWidth: 0 }}>
+        <div
+          style={{
+            flex: "0 0 60%",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            padding: "var(--space-10)",
+          }}
+        >
+          <div>
             {titleEl}
             {bodyText && (
               <p
@@ -581,14 +473,21 @@ export function UpNextCard({
               </p>
             )}
           </div>
-          <div style={{ marginTop: "auto", paddingTop: "var(--space-9)" }}>{legacyActions}</div>
+          <div style={{ marginTop: "auto" }}>
+            {demotedBlock}
+            {isEvent && onRsvp && !eventDetail && (
+              <div style={{ marginBottom: "var(--space-6)" }}>{rsvpFull("md")}</div>
+            )}
+            {detailsButton && <div>{detailsButton}</div>}
+            {attendeeChips && <div style={{ marginTop: "var(--space-5)" }}>{attendeeChips}</div>}
+          </div>
         </div>
-        <EventDetailCard detail={eventDetail} rsvp={rsvpNode("md")} />
+        {rightRegion}
       </div>
     )
   }
 
-  // Single editorial column.
+  // ── Non-fill standalone fallback (no current caller) — single editorial column ─
   return (
     <div
       style={{
@@ -598,8 +497,7 @@ export function UpNextCard({
         flexDirection: "column",
       }}
     >
-      {eyebrow}
-      <div style={{ marginTop: "var(--space-7)", maxWidth: 620 }}>
+      <div style={{ maxWidth: 620 }}>
         {titleEl}
         {bodyText && (
           <p
@@ -610,7 +508,13 @@ export function UpNextCard({
           </p>
         )}
       </div>
-      <div style={{ marginTop: "auto", paddingTop: "var(--space-9)" }}>{legacyActions}</div>
+      <div style={{ marginTop: "auto", paddingTop: "var(--space-9)" }}>
+        {isEvent && onRsvp && !eventDetail && (
+          <div style={{ marginBottom: "var(--space-6)" }}>{rsvpFull("md")}</div>
+        )}
+        {detailsButton && <div>{detailsButton}</div>}
+        {attendeeChips && <div style={{ marginTop: "var(--space-5)" }}>{attendeeChips}</div>}
+      </div>
     </div>
   )
 }

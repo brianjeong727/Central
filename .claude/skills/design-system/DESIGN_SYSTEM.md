@@ -75,6 +75,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
 | Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
 | Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
+| Date anchor | serif | 42–46 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** and the **announcement detail aside** may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
@@ -82,7 +83,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 - Long bodies (announcements, transition notes, chat thread) are set in **serif at 17–19px** for a reading-room feel — not sans body.
 - Stat card numbers are serif, not bold sans.
 
-**Display weight threshold:** Weight 600 is the heading emphasis carrier — use it at the top of the hierarchy only. Reserve weight 600 for: page H1, section H2, display/hero text. Use weight 400 for: editorial long-form body, stat card numbers, and all UI-chrome text (card titles in list views, role badges, metadata rows, tab labels, navigation items, helper copy). If more than two or three text nodes on a single screen carry weight 600, the hierarchy collapses and the effect is diluted.
+**Display weight threshold:** Weight 600 is the heading emphasis carrier — use it at the top of the hierarchy only. Reserve weight 600 for: page H1, section H2, display/hero text, **and the featured-card / announcement-detail date anchor (the §1.3 "Date anchor" exception)**. Use weight 400 for: editorial long-form body, stat card numbers, and all UI-chrome text (card titles in list views, role badges, metadata rows, tab labels, navigation items, helper copy). If more than two or three text nodes on a single screen carry weight 600, the hierarchy collapses and the effect is diluted.
 
 **Do not:** mix typefaces — Central uses Bricolage Grotesque exclusively; never import additional font families. Do not use weight 600 for body copy, UI labels, or metadata — reserve it for heading hierarchy (H1, H2, display). Do not all-caps anything except mono eyebrows.
 
