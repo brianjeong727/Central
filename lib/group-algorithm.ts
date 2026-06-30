@@ -64,33 +64,41 @@ export function runAlgorithm(
     naming,
   } = opts
 
-  const groupNames = Array.from({ length: numGroups }, (_, i) =>
+  const safeNumGroups = Math.max(1, Math.floor(numGroups || 1))
+
+  const groupNames = Array.from({ length: safeNumGroups }, (_, i) =>
     naming === "alpha"
       ? `Group ${String.fromCharCode(65 + i)}`
       : `Group ${i + 1}`,
   )
 
-  const groups: PoolPerson[][] = Array.from({ length: numGroups }, () => [])
+  const groups: PoolPerson[][] = Array.from({ length: safeNumGroups }, () => [])
+
+  // Split visitors out once so visitor-separation applies regardless of balanceByYear.
+  const visitors = separateVisitors
+    ? pool.filter((p) => ["visitor"].includes(p.role.toLowerCase()))
+    : []
+  const nonVisitors = separateVisitors
+    ? pool.filter((p) => !["visitor"].includes(p.role.toLowerCase()))
+    : pool
 
   if (balanceByYear) {
-    const visitors: PoolPerson[] = []
-    const nonVisitors: PoolPerson[] = []
-    for (const p of pool) {
-      if (separateVisitors && p.role.toLowerCase() === "visitor") {
-        visitors.push(p)
-      } else {
-        nonVisitors.push(p)
-      }
-    }
+    // Build year buckets from the graduation years actually present (never stale).
+    const yearsPresent = [
+      ...new Set(
+        nonVisitors
+          .map((p) => p.graduation_year)
+          .filter((y): y is number => y != null),
+      ),
+    ].sort((a, b) => a - b)
 
-    const YEAR_ORDER = [2025, 2026, 2027, 2028]
     const yearBuckets = new Map<number | "unknown", PoolPerson[]>()
-    YEAR_ORDER.forEach((y) => yearBuckets.set(y, []))
+    yearsPresent.forEach((y) => yearBuckets.set(y, []))
     yearBuckets.set("unknown", [])
 
     for (const p of nonVisitors) {
       const y = p.graduation_year
-      if (y && YEAR_ORDER.includes(y)) {
+      if (y != null && yearBuckets.has(y)) {
         yearBuckets.get(y)!.push(p)
       } else {
         yearBuckets.get("unknown")!.push(p)
@@ -100,7 +108,7 @@ export function runAlgorithm(
     for (const [k, v] of yearBuckets) yearBuckets.set(k, shuffle(v))
 
     const activeKeys = [
-      ...YEAR_ORDER.filter((y) => (yearBuckets.get(y) ?? []).length > 0),
+      ...yearsPresent.filter((y) => (yearBuckets.get(y) ?? []).length > 0),
       ...((yearBuckets.get("unknown") ?? []).length > 0 ? (["unknown"] as const) : []),
     ]
 
@@ -111,25 +119,26 @@ export function runAlgorithm(
       for (const key of activeKeys) {
         const bucket = yearBuckets.get(key)!
         if (bucket.length > 0) {
-          groups[gIdx % numGroups].push(bucket.shift()!)
+          groups[gIdx % safeNumGroups].push(bucket.shift()!)
           gIdx++
           anyLeft = true
         }
       }
     }
-
-    for (const v of shuffle(visitors)) {
-      const minIdx = groups.reduce(
-        (mi, g, i) => (g.length < groups[mi].length ? i : mi),
-        0,
-      )
-      groups[minIdx].push(v)
-    }
   } else {
-    const shuffled = shuffle(pool)
+    const shuffled = shuffle(nonVisitors)
     for (let i = 0; i < shuffled.length; i++) {
-      groups[i % numGroups].push(shuffled[i])
+      groups[i % safeNumGroups].push(shuffled[i])
     }
+  }
+
+  // Distribute visitors into the smallest groups — runs for both paths.
+  for (const v of shuffle(visitors)) {
+    const minIdx = groups.reduce(
+      (mi, g, i) => (g.length < groups[mi].length ? i : mi),
+      0,
+    )
+    groups[minIdx].push(v)
   }
 
   // Small group mode: swap-based penalty optimization
@@ -162,17 +171,17 @@ export function runAlgorithm(
           s += pairPenalty.get(pairKey(g[i].id, g[j].id)) ?? 0
       return s
     }
-    const totalScore = () => groups.reduce((s, g) => s + groupScore(g), 0)
-
     for (let pass = 0; pass < 60; pass++) {
       let improved = false
       for (let gi = 0; gi < groups.length; gi++) {
         for (let pi = 0; pi < groups[gi].length; pi++) {
           for (let gj = gi + 1; gj < groups.length; gj++) {
             for (let pj = 0; pj < groups[gj].length; pj++) {
-              const before = totalScore()
+              // Only groups gi and gj change under this swap, so score the delta.
+              const before = groupScore(groups[gi]) + groupScore(groups[gj])
               ;[groups[gi][pi], groups[gj][pj]] = [groups[gj][pj], groups[gi][pi]]
-              if (totalScore() < before) {
+              const after = groupScore(groups[gi]) + groupScore(groups[gj])
+              if (after < before) {
                 improved = true
               } else {
                 ;[groups[gi][pi], groups[gj][pj]] = [groups[gj][pj], groups[gi][pi]]
@@ -195,9 +204,10 @@ export function runSmallGroupAlgorithm(
   pool: PoolPerson[],
   opts: { balanceByYear: boolean; separateVisitors: boolean; prevPairings?: PrevPairing[] },
 ): SGGeneratedGroup[] {
-  const maleDGLs = dgls.filter(d => d.gender === "male")
-  const femaleDGLs = dgls.filter(d => d.gender === "female")
-  const unknownDGLs = dgls.filter(d => !d.gender)
+  const genderOf = (g: string | null | undefined) => (g ?? "").trim().toLowerCase()
+  const maleDGLs = dgls.filter(d => genderOf(d.gender) === "male")
+  const femaleDGLs = dgls.filter(d => genderOf(d.gender) === "female")
+  const unknownDGLs = dgls.filter(d => genderOf(d.gender) !== "male" && genderOf(d.gender) !== "female")
 
   const augMale = [...maleDGLs]
   const augFemale = [...femaleDGLs]
@@ -206,9 +216,9 @@ export function runSmallGroupAlgorithm(
     else augFemale.push(d)
   }
 
-  const malePool = pool.filter(p => p.gender === "male")
-  const femalePool = pool.filter(p => p.gender === "female")
-  const unknownPool = pool.filter(p => !p.gender)
+  const malePool = pool.filter(p => genderOf(p.gender) === "male")
+  const femalePool = pool.filter(p => genderOf(p.gender) === "female")
+  const unknownPool = pool.filter(p => genderOf(p.gender) !== "male" && genderOf(p.gender) !== "female")
 
   const augMalePool = [...malePool]
   const augFemalePool = [...femalePool]
@@ -242,7 +252,7 @@ export function runSmallGroupAlgorithm(
       numGroups,
       balanceByYear: opts.balanceByYear,
       separateVisitors: opts.separateVisitors,
-      smallGroupMode: false,
+      smallGroupMode: true,
       prevPairings: opts.prevPairings,
       naming: "numeric",
     })
