@@ -8321,11 +8321,26 @@ function GroupGeneratorWizard({
           .eq("announcement_id", sourceId)
         setPoolCount(count ?? 0)
       } else if (sourceType === "form" && sourceId) {
-        const { count } = await supabase
+        // Mirror the generate path: dedup respondents by user_id, then keep
+        // only those with a profile in this ministry.
+        const { data: respData } = await supabase
           .from("form_responses")
-          .select("user_id", { count: "exact", head: true })
+          .select("user_id")
           .eq("form_id", sourceId)
-        setPoolCount(count ?? 0)
+        const seen = new Set<string>()
+        const userIds = ((respData ?? []) as { user_id: string }[])
+          .map((r) => r.user_id)
+          .filter((id) => { if (seen.has(id)) return false; seen.add(id); return true })
+        if (userIds.length === 0) {
+          setPoolCount(0)
+        } else {
+          const { count } = await supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("ministry_id", ministryId)
+            .in("id", userIds)
+          setPoolCount(count ?? 0)
+        }
       } else {
         setPoolCount(null)
       }
@@ -8430,6 +8445,7 @@ function GroupGeneratorWizard({
           const { data, error } = await supabase
             .from("profiles")
             .select("id, name, graduation_year, role, gender")
+            .eq("ministry_id", ministryId)
             .in("id", userIds)
           if (error) throw new Error("Failed to fetch profiles.")
           pool = (data ?? []) as PoolPerson[]
@@ -8450,11 +8466,16 @@ function GroupGeneratorWizard({
         const result = runSmallGroupAlgorithm(sgDGLs, memberPool, {
           balanceByYear,
           separateVisitors: separateVisitors && hasVisitors,
+          prevPairings: smallGroupMode && prevCSVText.trim() ? parsePrevCSV(prevCSVText) : [],
         })
         if (result.length === 0) { setGenError("No groups generated."); return }
         setSgGroups(result)
         setGroups([])
         if (!sessionName) setSessionName(`Small Groups — ${semester}`)
+        const emptyCount = result.filter(g => g.members.length === 0).length
+        if (emptyCount > 0) {
+          setGenError(`${emptyCount} leader group(s) have no members — there are more leaders than members in that gender.`)
+        }
         setStep(3)
         return
       }
@@ -8760,7 +8781,7 @@ function GroupGeneratorWizard({
                     min={1}
                     max={poolCount ?? 100}
                     value={numGroups}
-                    onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                    onChange={e => setNumGroups(Math.min(Math.max(1, parseInt(e.target.value) || 1), poolCount && poolCount > 0 ? poolCount : 999))}
                     style={{ width: 80, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "var(--ink)", fontFamily: "inherit" }}
                   />
                   {estGroupSize !== null && (
@@ -8877,6 +8898,12 @@ function GroupGeneratorWizard({
         {/* ── Step 3: Preview & adjust ── */}
         {step === 3 && (
           <div>
+            {/* Non-blocking notice carried over from generation (e.g. empty leader groups) */}
+            {genError && (
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 10 }}>
+                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{genError}</p>
+              </div>
+            )}
             {/* Session name */}
             <div style={{ marginBottom: 24 }}>
               <label style={{ ...mono, display: "block", marginBottom: 6 }}>Session name</label>
