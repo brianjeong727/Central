@@ -24,11 +24,18 @@ function formatEventWhen(detail: UpNextEventDetail): string {
   return `${dateStr} · ${timeStr}`
 }
 
-function formatPosted(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+// Structured date parts for the BIG serif anchor in the 40% detail slot.
+function dateParts(iso: string) {
+  const d = new Date(iso)
+  return {
+    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
+    monthDay: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    year: d.toLocaleDateString("en-US", { year: "numeric" }),
+    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+  }
 }
 
-// Mono micro-label for the detail-panel cards ("Event Details", "Form", "Posted").
+// Mono micro-label for the detail-panel cards ("Event", "Form", "Posted").
 const MONO_LABEL: CSSProperties = {
   fontFamily: "var(--mono)",
   fontSize: 10,
@@ -37,7 +44,44 @@ const MONO_LABEL: CSSProperties = {
   textTransform: "uppercase",
 }
 
-// Quiet plum text affordance (form CTA, demoted links). No chrome.
+// Big serif date numeral — the visual anchor of the 40% slot. Stat-number role
+// per DESIGN_SYSTEM §1.3 (serif, weight 400, tight tracking). fontSize set per
+// call site (desktop 40 / mobile 34, within the 28–40 numeric band).
+const BIG_SERIF_DATE: CSSProperties = {
+  fontFamily: "var(--serif)",
+  fontWeight: 400,
+  letterSpacing: "-0.5px",
+  lineHeight: 1.0,
+  color: "var(--ink)",
+}
+
+// Weekday line above the big date.
+const DATE_WEEKDAY: CSSProperties = {
+  fontFamily: "var(--sans)",
+  fontSize: 13,
+  fontWeight: 500,
+  letterSpacing: "0.02em",
+  color: "var(--body)",
+}
+
+// Year / secondary line beneath the big date.
+const DATE_YEAR: CSSProperties = {
+  fontFamily: "var(--sans)",
+  fontSize: 14,
+  fontWeight: 400,
+  color: "var(--muted-text)",
+}
+
+// Event time — editorial serif, sits below the big date as a secondary focal point.
+const EVENT_TIME: CSSProperties = {
+  fontFamily: "var(--serif)",
+  fontSize: 20,
+  fontWeight: 400,
+  letterSpacing: "-0.01em",
+  color: "var(--ink)",
+}
+
+// Quiet plum text affordance (demoted links). No chrome.
 const QUIET_LINK: CSSProperties = {
   background: "none",
   border: "none",
@@ -55,10 +99,17 @@ const QUIET_LINK: CSSProperties = {
   gap: 6,
 }
 
+// Prominent plum affordance for the PRIMARY 40% form slot (bigger than QUIET_LINK).
+const PRIMARY_LINK: CSSProperties = {
+  ...QUIET_LINK,
+  fontSize: 15,
+}
+
 // ── The 40% detail-slot cards (desktop) ──────────────────────────────────────
 // One shared cream frame keeps every slot type reading as the same right panel,
 // so the 60/40 structure stays consistent no matter which detail wins.
-function DetailFrame({ children }: { children: ReactNode }) {
+// `auto` = mobile stacked use: size to content (no fixed-height frame to center in).
+function DetailFrame({ children, auto = false }: { children: ReactNode; auto?: boolean }) {
   return (
     <div
       style={{
@@ -67,10 +118,10 @@ function DetailFrame({ children }: { children: ReactNode }) {
         borderRadius: "var(--r-input)",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
-        gap: 14,
-        padding: "28px 24px",
-        height: "100%",
+        justifyContent: auto ? "flex-start" : "center",
+        gap: "var(--space-7)",
+        padding: "var(--space-9) var(--space-8)",
+        height: auto ? "auto" : "100%",
         boxSizing: "border-box",
       }}
     >
@@ -96,39 +147,61 @@ function ImageSlot({ url, mobile = false }: { url: string; mobile?: boolean }) {
   )
 }
 
-// Event slot — date + time BOLD, location, and the RSVP control travelling with it.
-function EventDetailCard({ detail, rsvp }: { detail: UpNextEventDetail; rsvp?: ReactNode }) {
+// Event slot — a calendar block: big serif day/date is the hero, time prominent
+// beneath, location, then the RSVP control travelling with it. `mobile` sizes the
+// numeral down and lets the frame grow to content (stacked card).
+function EventDetailCard({
+  detail,
+  rsvp,
+  mobile = false,
+}: {
+  detail: UpNextEventDetail
+  rsvp?: ReactNode
+  mobile?: boolean
+}) {
+  const p = dateParts(detail.startDate)
   return (
-    <DetailFrame>
-      <div style={MONO_LABEL}>Event Details</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <CalendarDays style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
-        <span style={{ fontSize: 16, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.01em" }}>
-          {formatEventWhen(detail)}
-        </span>
+    <DetailFrame auto={mobile}>
+      <div style={MONO_LABEL}>Event</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={DATE_WEEKDAY}>{p.weekday}</div>
+        <div style={{ ...BIG_SERIF_DATE, fontSize: mobile ? 34 : 40 }}>{p.monthDay}</div>
       </div>
-      {detail.location && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <MapPin style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
-          <span style={{ fontSize: 14, color: "var(--body)" }}>{detail.location}</span>
-        </div>
-      )}
-      {rsvp && <div style={{ marginTop: 4 }}>{rsvp}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={EVENT_TIME}>{detail.allDay ? "All day" : p.time}</div>
+        {detail.location && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MapPin style={{ width: 15, height: 15, color: "var(--plum)", flexShrink: 0 }} />
+            <span style={{ fontSize: 14, color: "var(--body)" }}>{detail.location}</span>
+          </div>
+        )}
+      </div>
+      {rsvp && <div style={{ marginTop: 2 }}>{rsvp}</div>}
     </DetailFrame>
   )
 }
 
-// Form slot — quiet CTA: "Includes a form" + a "View / Fill out →" affordance.
-function FormDetailCard({ onDetails }: { onDetails?: () => void }) {
+// Form slot — prominent icon + label "Includes a form" + a "View / Fill out →" CTA.
+function FormDetailCard({ onDetails, mobile = false }: { onDetails?: () => void; mobile?: boolean }) {
   return (
-    <DetailFrame>
+    <DetailFrame auto={mobile}>
       <div style={MONO_LABEL}>Form</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <ClipboardList style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />
-        <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>Includes a form</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <ClipboardList style={{ width: 28, height: 28, color: "var(--plum)", flexShrink: 0 }} />
+        <span
+          style={{
+            fontFamily: "var(--serif)",
+            fontSize: 20,
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+            color: "var(--ink)",
+          }}
+        >
+          Includes a form
+        </span>
       </div>
       {onDetails && (
-        <button onClick={onDetails} style={QUIET_LINK}>
+        <button onClick={onDetails} style={PRIMARY_LINK}>
           View / Fill out →
         </button>
       )}
@@ -136,14 +209,21 @@ function FormDetailCard({ onDetails }: { onDetails?: () => void }) {
   )
 }
 
-// Posted-date slot — keeps the 40% structure when there is nothing else to show.
-function PostedDetailCard({ date }: { date?: string }) {
+// Posted-date slot — big serif "Mon DD" anchor + year beneath. Keeps the 40%
+// structure when there is nothing else to show.
+function PostedDetailCard({ date, mobile = false }: { date?: string; mobile?: boolean }) {
+  const big = mobile ? 34 : 40
   return (
-    <DetailFrame>
+    <DetailFrame auto={mobile}>
       <div style={MONO_LABEL}>Posted</div>
-      <div style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>
-        {date ? formatPosted(date) : "—"}
-      </div>
+      {date ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ ...BIG_SERIF_DATE, fontSize: big }}>{dateParts(date).monthDay}</div>
+          <div style={DATE_YEAR}>{dateParts(date).year}</div>
+        </div>
+      ) : (
+        <div style={{ ...BIG_SERIF_DATE, fontSize: big, color: "var(--faint)" }}>—</div>
+      )}
     </DetailFrame>
   )
 }
@@ -186,29 +266,6 @@ function EventDetailInline({ detail }: { detail: UpNextEventDetail }) {
         </div>
       )}
     </div>
-  )
-}
-
-function FormInline({ onDetails }: { onDetails?: () => void }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <ClipboardList style={{ width: 14, height: 14, color: "var(--plum)", flexShrink: 0 }} />
-        <span style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500 }}>Includes a form</span>
-      </div>
-      {onDetails && (
-        <button onClick={onDetails} style={QUIET_LINK}>
-          View / Fill out →
-        </button>
-      )}
-    </div>
-  )
-}
-
-function PostedInline({ date }: { date?: string }) {
-  if (!date) return null
-  return (
-    <div style={{ ...MONO_LABEL, fontSize: 11, color: "var(--faint)" }}>Posted · {formatPosted(date)}</div>
   )
 }
 
@@ -364,14 +421,9 @@ export function UpNextCard({
     let mobilePrimary: ReactNode = null
     if (primary === "image" && imageUrl) mobilePrimary = <ImageSlot url={imageUrl} mobile />
     else if (primary === "event" && eventDetail)
-      mobilePrimary = (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <EventDetailInline detail={eventDetail} />
-          {rsvpNode("sm")}
-        </div>
-      )
-    else if (primary === "form") mobilePrimary = <FormInline onDetails={onDetails} />
-    else mobilePrimary = <PostedInline date={postedDate} />
+      mobilePrimary = <EventDetailCard detail={eventDetail} rsvp={rsvpNode("sm")} mobile />
+    else if (primary === "form") mobilePrimary = <FormDetailCard onDetails={onDetails} mobile />
+    else mobilePrimary = postedDate ? <PostedDetailCard date={postedDate} mobile /> : null
 
     const mobileDemoted: ReactNode[] = []
     if (primary === "image") {
