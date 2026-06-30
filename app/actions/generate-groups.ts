@@ -51,6 +51,7 @@ export async function generateGroupsAction(
         const { data } = await admin
           .from("profiles")
           .select("id, name, graduation_year, role")
+          .eq("ministry_id", params.ministryId)
           .in("id", userIds)
         pool = (data ?? []) as PoolPerson[]
       }

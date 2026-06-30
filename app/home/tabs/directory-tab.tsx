@@ -5,8 +5,8 @@ import useSWR from "swr"
 import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
-import { EmptyState, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton } from "@/components/central"
+import { EmptyState } from "../components/shared"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell } from "@/components/central"
 import { getInitials } from "../utils"
 import type { DirectoryMember } from "../types"
 
@@ -224,7 +224,8 @@ export function DirectoryTab({
 
       </div>
 
-      {/* ── Mobile: full self-contained layout (unchanged) ── */}
+      {/* ── Mobile: member list (hidden while a member subpage is open) ── */}
+      {!mobileSelected && (
       <div className="md:hidden">
         <div className="px-5 pt-14 pb-5">
           <div className="flex items-center gap-2.5 mb-4">
@@ -295,8 +296,9 @@ export function DirectoryTab({
           </div>
         )}
       </div>
+      )}
 
-      {/* Mobile: full-screen member sheet */}
+      {/* Mobile: member detail subpage (swaps in over the list) */}
       {mobileSelected && (
         <div className="md:hidden">
           <MemberSheet
@@ -529,25 +531,9 @@ export function MemberSheet({
   }
 
   return (
-    <AnimateIn className="fixed inset-0 z-[60] bg-white flex flex-col">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col bg-white">
-
-        {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 bg-white border-b border-[var(--line)]">
-          <button
-            onClick={onClose}
-            className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 text-[var(--body)]" />
-          </button>
-          <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[13px]" />
-          <h2 className="flex-1 min-w-0 text-[15px] font-bold text-[var(--ink)] tracking-tight truncate">
-            {member.name}
-          </h2>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-5 py-6">
+    <SubpageShell crumbs={[{ label: "Directory", onClick: onClose }, { label: member.name }]} width="full">
+        {/* Identity block */}
+        <div>
           <div className="flex flex-col items-center mb-7">
             <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-bold text-2xl mb-4" />
             <h1 className="text-[22px] font-bold text-[var(--ink)] tracking-tight mb-2">{member.name}</h1>
@@ -614,9 +600,9 @@ export function MemberSheet({
                 {sections.map(section => (
                   <div key={section.id}>
                     <p style={{ ...monoLabel, marginBottom: 10 }}>{section.label}</p>
-                    <div style={{ border: "1px solid #E5E0D2", borderRadius: 12, overflow: "hidden", background: "#FBF8F2" }}>
+                    <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream-2)" }}>
                       {section.fields.map((field, i) => (
-                        <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid #E5E0D2" : "none" }}>
+                        <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
                           <p style={monoLabel}>{field.label}</p>
                           <p style={{ fontSize: 14, color: field.italic ? "var(--plum)" : "var(--ink)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, fontStyle: field.italic ? "italic" : "normal", fontFamily: field.italic ? "var(--font-instrument-serif)" : "inherit" }}>{field.value}</p>
                         </div>
@@ -630,17 +616,16 @@ export function MemberSheet({
         </div>
 
         {!isOwnProfile && (
-          <div className="flex-shrink-0 bg-white border-t border-[var(--line)] px-5 py-4">
+          <div style={{ marginTop: 28, borderTop: "1px solid var(--line)", paddingTop: 18 }}>
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide shadow-[0_2px_8px_rgba(19,16,26,0.08)]"
+              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>
           </div>
         )}
-      </div>
-    </AnimateIn>
+    </SubpageShell>
   )
 }

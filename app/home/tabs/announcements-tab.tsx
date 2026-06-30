@@ -5,8 +5,8 @@ import useSWR from "swr"
 import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, AnimateIn, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton } from "@/components/central"
+import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, HeaderActionButton } from "../components/shared"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
@@ -437,7 +437,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
           <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
-          {/* Attachment — §4.18 dashed placeholder */}
+          {/* Attachment — §4.19 dashed placeholder */}
           <div className="px-6 py-6">
             <p style={monoStyle} className="mb-3">Attachment</p>
             {imagePreview ? (
@@ -964,6 +964,30 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     )
   }
 
+  // Body swap: filling out a form replaces the feed (in-content subpage §4.18) —
+  // the "Announcements" crumb (and mobile back) returns to the feed.
+  if (formFillState) {
+    const closeFill = () => setFormFillState(null)
+    return (
+      <SubpageShell
+        crumbs={[{ label: "Announcements", onClick: closeFill }, { label: formFillState.title }]}
+        width="centered"
+        maxWidth={640}
+      >
+        <FormFillView
+          formId={formFillState.formId}
+          announcementId={formFillState.announcementId}
+          userId={userId}
+          ministryId={ministryId}
+          onSubmitted={() => {
+            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
+            setFormFillState(null)
+          }}
+        />
+      </SubpageShell>
+    )
+  }
+
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
@@ -1205,21 +1229,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         >
           <Plus className="w-6 h-6 text-[var(--cream)]" />
         </button>
-      )}
-
-      {formFillState && (
-        <FormFillView
-          formId={formFillState.formId}
-          announcementId={formFillState.announcementId}
-          announcementTitle={formFillState.title}
-          userId={userId}
-          ministryId={ministryId}
-          onClose={() => setFormFillState(null)}
-          onSubmitted={() => {
-            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
-            setFormFillState(null)
-          }}
-        />
       )}
     </div>
   )
@@ -1483,14 +1492,16 @@ export function AnnouncementDetailView({
   ministryId,
   userRole,
   userName,
-  onClose,
+  onGoToList,
 }: {
   announcementId: string
   userId: string
   ministryId: string
   userRole: string
   userName: string
-  onClose: () => void
+  // Navigates to the Announcements list AND closes the detail (one atomic URL
+  // update upstream). Wired to the "Announcements" breadcrumb crumb + mobile back.
+  onGoToList: () => void
 }) {
   const supabase = createClient()
   const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
@@ -1572,14 +1583,14 @@ export function AnnouncementDetailView({
 
   function DetailContent() {
     if (loading) return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
         <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--plum)", animation: "spin 0.7s linear infinite" }} />
       </div>
     )
     if (!ann) return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-3" style={{ minHeight: 240 }}>
         <p className="text-[15px] font-medium text-[var(--ink)]">Announcement not found.</p>
-        <button onClick={onClose} className="text-[13px] text-[var(--body)] bg-transparent border-none cursor-pointer">← Close</button>
+        <button onClick={onGoToList} className="text-[13px] text-[var(--body)] bg-transparent border-none cursor-pointer">← Back to announcements</button>
       </div>
     )
     // Adaptive: an aside rail appears only when there's an event or a form.
@@ -1658,16 +1669,20 @@ export function AnnouncementDetailView({
     )
 
     return (
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Image banner — full width, bottom hairline */}
+      // SubpageShell owns scroll + horizontal inset (px-5 md:px-14) + vertical
+      // padding. No own scroll wrapper / px inset here — that would double both.
+      <>
+        {/* Image banner — full-bleed: negate the shell's horizontal inset and
+            top padding so it hugs the edges; keeps its bottom hairline. */}
         {ann.image_url && (
-          <div style={{ borderBottom: "1px solid var(--line)" }}>
+          <div className="-mx-5 md:-mx-14 -mt-7" style={{ borderBottom: "1px solid var(--line)" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={ann.image_url} alt={ann.title} className="w-full h-48 md:h-[300px] object-cover block" />
           </div>
         )}
-        {/* Body — single column, or 1.7fr / 1fr when an aside is present */}
-        <div className={`px-5 py-6 md:px-14 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
+        {/* Body — single column, or 1.7fr / 1fr when an aside is present.
+            Horizontal inset comes from SubpageShell; keep only vertical py + gaps. */}
+        <div className={`py-6 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
           {/* Main */}
           <div className="min-w-0">
             {eyebrowRow}
@@ -1691,39 +1706,46 @@ export function AnnouncementDetailView({
             </aside>
           )}
         </div>
-      </div>
+      </>
     )
   }
 
-  return (
-    <>
-      {/* Exact same shell as CreateAnnouncementModal */}
-      <AnimateIn className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-        {/* Header — mirrors CreateAnnouncementModal: mono label left, close right, border-b */}
-        <div className="flex-shrink-0 border-b border-[var(--line)] bg-[#FBF8F2]">
-          <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
-            <p style={monoStyle}>Announcement</p>
-            <button onClick={onClose} style={{ width: 38, height: 38, borderRadius: "var(--r-chip)", border: "1px solid var(--line-2)", background: "var(--cream)", color: "var(--body)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        <DetailContent />
-      </AnimateIn>
+  // In-content subpage (DESIGN_SYSTEM §4.18) — the shell breadcrumb is the back
+  // affordance; no standalone X. The "Announcements" crumb routes to the list AND
+  // closes the detail (one atomic URL update upstream). Cream-on-cream, no shadow.
+  // When the form is open, the SAME SubpageShell swaps its body to FormFillView and
+  // extends the trail with a "Form" crumb; the announcement-title crumb becomes the
+  // back into the detail (closeForm). The crumbs array is derived from formFillOpen,
+  // so useSubpageCrumbs re-pushes automatically on toggle — no nested SubpageShell.
+  const closeForm = () => setFormFillOpen(false)
+  const title = ann?.title || "Announcement"
+  const formOpen = formFillOpen && !!ann?.form_id
+  const crumbs = formOpen
+    ? [
+        { label: "Announcements", onClick: onGoToList },
+        { label: title, onClick: closeForm },
+        { label: "Form" },
+      ]
+    : [
+        { label: "Announcements", onClick: onGoToList },
+        { label: title },
+      ]
 
-      {formFillOpen && ann?.form_id && (
+  return (
+    <SubpageShell crumbs={crumbs} width="full">
+      {formOpen ? (
         <FormFillView
-          formId={ann.form_id}
-          announcementId={ann.id}
-          announcementTitle={ann.title}
+          formId={ann!.form_id!}
+          announcementId={ann!.id}
           userId={userId}
           ministryId={ministryId}
-          onClose={() => setFormFillOpen(false)}
           onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
         />
+      ) : (
+        <DetailContent />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </>
+    </SubpageShell>
   )
 }

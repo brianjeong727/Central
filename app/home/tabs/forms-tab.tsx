@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Check, ChevronDown, ChevronLeft, ChevronRight, FileText, X } from "lucide-react"
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FileText } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle, PlanSubTabStrip } from "@/components/central"
@@ -44,13 +44,14 @@ interface AnnouncementWithForm {
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
 
-export function FormFillView({ formId, announcementTitle, userId, ministryId, announcementId, onClose, onSubmitted }: {
+// In-content subpage body (DESIGN_SYSTEM §4.18). Renders ONLY the form body +
+// an inline submitted state — no fixed overlay, no own header, no X/back. The
+// host drops this inside a SubpageShell whose breadcrumb is the back affordance.
+export function FormFillView({ formId, userId, ministryId, announcementId, onSubmitted }: {
   formId: string
-  announcementTitle: string
   userId: string
   ministryId: string
   announcementId: string
-  onClose: () => void
   onSubmitted: () => void
 }) {
   const supabase = createClient()
@@ -127,136 +128,121 @@ export function FormFillView({ formId, announcementTitle, userId, ministryId, an
     setTimeout(() => onSubmitted(), 1400)
   }
 
+  if (loading) {
+    return <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
+  }
+
   if (done) {
     return (
-      <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col items-center justify-center gap-4 md:left-[var(--shell-offset)]">
-        <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center">
+      <AnimateIn className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 320 }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(62,21,64,0.1)" }}>
           <Check className="w-8 h-8 text-[var(--plum)]" />
         </div>
         <div className="text-center">
-          <p className="text-[16px] font-bold text-[var(--ink)]">Response submitted!</p>
+          <p className="text-[16px] font-medium text-[var(--ink)]">Response submitted!</p>
           <p className="text-[13px] text-[var(--muted-text)] mt-1">Thank you for filling out the form.</p>
         </div>
       </AnimateIn>
     )
   }
 
-  return (
-    <AnimateIn className="fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-      <div className="flex-shrink-0 border-b border-[var(--line)]">
-        <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-10">
-          <div>
-            <p style={MONO_STYLE}>Form</p>
-            <p className="text-[15px] font-semibold text-[var(--ink)] mt-0.5 line-clamp-1">{announcementTitle}</p>
-          </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-            <X className="w-3.5 h-3.5 text-[var(--body)]" />
-          </button>
-        </div>
+  if (fields.length === 0) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
+        <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
       </div>
+    )
+  }
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center"><Spinner /></div>
-      ) : fields.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
-        </div>
-      ) : (
-        <>
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-[640px] mx-auto px-5 md:px-10 py-6 flex flex-col gap-6">
-              {error && (
-                <div style={{ background: "rgba(62,21,64,0.07)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
-              )}
-              {fields.map(field => (
-                <div key={field.id}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 10 }}>
-                    {field.label}
-                    {field.required && <span style={{ color: "#9D2D2D", marginLeft: 4 }}>*</span>}
-                  </p>
-                  {field.type === 'text' && (
-                    <textarea
-                      value={(answers[field.id] as string) ?? ''}
-                      onChange={e => setSingleAnswer(field.id, e.target.value)}
-                      placeholder="Your answer…"
-                      rows={3}
-                      style={{
-                        width: '100%', padding: '10px 12px', borderRadius: 10,
-                        border: '1px solid var(--line-2)', background: '#FBF8F2',
-                        fontSize: 14, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
-                      }}
-                    />
-                  )}
-                  {(field.type === 'multiple_choice' || field.type === 'dropdown') && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {field.options.map(opt => {
-                        const selected = answers[field.id] === opt
-                        return (
-                          <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                            cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
-                            border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
-                            background: selected ? 'var(--plum)' : '#FBF8F2',
-                            color: selected ? '#F6F4EF' : 'var(--ink)',
-                          }}>
-                            <span style={{
-                              width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                              border: `2px solid ${selected ? '#F6F4EF' : '#C4C0B0'}`,
-                              background: selected ? 'rgba(246,244,239,0.25)' : 'transparent',
-                            }} />
-                            {opt}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {field.type === 'checkbox' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {field.options.map(opt => {
-                        const checked = ((answers[field.id] as string[]) ?? []).includes(opt)
-                        return (
-                          <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                            cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
-                            border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
-                            background: checked ? 'var(--plum)' : '#FBF8F2',
-                            color: checked ? '#F6F4EF' : 'var(--ink)',
-                          }}>
-                            <span style={{
-                              width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                              border: `2px solid ${checked ? '#F6F4EF' : '#C4C0B0'}`,
-                              background: checked ? 'rgba(246,244,239,0.25)' : 'transparent',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              {checked && <Check style={{ width: 10, height: 10, color: '#F6F4EF' }} />}
-                            </span>
-                            {opt}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex-shrink-0 border-t border-[var(--line)] px-5 md:px-10 py-4">
-            <div className="max-w-[640px] mx-auto">
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 10, background: 'var(--plum-2)',
-                  color: '#F6F4EF', fontSize: 14, fontWeight: 600, border: 'none',
-                  cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting ? 'Submitting…' : 'Submit Response'}
-              </button>
-            </div>
-          </div>
-        </>
+  return (
+    // Self-constrain to a readable form column + center, so the form looks
+    // identical whether the host SubpageShell is width="full" (inside the
+    // announcement detail) or width="centered" (from the feed).
+    <AnimateIn className="flex flex-col gap-6 w-full mx-auto" style={{ maxWidth: 600 }}>
+      {error && (
+        <div style={{ background: "rgba(62,21,64,0.07)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
       )}
+      {fields.map(field => (
+        <div key={field.id}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 10 }}>
+            {field.label}
+            {field.required && <span style={{ color: "#9D2D2D", marginLeft: 4 }}>*</span>}
+          </p>
+          {field.type === 'text' && (
+            <textarea
+              value={(answers[field.id] as string) ?? ''}
+              onChange={e => setSingleAnswer(field.id, e.target.value)}
+              placeholder="Your answer…"
+              rows={3}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 10,
+                border: '1px solid var(--line-2)', background: 'var(--cream)',
+                fontSize: 14, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
+              }}
+            />
+          )}
+          {(field.type === 'multiple_choice' || field.type === 'dropdown') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {field.options.map(opt => {
+                const selected = answers[field.id] === opt
+                return (
+                  <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
+                    cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
+                    border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
+                    background: selected ? 'var(--plum)' : 'var(--cream)',
+                    color: selected ? '#F6F4EF' : 'var(--ink)',
+                  }}>
+                    <span style={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+                      border: `2px solid ${selected ? '#F6F4EF' : '#C4C0B0'}`,
+                      background: selected ? 'rgba(246,244,239,0.25)' : 'transparent',
+                    }} />
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {field.type === 'checkbox' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {field.options.map(opt => {
+                const checked = ((answers[field.id] as string[]) ?? []).includes(opt)
+                return (
+                  <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
+                    cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
+                    border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
+                    background: checked ? 'var(--plum)' : 'var(--cream)',
+                    color: checked ? '#F6F4EF' : 'var(--ink)',
+                  }}>
+                    <span style={{
+                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                      border: `2px solid ${checked ? '#F6F4EF' : '#C4C0B0'}`,
+                      background: checked ? 'rgba(246,244,239,0.25)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {checked && <Check style={{ width: 10, height: 10, color: '#F6F4EF' }} />}
+                    </span>
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+      <button
+        onClick={handleSubmit}
+        disabled={submitting}
+        style={{
+          width: '100%', padding: '14px', borderRadius: 10, background: 'var(--plum-2)',
+          color: '#F6F4EF', fontSize: 14, fontWeight: 500, border: 'none',
+          cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1,
+        }}
+      >
+        {submitting ? 'Submitting…' : 'Submit Response'}
+      </button>
     </AnimateIn>
   )
 }
