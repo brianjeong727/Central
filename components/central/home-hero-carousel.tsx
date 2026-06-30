@@ -16,6 +16,9 @@ export type HeroSlide =
       isEvent: boolean
       eyebrowLabel?: string
       eyebrowAccent?: boolean
+      imageUrl?: string | null
+      hasForm?: boolean
+      eventDetail?: UpNextEventDetail
     }
   | {
       kind: "event"

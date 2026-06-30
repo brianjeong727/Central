@@ -179,6 +179,7 @@ export function HomeTab({
       { data: heroRsvpRows },
       { data: slideAnns },
       { data: slideEvents },
+      { data: slideForms },
     ] = await Promise.all([
       list.length > 0
         ? supabase
@@ -191,8 +192,8 @@ export function HomeTab({
         ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
         : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
       slideAnnIds.length
-        ? supabase.from("announcements").select("id, title, body, is_event").in("id", slideAnnIds).eq("ministry_id", ministryId)
-        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean }[] }),
+        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date").in("id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null }[] }),
       slideEvIds.length
         ? supabase
             .from("calendar_events")
@@ -200,6 +201,9 @@ export function HomeTab({
             .in("id", slideEvIds)
             .eq("ministry_id", ministryId)
         : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; location: string | null; start_date: string; end_date: string; all_day: boolean; linked_announcement_id: string | null }[] }),
+      slideAnnIds.length
+        ? supabase.from("announcement_forms").select("announcement_id").in("announcement_id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { announcement_id: string }[] }),
     ])
 
     const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
@@ -228,6 +232,7 @@ export function HomeTab({
     // ── Build curated hero slides from the resolved announcement/event data (RT2). ──
     const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
     const evMap = new Map((slideEvents ?? []).map((e) => [e.id, e]))
+    const slideFormSet = new Set((slideForms ?? []).map((f) => f.announcement_id))
 
     const slides: HeroSlide[] = []
     for (const r of rows) {
@@ -247,7 +252,17 @@ export function HomeTab({
       } else if (r.slide_type === "announcement") {
         const a = annMap.get(r.announcement_id ?? "")
         if (!a) continue
-        slides.push({ kind: "announcement", key: r.id, announcementId: a.id, title: a.title, body: a.body, isEvent: a.is_event })
+        slides.push({
+          kind: "announcement",
+          key: r.id,
+          announcementId: a.id,
+          title: a.title,
+          body: a.body,
+          isEvent: a.is_event,
+          imageUrl: a.image_url ?? null,
+          hasForm: slideFormSet.has(a.id),
+          eventDetail: a.is_event && a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined,
+        })
       } else {
         const e = evMap.get(r.calendar_event_id ?? "")
         if (!e) continue

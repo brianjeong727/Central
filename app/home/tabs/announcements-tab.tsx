@@ -25,6 +25,16 @@ interface DraftField {
 let _tempIdCounter = 0
 function newTempId() { return `draft-${++_tempIdCounter}` }
 
+// Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
+// <input type="datetime-local"> expects (local time, not UTC).
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const AUDIENCE_OPTIONS = [
   { value: "all", label: "Everyone" },
   { value: "2025", label: "Class of 2025" },
@@ -54,6 +64,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [body, setBody] = useState(existing?.body ?? "")
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
+  const [eventDate, setEventDate] = useState(isoToLocalInput(existing?.event_date))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
@@ -111,6 +122,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   async function handleSubmit(e: React.FormEvent, asDraft = false) {
     e.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
+    if (!asDraft && isEvent && !eventDate.trim()) { setError("Events need a date & time before publishing."); return }
     setSubmitting(true)
     setError(null)
     const status = asDraft ? "draft" : "published"
@@ -136,15 +148,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl, status })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
@@ -271,13 +283,22 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             </div>
           </div>
           {isEvent && (
-            <div className="flex items-start gap-3">
-              <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
-              </button>
-              <div>
-                <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
-                <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
+                <input
+                  type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                  style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                />
+              </div>
+              <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+                </div>
               </div>
             </div>
           )}
@@ -383,17 +404,26 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               </div>
             </div>
             {isEvent && (
-              <div className="flex items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAttendees((v) => !v)}
-                  style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
-                >
-                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
-                </button>
-                <div>
-                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
-                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
+                  <input
+                    type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                    style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                  />
+                </div>
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttendees((v) => !v)}
+                    style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                  >
+                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                  </button>
+                  <div>
+                    <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
+                    <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -552,13 +582,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 // ── Inline Edit Form (shared across card types) ──────────────────────────────
 
 function InlineEditFields({
-  title, body, audience, isEvent, showAttendees,
-  onTitle, onBody, onAudience, onIsEvent, onShowAttendees,
+  title, body, audience, isEvent, eventDate, showAttendees,
+  onTitle, onBody, onAudience, onIsEvent, onEventDate, onShowAttendees,
   onSave, onCancel, saving, dark,
 }: {
-  title: string; body: string; audience: string; isEvent: boolean; showAttendees: boolean
+  title: string; body: string; audience: string; isEvent: boolean; eventDate: string; showAttendees: boolean
   onTitle: (v: string) => void; onBody: (v: string) => void
-  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void; onShowAttendees: (v: boolean) => void
+  onAudience: (v: string) => void; onIsEvent: (v: boolean) => void; onEventDate: (v: string) => void; onShowAttendees: (v: boolean) => void
   onSave: () => void; onCancel: () => void
   saving: boolean; dark?: boolean
 }) {
@@ -629,7 +659,16 @@ function InlineEditFields({
           }} />
         </button>
       </div>
-      {/* Show attendees toggle — only relevant for events */}
+      {/* Event date + show attendees — only relevant for events */}
+      {isEvent && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+          <span style={{ fontSize: 12, color: fgMuted }}>Event date &amp; time</span>
+          <input
+            type="datetime-local" value={eventDate} onChange={(e) => onEventDate(e.target.value)} required
+            style={{ fontSize: 12, color: fg, background: "transparent", border: `1px solid ${borderColor}`, borderRadius: "var(--r-input)", padding: "7px 9px", outline: "none", width: "100%", fontFamily: "inherit" }}
+          />
+        </div>
+      )}
       {isEvent && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
           <span style={{ fontSize: 12, color: fgMuted }}>Show attendees publicly</span>

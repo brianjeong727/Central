@@ -70,6 +70,7 @@ export interface Announcement {
   is_pinned: boolean
   is_sub_pinned: boolean
   is_event: boolean
+  event_date: string | null
   image_url: string | null
   audience: string | null
   created_by: string | null
