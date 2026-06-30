@@ -454,6 +454,9 @@ function Dots({ count, active, onPick }: { count: number; active: number; onPick
   )
 }
 
+// Auto-advance cadence — slow + unhurried to stay "calm, not playful".
+const AUTOPLAY_MS = 7000
+
 interface HomeHeroCarouselProps {
   slides: HeroSlide[]
   mobile?: boolean
@@ -484,6 +487,19 @@ export function HomeHeroCarousel({
 }: HomeHeroCarouselProps) {
   // Ephemeral, manually-advanced index — intentionally NOT URL-synced.
   const [idx, setIdx] = useState(0)
+  // Auto-advance pauses while the user is hovering/focusing the carousel.
+  const [paused, setPaused] = useState(false)
+
+  // Gentle auto-rotation: advance to the next slide (looping) every AUTOPLAY_MS.
+  // The timer is keyed on `idx`, so any change — auto OR manual nav — resets the
+  // countdown. Pauses on hover/focus and respects prefers-reduced-motion. Manual
+  // prev/next stay bounded (no loop); only the auto-advance wraps to the start.
+  useEffect(() => {
+    if (slides.length <= 1 || paused) return
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return
+    const t = setTimeout(() => setIdx((i) => (i + 1) % slides.length), AUTOPLAY_MS)
+    return () => clearTimeout(t)
+  }, [idx, paused, slides.length])
 
   if (slides.length === 0) return null
 
@@ -564,7 +580,13 @@ export function HomeHeroCarousel({
   // ── Mobile: interior + round arrows + dots below ──
   if (mobile) {
     return (
-      <div style={style}>
+      <div
+        style={style}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocusCapture={() => setPaused(true)}
+        onBlurCapture={() => setPaused(false)}
+      >
         {interior}
         {multi && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: "var(--space-6)" }}>
@@ -579,7 +601,13 @@ export function HomeHeroCarousel({
 
   // ── Desktop: tall flanking arrows + framed interior + dots below ──
   return (
-    <div style={style}>
+    <div
+      style={style}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
       <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
         {multi && <TallArrow dir="prev" disabled={safeIdx === 0} onClick={() => setIdx(safeIdx - 1)} onPhoto={usePhoto} />}
         <HeroFrame bare={usePhoto} style={{ flex: 1, minWidth: 0 }}>{interior}</HeroFrame>
