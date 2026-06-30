@@ -401,7 +401,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
           <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
-          {/* Attachment — §4.18 dashed placeholder */}
+          {/* Attachment — §4.19 dashed placeholder */}
           <div className="px-6 py-6">
             <p style={monoStyle} className="mb-3">Attachment</p>
             {imagePreview ? (

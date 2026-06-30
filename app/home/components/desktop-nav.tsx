@@ -4,6 +4,7 @@ import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt } fro
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { DirectoryMemberListPanel } from "../tabs/directory-tab"
+import { useBreadcrumbExtra } from "../breadcrumb-context"
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
 
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
@@ -28,14 +29,16 @@ const MONO: React.CSSProperties = {
 // ── DesktopTopbar ─────────────────────────────────────────────────────────────
 
 export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
+  const extra = useBreadcrumbExtra()
+  const allCrumbs = [...crumbs, ...extra]
   return (
     <div
       className="hidden md:flex h-12 px-14 items-center justify-between gap-4 flex-shrink-0"
       style={{ background: "transparent" }}
     >
       <div className="flex items-center gap-1.5 text-[12px]">
-        {crumbs.map((c, i) => {
-          const isLast = i === crumbs.length - 1
+        {allCrumbs.map((c, i) => {
+          const isLast = i === allCrumbs.length - 1
           const clickable = !!c.onClick && !isLast
           return (
             <span key={i} className="flex items-center gap-1.5">
