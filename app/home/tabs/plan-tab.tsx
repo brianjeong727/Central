@@ -2116,6 +2116,25 @@ export function PlanTab({
     />
   ) : null
 
+  // Add-workspace is an in-content subpage (SubpageShell), not a portal/modal. The
+  // same element description is rendered in the desktop picker swap and the mobile
+  // content swap — each viewport section mounts its own instance (the established
+  // twice-rendered pattern), and the shell breadcrumb / mobile back row is the back.
+  const addWorkspaceModal = (
+    <AddWorkspaceModal
+      ministryId={ministryId}
+      userId={userId}
+      ownedKeys={ownedPresetKeys([...userTeams.map(t => ({ team_type: t.teamType, name: t.teamName })), ...allTeams.map(t => ({ team_type: t.team_type, name: t.name }))])}
+      onClose={() => setShowCreateTeam(false)}
+      onCreated={(team) => {
+        setShowCreateTeam(false)
+        onTeamsChange()
+        // Open the new (empty) workspace's settings so the admin assigns a president.
+        openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "view", allow_admin_members: false, hasPresident: false })
+      }}
+    />
+  )
+
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
@@ -2201,6 +2220,11 @@ export function PlanTab({
             (sidebar → Receipts), filed under a team's receipt category. The old
             per-team-workspace "Submit receipt" affordance was removed in B2. */}
         {!activeTeamId ? (
+          /* Add-workspace subpage swaps IN PLACE of the picker tiles (content swap,
+             §4.18) — the SubpageShell owns the header + breadcrumb back. */
+          showCreateTeam ? (
+            addWorkspaceModal
+          ) :
           /* ── Three-way branch: 0 teams → empty state | 2+ teams (or any
              governance-accessible team) → picker
              (1-team case auto-entered in home-app before this renders) ── */
@@ -2442,6 +2466,10 @@ export function PlanTab({
           internally. Every other team kind keeps the shared px-5 wrapper. */}
       {openTeam ? (
         <div className="md:hidden">{teamSettingsEl}</div>
+      ) : showCreateTeam ? (
+        /* Add-workspace subpage (SubpageShell) — overrides mobile content; its own
+           md:hidden back row is the back. Mobile has no shell breadcrumb. */
+        <div className="md:hidden">{addWorkspaceModal}</div>
       ) : activeTeamId === "receipts" ? (
         <div className="md:hidden pb-4">
           <ReceiptsWorkspace
@@ -2606,21 +2634,6 @@ export function PlanTab({
           </>
         )}
       </div>
-      )}
-
-      {showCreateTeam && (
-        <AddWorkspaceModal
-          ministryId={ministryId}
-          userId={userId}
-          ownedKeys={ownedPresetKeys([...userTeams.map(t => ({ team_type: t.teamType, name: t.teamName })), ...allTeams.map(t => ({ team_type: t.team_type, name: t.name }))])}
-          onClose={() => setShowCreateTeam(false)}
-          onCreated={(team) => {
-            setShowCreateTeam(false)
-            onTeamsChange()
-            // Open the new (empty) workspace's settings so the admin assigns a president.
-            openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "view", allow_admin_members: false, hasPresident: false })
-          }}
-        />
       )}
 
     </div>
@@ -9189,8 +9202,6 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
   onCreated: (team: { id: string; name: string; icon: string; team_type: string }) => void
 }) {
   const supabase = createClient()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState("")
 
@@ -9234,37 +9245,26 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
     }
   }
 
-  const overlay = (
-    <AnimateIn className="workspace-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-12 pb-4 md:pt-5 md:px-14 border-b border-[var(--line)] bg-[#FBF8F2] md:bg-[var(--cream)]">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 text-[13px] text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Cancel
-        </button>
-        <span className="text-[14px] font-semibold text-[var(--ink)]">Add workspace</span>
-        <div className="w-14" />
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-5 md:px-14 md:py-8 md:max-w-[820px] md:mx-auto md:w-full">
+  // §4.18: SubpageShell owns the page header (title "New workspace") + the shell
+  // breadcrumb back (desktop) / mobile back row — no portal, no hand-rolled header.
+  // width="centered" maxWidth 820 preserves the previous constrained card layout;
+  // SubpageShell supplies the px-5 inset + max-width + bottom padding, so the body
+  // wrapper only carries its own top rhythm.
+  return (
+    <SubpageShell
+      crumbs={[{ label: "Workspace", onClick: onClose }, { label: "New workspace" }]}
+      title="New workspace"
+      width="centered"
+      maxWidth={820}
+    >
+      <div className="pt-5 md:pt-8">
         {error && (
           <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium mb-4" style={{ background: "color-mix(in oklab, var(--plum) 8%, transparent)" }}>{error}</div>
         )}
 
-        {/* Desktop serif hero */}
-        <div className="hidden md:block mb-8">
-          <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--muted-text)] mb-2">New workspace</p>
-          <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, lineHeight: 1, color: "var(--ink)", fontWeight: 400, marginBottom: 8 }}>
-            Choose a workspace.
-          </h1>
-          <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 560, lineHeight: 1.6 }}>
-            Each workspace comes preset for a part of your ministry. It starts empty — you&apos;ll assign a president next.
-          </p>
-        </div>
-        <p className="md:hidden text-[13px] text-[var(--muted-text)] mb-3">Each workspace comes preset for a part of your ministry.</p>
+        <p className="text-[13px] text-[var(--muted-text)] mb-4" style={{ maxWidth: 560, lineHeight: 1.6 }}>
+          Each workspace comes preset for a part of your ministry. It starts empty — you&apos;ll assign a president next.
+        </p>
 
         {available.length === 0 && (
           <div className="rounded-2xl border border-[var(--line)] bg-[var(--cream-2)] px-4 py-5 mb-6 text-[13px] text-[var(--body)] leading-relaxed">
@@ -9325,11 +9325,8 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           </>
         )}
       </div>
-    </AnimateIn>
+    </SubpageShell>
   )
-
-  if (!mounted) return null
-  return createPortal(overlay, document.body)
 }
 
 // ── TeamDetailOverlay ─────────────────────────────────────────────────────────
