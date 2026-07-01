@@ -20,7 +20,7 @@ import { fetchChatList } from "./chat-list"
 // Components
 import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
-import { BreadcrumbProvider } from "./breadcrumb-context"
+import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 
 // Tabs
 // HomeTab stays eager — it's the default landing tab. Every other tab (and the
@@ -901,10 +901,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
         {/* Shell topbar — suppressed on chats and on planning team picker (picker has its
             own full-width header). Always shown when the announcement detail subpage is
-            open (it swaps the whole content area and needs its breadcrumb back). */}
-        {(openAnnouncementId || (activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId))) && (
-          <DesktopTopbar crumbs={getShellCrumbs()} />
-        )}
+            open (it swaps the whole content area and needs its breadcrumb back). Rendered
+            via ShellTopbar (INSIDE BreadcrumbProvider) so a pushed-crumb subpage forces the
+            topbar even on the otherwise breadcrumb-less chats layout and workspace picker. */}
+        <ShellTopbar
+          base={getShellCrumbs()}
+          baseVisible={openAnnouncementId != null || (activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId))}
+        />
 
         {/* Scrollable content area */}
         <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
@@ -1213,6 +1216,16 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       )}
     </div>
   )
+}
+
+// Renders inside BreadcrumbProvider so it can read the pushed-crumb signal. The
+// topbar shows whenever the base is visible (normal navigation, unchanged) OR any
+// subpage has pushed crumbs — so a triggered subpage's breadcrumb-back works even
+// on the chats layout and the workspace picker, which suppress the base topbar.
+function ShellTopbar({ base, baseVisible }: { base: Crumb[]; baseVisible: boolean }) {
+  const extra = useBreadcrumbExtra()
+  if (!baseVisible && extra.length === 0) return null
+  return <DesktopTopbar crumbs={base} />
 }
 
 export function HomeApp(props: HomeAppProps) {

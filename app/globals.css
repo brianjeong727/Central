@@ -316,19 +316,6 @@
     margin: 0;
     background: var(--cream);
   }
-  /* The Add-workspace overlay opens from the Plan picker, where the secondary
-     sidebar is hidden (hideSidePanel) and content starts at the rail edge.
-     Pin it to the rail, not the full shell offset, or it floats off to the
-     right into the space the absent sidebar would occupy. */
-  .workspace-overlay-desktop {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: var(--rail-width);
-    max-width: none;
-    margin: 0;
-    background: var(--cream);
-  }
 }
 /* ── Home greeting "living accent" (Dir 3) ──────────────────────────────────
    A slow light-sheen drifts across the greeting headline and the Featured dot
