@@ -73,7 +73,7 @@ export default function PickMinistryPage() {
               style={{
                 display: "flex", alignItems: "center", gap: 16,
                 padding: 16, borderRadius: 16, border: "1px solid var(--line)",
-                background: selecting === m.id ? "var(--plum)" : "white",
+                background: selecting === m.id ? "var(--plum)" : "var(--cream-panel)",
                 cursor: selecting ? "default" : "pointer",
                 opacity: selecting && selecting !== m.id ? 0.5 : 1,
                 textAlign: "left", width: "100%",
