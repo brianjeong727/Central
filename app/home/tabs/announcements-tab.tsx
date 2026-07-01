@@ -1348,7 +1348,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
                 <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>
           )}
@@ -1436,7 +1436,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
               <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         )}
