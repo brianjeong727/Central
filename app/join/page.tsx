@@ -7,6 +7,7 @@ import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinis
 import { Spinner } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 import { MonogramChip } from "@/components/central/MonogramChip"
+import { getInitials } from "@/app/home/utils"
 
 // ─── design tokens ──────────────────────────────────────────────
 const SANS = "var(--font-inter), system-ui, sans-serif"
@@ -73,10 +74,6 @@ const SIZE_LABELS: Record<string, string> = {
 
 type Ministry = { id: string; name: string; university: string; size: string; location: string | null }
 type Tab = "browse" | "code"
-
-function getInitials(name: string) {
-  return name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
-}
 
 function readPendingJoinState(): { tab: Tab; inviteCode: string; selected: Ministry | null } {
   if (typeof window === "undefined") return { tab: "browse", inviteCode: "", selected: null }

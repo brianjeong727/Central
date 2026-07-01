@@ -24,9 +24,6 @@ export {
   DirectoryListSkeleton,
   DirectoryTabSkeleton,
   ChatListSkeleton,
-  FinanceListSkeleton,
-  GivingGiveSkeleton,
-  GivingTabSkeleton,
   JournalListSkeleton,
   ProfileTabSkeleton,
 } from "./skeletons"
