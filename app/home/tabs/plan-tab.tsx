@@ -2100,6 +2100,22 @@ export function PlanTab({
     ...govTeams.map(t => ({ id: t.id, name: t.name })),
   ]
 
+  // Team-settings subpage — rendered IN-CONTENT (not a portal) via SubpageShell.
+  // Mounted once per viewport (desktop section swaps the team body for it; mobile
+  // area wraps it in md:hidden), mirroring the file's existing double-mount pattern.
+  const teamSettingsEl = openTeam ? (
+    <TeamDetailOverlay
+      team={openTeam}
+      userId={userId}
+      ministryId={ministryId}
+      isAdmin={isAdmin}
+      isGovernanceAdmin={isGovernanceAdmin}
+      onClose={closeSettings}
+      onChanged={() => { closeSettings(); onTeamsChange() }}
+      onOpenChat={onOpenChat}
+    />
+  ) : null
+
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
@@ -2148,7 +2164,7 @@ export function PlanTab({
         {/* Page header — hidden for student org board, DGL team (both use section-level headers),
             the no-team picker screen, the Receipts sentinel (ReceiptsWorkspace owns its own header),
             and whenever a subpage is open (§4.18: the subpage consumes the page header). */}
-        {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && !subpageActive && (
+        {activeTeamId && activeTeamId !== "receipts" && teamKind !== "studentOrg" && teamKind !== "dgl" && !subpageActive && !openTeam && (
           <TabPageHeader>
             {/* Compact workspace header (DESIGN_SYSTEM §3.1): 25px title, no eyebrow.
                 Shared by every non-section workspace kind (praise, finance, etc.). */}
@@ -2168,6 +2184,9 @@ export function PlanTab({
           </TabPageHeader>
         )}
 
+        {/* Team settings subpage swaps the whole team body (mirrors the event page). */}
+        {openTeam ? teamSettingsEl : (
+        <>
         {/* Scrollable team content */}
         <div className="flex-1 overflow-y-auto">
         {activeTeamId && activeTeamId !== "receipts" && govView && (
@@ -2414,12 +2433,16 @@ export function PlanTab({
           )
         })()}
       </div>
+        </>
+        )}
       </div>
 
       {/* Mobile content. Receipts + Finance render FULL-BLEED (no px-5 wrapper) so their
           detail SubpageShell is the only horizontal inset; each supplies its own inset
           internally. Every other team kind keeps the shared px-5 wrapper. */}
-      {activeTeamId === "receipts" ? (
+      {openTeam ? (
+        <div className="md:hidden">{teamSettingsEl}</div>
+      ) : activeTeamId === "receipts" ? (
         <div className="md:hidden pb-4">
           <ReceiptsWorkspace
             ministryId={ministryId}
@@ -2597,19 +2620,6 @@ export function PlanTab({
             // Open the new (empty) workspace's settings so the admin assigns a president.
             openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "view", allow_admin_members: false, hasPresident: false })
           }}
-        />
-      )}
-
-      {openTeam && (
-        <TeamDetailOverlay
-          team={openTeam}
-          userId={userId}
-          ministryId={ministryId}
-          isAdmin={isAdmin}
-          isGovernanceAdmin={isGovernanceAdmin}
-          onClose={closeSettings}
-          onChanged={() => { closeSettings(); onTeamsChange() }}
-          onOpenChat={onOpenChat}
         />
       )}
 
@@ -9366,10 +9376,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const [roles, setRoles] = useState<TeamRole[]>([])
-  const [savedPerms, setSavedPerms] = useState<Record<string, string[]>>({})
-  const [savingPerms, setSavingPerms] = useState(false)
-  const [draftRoleIds, setDraftRoleIds] = useState<Set<string>>(new Set())
-  const [pendingDeleteRoleIds, setPendingDeleteRoleIds] = useState<Set<string>>(new Set())
   const [members, setMembers] = useState<TeamMemberDisplay[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -9388,9 +9394,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState<string | null>(null)
   const [roleDeleteError, setRoleDeleteError] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
-  // Pending member role changes — staged until Save
-  const [pendingMemberRoles, setPendingMemberRoles] = useState<Record<string, string>>({})
-  const [savedMsg, setSavedMsg] = useState<string | null>(null)
   // Co-presidency — persisted per-team setting (teams.allow_co_presidency)
   const [allowCoPresidency, setAllowCoPresidency] = useState(team.allow_co_presidency)
   const [savingCoPres, setSavingCoPres] = useState(false)
@@ -9463,7 +9466,6 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   useEffect(() => {
     if (!tsData) return
     setRoles(tsData.roles)
-    setSavedPerms(Object.fromEntries(tsData.roles.map(r => [r.id, r.permissions])))
     setMembers(tsData.members)
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -9494,7 +9496,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   }, [showAddMember, members.length])
 
   async function handleDeleteTeam() {
-    await supabase.from("teams").delete().eq("id", team.id)
+    await supabase.from("teams").delete().eq("id", team.id).eq("ministry_id", ministryId)
     onChanged()
     onClose()
   }
@@ -9571,9 +9573,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     setConfirmRemoveId(null)
   }
 
-  function handleChangeRole(memberId: string, newRoleId: string) {
+  async function handleChangeRole(memberId: string, newRoleId: string) {
     const newRole = roles.find(r => r.id === newRoleId)
-    // President overflow guard — promoting past the max routes into the Replace flow instead of staging.
+    // President overflow guard — promoting past the max routes into the Replace flow.
     if (newRole?.is_president) {
       const others = presidentMembers.filter(m => m.user_id !== memberId)
       if (others.length >= maxPresidents) {
@@ -9583,9 +9585,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
         return // controlled <select> reverts to the prior role since `members` is untouched
       }
     }
-    // Stage the change — persisted on Save
-    setPendingMemberRoles(prev => ({ ...prev, [memberId]: newRoleId }))
+    // Autosave: optimistic update + immediate write.
+    const snapshot = members
     setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
+    const { error: err } = await supabase.from("team_members").update({ role_id: newRoleId }).eq("team_id", team.id).eq("user_id", memberId)
+    if (err) { setMembers(snapshot); setError(err.message) }
   }
 
   // Confirm the president swap: demote the outgoing president to the default non-president role and promote the target.
@@ -9595,14 +9599,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     if (!outgoing) return
 
     if (replaceCtx.mode === "change" && replaceCtx.targetUserId) {
-      // Stage both the demote and the promote (consistent with the staged role-change model — persisted on Save).
+      // Autosave: demote the outgoing president and promote the target immediately.
       const targetUserId = replaceCtx.targetUserId
-      setPendingMemberRoles(prev => ({ ...prev, [outgoing]: defaultNonPresidentRole.id, [targetUserId]: presidentRole.id }))
+      setReplacing(true)
+      setError(null)
+      const snapshot = members
       setMembers(prev => prev.map(m => {
         if (m.user_id === outgoing) return { ...m, role_id: defaultNonPresidentRole.id, role_name: defaultNonPresidentRole.name }
         if (m.user_id === targetUserId) return { ...m, role_id: presidentRole.id, role_name: presidentRole.name }
         return m
       }))
+      const { error: demoteErr } = await supabase.from("team_members").update({ role_id: defaultNonPresidentRole.id }).eq("team_id", team.id).eq("user_id", outgoing)
+      const { error: promoteErr } = await supabase.from("team_members").update({ role_id: presidentRole.id }).eq("team_id", team.id).eq("user_id", targetUserId)
+      if (demoteErr || promoteErr) { setMembers(snapshot); setError((demoteErr ?? promoteErr)!.message) }
+      setReplacing(false)
       setReplaceCtx(null)
       setReplacePickId(null)
       return
@@ -9635,7 +9645,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   async function handleRenameTeam() {
     const val = teamNameDraft.trim()
     if (!val || val === localTeamName) { setEditingTeamName(false); return }
-    await supabase.from("teams").update({ name: val }).eq("id", team.id)
+    await supabase.from("teams").update({ name: val }).eq("id", team.id).eq("ministry_id", ministryId)
     setLocalTeamName(val)
     setEditingTeamName(false)
   }
@@ -9664,35 +9674,33 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     setSavingAdminMembers(false)
   }
 
-  function handleDeleteRole(roleId: string) {
-    if (draftRoleIds.has(roleId)) {
-      // Draft (not yet in DB): just remove from local state
-      setRoles(prev => {
-        const next = prev.filter(r => r.id !== roleId)
-        setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
-        return next
-      })
-      setDraftRoleIds(prev => { const n = new Set(prev); n.delete(roleId); return n })
-    } else if (pendingDeleteRoleIds.has(roleId)) {
-      // Already staged: toggle off (un-stage)
-      setPendingDeleteRoleIds(prev => { const n = new Set(prev); n.delete(roleId); return n })
-    } else {
-      // Existing: mark as pending delete (stays visible, committed on Save)
-      setPendingDeleteRoleIds(prev => new Set([...prev, roleId]))
-    }
+  async function handleDeleteRole(roleId: string) {
+    // Autosave: null out members holding this role, then delete the role immediately.
+    await supabase.from("team_members").update({ role_id: null }).eq("role_id", roleId).eq("team_id", team.id)
+    const { error: err } = await supabase.from("team_roles").delete().eq("id", roleId)
+    if (err) { setRoleDeleteError(err.message); return }
+    setRoles(prev => {
+      const next = prev.filter(r => r.id !== roleId)
+      setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
+      return next
+    })
+    setMembers(prev => prev.map(m => m.role_id === roleId ? { ...m, role_id: "", role_name: "No role" } : m))
     setConfirmDeleteRoleId(null)
     setRoleDeleteError(null)
   }
 
-  function handleAddRole() {
+  async function handleAddRole() {
     const val = newRoleName.trim()
     if (!val) { setAddingRole(false); return }
-    const tempId = `draft-${Date.now()}`
-    const newRole: TeamRole = { id: tempId, team_id: team.id, name: val, permissions: [], is_president: false }
-    setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
-    setDraftRoleIds(prev => new Set([...prev, tempId]))
     setAddingRole(false)
     setNewRoleName("")
+    // Autosave: insert immediately and adopt the real row.
+    const { data, error: err } = await supabase.from("team_roles")
+      .insert({ team_id: team.id, name: val, permissions: [] })
+      .select("id, team_id, name, permissions, is_president").single()
+    if (err || !data) { setError(err?.message ?? "Failed to add role."); return }
+    const newRole: TeamRole = { ...data, permissions: Array.isArray(data.permissions) ? data.permissions : [], is_president: !!data.is_president }
+    setRoles(prev => { const next = [...prev, newRole]; setActiveRole(next.length - 1); return next })
   }
 
   async function handleRenameRole(roleId: string) {
@@ -9705,109 +9713,20 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
   const visiblePerms = getVisiblePermissions(team.name)
 
-  const hasChanges =
-    draftRoleIds.size > 0 ||
-    pendingDeleteRoleIds.size > 0 ||
-    Object.keys(pendingMemberRoles).length > 0 ||
-    roles.some(r => {
-      if (draftRoleIds.has(r.id)) return false
-      const saved = savedPerms[r.id]
-      if (saved === undefined) return false
-      return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
-    })
-
-  function togglePermission(perm: string) {
+  // Autosave: toggling a permission writes to the role immediately (optimistic + persist).
+  async function togglePermission(perm: string) {
     if (!canManageTeam) return
-    setRoles(prev => prev.map((r, i) =>
-      i === activeRole
-        ? { ...r, permissions: r.permissions.includes(perm) ? r.permissions.filter(p => p !== perm) : [...r.permissions, perm] }
-        : r
-    ))
-  }
-
-  async function handleSaveChanges() {
-    setSavingPerms(true)
-    const snapRoles = [...roles]
-    const snapDrafts = new Set(draftRoleIds)
-    const snapDeletes = new Set(pendingDeleteRoleIds)
-
-    // 1. Delete pending-delete roles
-    if (snapDeletes.size > 0) {
-      const ids = [...snapDeletes]
-      await Promise.all(ids.map(id =>
-        supabase.from("team_members").update({ role_id: null }).eq("role_id", id).eq("team_id", team.id)
-      ))
-      await Promise.all(ids.map(id => supabase.from("team_roles").delete().eq("id", id)))
-      setRoles(prev => {
-        const next = prev.filter(r => !snapDeletes.has(r.id))
-        setActiveRole(cur => Math.min(cur, Math.max(0, next.length - 1)))
-        return next
-      })
-      setSavedPerms(prev => { const next = { ...prev }; ids.forEach(id => delete next[id]); return next })
-      setMembers(prev => prev.map(m => snapDeletes.has(m.role_id ?? "") ? { ...m, role_id: "", role_name: "No role" } : m))
-      setPendingDeleteRoleIds(new Set())
+    const role = roles[activeRole]
+    if (!role) return
+    const nextPerms = role.permissions.includes(perm)
+      ? role.permissions.filter(p => p !== perm)
+      : [...role.permissions, perm]
+    setRoles(prev => prev.map(r => r.id === role.id ? { ...r, permissions: nextPerms } : r))
+    const { error: err } = await supabase.from("team_roles").update({ permissions: nextPerms }).eq("id", role.id)
+    if (err) {
+      setRoles(prev => prev.map(r => r.id === role.id ? { ...r, permissions: role.permissions } : r))
+      setError(err.message)
     }
-
-    // 2. Insert draft roles
-    if (snapDrafts.size > 0) {
-      const idMap: Record<string, string> = {}
-      for (const dr of snapRoles.filter(r => snapDrafts.has(r.id))) {
-        const { data } = await supabase.from("team_roles")
-          .insert({ team_id: team.id, name: dr.name, permissions: dr.permissions })
-          .select("id, team_id, name, permissions").single()
-        if (data) idMap[dr.id] = data.id
-      }
-      setRoles(prev => prev.map(r => idMap[r.id] ? { ...r, id: idMap[r.id] } : r))
-      setSavedPerms(prev => {
-        const next = { ...prev }
-        for (const [tmp, real] of Object.entries(idMap)) {
-          delete next[tmp]
-          next[real] = snapRoles.find(r => r.id === tmp)?.permissions ?? []
-        }
-        return next
-      })
-      setDraftRoleIds(new Set())
-    }
-
-    // 3. Save permission edits for existing roles
-    const toSave = snapRoles.filter(r => {
-      if (snapDrafts.has(r.id) || snapDeletes.has(r.id)) return false
-      const saved = savedPerms[r.id]
-      if (saved === undefined) return false
-      return JSON.stringify([...r.permissions].sort()) !== JSON.stringify([...saved].sort())
-    })
-    await Promise.all(toSave.map(r => supabase.from("team_roles").update({ permissions: r.permissions }).eq("id", r.id)))
-    setSavedPerms(prev => {
-      const next = { ...prev }
-      toSave.forEach(r => { next[r.id] = r.permissions })
-      return next
-    })
-
-    // 4. Save staged member role changes
-    const snapMemberRoles = { ...pendingMemberRoles }
-    if (Object.keys(snapMemberRoles).length > 0) {
-      await Promise.all(
-        Object.entries(snapMemberRoles).map(([uid, roleId]) =>
-          supabase.from("team_members").update({ role_id: roleId }).eq("team_id", team.id).eq("user_id", uid)
-        )
-      )
-      setPendingMemberRoles({})
-    }
-
-    setSavingPerms(false)
-    setSavedMsg("Changes saved")
-    setTimeout(() => setSavedMsg(null), 3000)
-  }
-
-  function handleDiscardChanges() {
-    const surviving = roles
-      .filter(r => !draftRoleIds.has(r.id))
-      .map(r => savedPerms[r.id] !== undefined ? { ...r, permissions: [...savedPerms[r.id]] } : r)
-    setRoles(surviving)
-    setActiveRole(cur => Math.min(cur, Math.max(0, surviving.length - 1)))
-    setDraftRoleIds(new Set())
-    setPendingDeleteRoleIds(new Set())
-    setPendingMemberRoles({})
   }
 
   const filteredAdd = ministryMembers.filter((m) =>
@@ -9936,144 +9855,58 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     </div>
   )
 
-  const overlay = (
-    <AnimateIn className="team-overlay-desktop fixed inset-0 z-[70] flex flex-col bg-[#FBF8F2] max-w-[390px] mx-auto">
+  return (
+    <SubpageShell title="Settings" crumbs={[{ label: localTeamName, onClick: onClose }, { label: "Settings" }]} width="full">
 
-      {/* ── Mobile header ── */}
-      <div className="md:hidden flex items-center justify-between px-5 pt-12 pb-4 border-b border-[var(--line)] bg-[#FBF8F2]">
-        <button
-          onClick={showAddMember ? () => { setShowAddMember(false); setError(null) } : confirmDelete ? () => setConfirmDelete(false) : onClose}
-          className="size-9 bg-white border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
-        >
-          <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
-        </button>
-        <div className="flex items-center gap-2">
-          {!showAddMember && (confirmDelete
-            ? <span className="text-[18px]">⚠️</span>
-            : <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="var(--plum)" fg="#FBF8F2" />
-          )}
-          <span className="text-[14px] font-semibold text-[var(--ink)]">
-            {showAddMember ? "Add Member" : confirmDelete ? "Delete team?" : team.name}
-          </span>
-        </div>
-        <div className="flex justify-end">
-          {!showAddMember && (
-            confirmDelete ? (
-              <button
-                onClick={handleDeleteTeam}
-                style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
-              >
-                Delete
-              </button>
-            ) : savedMsg ? (
-              <span style={{ fontSize: 13, color: "var(--body)" }}>{savedMsg}</span>
-            ) : hasChanges ? (
-              <button
-                onClick={handleSaveChanges}
-                disabled={savingPerms}
-                style={{ height: 34, padding: "0 14px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}
-              >
-                {savingPerms ? "Saving…" : "Save"}
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                {canCreateGroupChat && (
-                  chatCreated ? (
-                    <button
-                      onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
-                      className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[13px] font-semibold text-white"
-                      style={{ background: "var(--plum-2)", border: "none", cursor: "pointer" }}
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" /> Open chat
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleCreateGroupChat}
-                      disabled={creatingChat}
-                      className="size-9 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors"
-                      style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
-                    >
-                      <MessageCircle className="w-4 h-4 text-[var(--muted-text)]" />
-                    </button>
-                  )
-                )}
-                {canDelete && (
-                  <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4 text-[var(--muted-text)]" />
-                  </button>
-                )}
-              </div>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* ── Desktop settings header ── */}
-      <div className="hidden md:flex h-12 px-14 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
-        <div className="flex items-center gap-1.5 text-[12px]" style={{ flex: 1 }}>
-          <span style={{ color: "var(--muted-text)" }}>Central</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--muted-text)" }}>Planning</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--muted-text)" }}>{team.name}</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--ink)", fontWeight: 500 }}>{showAddMember ? "Add member" : "Settings"}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {showAddMember ? (
-            <>
-              <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
-                <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
-              </button>
-              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer", color: "var(--body)" }}>
-                <X style={{ width: 15, height: 15 }} />
-              </button>
-            </>
-          ) : confirmDelete ? (
-            <>
-              <button onClick={() => setConfirmDelete(false)} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-              <button onClick={handleDeleteTeam} style={{ height: 34, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete team</button>
-            </>
-          ) : savedMsg ? (
-            <span style={{ fontSize: 13, color: "var(--body)" }}>{savedMsg}</span>
-          ) : hasChanges ? (
-            <>
-              <button onClick={handleDiscardChanges} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Discard</button>
-              <button onClick={handleSaveChanges} disabled={savingPerms} style={{ height: 34, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: savingPerms ? "not-allowed" : "pointer", opacity: savingPerms ? 0.6 : 1 }}>
-                {savingPerms ? "Saving…" : "Save changes"}
-              </button>
-            </>
-          ) : (
-            <>
+      {/* ── Mobile header — SubpageShell's `title` is desktop-only, so mobile keeps a
+          self-contained header (team icon + name + inline actions). The mobile back
+          row ("← {team}") is rendered by SubpageShell, so no ArrowLeft here. ── */}
+      <div className="md:hidden flex items-center justify-between mb-5" style={{ paddingBottom: 14, borderBottom: "1px solid var(--line)" }}>
+        {showAddMember ? (
+          <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
+            <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
+          </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="var(--plum)" fg="var(--cream)" />
+              <span className="text-[14px] font-semibold text-[var(--ink)]">{localTeamName}</span>
+            </div>
+            <div className="flex items-center gap-2">
               {canCreateGroupChat && (chatCreated ? (
-                <button onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
-                  <MessageCircle style={{ width: 13, height: 13 }} /> Open chat
+                <button
+                  onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
+                  className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[13px] font-semibold"
+                  style={{ background: "var(--plum-2)", color: "var(--cream)", border: "none", cursor: "pointer" }}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> Open chat
                 </button>
               ) : (
-                <button onClick={handleCreateGroupChat} disabled={creatingChat} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.6 : 1 }}>
-                  <MessageCircle style={{ width: 13, height: 13 }} /> {creatingChat ? "Creating…" : "Group chat"}
+                <button
+                  onClick={handleCreateGroupChat}
+                  disabled={creatingChat}
+                  className="size-9 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors"
+                  style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
+                >
+                  <MessageCircle className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
               ))}
               {canDelete && (
-                <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: 8, color: "#B0413E", fontSize: 13, cursor: "pointer" }}>
-                  <Trash2 style={{ width: 13, height: 13 }} /> Delete team
+                <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-[#FDF0F0] transition-colors">
+                  <Trash2 className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
               )}
-              <button onClick={onClose} style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer", color: "var(--body)" }} title="Close settings">
-                <X style={{ width: 15, height: 15 }} />
-              </button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {error && (
-          <div className="mx-5 mt-4 rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">{error}</div>
-        )}
+      {error && (
+        <div className="rounded-xl px-4 py-3 mb-4 text-[13px] text-[var(--plum)] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)" }}>{error}</div>
+      )}
 
-        {/* ── Mobile content ── */}
-        <div className="md:hidden px-5 py-5">
+      {/* ── Mobile content ── */}
+      <div className="md:hidden">
           {!showAddMember && (
             <>
               {loading ? <Spinner /> : (
@@ -10085,12 +9918,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No roles defined.</p>
                       )}
                       {roles.map((role) => (
-                        <div key={role.id} className="bg-white rounded-2xl border border-[var(--line)] p-4">
+                        <div key={role.id} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4">
                           <p className="text-[14px] font-semibold text-[var(--ink)] mb-2">{role.name}</p>
                           {role.permissions.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {role.permissions.map((p) => (
-                                <span key={p} className="text-[11px] bg-[#FBF8F2] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
+                                <span key={p} className="text-[11px] bg-[var(--ivory)] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
                                   {PERMISSION_LABELS[p] ?? p}
                                 </span>
                               ))}
@@ -10105,7 +9938,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   {canManageTeam && (
                     <div>
                       <PlanSectionHeader>Leadership</PlanSectionHeader>
-                      <div className="bg-white rounded-2xl border border-[var(--line)] p-4 flex flex-col gap-4">
+                      <div className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 flex flex-col gap-4">
                         <GgToggle
                           checked={allowCoPresidency}
                           onChange={handleToggleCoPresidency}
@@ -10143,7 +9976,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         const isRevealed = mobileRevealMemberId === m.user_id
                         return (
                           <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3"
-                            style={{ background: isConfirming ? "#FDF0F0" : "white", transition: "background 0.1s" }}
+                            style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", transition: "background 0.1s" }}
                             onClick={() => { if ((isAdmin || isPresident) && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
@@ -10191,12 +10024,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
         {/* ── Desktop content ── */}
         {!showAddMember ? (
-          <div className="hidden md:block px-14 py-8">
+          <div className="hidden md:block" style={{ paddingTop: 28 }}>
             {loading ? <Spinner /> : (
               <>
-                {/* Hero strip */}
-                <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                  <PlanLineIcon iconKey={team.icon ?? "users"} size={76} bg="var(--plum)" fg="#F6F4EF" />
+                {/* Hero strip — team identity + inline rename (page title "Settings"
+                    is supplied by SubpageShell, so this name stays ≤ PageTitle scale). */}
+                <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 32 }}>
+                  <PlanLineIcon iconKey={team.icon ?? "users"} size={52} bg="var(--plum)" fg="var(--cream)" />
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>Team settings</p>
                     {editingTeamName ? (
@@ -10206,7 +10040,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         onChange={e => setTeamNameDraft(e.target.value)}
                         onKeyDown={e => { if (e.key === "Enter") handleRenameTeam(); if (e.key === "Escape") setEditingTeamName(false) }}
                         onBlur={handleRenameTeam}
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0 }}
+                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0 }}
                       />
                     ) : (
                       <div
@@ -10214,7 +10048,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         style={{ cursor: canManageTeam ? "text" : "default" }}
                         onClick={canManageTeam ? () => { setTeamNameDraft(localTeamName); setEditingTeamName(true) } : undefined}
                       >
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1 }}>{localTeamName}</p>
+                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1 }}>{localTeamName}</p>
                         {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 6 }} />}
                       </div>
                     )}
@@ -10226,18 +10060,16 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
                 {/* Roles & permissions */}
                 <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Roles & permissions</p>
-                <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+                <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
                   {roles.length === 0 ? (
                     <p style={{ padding: "24px", textAlign: "center", color: "var(--muted-text)", fontSize: 13 }}>No roles defined.</p>
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "260px 1fr" }}>
                       {/* Role left nav */}
-                      <div style={{ borderRight: "1px solid var(--line)", background: "#FBF8F2" }}>
+                      <div style={{ borderRight: "1px solid var(--line)", background: "var(--ivory)" }}>
                         {roles.map((role, i) => {
                           const roleCount = members.filter(m => m.role_id === role.id).length
                           const isRoleConfirming = confirmDeleteRoleId === role.id
-                          const isPendingDelete = pendingDeleteRoleIds.has(role.id)
-                          const isDraft = draftRoleIds.has(role.id)
                           return (
                             <div
                               key={role.id}
@@ -10247,18 +10079,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                               style={{
                                 padding: "16px 20px",
                                 borderBottom: i < roles.length - 1 ? "1px solid var(--line)" : "none",
-                                borderLeft: isPendingDelete ? "2px solid #9F3030" : (activeRole === i ? "2px solid var(--plum)" : "2px solid transparent"),
-                                background: isPendingDelete ? "#FDF0F0" : (isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "white" : "transparent")),
+                                borderLeft: activeRole === i ? "2px solid var(--plum)" : "2px solid transparent",
+                                background: isRoleConfirming ? "#FDF0F0" : (activeRole === i ? "var(--cream)" : "transparent"),
                                 cursor: isRoleConfirming ? "default" : "pointer",
                                 transition: "background 0.1s",
-                                opacity: isPendingDelete ? 0.6 : 1,
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                                  <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPendingDelete ? "#9F3030" : "var(--ink)", textDecoration: isPendingDelete ? "line-through" : "none" }}>{role.name}</span>
-                                  {isDraft && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#2F7A3E", background: "#E8F5EB", border: "1px solid #C2E0C8", borderRadius: 4, padding: "1px 5px" }}>NEW</span>}
-                                  {isPendingDelete && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
+                                  <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "var(--ink)" }}>{role.name}</span>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   {!isRoleConfirming && (
@@ -10294,8 +10123,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                       )
                                     ) : (
                                       <button
-                                        onClick={e => { e.stopPropagation(); isPendingDelete ? handleDeleteRole(role.id) : setConfirmDeleteRoleId(role.id) }}
-                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: isPendingDelete ? "#9F3030" : "var(--muted-text)", opacity: (hoveredRoleId === role.id || isPendingDelete) ? 1 : 0, transition: "opacity 0.15s", pointerEvents: (hoveredRoleId === role.id || isPendingDelete) ? "auto" : "none" }}
+                                        onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(role.id) }}
+                                        style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: hoveredRoleId === role.id ? 1 : 0, transition: "opacity 0.15s", pointerEvents: hoveredRoleId === role.id ? "auto" : "none" }}
                                       >
                                         <X style={{ width: 14, height: 14 }} />
                                       </button>
@@ -10369,7 +10198,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                   >
                                     <p style={{ flex: 1, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
                                     <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--line)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
-                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
+                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
                                     </div>
                                   </div>
                                 )
@@ -10386,7 +10215,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 {canManageTeam && (
                   <>
                     <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Leadership</p>
-                    <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 22px", marginBottom: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 22px", marginBottom: 28, display: "flex", flexDirection: "column", gap: 16 }}>
                       <GgToggle
                         checked={allowCoPresidency}
                         onChange={handleToggleCoPresidency}
@@ -10406,19 +10235,26 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   </>
                 )}
 
-                {/* Members roster */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Members</p>
-                  {(isAdmin || isPresident) && (
-                    <button
-                      onClick={() => setShowAddMember(true)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "var(--plum)", border: "none", borderRadius: 8, color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      + Add member
-                    </button>
-                  )}
+                {/* Members roster — Create-chat lives in the ContentHeader action slot
+                    (canonical body-action location, §3.2), alongside Add member. */}
+                <div style={{ marginBottom: 12 }}>
+                  <ContentHeader
+                    label="Members"
+                    action={
+                      <>
+                        {canCreateGroupChat && (chatCreated ? (
+                          <ContentActionButton variant="ghost" icon={<MessageCircle style={{ width: 14, height: 14 }} />} label="Open chat" onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }} />
+                        ) : (
+                          <ContentActionButton variant="ghost" icon={<MessageCircle style={{ width: 14, height: 14 }} />} label={creatingChat ? "Creating…" : "Group chat"} onClick={handleCreateGroupChat} disabled={creatingChat} />
+                        ))}
+                        {(isAdmin || isPresident) && (
+                          <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add member" onClick={() => setShowAddMember(true)} />
+                        )}
+                      </>
+                    }
+                  />
                 </div>
-                <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 1fr 120px", padding: "10px 22px", borderBottom: "1px solid var(--line)", color: "var(--muted-text)", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase" }}>
                     <span />
                     <span>Name</span>
@@ -10478,25 +10314,35 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                     )
                   })}
                 </div>
+
+                {/* Danger zone — the delete confirm renders as a top-layer portal dialog. */}
+                {canDelete && (
+                  <div style={{ marginTop: 36 }}>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>Danger zone</p>
+                    <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
+                    <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: "var(--r-chip)", color: "#B0413E", fontSize: 14, cursor: "pointer" }}>
+                      <Trash2 style={{ width: 14, height: 14 }} /> Delete team
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
         ) : (
-          <div className="hidden md:block px-14 py-8">
+          <div className="hidden md:block" style={{ paddingTop: 28 }}>
             <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>
               TEAM SETTINGS · {team.name.toUpperCase()}
             </p>
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 44, color: "var(--ink)", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
+            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
             <p style={{ fontSize: 15, color: "var(--body)", marginBottom: 32 }}>Select people from your ministry and assign them a role on this team.</p>
             {addMemberForm}
           </div>
         )}
-      </div>
 
-      {/* Sticky action footer — add members */}
+      {/* Add-member action row (inline under SubpageShell; interim sub-view) */}
       {showAddMember && selectedIds.size > 0 && (
-        <div style={{ flexShrink: 0, borderTop: "1px solid var(--line)" }}
-          className="px-5 md:px-14 py-4 pb-8 md:pb-5 bg-[#FBF8F2] md:bg-[var(--cream)]"
+        <div style={{ borderTop: "1px solid var(--line)", marginTop: 20 }}
+          className="py-4 pb-8 md:pb-5"
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
@@ -10505,7 +10351,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             <button
               onClick={handleAddMembers}
               disabled={saving}
-              style={{ padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
+              style={{ padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
             >
               {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
             </button>
@@ -10513,8 +10359,32 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
         </div>
       )}
 
-      {/* "Replace a president?" swap dialog */}
-      {replaceCtx && (() => {
+      {/* Top-layer dialogs — rendered via portal so a transformed content-enter
+          ancestor can't trap `position: fixed`. Delete confirm + president swap. */}
+      {mounted && createPortal(
+        <>
+        {confirmDelete && (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center animate-backdrop-in"
+            style={{ background: "rgba(20,16,26,0.32)" }}
+            onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(false) }}
+          >
+            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+              <div style={{ padding: "26px 26px 20px" }}>
+                <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 8 }}>Danger zone</p>
+                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>Delete this team?</h2>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{localTeamName}</span> and its roles will be permanently removed. This can&apos;t be undone.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+                <button onClick={() => setConfirmDelete(false)} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleDeleteTeam} style={{ height: 38, padding: "0 20px", background: "#9F3030", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete team</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {replaceCtx && (() => {
         const isCoPres = presidentMembers.length >= 2
         const confirmDisabled = replacing || (isCoPres && !replacePickId)
         const close = () => { if (!replacing) { setReplaceCtx(null); setReplacePickId(null) } }
@@ -10525,7 +10395,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             style={{ background: "rgba(20,16,26,0.32)" }}
             onClick={e => { if (e.target === e.currentTarget) close() }}
           >
-            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
               <div style={{ padding: "26px 26px 20px" }}>
                 <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 8 }}>{presLabel}</p>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>
@@ -10544,7 +10414,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           <button
                             key={p.user_id}
                             onClick={() => setReplacePickId(p.user_id)}
-                            style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "white", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
+                            style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "var(--cream)", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
                           >
                             <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-semibold" />
                             <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{p.name}</span>
@@ -10565,7 +10435,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
               </div>
               <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
                 <button onClick={close} disabled={replacing} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: replacing ? "not-allowed" : "pointer" }}>Cancel</button>
-                <button onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: confirmDisabled ? "not-allowed" : "pointer", opacity: confirmDisabled ? 0.6 : 1 }}>
+                <button onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: confirmDisabled ? "not-allowed" : "pointer", opacity: confirmDisabled ? 0.6 : 1 }}>
                   {replacing ? "Replacing…" : "Replace"}
                 </button>
               </div>
@@ -10573,12 +10443,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
           </div>
         )
       })()}
+        </>,
+        document.body
+      )}
 
-    </AnimateIn>
+    </SubpageShell>
   )
-
-  if (!mounted) return null
-  return createPortal(overlay, document.body)
 }
 
 // ── SmallGroupLeadersTab ──────────────────────────────────────────────────────
