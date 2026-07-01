@@ -9,7 +9,7 @@ import { EyeButton } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 
-const inputClass = "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+const inputClass = "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("")
@@ -50,16 +50,13 @@ export default function UpdatePasswordPage() {
         flexDirection: "column", justifyContent: "space-between",
         padding: "52px 56px", position: "relative", overflow: "hidden",
       }}>
-        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.1) 1px, transparent 1px)", backgroundSize: "22px 22px", pointerEvents: "none" }} />
-        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%, rgba(246,244,239,0.07) 0%, transparent 50%)", pointerEvents: "none" }} />
-
         <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, position: "relative", textDecoration: "none", color: "inherit" }}>
-          <RingCrossLogo size={26} color="#F6F4EF" />
-          <span style={{ fontFamily: SERIF, fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
+          <RingCrossLogo size={26} color="var(--cream-on-dark)" />
+          <span style={{ fontFamily: SERIF, fontSize: 22, color: "var(--cream-on-dark)", letterSpacing: "-0.01em" }}>Central</span>
         </Link>
 
         <div style={{ position: "relative" }}>
-          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "#F6F4EF", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
+          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "var(--cream-on-dark)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
             One place for your ministry to gather.
           </h2>
           <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 15, color: "rgba(246,244,239,0.6)", lineHeight: 1.7, margin: "0 0 10px" }}>
@@ -72,7 +69,7 @@ export default function UpdatePasswordPage() {
       </div>
 
       {/* ── Form panel ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#FBF8F2", padding: "48px 24px" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--cream-panel)", padding: "48px 24px" }}>
 
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">

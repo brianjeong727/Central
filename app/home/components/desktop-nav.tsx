@@ -273,8 +273,8 @@ export function DesktopSidebar({
             style={{ background: PLUM, border: "none", cursor: "pointer", padding: 0 }}
           >
             <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-              <path d="M70 28 A32 32 0 1 0 70 72" stroke="#F6F4EF" strokeWidth="8" strokeLinecap="round" />
-              <circle cx="50" cy="50" r="6" fill="#F6F4EF" />
+              <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--cream-on-dark)" strokeWidth="8" strokeLinecap="round" />
+              <circle cx="50" cy="50" r="6" fill="var(--cream-on-dark)" />
             </svg>
           </button>
           {showWorkspaceNavHint && (

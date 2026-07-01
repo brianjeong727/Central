@@ -29,7 +29,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
   const compact = tabs.length > 5
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-[#F0EEF8] h-16 z-50 md:hidden">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[var(--cream-panel)] border-t border-[#F0EEF8] h-16 z-50 md:hidden">
       <div className="flex items-center justify-around h-full">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab || (tab.id === "profile" && activeTab === "congregation")

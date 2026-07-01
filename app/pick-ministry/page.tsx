@@ -35,7 +35,7 @@ export default function PickMinistryPage() {
   }
 
   return (
-    <div style={{ minHeight: "100svh", background: "#FBF8F2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
+    <div style={{ minHeight: "100svh", background: "var(--cream-panel)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
 
       {/* Logo */}
       <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 9, marginBottom: 8, textDecoration: "none", color: "inherit" }}>
@@ -73,7 +73,7 @@ export default function PickMinistryPage() {
               style={{
                 display: "flex", alignItems: "center", gap: 16,
                 padding: 16, borderRadius: 16, border: "1px solid var(--line)",
-                background: selecting === m.id ? "var(--plum)" : "white",
+                background: selecting === m.id ? "var(--plum)" : "var(--cream-panel)",
                 cursor: selecting ? "default" : "pointer",
                 opacity: selecting && selecting !== m.id ? 0.5 : 1,
                 textAlign: "left", width: "100%",
@@ -85,12 +85,12 @@ export default function PickMinistryPage() {
                 background: selecting === m.id ? "rgba(246,244,239,0.15)" : "var(--plum)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#F6F4EF" }}>
+                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--cream-on-dark)" }}>
                   {m.name[0]}
                 </span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "#F6F4EF" : "var(--ink)", margin: 0, marginBottom: 2 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "var(--cream-on-dark)" : "var(--ink)", margin: 0, marginBottom: 2 }}>
                   {selecting === m.id ? "Opening…" : m.name}
                 </p>
                 <p style={{ fontSize: 12, color: selecting === m.id ? "rgba(246,244,239,0.65)" : "var(--muted-text)", margin: 0 }}>

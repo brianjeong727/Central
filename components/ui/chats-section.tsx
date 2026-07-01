@@ -58,7 +58,7 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
   return (
     <button
       onClick={onClick}
-      className="w-full bg-[#FBF8F2] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
+      className="w-full bg-[var(--cream-panel)] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors text-left group"
     >
       <div className="flex items-center gap-3.5">
         <MonogramChip

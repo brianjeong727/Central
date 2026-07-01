@@ -66,7 +66,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF8F2]">
+    <div className="min-h-screen bg-[var(--cream-panel)]">
 
       {/* Header */}
       <div className="border-b border-[#E5E0D2] bg-white px-6 py-4 flex items-center gap-4">
@@ -195,7 +195,7 @@ export default function AdminPage() {
                   <button
                     onClick={() => handleApprove(m.id)}
                     disabled={acting === m.id}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[13px] font-semibold text-[#F6F4EF] disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[13px] font-semibold text-[var(--cream-on-dark)] disabled:opacity-50 transition-colors"
                   >
                     <Check className="w-3.5 h-3.5" />
                     Approve

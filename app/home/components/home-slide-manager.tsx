@@ -294,7 +294,7 @@ export function HomeSlideManager({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--cream-2, #FBF8F2)",
+          background: "var(--cream-2, var(--cream-panel))",
           borderRadius: "var(--r-callout)",
           width: "100%",
           maxWidth: 480,

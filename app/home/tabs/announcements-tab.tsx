@@ -598,12 +598,12 @@ function InlineEditFields({
   onSave: () => void; onCancel: () => void
   saving: boolean; dark?: boolean
 }) {
-  const fg = dark ? "#F6F4EF" : "var(--ink)"
+  const fg = dark ? "var(--cream-on-dark)" : "var(--ink)"
   const fgMuted = dark ? "rgba(246,244,239,0.55)" : "var(--muted-text)"
   const fgBody = dark ? "rgba(246,244,239,0.78)" : "var(--body)"
   const borderColor = dark ? "rgba(246,244,239,0.18)" : "var(--line)"
   const chipSel = dark ? "rgba(246,244,239,0.22)" : "var(--plum)"
-  const chipSelText = dark ? "#F6F4EF" : "var(--cream)"
+  const chipSelText = dark ? "var(--cream-on-dark)" : "var(--cream)"
   const chipUnsel = dark ? "transparent" : "transparent"
   const chipUnselText = dark ? "rgba(246,244,239,0.45)" : "var(--body)"
   const chipBorder = dark ? "rgba(246,244,239,0.2)" : "var(--line)"
@@ -707,7 +707,7 @@ function InlineEditFields({
           style={{
             padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer",
             background: dark ? "rgba(246,244,239,0.22)" : "var(--plum)",
-            color: dark ? "#F6F4EF" : "var(--cream)",
+            color: dark ? "var(--cream-on-dark)" : "var(--cream)",
             border: "none", opacity: saving || !title.trim() || !body.trim() ? 0.5 : 1,
           }}
         >{saving ? "Saving…" : "Save"}</button>
@@ -1275,7 +1275,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                 {!isPinned && announcement.is_sub_pinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>For You ·</span>}
                 <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
                 {announcement.audience && announcement.audience !== "all" && (
-                  <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "#F6F4EF", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+                  <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "var(--cream-on-dark)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -1290,15 +1290,15 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                     </button>
                     {showMenu && (
                       <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
-                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left">
+                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left">
                           {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                           {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left">
+                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left">
                           <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
                           {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[#FBF8F2] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
+                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
                         <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
                     )}
@@ -1307,14 +1307,14 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               </div>
             </div>
 
-            <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "#F6F4EF", margin: "0 0 8px" }}>{announcement.title}</h3>
+            <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--cream-on-dark)", margin: "0 0 8px" }}>{announcement.title}</h3>
             <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
             <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[#F6F4EF] hover:bg-white/30 active:scale-[0.97]" : "bg-[#F6F4EF] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1335,7 +1335,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               <div className="mt-3">
                 {announcement.user_has_responded
                   ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
                 }
               </div>
             )}
@@ -1344,11 +1344,11 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           {showDeleteConfirm && (
             <div className="absolute inset-0 z-[20] bg-[#3E1540]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
               <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-              <p className="text-[15px] font-bold text-[#F6F4EF] text-center">Delete this announcement?</p>
+              <p className="text-[15px] font-bold text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
-                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[#F6F4EF] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
+                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>
           )}
@@ -1436,7 +1436,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
               <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">{deleting ? "Deleting…" : "Delete"}</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         )}

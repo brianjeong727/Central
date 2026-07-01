@@ -143,15 +143,15 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   const noMembers = selectedIds.size === 0
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#FBF8F2] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-[#FBF8F2] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-[var(--cream-panel)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
           <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-white border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
@@ -180,7 +180,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Chat name — adapts to selection state */}
           {noMembers && (
             // No members selected: show traditional name input (needed for church chats)
-            <div className="bg-white rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
               <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
               <input
                 type="text"
@@ -195,7 +195,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
           {isGroup && (
             // 2+ members: show auto-name with optional edit link
-            <div className="bg-white rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
                 <button
@@ -239,7 +239,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
               />
             </div>
 
@@ -260,7 +260,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               </div>
             )}
 
-            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-white overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
               {filtered.length === 0 ? (
                 <p className="text-center text-[13px] text-[#8A8497]/50 py-8">No members found</p>
               ) : (
@@ -301,7 +301,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         </div>
 
         {/* Create button */}
-        <div className="flex-shrink-0 bg-[#FBF8F2] border-t border-[var(--line)] px-5 py-4">
+        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] px-5 py-4">
           <button
             onClick={handleCreate}
             disabled={creating || !effectiveName.trim()}
@@ -2071,7 +2071,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   return (
     <>
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]"}>
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
@@ -2140,10 +2140,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       style={{
                         width: 16, height: 16, borderRadius: 99,
                         background: "var(--plum)",
-                        color: "#FBF8F2", fontSize: 9, fontWeight: 600,
+                        color: "var(--cream-panel)", fontSize: 9, fontWeight: 600,
                         display: "inline-grid", placeItems: "center",
                         marginLeft: i ? -4 : 0,
-                        border: "1.5px solid #FBF8F2",
+                        border: "1.5px solid var(--cream-panel)",
                         flexShrink: 0,
                       }}
                     >{name.charAt(0).toUpperCase()}</span>
@@ -2284,7 +2284,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       </div>
                     )}
                     <div className="flex flex-col items-center mt-4 mb-1">
-                      <div className="w-full max-w-[290px] bg-white border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm">
+                      <div className="w-full max-w-[290px] bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm">
                         {poll ? (
                           <>
                             {/* Card header */}
@@ -2303,7 +2303,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                     <MoreHorizontal className="w-3.5 h-3.5 text-[var(--muted-text)]" />
                                   </button>
                                   {pollMenuFor === msg.id && (
-                                    <div className="absolute right-0 top-8 z-[160] bg-white rounded-xl border border-[var(--line)] shadow-lg overflow-hidden min-w-[130px]">
+                                    <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] shadow-lg overflow-hidden min-w-[130px]">
                                       <button
                                         onClick={() => handleDeletePoll(msg.id, msg.poll_id!)}
                                         className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
@@ -2425,7 +2425,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         className={`absolute z-[160] ${i === 0 ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
-                        <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
+                        <div className="bg-[var(--cream-panel)] rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
                           {REACTION_EMOJIS.map((emoji) => (
                             <button
                               key={emoji}
@@ -2464,7 +2464,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         className={`absolute z-[160] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
-                        <div className="bg-white rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
+                        <div className="bg-[var(--cream-panel)] rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
                           {!msg.deleted && (
                             <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[#F3EDE6]">
                               {REACTION_EMOJIS.map((emoji) => (
@@ -2489,7 +2489,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                           >
                             <CornerUpLeft className="w-4 h-4 text-[var(--body)]" />
                             Reply
@@ -2497,7 +2497,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           <button
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); openForwardSheet(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                           >
                             <Forward className="w-4 h-4 text-[var(--body)]" />
                             Forward
@@ -2506,7 +2506,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); pinnedMessageId === msg.id ? handleUnpin() : handlePin(msg.id) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                             >
                               <Pin className="w-4 h-4 text-[var(--body)]" />
                               {pinnedMessageId === msg.id ? "Unpin" : "Pin"}
@@ -2516,7 +2516,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             <button
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content); setEditOriginalText(msg.content) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
                             >
                               <Pencil className="w-4 h-4 text-[var(--body)]" />
                               Edit
@@ -2582,10 +2582,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           msg.deleted
                             ? isOwn
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                              : `bg-[#FBF8F2] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
+                              : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                             : isOwn
-                              ? `bg-[var(--plum-2)] text-[#F6F4EF] ${outgoingRadius}`
-                              : `bg-[#FBF8F2] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
+                              ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
+                              : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
                         } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
                       >
                         {msg.deleted ? (
@@ -2599,7 +2599,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                   onClick={() => scrollToMessage(msg.reply_to_id!)}
                                   className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                                     isOwn
-                                      ? "bg-white/10 border-l-[2px] border-[#F6F4EF]/50"
+                                      ? "bg-[var(--cream-panel)]/10 border-l-[2px] border-[var(--cream-on-dark)]/50"
                                       : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
                                   }`}
                                 >
@@ -2638,7 +2638,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                 </div>
                                 <div className="flex gap-2 justify-end mt-1.5">
                                   <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
-                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[var(--plum)]"}`}>Save</button>
+                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[var(--plum)]"}`}>Save</button>
                                 </div>
                               </div>
                             ) : (
@@ -2660,7 +2660,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                   <div
                                     className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1 cursor-pointer"
                                   >
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-white/10" : "bg-[var(--ivory)]"}`}>
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-[var(--cream-panel)]/10" : "bg-[var(--ivory)]"}`}>
                                       <FileDown className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -2694,7 +2694,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                           rel="noopener noreferrer"
                                           onPointerDown={(e) => e.stopPropagation()}
                                           onClick={(e) => e.stopPropagation()}
-                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-white/10" : "border-[var(--line)] bg-[#F4F1E8]"}`}
+                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[#F4F1E8]"}`}
                                           style={{ textDecoration: "none" }}
                                         >
                                           {preview.image && (
@@ -2735,11 +2735,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
                               userReacted
                                 ? "bg-[var(--plum)] border-[var(--plum)]"
-                                : "bg-white border-[var(--line)]"
+                                : "bg-[var(--cream-panel)] border-[var(--line)]"
                             }`}
                           >
                             <span>{emoji}</span>
-                            <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[var(--muted-text)]"}`}>{count}</span>
+                            <span className={`text-[11px] font-medium ${userReacted ? "text-[var(--cream-on-dark)]" : "text-[var(--muted-text)]"}`}>{count}</span>
                           </button>
                         ))}
                       </div>
@@ -2785,7 +2785,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
                 <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-bold" />
-                <div className="bg-[#FBF8F2] border border-[var(--line)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
+                <div className="bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
@@ -2818,7 +2818,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
       {/* ── GIF Picker panel ── */}
       {showGifPicker && !groupArchived && (
-        <div className="flex-shrink-0 bg-white border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
+        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
             <input
               autoFocus
@@ -2866,13 +2866,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
+            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
               {filteredMentions.map((member, idx) => (
                 <button
                   key={member.id}
                   onPointerDown={(e) => e.preventDefault()}
                   onClick={() => handleMentionSelect(member.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[#FBF8F2]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[var(--cream-panel)]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
                 >
                   <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
                   <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
@@ -3016,7 +3016,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const confirmLabel = pendingVoteOption === "unvote" ? "Remove vote" : vUserVote !== undefined ? "Change vote" : "Submit vote"
         return (
           <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={closeFn}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
                 <div className="flex-1">
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Poll</p>
@@ -3056,7 +3056,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             }
                           }}
                           className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
-                          style={{ borderColor: isSelected ? "var(--plum)" : "var(--line)", background: isSelected ? "rgba(62,21,64,0.05)" : "#FBF8F2" }}
+                          style={{ borderColor: isSelected ? "var(--plum)" : "var(--line)", background: isSelected ? "rgba(62,21,64,0.05)" : "var(--cream-panel)" }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -3112,7 +3112,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         closeFn()
                       }}
                       className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
-                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "#F6F4EF" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
+                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "var(--cream-on-dark)" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
                     >
                       {hasPending ? confirmLabel : "Select an option"}
                     </button>
@@ -3134,7 +3134,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const vVoters = pollVoters[votersPollId] ?? []
         return (
           <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40" onClick={() => setVotersPollId(null)}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", flex: 1 }}>Votes</p>
                 <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
@@ -3180,7 +3180,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       {/* Poll creator modal */}
       {showPollCreator && !groupArchived && (
         <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowPollCreator(false)}>
-          <div className="w-full max-w-[390px] md:max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Create a poll</p>
               <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
@@ -3195,7 +3195,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   value={pollQuestion}
                   onChange={e => setPollQuestion(e.target.value)}
                   placeholder="Ask something…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
                 />
               </div>
               <div>
@@ -3207,7 +3207,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         value={opt}
                         onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
                         placeholder={`Option ${oi + 1}`}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
                       />
                       {pollOptions.length > 2 && (
                         <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
@@ -3244,7 +3244,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       {/* Forward sheet */}
       {forwardingMsg && (
         <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center" onClick={() => setForwardingMsg(null)}>
-          <div className="w-full max-w-[390px] md:max-w-[420px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-[390px] md:max-w-[420px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Forward to</p>
               <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
@@ -3259,7 +3259,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   <button
                     key={g.id}
                     onClick={() => handleForward(g.id)}
-                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[#FBF8F2] active:bg-[#F3EDE6] transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-semibold" />
@@ -3290,7 +3290,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         onClick={() => setLightboxUrl(null)}
       >
         <button
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-[var(--cream-panel)]/10 flex items-center justify-center text-white hover:bg-[var(--cream-panel)]/20 transition-colors"
           onClick={() => setLightboxUrl(null)}
         >
           <X className="w-5 h-5" />
@@ -3459,7 +3459,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       {/* Sub-tab switcher — mobile only */}
-      <div className="flex items-center gap-1 bg-[#FBF8F2] rounded-xl p-1 mb-5 md:hidden">
+      <div className="flex items-center gap-1 bg-[var(--cream-panel)] rounded-xl p-1 mb-5 md:hidden">
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
@@ -3487,7 +3487,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
         />
       </div>
 
@@ -3504,7 +3504,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[#FBF8F2] border border-[var(--line)] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
+            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
           >
             <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
           </button>
@@ -3593,7 +3593,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
   return (
     <button onClick={onClick} className="w-full text-left group">
       {/* Mobile style */}
-      <div className="md:hidden bg-[#FBF8F2] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
+      <div className="md:hidden bg-[var(--cream-panel)] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
           <MonogramChip
             initials={firstInitial}

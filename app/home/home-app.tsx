@@ -1182,7 +1182,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
       {showGradPrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>
-          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "36px 32px", maxWidth: 400, width: "100%", boxShadow: "0 24px 80px rgba(19,16,26,0.18)" }}>
+          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "36px 32px", maxWidth: 400, width: "100%", boxShadow: "0 24px 80px rgba(19,16,26,0.18)" }}>
             <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
             <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
             <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 28px" }}>
@@ -1195,7 +1195,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   sessionStorage.setItem(key, "1")
                   setShowGradPrompt(false)
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
               >
                 Stay in {ministryName}
               </button>

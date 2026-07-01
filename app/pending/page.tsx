@@ -46,7 +46,7 @@ export default function PendingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF8F2] flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-[var(--cream-panel)] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-[390px] flex flex-col items-center text-center">
 
         {/* Logo */}
@@ -85,7 +85,7 @@ export default function PendingPage() {
           <button
             onClick={checkStatus}
             disabled={checking}
-            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[#F6F4EF] font-bold text-[14px] transition-colors"
+            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
           >
             {checking ? "Checking…" : "Check status"}
           </button>

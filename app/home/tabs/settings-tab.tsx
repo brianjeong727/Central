@@ -53,10 +53,10 @@ interface GovTeamRow {
 }
 
 const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-  admin:   { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Admin"   },
-  deacon:  { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Deacon"  },
-  elder:   { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Elder"   },
-  pastor:  { bg: "var(--plum-2)",  color: "#FBF8F2", border: "var(--plum-2)",              label: "Pastor"  },
+  admin:   { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Admin"   },
+  deacon:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Deacon"  },
+  elder:   { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Elder"   },
+  pastor:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Pastor"  },
   leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
   member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
   visitor: { bg: "white",    color: "var(--muted-text)", border: "#D8D3C8",              label: "Visitor" },
@@ -75,7 +75,7 @@ function roleBadge(role: string) {
 const SECTION_LABEL: React.CSSProperties = { ...EYEBROW_STYLE, fontWeight: 400 }
 
 const CARD: React.CSSProperties = {
-  background: "#FBF8F2", borderRadius: "14px", border: "1px solid var(--line)",
+  background: "var(--cream-panel)", borderRadius: "14px", border: "1px solid var(--line)",
 }
 
 export function SettingsTab({
@@ -765,7 +765,7 @@ export function SettingsTab({
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
                           </div>
                         </div>
                       )}
@@ -781,7 +781,7 @@ export function SettingsTab({
                     <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
-                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {homeVerses.length === 0 && !addingVerse && (
                       <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No verses yet. Add one to start the daily rotation.</p></div>
                     )}
@@ -795,7 +795,7 @@ export function SettingsTab({
                               <textarea value={verseTextDraft} onChange={e => setVerseTextDraft(e.target.value)} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
+                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
                               </div>
                             </div>
                           ) : confirmDeleteVerseId === v.id ? (
@@ -812,7 +812,7 @@ export function SettingsTab({
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{v.reference}</span>
-                                  {isToday && <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", fontSize: 10, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 500 }}>Today</span>}
+                                  {isToday && <span style={{ padding: "2px 8px", borderRadius: 999, background: "var(--plum)", color: "var(--cream-panel)", fontSize: 10, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 500 }}>Today</span>}
                                 </div>
                                 <div style={{ marginTop: 4, fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.text}</div>
                               </div>
@@ -831,7 +831,7 @@ export function SettingsTab({
                         <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
+                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
                         </div>
                       </div>
                     ) : (
@@ -861,7 +861,7 @@ export function SettingsTab({
                     ) : (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                         <p style={{ fontSize: "12px", color: "var(--muted-text)", textAlign: "right" }}>Type <strong style={{ color: "var(--ink)" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
-                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "var(--ink)", outline: "none", background: "#FBF8F2", width: 192, fontFamily: "inherit" }} />
+                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "var(--ink)", outline: "none", background: "var(--cream-panel)", width: 192, fontFamily: "inherit" }} />
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
                           <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #9F3030", fontSize: 12, fontWeight: 600, color: "#9F3030", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
@@ -900,13 +900,13 @@ export function SettingsTab({
 
               {/* Search + filter */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2" }}>
+                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)" }}>
                   <Search style={{ width: 15, height: 15, color: "var(--muted-text)", flexShrink: 0 }} />
                   <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)" }} />
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
-                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "var(--plum)" : "var(--line-2)"}`, background: peopleFilter === f ? "var(--plum-2)" : "#FBF8F2", color: peopleFilter === f ? "#FBF8F2" : "var(--body)", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "var(--plum)" : "var(--line-2)"}`, background: peopleFilter === f ? "var(--plum-2)" : "var(--cream-panel)", color: peopleFilter === f ? "var(--cream-panel)" : "var(--body)", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
                       {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
@@ -929,7 +929,7 @@ export function SettingsTab({
               })()}
 
               {/* Member list */}
-              <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+              <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                 {peopleFiltered.length === 0 ? (
                   <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
                 ) : peopleFiltered.map((m, i) => {
@@ -953,7 +953,7 @@ export function SettingsTab({
                             <MoreHorizontal style={{ width: 16, height: 16, color: "#A09A8C" }} />
                           </button>
                           {menuOpen && (
-                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "#FBF8F2", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
+                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
                                 <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
@@ -984,7 +984,7 @@ export function SettingsTab({
                       <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
                     <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "#FBF8F2", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
                       {excomming ? "Banning…" : "Excommunicate"}
                     </button>
                   </div>
@@ -995,7 +995,7 @@ export function SettingsTab({
               {isAdmin && bannedMembers.length > 0 && (
                 <div>
                   <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Excommunicated</p>
-                  <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {bannedMembers.map((b, i) => (
                       <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
                         <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-semibold" />
@@ -1043,7 +1043,7 @@ export function SettingsTab({
                 {!governanceSettings.all_admins && (
                   <div style={{ marginTop: 16 }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Governing roster</p>
-                    <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                    <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                       {adminMembers.length === 0 ? (
                         <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No admin-tier members to choose from.</p>
                       ) : adminMembers.map((m, i) => {
@@ -1085,7 +1085,7 @@ export function SettingsTab({
                   </div>
                 </div>
 
-                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                   {govTeams.length === 0 ? (
                     <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No teams yet.</p>
                   ) : govTeams.map((team, i) => (
@@ -1096,7 +1096,7 @@ export function SettingsTab({
                         {(["none", "view", "write"] as const).map(opt => {
                           const active = team.admin_access === opt
                           return (
-                            <button key={opt} onClick={() => handleTeamAccessChange(team.id, opt)} style={{ padding: "5px 14px", borderRadius: 999, border: "none", background: active ? "var(--plum)" : "transparent", color: active ? "#FBF8F2" : "var(--body)", fontSize: 12, fontWeight: active ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                            <button key={opt} onClick={() => handleTeamAccessChange(team.id, opt)} style={{ padding: "5px 14px", borderRadius: 999, border: "none", background: active ? "var(--plum)" : "transparent", color: active ? "var(--cream-panel)" : "var(--body)", fontSize: 12, fontWeight: active ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
                               {opt.charAt(0).toUpperCase() + opt.slice(1)}
                             </button>
                           )
@@ -1190,7 +1190,7 @@ export function SettingsTab({
               {hasAutomationChanges && !showArchiveWarning && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                   <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
-                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                     {savingAutomations ? "Saving…" : "Save changes"}
                   </button>
                 </div>
@@ -1210,7 +1210,7 @@ export function SettingsTab({
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
                     {maintenanceResult && <div style={{ marginTop: 8, fontSize: 12, color: maintenanceResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{maintenanceResult}</div>}
                   </div>
-                  <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: maintenanceRunning ? "var(--line-2)" : "#FBF8F2", color: maintenanceRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
+                  <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: maintenanceRunning ? "var(--line-2)" : "var(--cream-panel)", color: maintenanceRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {maintenanceRunning ? "Running…" : "Run now"}
                   </button>
                 </div>
@@ -1224,7 +1224,7 @@ export function SettingsTab({
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as "Former Member."</div>
                     {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{cleanupResult}</div>}
                   </div>
-                  <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "#FBF8F2", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
+                  <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "var(--cream-panel)", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {cleanupRunning ? "Running…" : "Run now"}
                   </button>
                 </div>
@@ -1259,7 +1259,7 @@ export function SettingsTab({
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
                         </div>
                       </div>
                     ) : (
@@ -1286,7 +1286,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "#FBF8F2", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
                           </div>
                         </div>
                       ) : (
@@ -1312,7 +1312,7 @@ export function SettingsTab({
                       {calCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                       {calCopied ? "Copied" : "Copy"}
                     </button>
-                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "var(--plum-2)", border: "none", color: "#FBF8F2", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
+                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "var(--plum-2)", border: "none", color: "var(--cream-panel)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
                       <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
                     </button>
                   </div>
@@ -1327,7 +1327,7 @@ export function SettingsTab({
                     <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
-                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
                     {receiptLimits.map((l, i) => {
                       const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
@@ -1353,7 +1353,7 @@ export function SettingsTab({
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
                                 disabled={savingLimitEdit || !editingLimitAmount}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "#F6F4EF", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
                               >{savingLimitEdit ? "…" : "Save"}</button>
                               <button
                                 onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
@@ -1384,7 +1384,7 @@ export function SettingsTab({
                         {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", marginBottom: 8 }}>{limitError}</p>}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "#F6F4EF", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
+                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>
                     )}
@@ -1407,7 +1407,7 @@ export function SettingsTab({
                   <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No admin actions have been recorded yet.</p>
                 </div>
               ) : (
-                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2", overflow: "hidden" }}>
+                <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                   {auditLogs.map((log, i) => {
                     const actionLabel: Record<string, string> = {
                       "announcement.create": "Created announcement",
