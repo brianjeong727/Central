@@ -242,8 +242,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     const year = now.getFullYear()
     // Show from May (5) of graduation year onward
     if (gradYear <= year && month >= 5) {
-      const key = `grad_prompt_dismissed_${gradYear}`
-      if (!sessionStorage.getItem(key)) setShowGradPrompt(true)
+      setShowGradPrompt(true)
     }
   }, [initialProfile.graduation_year])
 
@@ -1190,11 +1189,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
-                onClick={() => {
-                  const key = `grad_prompt_dismissed_${initialProfile.graduation_year}`
-                  sessionStorage.setItem(key, "1")
-                  setShowGradPrompt(false)
-                }}
+                onClick={() => setShowGradPrompt(false)}
                 style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
               >
                 Stay in {ministryName}
