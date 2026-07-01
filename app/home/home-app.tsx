@@ -240,11 +240,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     const now = new Date()
     const month = now.getMonth() + 1 // 1-indexed
     const year = now.getFullYear()
-    // Show from May (5) of graduation year onward
-    if (gradYear <= year && month >= 5) {
+    // Show from May (5) of graduation year onward, unless already dismissed
+    if (gradYear <= year && month >= 5 && !initialProfile.grad_prompt_dismissed) {
       setShowGradPrompt(true)
     }
-  }, [initialProfile.graduation_year])
+  }, [initialProfile.graduation_year, initialProfile.grad_prompt_dismissed])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -1189,7 +1189,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
-                onClick={() => setShowGradPrompt(false)}
+                onClick={() => {
+                  supabase.from("profiles").update({ grad_prompt_dismissed: true }).eq("id", userId).eq("ministry_id", ministryId).then(() => {})
+                  setShowGradPrompt(false)
+                }}
                 style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
               >
                 Stay in {ministryName}
