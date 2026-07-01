@@ -34,10 +34,10 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
       <span style={{
         width: 32, height: 32, borderRadius: 8,
         background: isInk ? "var(--plum)" : "rgba(251,248,242,0.10)",
-        color: "#FBF8F2", display: "grid", placeItems: "center",
+        color: "var(--cream-panel)", display: "grid", placeItems: "center",
         fontFamily: SERIF, fontSize: 15, flexShrink: 0,
       }}>C</span>
-      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "var(--ink)" : "#FBF8F2" }}>
+      <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: isInk ? "var(--ink)" : "var(--cream-panel)" }}>
         Central
       </span>
     </div>
@@ -52,7 +52,7 @@ function ModalAction({ children, onClick, disabled }: {
     <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
       width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
       background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "#A09A8C" : "#FBF8F2",
+      color: disabled ? "#A09A8C" : "var(--cream-panel)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer",
       transition: "background .15s ease",
@@ -283,7 +283,7 @@ function JoinContent() {
           background: "rgba(19,16,26,0.6)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
         }}>
-          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>One more thing</div>
             <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               Which school?
@@ -303,11 +303,11 @@ function JoinContent() {
                   <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{
                     padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
                     border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
-                    background: active ? "var(--plum-2)" : "#FBF8F2",
+                    background: active ? "var(--plum-2)" : "var(--cream-panel)",
                     transition: "all .12s ease",
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                   }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "#FBF8F2" : "var(--ink)" }}>
+                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "var(--cream-panel)" : "var(--ink)" }}>
                       {s.name}
                     </span>
                     <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "var(--muted-text)" }}>
@@ -319,10 +319,10 @@ function JoinContent() {
               <button type="button" onClick={() => setSelectedSchoolId("other")} style={{
                 padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
                 border: `1px solid ${selectedSchoolId === "other" ? "var(--plum-2)" : "var(--line-2)"}`,
-                background: selectedSchoolId === "other" ? "var(--plum-2)" : "#FBF8F2",
+                background: selectedSchoolId === "other" ? "var(--plum-2)" : "var(--cream-panel)",
                 transition: "all .12s ease",
               }}>
-                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "#FBF8F2" : "var(--ink)" }}>
+                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "var(--cream-panel)" : "var(--ink)" }}>
                   Other / Not a student
                 </span>
               </button>
@@ -345,7 +345,7 @@ function JoinContent() {
           background: "rgba(19,16,26,0.6)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
         }}>
-          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>Staff invite code</div>
             <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
@@ -369,10 +369,10 @@ function JoinContent() {
                   <button key={value} type="button" onClick={() => setStaffRole(value)} style={{
                     padding: "14px 18px", borderRadius: 12, textAlign: "left", cursor: "pointer",
                     border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
-                    background: active ? "var(--plum-2)" : "#FBF8F2",
+                    background: active ? "var(--plum-2)" : "var(--cream-panel)",
                     transition: "all .12s ease",
                   }}>
-                    <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "#FBF8F2" : "var(--ink)" }}>{label}</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "var(--cream-panel)" : "var(--ink)" }}>{label}</div>
                     <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "var(--muted-text)", marginTop: 4 }}>{desc}</div>
                   </button>
                 )
@@ -396,7 +396,7 @@ function JoinContent() {
           background: "rgba(19,16,26,0.6)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
         }}>
-          <div style={{ background: "#FBF8F2", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
+          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
             <div style={mono}>One more thing</div>
             <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
               What&apos;s your gender?
@@ -416,8 +416,8 @@ function JoinContent() {
                   <button key={value} type="button" onClick={() => setGender(value)} style={{
                     flex: 1, padding: "10px 16px", borderRadius: 999,
                     border: `1px solid ${active ? "var(--plum)" : "var(--line-2)"}`,
-                    background: active ? "var(--plum-2)" : "#FBF8F2",
-                    color: active ? "#FBF8F2" : "var(--body)",
+                    background: active ? "var(--plum-2)" : "var(--cream-panel)",
+                    color: active ? "var(--cream-panel)" : "var(--body)",
                     fontSize: 14, fontWeight: active ? 500 : 400, cursor: "pointer",
                     transition: "all .12s ease", fontFamily: SANS,
                   }}>
@@ -437,11 +437,11 @@ function JoinContent() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", background: "#FBF8F2", height: "100svh", fontFamily: SANS }}>
+      <div style={{ display: "flex", flexDirection: "column", background: "var(--cream-panel)", height: "100svh", fontFamily: SANS }}>
 
         {/* ── Plum hero band ── */}
         <div style={{
-          flexShrink: 0, position: "relative", overflow: "hidden", color: "#FBF8F2",
+          flexShrink: 0, position: "relative", overflow: "hidden", color: "var(--cream-panel)",
           background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, var(--plum) 55%, #2A0E2C 100%)",
           padding: "28px 0 32px",
         }}>
@@ -457,7 +457,7 @@ function JoinContent() {
               Find your ministry
             </div>
             <h1 style={{
-              fontFamily: SERIF, fontWeight: 400, color: "#FBF8F2",
+              fontFamily: SERIF, fontWeight: 400, color: "var(--cream-panel)",
               fontSize: 40, letterSpacing: "-0.03em", lineHeight: 1.04, margin: 0,
             }}>
               Choose a ministry.
@@ -466,7 +466,7 @@ function JoinContent() {
         </div>
 
         {/* ── Tab bar ── */}
-        <div style={{ borderBottom: "1px solid var(--line)", flexShrink: 0, background: "#FBF8F2" }}>
+        <div style={{ borderBottom: "1px solid var(--line)", flexShrink: 0, background: "var(--cream-panel)" }}>
           <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", padding: "0 24px" }}>
             {(["browse", "code"] as Tab[]).map((t) => (
               <button key={t} onClick={() => setTab(t)} style={{
@@ -502,7 +502,7 @@ function JoinContent() {
                   autoComplete="off"
                   style={{
                     width: "100%", paddingLeft: 42, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
-                    borderRadius: 12, border: "1px solid var(--line-2)", background: "#FBF8F2",
+                    borderRadius: 12, border: "1px solid var(--line-2)", background: "var(--cream-panel)",
                     fontSize: 14, color: "var(--ink)", fontFamily: SANS, outline: "none",
                     boxSizing: "border-box",
                   }}
@@ -555,7 +555,7 @@ function JoinContent() {
                           display: "flex", alignItems: "center", gap: 16, borderRadius: 14,
                           padding: "16px 18px", textAlign: "left", width: "100%", cursor: "pointer",
                           border: `1px solid ${isSelected ? "var(--plum)" : "var(--line-2)"}`,
-                          background: isSelected ? "#F6F2E8" : "#FBF8F2",
+                          background: isSelected ? "#F6F2E8" : "var(--cream-panel)",
                           transition: "all .12s ease",
                         }}>
                           <MonogramChip
@@ -591,7 +591,7 @@ function JoinContent() {
                 <button onClick={handleBrowseJoin} disabled={!selected || confirming || !!switching} style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                   background: (!selected || confirming || !!switching) ? "var(--line-2)" : "var(--plum-2)",
-                  color: (!selected || confirming || !!switching) ? "#A09A8C" : "#FBF8F2",
+                  color: (!selected || confirming || !!switching) ? "#A09A8C" : "var(--cream-panel)",
                   fontSize: 15, fontWeight: 500, fontFamily: SANS,
                   cursor: (!selected || confirming || !!switching) ? "not-allowed" : "pointer",
                   transition: "background .15s ease",
@@ -626,7 +626,7 @@ function JoinContent() {
                   autoComplete="off" autoCapitalize="characters"
                   style={{
                     width: "100%", padding: "16px 0", textAlign: "center",
-                    borderRadius: 12, border: "1px solid var(--line-2)", background: "#FBF8F2",
+                    borderRadius: 12, border: "1px solid var(--line-2)", background: "var(--cream-panel)",
                     fontSize: 22, color: "var(--ink)",
                     fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
                     letterSpacing: "0.18em", textTransform: "uppercase",
@@ -641,7 +641,7 @@ function JoinContent() {
               <button type="submit" disabled={joining || inviteCode.trim().length < 4} style={{
                 width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                 background: (joining || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
-                color: (joining || inviteCode.trim().length < 4) ? "#A09A8C" : "#FBF8F2",
+                color: (joining || inviteCode.trim().length < 4) ? "#A09A8C" : "var(--cream-panel)",
                 fontSize: 15, fontWeight: 500, fontFamily: SANS,
                 cursor: (joining || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
                 transition: "background .15s ease",

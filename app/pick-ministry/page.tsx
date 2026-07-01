@@ -35,7 +35,7 @@ export default function PickMinistryPage() {
   }
 
   return (
-    <div style={{ minHeight: "100svh", background: "#FBF8F2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
+    <div style={{ minHeight: "100svh", background: "var(--cream-panel)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
 
       {/* Logo */}
       <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 9, marginBottom: 8, textDecoration: "none", color: "inherit" }}>

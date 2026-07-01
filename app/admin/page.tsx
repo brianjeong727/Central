@@ -66,7 +66,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF8F2]">
+    <div className="min-h-screen bg-[var(--cream-panel)]">
 
       {/* Header */}
       <div className="border-b border-[#E5E0D2] bg-white px-6 py-4 flex items-center gap-4">

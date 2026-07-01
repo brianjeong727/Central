@@ -124,7 +124,7 @@ function LoginContent() {
       <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
         <label style={{ display: "block" }}>
           <div style={{ ...mono, marginBottom: 8 }}>Email</div>
-          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@university.edu" required autoComplete="email"
@@ -140,7 +140,7 @@ function LoginContent() {
               Forgot password?
             </Link>
           </div>
-          <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
               type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••••" required autoComplete="current-password"
@@ -154,7 +154,7 @@ function LoginContent() {
           type="submit" disabled={loading}
           style={{
             width: "100%", padding: "15px", border: "none", borderRadius: 10,
-            background: "var(--plum-2)", color: "#FBF8F2",
+            background: "var(--plum-2)", color: "var(--cream-panel)",
             fontFamily: SANS, fontSize: 15, fontWeight: 500,
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.75 : 1,
@@ -163,7 +163,7 @@ function LoginContent() {
           }}
         >
           {loading && (
-            <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(251,248,242,0.3)", borderTopColor: "#FBF8F2", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />
+            <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(251,248,242,0.3)", borderTopColor: "var(--cream-panel)", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />
           )}
           {loading ? "Signing in…" : "Sign in"}
         </button>

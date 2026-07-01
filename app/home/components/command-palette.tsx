@@ -112,7 +112,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
     >
       <div
         className="w-full max-w-[560px] mx-4 rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(19,16,26,0.22)]"
-        style={{ background: "#FBF8F2", border: "1px solid var(--line)" }}
+        style={{ background: "var(--cream-panel)", border: "1px solid var(--line)" }}
       >
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[var(--line)]">

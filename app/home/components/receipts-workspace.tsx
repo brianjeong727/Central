@@ -101,7 +101,7 @@ export function ReceiptsWorkspace({
         {teamId && onOpenTeamSettings && (
           <button
             onClick={onOpenTeamSettings}
-            className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
+            className="ml-auto w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0"
             title="Team settings"
           >
             <Settings className="w-4 h-4 text-[var(--body)]" />

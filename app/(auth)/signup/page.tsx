@@ -45,7 +45,7 @@ function Field({ label, hint, helper, value, onChange, placeholder, type = "text
         <span style={mono}>{label}</span>
         {hint}
       </div>
-      <div style={{ display: "flex", alignItems: "center", background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
         <input
           type={type} value={value} onChange={onChange} placeholder={placeholder}
           autoFocus={autoFocus} required={required}
@@ -69,7 +69,7 @@ function Primary({ children, disabled, loading, onClick }: {
     <button type={onClick ? "button" : "submit"} disabled={disabled} onClick={onClick} style={{
       width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
       background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "#A09A8C" : "#FBF8F2",
+      color: disabled ? "#A09A8C" : "var(--cream-panel)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer", letterSpacing: "0.01em",
       transition: "background .15s",
@@ -100,8 +100,8 @@ function Pill({ label, on, onClick }: { label: string; on: boolean; onClick: () 
     <button type="button" onClick={onClick} style={{
       padding: "9px 16px", borderRadius: 999,
       border: "1px solid " + (on ? "var(--plum)" : "var(--line-2)"),
-      background: on ? "var(--plum-2)" : "#FBF8F2",
-      color: on ? "#FBF8F2" : "var(--body)",
+      background: on ? "var(--plum-2)" : "var(--cream-panel)",
+      color: on ? "var(--cream-panel)" : "var(--body)",
       fontSize: 14, fontWeight: on ? 500 : 400, fontFamily: SANS, cursor: "pointer",
       transition: "all .12s",
     }}>{label}</button>
@@ -116,10 +116,10 @@ function SelectTile({ title, sub, on, onClick }: {
     <button type="button" onClick={onClick} style={{
       flex: 1, textAlign: "left", padding: "16px 18px", borderRadius: 12,
       border: "1px solid " + (on ? "var(--plum-2)" : "var(--line-2)"),
-      background: on ? "var(--plum-2)" : "#FBF8F2", cursor: "pointer",
+      background: on ? "var(--plum-2)" : "var(--cream-panel)", cursor: "pointer",
       fontFamily: SANS, transition: "all .12s",
     }}>
-      <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "#FBF8F2" : "var(--ink)" }}>
+      <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "var(--cream-panel)" : "var(--ink)" }}>
         {title}
       </div>
       {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "var(--muted-text)" }}>{sub}</div>}
@@ -136,7 +136,7 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
     <button type="button" onClick={onClick} style={{
       width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 18,
       padding: "22px 24px", borderRadius: 14, border: "1px solid var(--line-2)",
-      background: "#FBF8F2", cursor: "pointer", fontFamily: SANS, transition: "border-color .15s",
+      background: "var(--cream-panel)", cursor: "pointer", fontFamily: SANS, transition: "border-color .15s",
     }}
       className="hover:border-[var(--plum)]"
     >
@@ -268,7 +268,7 @@ function SignupContent() {
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 34 }}>
         <PathRow
           icon={<Icon d="M3 11l9-8 9 8M5 10v10h14V10" size={20}/>}
-          iconBg="var(--plum)" iconFg="#FBF8F2"
+          iconBg="var(--plum)" iconFg="var(--cream-panel)"
           title="Register a church"
           body="I'm a pastor, deacon, or elder starting a new ministry on Central."
           onClick={() => setView("admin")}

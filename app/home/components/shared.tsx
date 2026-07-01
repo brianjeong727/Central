@@ -117,7 +117,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-fade-up">
-      <div className="w-14 h-14 rounded-2xl bg-[#FBF8F2] border border-[var(--line)] flex items-center justify-center text-[var(--muted-text)]">
+      <div className="w-14 h-14 rounded-2xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center text-[var(--muted-text)]">
         {icon}
       </div>
       <div>

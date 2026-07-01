@@ -46,7 +46,7 @@ export default function PendingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF8F2] flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-[var(--cream-panel)] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-[390px] flex flex-col items-center text-center">
 
         {/* Logo */}

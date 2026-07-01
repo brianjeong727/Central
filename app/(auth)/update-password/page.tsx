@@ -9,7 +9,7 @@ import { EyeButton } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 
-const inputClass = "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[#FBF8F2] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+const inputClass = "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("")
@@ -72,7 +72,7 @@ export default function UpdatePasswordPage() {
       </div>
 
       {/* ── Form panel ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#FBF8F2", padding: "48px 24px" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--cream-panel)", padding: "48px 24px" }}>
 
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">

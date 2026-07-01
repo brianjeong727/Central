@@ -17,7 +17,7 @@ export function AuthPhotoPanel() {
   return (
     <div className="hidden md:flex" style={{
       position: "sticky", top: 0, alignSelf: "start", height: "100vh",
-      overflow: "hidden", color: "#FBF8F2", background: "#1E0A20",
+      overflow: "hidden", color: "var(--cream-panel)", background: "#1E0A20",
       padding: "44px", flexDirection: "column", justifyContent: "space-between",
     }}>
       <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
@@ -33,11 +33,11 @@ export function AuthPhotoPanel() {
         }}>
           <RingCrossLogo size={20} color="var(--ivory)" />
         </span>
-        <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "#FBF8F2" }}>Central</span>
+        <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "var(--cream-panel)" }}>Central</span>
       </Link>
       {/* Tagline + verse */}
       <div style={{ position: "relative" }}>
-        <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.03, letterSpacing: "-0.02em", color: "#FBF8F2" }}>
+        <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.03, letterSpacing: "-0.02em", color: "var(--cream-panel)" }}>
           Your ministry,<br/>all in one place.
         </div>
         <div style={{ marginTop: 26, maxWidth: 360 }}>
@@ -59,7 +59,7 @@ export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; chi
     <div style={{
       width: "100%", minHeight: "100svh",
       display: "grid", gridTemplateColumns: "0.786fr 1fr", alignItems: "start",
-      background: "#FBF8F2", fontFamily: SANS,
+      background: "var(--cream-panel)", fontFamily: SANS,
     }}>
       <AuthPhotoPanel />
       <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column" }}>
@@ -80,7 +80,7 @@ export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; chi
             <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 12, textDecoration: "none", color: "inherit" }}>
               <span style={{
                 width: 32, height: 32, borderRadius: 8, background: "var(--plum)",
-                color: "#FBF8F2", display: "grid", placeItems: "center",
+                color: "var(--cream-panel)", display: "grid", placeItems: "center",
                 fontFamily: SERIF, fontSize: 15, flexShrink: 0,
               }}>C</span>
               <span style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
@@ -98,7 +98,7 @@ export function GoogleButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} style={{
       width: "100%", padding: "13px 18px", borderRadius: 12,
-      background: "#FBF8F2", border: "1px solid var(--line-2)", color: "var(--ink)",
+      background: "var(--cream-panel)", border: "1px solid var(--line-2)", color: "var(--ink)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS, cursor: "pointer",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
       transition: "background .15s",

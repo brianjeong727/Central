@@ -320,7 +320,7 @@ export function StudentOrgRoleTabContent({
   }
 
   const cardStyle: React.CSSProperties = {
-    background: "#FBF8F2",
+    background: "var(--cream-panel)",
     border: "1px solid var(--line)",
     borderRadius: 16,
     padding: "16px 20px",
@@ -1395,7 +1395,7 @@ export function StudentOrgTeamHome({
           {onTeamSettings && (
             <button
               onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
               title="Team settings"
             >
               <Settings className="w-4 h-4 text-[var(--body)]" />
@@ -1431,7 +1431,7 @@ export function StudentOrgTeamHome({
             {onTeamSettings && (
               <button
                 onClick={onTeamSettings}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
                 title="Team settings"
               >
                 <Settings className="w-4 h-4 text-[var(--body)]" />
@@ -1556,7 +1556,7 @@ export function StudentOrgTeamHome({
                           <button
                             onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id) }}
                             disabled={deleting}
-                            style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}
+                            style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#9F3030", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}
                           >
                             {deleting ? "Deleting…" : "Delete"}
                           </button>
@@ -1778,7 +1778,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
       {ROTATION_TYPES.map(({ type, label }) => (
         <div key={type}>
           <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>{label}</p>
-          <div style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
             {upcomingSundays.map((weekDate, i) => {
               const assignment = getAssignment(type, weekDate)
               const key = `${type}::${weekDate}`
@@ -2194,7 +2194,7 @@ export function PlanTab({
             {activeTeamFull && canOpenTeamSettings && (
               <button
                 onClick={() => openSettings(activeTeamFull)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
                 title="Team settings"
               >
                 <Settings className="w-4 h-4 text-[var(--body)]" />
@@ -2335,7 +2335,7 @@ export function PlanTab({
                 {isAdmin && (
                   <button
                     onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "#FBF8F2", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "var(--cream-panel)", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer" }}
                   >
                     <Plus style={{ width: 14, height: 14 }} /> Add a workspace
                   </button>
@@ -3327,7 +3327,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
           {/* Add week inline form */}
           {showAddWeek && (
-            <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+            <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New worship week</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
@@ -3366,7 +3366,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     Leader <span style={{ color: newLeaderError ? "#DC2626" : "var(--muted-text)", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
                   </label>
                   <select value={newLeaderId} onChange={e => { setNewLeaderId(e.target.value); setNewLeaderError(false) }}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "var(--line)"}`, background: "#FBF8F2", fontSize: 14, color: newLeaderId ? "var(--ink)" : "var(--muted-text)", outline: "none" }}>
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "var(--line)"}`, background: "var(--cream-panel)", fontSize: 14, color: newLeaderId ? "var(--ink)" : "var(--muted-text)", outline: "none" }}>
                     <option value="">Select Worship Leader…</option>
                     {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                   </select>
@@ -3389,7 +3389,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
           {scheduleLoading ? (
             <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
           ) : visibleWeeks.length === 0 ? (
-            <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No weeks scheduled yet.</p>
               <p style={{ fontSize: 13, color: "var(--muted-text)" }}>{canManageSchedule ? "Add one to get started." : "Check back later or set your availability."}</p>
             </div>
@@ -3405,7 +3405,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                 )
                 const isHighlighted = highlightWeek === week.week_date
                 return (
-                  <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "#FBF8F2", border: isHighlighted ? "2px solid var(--plum)" : "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+                  <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "var(--cream-panel)", border: isHighlighted ? "2px solid var(--plum)" : "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
 
                     {/* ── Date / status / delete row ── */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
@@ -3553,7 +3553,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
       {subTab === "setlist" && (
         <div>
           {weeks.length === 0 ? (
-            <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No weeks scheduled yet.</p>
               <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add a week in the Schedule tab first.</p>
             </div>
@@ -3563,7 +3563,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                 const songs = [...(songsByWeek[week.id] ?? [])].sort((a, b) => a.order_index - b.order_index)
                 const isUploadingThis = uploadingChartWeek === week.id
                 return (
-                  <div key={week.id} style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
+                  <div key={week.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
                     {/* Card header */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: songs.length > 0 || isUploadingThis ? "1px solid var(--line-2)" : "none" }}>
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2 }}>
@@ -3690,11 +3690,11 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
               <div style={{ marginBottom: 32 }}>
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", marginBottom: 14 }}>My availability</p>
                 {weeks.length === 0 ? (
-                  <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
+                  <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "32px 24px", textAlign: "center" }}>
                     <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No weeks scheduled this month. Check the Schedule tab.</p>
                   </div>
                 ) : (
-                  <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
+                  <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, overflow: "hidden" }}>
                     {weeks.map((week, i) => {
                       const date = week.week_date
                       const avail = myAvailability[date]
@@ -3735,7 +3735,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
               {weeks.length > 0 && teamMembers.length > 0 && (
                 <div>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", marginBottom: 14 }}>Team availability</p>
-                  <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, overflowX: "auto" }}>
+                  <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--line-2)" }}>
@@ -4007,7 +4007,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Members panel */}
       {showMembers && (
-        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 24 }}>
           <p style={{ ...monoStyle, marginBottom: 14 }}>Team members</p>
           {teamMembers.length === 0 && <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>No members yet.</p>}
           {teamMembers.map(m => (
@@ -4048,7 +4048,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Add event form */}
       {showAddEvent && (
-        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+        <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New event</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
@@ -4072,7 +4072,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
       {/* Events list */}
       {events.length === 0 && !showAddEvent ? (
-        <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+        <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No events yet.</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add an event to get started.</p>
         </div>
@@ -4084,7 +4084,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             const assignedIds = new Set(event.roles.map(r => r.user_id))
             const availableMembers = teamMembers.filter(m => !assignedIds.has(m.user_id) && (!addRoleSearch || m.name.toLowerCase().includes(addRoleSearch.toLowerCase())))
             return (
-              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+              <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
                 {/* Date header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)" }}>
@@ -4406,7 +4406,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
       </div>
 
       {showAddEvent && (
-        <div style={{ background: "#FBF8F2", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+        <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 14, padding: 20, marginBottom: 16 }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", marginBottom: 14 }}>New event</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
@@ -4434,7 +4434,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
       )}
 
       {events.length === 0 && !showAddEvent ? (
-        <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
+        <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>No events yet.</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)" }}>Add an event to get started.</p>
         </div>
@@ -4446,7 +4446,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
             const assignedIds = new Set(event.roles.map(r => r.user_id))
             const availableForRole = filteredForRole.filter(m => !assignedIds.has(m.id))
             return (
-              <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+              <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
                   <div>
                     {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2 }}>{event.event_name}</p>}
@@ -4729,7 +4729,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
     const label = event.event_name ?? (showTeamName ? event.teamName : event.teamName)
     const dateStr = new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
     return (
-      <div key={event.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+      <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: songs.length > 0 ? "1px solid #EFE9DA" : "none" }}>
           <div>
             {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.event_name}</p>}
@@ -4804,7 +4804,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
       <div style={{ marginBottom: 36 }}>
         <p style={{ ...monoStyle, marginBottom: 16 }}>Sunday Service</p>
         {sundayEvents.length === 0 ? (
-          <div style={{ background: "#FBF8F2", border: "1.5px dashed var(--line-2)", borderRadius: 12, padding: "28px 20px", textAlign: "center" }}>
+          <div style={{ background: "var(--cream-panel)", border: "1.5px dashed var(--line-2)", borderRadius: 12, padding: "28px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No Sunday sets yet.</p>
           </div>
         ) : sundayEvents.map(e => renderEventCard(e, false))}
@@ -5085,7 +5085,7 @@ function SetListPdfViewer({
 const CATEGORY_CONFIG = {
   welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
   retreat:   { label: "Retreat",   dot: "var(--body)", bg: "#F4F1E8", text: "var(--plum)" },
-  social:    { label: "Social",    dot: "var(--muted-text)", bg: "#FBF8F2", text: "var(--body)" },
+  social:    { label: "Social",    dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)" },
   service:   { label: "Service",   dot: "var(--plum)", bg: "#F0EDE8", text: "var(--plum)" },
   regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "#F3F0F7", text: "var(--body)" },
 } as const
@@ -5292,7 +5292,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: [],
   },
   social: {
-    label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "#FBF8F2", text: "var(--body)",
+    label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)",
     budgetCategory: null, canHaveSubEvents: false,
     description: "Informal social events — Church Picnic, game nights, IM sports, community volunteering (Wilkinsburg Food Pantry), or any hangout.",
     defaultPhases: [
@@ -5368,7 +5368,7 @@ export function MonthGrid({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 12 }}>
         <button
           onClick={() => onMonthChange(new Date(year, month - 1, 1))}
-          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <ChevronLeft className="w-4 h-4 text-[var(--body)]" />
         </button>
@@ -5377,7 +5377,7 @@ export function MonthGrid({
         </span>
         <button
           onClick={() => onMonthChange(new Date(year, month + 1, 1))}
-          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <ChevronRight className="w-4 h-4 text-[var(--body)]" />
         </button>
@@ -5406,7 +5406,7 @@ export function MonthGrid({
                 minHeight: 80,
                 borderRight: idx % 7 !== 6 ? "1px solid #E5E0D2" : "none",
                 borderBottom: idx < cells.length - 7 ? "1px solid #E5E0D2" : "none",
-                background: day && isToday(day) ? "#F4F0F8" : "#FBF8F2",
+                background: day && isToday(day) ? "#F4F0F8" : "var(--cream-panel)",
                 padding: "4px 3px 3px",
                 position: "relative",
               }}
@@ -5521,7 +5521,7 @@ export function TimelineView({
                       display: "flex",
                       alignItems: "flex-start",
                       gap: 10,
-                      background: "#FBF8F2",
+                      background: "var(--cream-panel)",
                       border: "1px solid #E5E0D2",
                       borderRadius: 10,
                       padding: "10px 12px",
@@ -5583,7 +5583,7 @@ export function EventDetailPopover({
       onClick={onClose}
     >
       <div
-        style={{ background: "#FBF8F2", borderRadius: 16, padding: "24px", maxWidth: 480, width: "100%", maxHeight: 500, overflowY: "auto", boxShadow: "0 8px 40px rgba(19,16,26,0.16)" }}
+        style={{ background: "var(--cream-panel)", borderRadius: 16, padding: "24px", maxWidth: 480, width: "100%", maxHeight: 500, overflowY: "auto", boxShadow: "0 8px 40px rgba(19,16,26,0.16)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
@@ -5814,7 +5814,7 @@ export function AddEventModal({
   }
 
   const inputStyle: React.CSSProperties = {
-    width: "100%", background: "#FBF8F2", border: "1px solid #E5E0D2", borderRadius: 8,
+    width: "100%", background: "var(--cream-panel)", border: "1px solid #E5E0D2", borderRadius: 8,
     padding: "8px 12px", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box",
   }
 
@@ -5824,7 +5824,7 @@ export function AddEventModal({
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "#FBF8F2", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--cream-panel)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
       <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", padding: "48px 24px 60px" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
@@ -5852,7 +5852,7 @@ export function AddEventModal({
                       style={{
                         padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
                         border: selected ? `2px solid ${tcfg.dot}` : "2px solid var(--line)",
-                        background: selected ? tcfg.bg : "#FBF8F2",
+                        background: selected ? tcfg.bg : "var(--cream-panel)",
                         transition: "border-color 0.15s, background 0.15s",
                       }}
                     >
@@ -5928,7 +5928,7 @@ export function AddEventModal({
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 13, color: "#9F3030", flex: 1 }}>This will permanently delete the event and all its planning data.</span>
                   <button onClick={() => setDeleteConfirm(false)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "transparent", fontSize: 13, cursor: "pointer", color: "var(--body)" }}>Cancel</button>
-                  <button onClick={handleDelete} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#9F3030", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
+                  <button onClick={handleDelete} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#9F3030", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
                     {deleting ? "Deleting…" : "Delete forever"}
                   </button>
                 </div>
@@ -5944,7 +5944,7 @@ export function AddEventModal({
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "#FBF8F2", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
+            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
               Cancel
             </button>
             <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--plum)", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
@@ -6028,7 +6028,7 @@ export function MinistryCalendar({
       <div className="px-14 py-7">
         <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", marginBottom: 8 }}>Ministry Calendar</p>
-        <div style={{ background: "#FBF8F2", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
+        <div style={{ background: "var(--cream-panel)", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
           <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 4 }}>Calendar database table not set up yet.</p>
           <p style={{ fontSize: 12, color: "var(--muted-text)" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
         </div>
@@ -6056,7 +6056,7 @@ export function MinistryCalendar({
               onClick={() => setView("month")}
               style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
-                background: view === "month" ? "#FBF8F2" : "transparent",
+                background: view === "month" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "month" ? 500 : 400,
                 boxShadow: view === "month" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
@@ -6068,7 +6068,7 @@ export function MinistryCalendar({
               onClick={() => setView("list")}
               style={{
                 display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
-                background: view === "list" ? "#FBF8F2" : "transparent",
+                background: view === "list" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "list" ? 500 : 400,
                 boxShadow: view === "list" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
@@ -6610,7 +6610,7 @@ export function EventPlanWorkspace({
       ]
 
   const inputStyle: React.CSSProperties = {
-    background: "#FBF8F2",
+    background: "var(--cream-panel)",
     border: "1px solid #E5E0D2",
     borderRadius: 8,
     padding: "8px 12px",
@@ -6622,7 +6622,7 @@ export function EventPlanWorkspace({
   }
 
   const selectStyle: React.CSSProperties = {
-    background: "#FBF8F2",
+    background: "var(--cream-panel)",
     border: "1px solid #E5E0D2",
     borderRadius: 8,
     padding: "8px 12px",
@@ -6633,7 +6633,7 @@ export function EventPlanWorkspace({
   }
 
   const cardStyle: React.CSSProperties = {
-    background: "#FBF8F2",
+    background: "var(--cream-panel)",
     border: "1px solid #E5E0D2",
     borderRadius: 12,
     padding: "20px 24px",
@@ -6661,7 +6661,7 @@ export function EventPlanWorkspace({
     <div
       style={inline
         ? {}
-        : { position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "#FBF8F2", overflowY: "auto" }
+        : { position: "fixed", top: 0, bottom: 0, left: 0, right: 0, zIndex: 75, background: "var(--cream-panel)", overflowY: "auto" }
       }
       className={inline ? "" : "md:left-[var(--shell-offset)]"}
     >
@@ -6936,7 +6936,7 @@ export function EventPlanWorkspace({
                                   <select
                                     value={newTaskAssignee}
                                     onChange={(e) => setNewTaskAssignee(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                                   >
                                     <option value="">Unassigned</option>
                                     {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -6945,12 +6945,12 @@ export function EventPlanWorkspace({
                                     type="date"
                                     value={newTaskDue}
                                     onChange={(e) => setNewTaskDue(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
                                   <button
                                     onClick={() => handleAddTask(phase.key)}
                                     disabled={addingTask}
-                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
+                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
                                   >
                                     Add
                                   </button>
@@ -6977,7 +6977,7 @@ export function EventPlanWorkspace({
                       {planningGroupId ? (
                         <button
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
                         >
                           <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
                         </button>
@@ -7034,7 +7034,7 @@ export function EventPlanWorkspace({
                           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                             {role.assigned_name ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)" }}>
-                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "var(--plum)", color: "#FBF8F2", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
+                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "var(--plum)", color: "var(--cream-panel)", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
                                   {role.assigned_name.split(" ").map((s: string) => s[0]).join("")}
                                 </span>
                                 <span style={{ fontSize: 13 }}>{role.assigned_name}</span>
@@ -7079,7 +7079,7 @@ export function EventPlanWorkspace({
                       <select
                         value={newRoleAssignee}
                         onChange={(e) => setNewRoleAssignee(e.target.value)}
-                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                       >
                         <option value="">Unassigned</option>
                         {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -7087,7 +7087,7 @@ export function EventPlanWorkspace({
                       <button
                         onClick={handleAddRole}
                         disabled={addingRole || !newRoleName.trim()}
-                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
+                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
                       >
                         Add
                       </button>
@@ -7135,14 +7135,14 @@ export function EventPlanWorkspace({
                       onChange={(e) => setNewNote(e.target.value)}
                       placeholder="What should the next leader know before this event?"
                       rows={5}
-                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
                     />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                       <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
                       <button
                         onClick={handleAddNote}
                         disabled={addingNote || !newNote.trim()}
-                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
+                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
                       >
                         {addingNote ? "Adding…" : "Add to record"}
                       </button>
@@ -7423,7 +7423,7 @@ function NewFolksTab({
               value={folk.assigned_dgl_id ?? ""}
               onChange={(e) => canEdit && handleAssignDGL(folk.id, e.target.value)}
               disabled={!canEdit}
-              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: folk.assigned_dgl_id ? "var(--plum-2)" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
+              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: folk.assigned_dgl_id ? "var(--plum-2)" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
             >
               <option value="">Unassigned</option>
               {dgls.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -7441,7 +7441,7 @@ function NewFolksTab({
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }} />
           <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
           <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "#FBF8F2", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
+          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
         </div>
       )}
     </div>
@@ -7517,7 +7517,7 @@ function ActsTab({
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
             )}
             {canEdit ? (
-              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
+              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
                 {["Music", "Spoken Word", "Comedy", "Dance", "Other"].map(t => <option key={t}>{t}</option>)}
               </select>
             ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.type}</span>}
@@ -7578,7 +7578,7 @@ function TeamsTab({
   }
 
   const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
-    <div style={{ flex: 1, padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
+    <div style={{ flex: 1, padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
       {canEdit ? (
         <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
       ) : (
@@ -7619,7 +7619,7 @@ function TeamsTab({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 14, color: "var(--body)", whiteSpace: "nowrap" }}>Commissioner:</span>
         {canEdit ? (
-          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
+          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
@@ -7711,10 +7711,10 @@ function TransportTab({
           const driver = members.find(m => m.id === car.driver_id)
           const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
           return (
-            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid var(--line)", borderRadius: 14, background: "#FBF8F2" }}>
+            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 {canEdit ? (
-                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
                     <option value="">Driver…</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
@@ -7842,7 +7842,7 @@ function ProgramTab({
                   <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
                 )}
                 {canEdit ? (
-                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "#FBF8F2", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
+                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
                     <option value="">No leader</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
@@ -7996,7 +7996,7 @@ function GroupsTab({
           {sessions.map(session => (
             <div
               key={session.id}
-              style={{ background: "#FBF8F2", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
+              style={{ background: "var(--cream-panel)", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -8159,7 +8159,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {groups.map(g => (
-            <div key={g.id} style={{ background: "#FBF8F2", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" }}>
+            <div key={g.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                 <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
@@ -8168,7 +8168,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
                 {g.members.map(m => (
                   <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: "#FBF8F2" }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--cream-panel)" }}>
                         {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                     </div>
@@ -8635,7 +8635,7 @@ function GroupGeneratorWizard({
 
   return (
     <AnimateIn
-      className="fixed inset-0 z-[85] bg-[#FBF8F2] flex flex-col"
+      className="fixed inset-0 z-[85] bg-[var(--cream-panel)] flex flex-col"
       style={{ left: 0 }}
     >
       {/* Header — full-bleed bar, inner content centered to the wizard column.
@@ -8671,7 +8671,7 @@ function GroupGeneratorWizard({
                 background: i < stepIdx ? "var(--plum)" : i === stepIdx ? "var(--ink)" : "transparent",
                 border: i > stepIdx ? "1px solid var(--line-2)" : "none",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, color: i <= stepIdx ? "#FBF8F2" : "var(--muted-text)", fontWeight: 600,
+                fontSize: 10, color: i <= stepIdx ? "var(--cream-panel)" : "var(--muted-text)", fontWeight: 600,
               }}>
                 {i < stepIdx ? <Check style={{ width: 10, height: 10 }} /> : i + 1}
               </div>
@@ -8705,7 +8705,7 @@ function GroupGeneratorWizard({
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 18px",
                     border: sourceType === opt.value ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                    borderRadius: 12, background: sourceType === opt.value ? "#F6F2E8" : "#FBF8F2",
+                    borderRadius: 12, background: sourceType === opt.value ? "#F6F2E8" : "var(--cream-panel)",
                     cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                     boxShadow: sourceType === opt.value ? "inset 0 0 0 1px var(--plum)" : "none",
                   }}
@@ -8735,7 +8735,7 @@ function GroupGeneratorWizard({
                   <select
                     value={sourceId}
                     onChange={e => setSourceId(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
                   >
                     <option value="">Choose an announcement…</option>
                     {announcements.map(a => (
@@ -8755,7 +8755,7 @@ function GroupGeneratorWizard({
                   <select
                     value={sourceId}
                     onChange={e => setSourceId(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", fontFamily: "inherit" }}
                   >
                     <option value="">Choose a form…</option>
                     {forms.map(f => (
@@ -8795,7 +8795,7 @@ function GroupGeneratorWizard({
                     max={poolCount ?? 100}
                     value={numGroups}
                     onChange={e => setNumGroups(Math.min(Math.max(1, parseInt(e.target.value) || 1), poolCount && poolCount > 0 ? poolCount : 999))}
-                    style={{ width: 80, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "var(--ink)", fontFamily: "inherit" }}
+                    style={{ width: 80, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 15, color: "var(--ink)", fontFamily: "inherit" }}
                   />
                   {estGroupSize !== null && (
                     <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>
@@ -8866,7 +8866,7 @@ function GroupGeneratorWizard({
                   onChange={e => setPrevCSVText(e.target.value)}
                   placeholder={"Name,Group\nJane Smith,Group 1\nJohn Doe,Group 2"}
                   rows={6}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "#FBF8F2", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream-panel)", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
             )}
@@ -8889,7 +8889,7 @@ function GroupGeneratorWizard({
                         padding: "8px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
                         border: "1px solid " + (naming === opt.value ? "var(--plum)" : "var(--line-2)"),
                         background: naming === opt.value ? "var(--plum)" : "transparent",
-                        color: naming === opt.value ? "#FBF8F2" : "var(--body)",
+                        color: naming === opt.value ? "var(--cream-panel)" : "var(--body)",
                         cursor: "pointer", fontFamily: "inherit",
                       }}
                     >
@@ -8925,7 +8925,7 @@ function GroupGeneratorWizard({
                 value={sessionName}
                 onChange={e => setSessionName(e.target.value)}
                 placeholder="e.g. Fall Retreat Groups 2026"
-                style={{ width: "100%", maxWidth: 440, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 14, color: "var(--ink)", fontFamily: "inherit", boxSizing: "border-box" }}
+                style={{ width: "100%", maxWidth: 440, padding: "10px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", fontFamily: "inherit", boxSizing: "border-box" }}
               />
             </div>
 
@@ -8958,7 +8958,7 @@ function GroupGeneratorWizard({
                       onDragLeave={() => setDragOver(null)}
                       onDrop={() => handleDrop(gIdx)}
                       style={{
-                        background: "#FBF8F2",
+                        background: "var(--cream-panel)",
                         border: "1px solid " + (dragOver === gIdx ? "var(--plum)" : g.leader_gender === "male" ? "#B8D4F0" : g.leader_gender === "female" ? "#F0B8D4" : "var(--line)"),
                         borderRadius: 14, padding: "16px 18px", minHeight: 80,
                         transition: "border-color 0.1s",
@@ -8988,13 +8988,13 @@ function GroupGeneratorWizard({
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
                               border: "1px solid var(--line)", borderRadius: 8,
-                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
                             <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                               </span>
                             </div>
@@ -9028,7 +9028,7 @@ function GroupGeneratorWizard({
                       onDragLeave={() => setDragOver(null)}
                       onDrop={() => handleDrop(gIdx)}
                       style={{
-                        background: "#FBF8F2", border: "1px solid " + (dragOver === gIdx ? "var(--plum)" : "var(--line)"),
+                        background: "var(--cream-panel)", border: "1px solid " + (dragOver === gIdx ? "var(--plum)" : "var(--line)"),
                         borderRadius: 14, padding: "16px 18px", minHeight: 80,
                         transition: "border-color 0.1s",
                       }}
@@ -9046,13 +9046,13 @@ function GroupGeneratorWizard({
                             onDragEnd={() => { setDragSource(null); setDragOver(null) }}
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "#FBF8F2",
+                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
                             <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: "#FBF8F2" }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                               </span>
                             </div>
@@ -9077,7 +9077,7 @@ function GroupGeneratorWizard({
       </div>
 
       {/* Footer */}
-      <div style={{ borderTop: "1px solid var(--line)", padding: "16px 32px", flexShrink: 0, background: "#FBF8F2" }}>
+      <div style={{ borderTop: "1px solid var(--line)", padding: "16px 32px", flexShrink: 0, background: "var(--cream-panel)" }}>
         <div style={{ maxWidth: 680, margin: "0 auto", width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
           {step === 2 && (
@@ -9110,7 +9110,7 @@ function GroupGeneratorWizard({
               onClick={step === 1 ? () => setStep(2) : handleGenerate}
               disabled={(step === 1 && !step1Ready) || generating}
               style={{
-                padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2",
+                padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream-panel)",
                 borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
                 cursor: generating || (step === 1 && !step1Ready) ? "not-allowed" : "pointer",
                 opacity: (step === 1 && !step1Ready) ? 0.5 : 1,
@@ -9126,7 +9126,7 @@ function GroupGeneratorWizard({
               onClick={handleSave}
               disabled={saving || confirmingSG || !sessionName.trim()}
               style={{
-                padding: "10px 22px", background: "var(--plum-2)", color: "#FBF8F2",
+                padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream-panel)",
                 borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
                 cursor: saving || confirmingSG || !sessionName.trim() ? "not-allowed" : "pointer",
                 opacity: !sessionName.trim() ? 0.5 : 1,
@@ -9174,7 +9174,7 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
       >
         <div style={{
           position: "absolute", top: 2, left: checked ? 18 : 2,
-          width: 16, height: 16, borderRadius: 999, background: "#FBF8F2",
+          width: 16, height: 16, borderRadius: 999, background: "var(--cream-panel)",
           transition: "left 0.15s",
         }} />
       </button>
@@ -9747,8 +9747,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 style={{
                   padding: "7px 14px", borderRadius: 999, fontSize: 13,
                   border: `1px solid ${defaultRoleId === r.id ? "var(--plum-2)" : "var(--line-2)"}`,
-                  background: defaultRoleId === r.id ? "var(--plum-2)" : "#FBF8F2",
-                  color: defaultRoleId === r.id ? "#FBF8F2" : "var(--body)",
+                  background: defaultRoleId === r.id ? "var(--plum-2)" : "var(--cream-panel)",
+                  color: defaultRoleId === r.id ? "var(--cream-panel)" : "var(--body)",
                   cursor: "pointer", transition: "all 0.12s",
                 }}
               >
@@ -9767,7 +9767,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
           value={addSearch}
           onChange={(e) => setAddSearch(e.target.value)}
           placeholder="Search members…"
-          style={{ width: "100%", padding: "12px 14px 12px 44px", border: "1px solid var(--line-2)", borderRadius: 10, background: "#FBF8F2", fontSize: 15, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }}
+          style={{ width: "100%", padding: "12px 14px 12px 44px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 15, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }}
         />
       </div>
 
@@ -9823,7 +9823,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         style={{
                           marginTop: 5, fontSize: 12, padding: "4px 8px",
                           border: "1px solid #C9C0B0", borderRadius: 6,
-                          background: "#FBF8F2", color: "var(--ink)", cursor: "pointer",
+                          background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer",
                           outline: "none", maxWidth: "100%",
                         }}
                       >
@@ -9840,7 +9840,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                       width: 20, height: 20, borderRadius: 5, background: "var(--plum)", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
-                      <Check style={{ width: 11, height: 11, color: "#FBF8F2" }} />
+                      <Check style={{ width: 11, height: 11, color: "var(--cream-panel)" }} />
                     </div>
                   )}
                 </button>
@@ -11067,7 +11067,7 @@ function SmallGroupLeadersTab({
           {onTeamSettings && (
             <button
               onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
               title="Team settings"
             >
               <Settings className="w-4 h-4 text-[var(--body)]" />
@@ -11092,7 +11092,7 @@ function SmallGroupLeadersTab({
           {onTeamSettings && (
             <button
               onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[#FBF8F2] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
               title="Team settings"
             >
               <Settings className="w-4 h-4 text-[var(--body)]" />
@@ -11151,7 +11151,7 @@ function SmallGroupLeadersTab({
           <section>
             <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
                 <p className="text-[13px] text-[var(--muted-text)]">Your schedule hasn&apos;t been published yet.</p>
               </div>
             ) : (() => {
@@ -11164,7 +11164,7 @@ function SmallGroupLeadersTab({
               }
               const firstUpcomingIdx = myUpcoming.findIndex(a => getDateStr(a) >= todayStr)
               return (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   {myUpcoming.map((a, i) => {
                     const sunday = new Date(a.week_date + "T12:00:00")
                     const d = new Date(sunday)
@@ -11256,14 +11256,14 @@ function SmallGroupLeadersTab({
 
               {/* Add / Edit mode — member picker */}
               {(rosterAddMode || editingRoster) && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   <div className="px-4 pt-4 pb-3 border-b border-[#EFE9DA]">
                     <input
                       type="text"
                       placeholder="Search members…"
                       value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
-                      style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2" }}
+                      style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream-panel)" }}
                     />
                   </div>
                   <div style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -11305,7 +11305,7 @@ function SmallGroupLeadersTab({
 
               {/* Confirmed roster list */}
               {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
                       <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
@@ -11346,7 +11346,7 @@ function SmallGroupLeadersTab({
                     >Edit</button>
                   )}
                 />
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   {members.length === 0 && !pendingAddMemberIds.size ? (
                     <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                   ) : (
@@ -11396,8 +11396,8 @@ function SmallGroupLeadersTab({
                     <div className="border-t border-[#EFE9DA]">
                       {showSgAddPicker ? (
                         <div className="p-3">
-                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "#FBF8F2", marginBottom: 6 }} />
-                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "#FBF8F2" }}>
+                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream-panel)", marginBottom: 6 }} />
+                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream-panel)" }}>
                             {addableMembers.length === 0 ? (
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "var(--muted-text)" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
@@ -11432,7 +11432,7 @@ function SmallGroupLeadersTab({
                 {pairedGroup && (
                   <div className="mt-3">
                     <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
-                    <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                    <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                       {pairedMs.length === 0 ? (
                         <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
@@ -11468,7 +11468,7 @@ function SmallGroupLeadersTab({
               <select
                 value={semester}
                 onChange={e => setSemester(e.target.value)}
-                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "#FBF8F2", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
               >
                 {getSemesterOptions().map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -11482,7 +11482,7 @@ function SmallGroupLeadersTab({
             <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
                 <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster not confirmed</p>
                 <p className="text-[13px] text-[var(--muted-text)]">
                   The president needs to confirm the DGL roster before availability can be set.
@@ -11511,7 +11511,7 @@ function SmallGroupLeadersTab({
                   <p className="text-[12px] text-[var(--muted-text)] mb-3 mt-3">
                     Check dates when you&apos;re <span className="font-semibold text-[var(--plum)]">not available</span>. Changes save automatically.
                   </p>
-                  <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                  <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                     <div className="overflow-x-auto">
                       <table style={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: nameColW + semesterDates.length * datColW }}>
                         <thead>
@@ -11546,7 +11546,7 @@ function SmallGroupLeadersTab({
                         <tbody>
                           {displayMembers.map((member, i) => (
                             <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #EFE9DA" : undefined }}>
-                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#FBF8F2", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "var(--body)", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid var(--line)" }}>
+                              <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "var(--cream-panel)", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "var(--body)", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid var(--line)" }}>
                                 {member.name.split(" ")[0]}
                               </td>
                               {semesterDates.map(({ date, slot }) => {
@@ -11608,7 +11608,7 @@ function SmallGroupLeadersTab({
             <div>
               <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
                   <p className="text-[13px] text-[var(--muted-text)]">The rotation hasn&apos;t been published yet.</p>
                 </div>
               ) : (
@@ -11649,7 +11649,7 @@ function SmallGroupLeadersTab({
 
               {/* DGL readiness summary */}
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
                     <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
@@ -11671,7 +11671,7 @@ function SmallGroupLeadersTab({
               )}
 
               {!rosterConfirmedForSchedule ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
                   <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster required</p>
                   <p className="text-[13px] text-[var(--muted-text)]">
                     Confirm the DGL roster on the Home tab first to generate a rotation.
@@ -11686,7 +11686,7 @@ function SmallGroupLeadersTab({
                   )}
 
                   {rotationPhase === "idle" && (
-                    <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "#FBF8F2" }}>
+                    <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
                       <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No rotation yet</p>
                       <p className="text-[13px] text-[var(--muted-text)] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
@@ -11713,7 +11713,7 @@ function SmallGroupLeadersTab({
                           const weekDates = [...new Set(rows.map(r => r.week_date))].sort()
                           const isOpen = openRotMonths.has(month)
                           return (
-                            <div key={month} className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "#FBF8F2" }}>
+                            <div key={month} className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                               <button
                                 onClick={() => setOpenRotMonths(prev => { const n = new Set(prev); isOpen ? n.delete(month) : n.add(month); return n })}
                                 className="w-full flex items-center gap-3 px-5 py-4 text-left"
@@ -12234,7 +12234,7 @@ function BibleStudySubTab({
           return (
             <div key={s.id} style={{ flexShrink: 0, position: "relative" as const }}>
               {isRenaming ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1.5px solid var(--plum)", borderRadius: 20, background: "#FBF8F2" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1.5px solid var(--plum)", borderRadius: 20, background: "var(--cream-panel)" }}>
                   <input
                     autoFocus
                     value={renameValue}
@@ -12519,7 +12519,7 @@ function BibleStudySubTab({
                   Finalize &amp; Export PDF →
                 </button>
               ) : (
-                <div style={{ padding: "14px 16px", background: "#FBF8F2", border: "1.5px solid var(--line)", borderRadius: 12 }}>
+                <div style={{ padding: "14px 16px", background: "var(--cream-panel)", border: "1.5px solid var(--line)", borderRadius: 12 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
                   <p style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 10 }}>
                     The Google Doc will be exported to PDF and locked for annotation. Ensure the doc is publicly viewable.
@@ -12603,7 +12603,7 @@ function DGLAssignmentTable({
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "#FBF8F2" }}>
+          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "var(--cream-panel)" }}>
             <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#EFE9DA]"}`} style={hasFlagged ? {} : { background: "#F6F2E8" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (

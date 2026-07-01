@@ -37,7 +37,7 @@ export default function NotAdminPage() {
       </div>
 
       {/* ── Content panel ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#FBF8F2", padding: "48px 24px" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--cream-panel)", padding: "48px 24px" }}>
 
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-10 md:hidden">
