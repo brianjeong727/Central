@@ -847,6 +847,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
 }
 
+// Shared message select — used by the initial newest-50 load and the load-older
+// keyset page so both build identical enriched Message rows.
+const MESSAGE_SELECT = "id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))"
+
 export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
@@ -880,6 +884,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [inputText, setInputText] = useState("")
   const [sending, setSending] = useState(false)
   const [displayName, setDisplayName] = useState(groupName)
+  // Re-seed the header name whenever the groupName prop changes (chat switch through
+  // a path that reuses this instance, or the async name backfill in home-app). The
+  // rename flow still calls setDisplayName directly; this only mirrors the prop.
+  useEffect(() => { setDisplayName(groupName) }, [groupName])
   const [groupType, setGroupType] = useState("")
   const [groupArchived, setGroupArchived] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -919,23 +927,32 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [uploading, setUploading] = useState(false)
   const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
-  // SWR-cached @mention member list — read-only lookup, pure fetcher.
-  const { data: mentionData } = useSWR(
-    groupId ? ["chat-mention-members", groupId] : null,
+  // SWR-cached group roster — the SINGLE source for @mention names, member count,
+  // and (small-room) seed read state. Read-only lookup, pure fetcher. Replaces the
+  // old @mention-only join AND the standalone loadMemberReadStates fetch.
+  const { data: rosterData } = useSWR(
+    groupId ? ["chat-roster", groupId] : null,
     async () => {
       const { data } = await supabase
         .from("group_members")
-        .select("user_id, profiles!user_id(name)")
+        .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
         .eq("group_id", groupId)
       return (data ?? [])
-        .map((m: { user_id: string; profiles: { name: string } | { name: string }[] | null }) => {
+        .map((m: { user_id: string; last_read_at: string | null; profiles: { name: string; avatar_url: string | null } | { name: string; avatar_url: string | null }[] | null }) => {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          return p ? { id: m.user_id, name: p.name } : null
+          return p ? { id: m.user_id, name: p.name, avatarUrl: p.avatar_url ?? null, lastReadAt: m.last_read_at ?? null } : null
         })
-        .filter((m): m is { id: string; name: string } => m !== null)
+        .filter((m): m is { id: string; name: string; avatarUrl: string | null; lastReadAt: string | null } => m !== null)
     }
   )
-  const mentionMembers = useMemo(() => (mentionData ?? []).filter(m => m.id !== userId), [mentionData, userId])
+  const roster = useMemo(() => rosterData ?? [], [rosterData])
+  const rosterLoaded = rosterData !== undefined
+  const mentionMembers = useMemo(() => roster.filter(m => m.id !== userId), [roster, userId])
+  const memberCount = roster.length
+  // Threshold switch (Brian's product decision): rooms ≥30 members drop the live
+  // per-member read-receipt fan-out (the O(members²) source) for an on-demand
+  // "Seen by N" pill; <30 keep today's live per-member receipts exactly.
+  const isLargeRoom = memberCount >= 30
   const [mentionIndex, setMentionIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Polls
@@ -959,6 +976,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevMsgCountRef = useRef(0)
   const suppressScrollRef = useRef(false)
+  // Upward (older-message) pagination — keyset cursor is the oldest loaded message.
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const loadingOlderRef = useRef(false)
+  const lastTypingSentRef = useRef(0)
+  // On-demand "Seen by N" (large rooms only): point-in-time, never live.
+  const [seenByCount, setSeenByCount] = useState<number | null>(null)
+  const [seenByOpen, setSeenByOpen] = useState(false)
+  const [seenByList, setSeenByList] = useState<{ name: string; avatarUrl: string | null }[] | null>(null)
   // Departed members — show "left" indicator on their messages.
   // SWR-cached ministry-scoped lookup, pure fetcher; derived to a Set below.
   const { data: departuresData } = useSWR(
@@ -1430,31 +1456,28 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupMeta])
 
-  // Load other members' last_read_at for read receipts
+  // Seed member read state from the shared roster SWR (Part B3 consolidation — no
+  // separate fetch). Small rooms (<30) get the live per-member map (self excluded);
+  // large rooms leave it empty ({}) — the live receipt path is disabled there.
   useEffect(() => {
-    async function loadMemberReadStates() {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
-        .eq("group_id", groupId)
-        .neq("user_id", userId)
-
-      if (data) {
-        const map: Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }> = {}
-        for (const m of data) {
-          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          const prof = p as { name: string; avatar_url: string | null } | null
-          map[m.user_id] = { name: prof?.name ?? "?", lastReadAt: m.last_read_at, avatarUrl: prof?.avatar_url ?? null }
-        }
-        setMemberReadMap(map)
-      }
+    if (!rosterLoaded) return
+    if (isLargeRoom) { setMemberReadMap({}); return }
+    const map: Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }> = {}
+    for (const m of roster) {
+      if (m.id === userId) continue
+      map[m.id] = { name: m.name, lastReadAt: m.lastReadAt, avatarUrl: m.avatarUrl }
     }
-    loadMemberReadStates()
+    setMemberReadMap(map)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, userId])
+  }, [roster, rosterLoaded, isLargeRoom, userId])
 
-  // Realtime: update memberReadMap when other members mark messages read
+  // Realtime: update memberReadMap when other members mark messages read.
+  // SMALL ROOMS ONLY. In large rooms (≥30) every member subscribing to every
+  // member's read update is the O(members²) blow-up — so we never create this
+  // channel there. Wait until the roster is known before deciding, and tear the
+  // channel down if isLargeRoom flips true after a late roster load.
   useEffect(() => {
+    if (!rosterLoaded || isLargeRoom) return
     const channel = supabase
       .channel(`read-receipts-${groupId}`)
       .on(
@@ -1473,7 +1496,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, userId])
+  }, [groupId, userId, rosterLoaded, isLargeRoom])
 
   // Typing indicator — broadcast channel
   useEffect(() => {
@@ -1501,7 +1524,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
 
-  // Mark messages as read on open and again on close (clears badges for messages received while inside)
+  // Mark messages as read on open (clears the badge). No unmount fire: the realtime
+  // INSERT handler below already advances last_read_at = raw.created_at for every
+  // message received while viewing, so live-received messages stay read without an
+  // extra write on close (and without every close hitting group_members at scale).
   useEffect(() => {
     const markRead = () =>
       supabase
@@ -1512,55 +1538,81 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         .then(() => { if (onRead) onRead() })
 
     markRead()
-    return () => { markRead() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
 
-  // Load last 50 messages
+  // Shared row→Message enrichment (initial load AND load-older). Side effect:
+  // populates profilesCache/avatarCache. Otherwise a pure transform.
+  const enrichRows = useCallback((rows: unknown[]): Message[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (rows as any[]).map((m: any) => {
+      const isSystem = m.message_type === "system"
+      const p = isSystem ? null : (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
+      const name = p?.name ?? (isSystem ? "" : "Unknown")
+      const avatarUrl = p?.avatar_url ?? null
+      if (m.sender_id) {
+        profilesCache.current[m.sender_id] = name
+        avatarCache.current[m.sender_id] = avatarUrl
+      }
+
+      const replyRaw = m.reply_to ?? null
+      const replyProfile = replyRaw?.profiles
+        ? (Array.isArray(replyRaw.profiles) ? replyRaw.profiles[0] : replyRaw.profiles)
+        : null
+
+      return {
+        id: m.id, group_id: m.group_id, sender_id: m.sender_id,
+        content: m.content, created_at: m.created_at, sender_name: name,
+        sender_avatar_url: avatarUrl,
+        reply_to_id: m.reply_to_id ?? null,
+        reply_to_content: replyPreviewLabel(replyRaw?.content, replyRaw?.attachment_type, replyRaw?.attachment_name),
+        reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
+        message_type: m.message_type ?? "user",
+        is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
+        deleted: (m as { deleted?: boolean }).deleted ?? false,
+        attachment_url: (m as { attachment_url?: string | null }).attachment_url ?? null,
+        attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
+        attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
+        attachment_size: (m as { attachment_size?: number | null }).attachment_size ?? null,
+        poll_id: (m as { poll_id?: string | null }).poll_id ?? null,
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Merge a batch of reactions into the existing map (used by load-older).
+  const mergeReactionsFor = useCallback(async (messageIds: string[]) => {
+    if (messageIds.length === 0) return
+    const { data: rxData } = await supabase
+      .from("message_reactions")
+      .select("id, message_id, user_id, emoji")
+      .in("message_id", messageIds)
+    setReactions((prev) => {
+      const rxMap: Record<string, Reaction[]> = { ...prev }
+      for (const rx of ((rxData ?? []) as Reaction[])) {
+        const list = rxMap[rx.message_id] ? [...rxMap[rx.message_id]] : []
+        if (!list.find((r) => r.id === rx.id)) list.push(rx)
+        rxMap[rx.message_id] = list
+      }
+      return rxMap
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Initial load = NEWEST 50 (fetched desc, reversed to ascending for render).
   useEffect(() => {
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))")
+        .select(MESSAGE_SELECT)
         .eq("group_id", groupId)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(50)
 
       if (data) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const enriched: Message[] = data.map((m: any) => {
-          const isSystem = m.message_type === "system"
-          const p = isSystem ? null : (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
-          const name = p?.name ?? (isSystem ? "" : "Unknown")
-          const avatarUrl = p?.avatar_url ?? null
-          if (m.sender_id) {
-            profilesCache.current[m.sender_id] = name
-            avatarCache.current[m.sender_id] = avatarUrl
-          }
-
-          const replyRaw = m.reply_to ?? null
-          const replyProfile = replyRaw?.profiles
-            ? (Array.isArray(replyRaw.profiles) ? replyRaw.profiles[0] : replyRaw.profiles)
-            : null
-
-          return {
-            id: m.id, group_id: m.group_id, sender_id: m.sender_id,
-            content: m.content, created_at: m.created_at, sender_name: name,
-            sender_avatar_url: avatarUrl,
-            reply_to_id: m.reply_to_id ?? null,
-            reply_to_content: replyPreviewLabel(replyRaw?.content, replyRaw?.attachment_type, replyRaw?.attachment_name),
-            reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
-            message_type: m.message_type ?? "user",
-            is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
-            deleted: (m as { deleted?: boolean }).deleted ?? false,
-            attachment_url: (m as { attachment_url?: string | null }).attachment_url ?? null,
-            attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
-            attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
-            attachment_size: (m as { attachment_size?: number | null }).attachment_size ?? null,
-            poll_id: (m as { poll_id?: string | null }).poll_id ?? null,
-          }
-        })
+        const enriched = enrichRows([...data].reverse())
         setMessages(enriched)
+        setHasMore(data.length === 50)
 
         // Load polls for any poll messages
         const pollIds = enriched.filter(m => m.poll_id).map(m => m.poll_id!)
@@ -1586,6 +1638,61 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     loadMessages()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
+
+  // Load-older: keyset page on scroll-up. Cursor = oldest loaded message's
+  // created_at (.lt). Prepends, preserves scroll position, and pulls the new
+  // page's polls + reactions. hasMore=false once a page returns <50 rows.
+  const loadOlder = useCallback(async () => {
+    if (loadingOlderRef.current || !hasMore) return
+    const oldest = messagesRef.current[0]
+    if (!oldest) return
+    loadingOlderRef.current = true
+
+    const container = scrollContainerRef.current
+    const prevScrollHeight = container?.scrollHeight ?? 0
+    const prevScrollTop = container?.scrollTop ?? 0
+
+    const { data } = await supabase
+      .from("messages")
+      .select(MESSAGE_SELECT)
+      .eq("group_id", groupId)
+      .lt("created_at", oldest.created_at)
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    if (data && data.length > 0) {
+      const enriched = enrichRows([...data].reverse())
+      // Suppress the auto-scroll-to-bottom effect: prepending grows the list but
+      // the view must stay put (scroll position is restored below).
+      suppressScrollRef.current = true
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.id))
+        const toPrepend = enriched.filter((m) => !existing.has(m.id))
+        return [...toPrepend, ...prev]
+      })
+
+      const pollIds = enriched.filter(m => m.poll_id).map(m => m.poll_id!)
+      if (pollIds.length > 0) loadPollsData(pollIds)
+      mergeReactionsFor(enriched.map((m) => m.id))
+
+      if (data.length < 50) setHasMore(false)
+
+      // Restore scroll position after the prepended rows lay out.
+      requestAnimationFrame(() => {
+        const c = scrollContainerRef.current
+        if (c) c.scrollTop = c.scrollHeight - prevScrollHeight + prevScrollTop
+      })
+    } else {
+      setHasMore(false)
+    }
+    loadingOlderRef.current = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, hasMore, enrichRows, mergeReactionsFor])
+
+  // Trigger load-older when the thread is scrolled near the top.
+  const handleMessagesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 120 && hasMore && !loadingOlderRef.current) loadOlder()
+  }, [hasMore, loadOlder])
 
   // Keep messagesRef current so realtime callbacks can look up reply content
   useEffect(() => {
@@ -1777,7 +1884,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMentionQuery(null)
     }
     if (typingChannelRef.current && val.trim()) {
-      typingChannelRef.current.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: true } })
+      // Throttle the isTyping:true SEND to at most ~1/sec while held — every keystroke
+      // firing a broadcast is needless fan-out at scale. The 2500ms stop-typing reset
+      // timer still refreshes on every keystroke.
+      if (Date.now() - lastTypingSentRef.current >= 1000) {
+        lastTypingSentRef.current = Date.now()
+        typingChannelRef.current.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: true } })
+      }
       if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
       myTypingTimeoutRef.current = setTimeout(() => {
         typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
@@ -1935,6 +2048,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // For each own message: which other members have it as their most-recently-read own message
   const readReceiptMap = useMemo(() => {
     const map: Record<string, { name: string; avatarUrl: string | null }[]> = {}
+    // Large rooms don't do live per-member receipts — skip the members×messages walk.
+    if (isLargeRoom) return map
     const ownMsgs = messages.filter((m) => m.sender_id === userId)
     if (ownMsgs.length === 0) return map
     for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
@@ -1950,7 +2065,56 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       }
     }
     return map
-  }, [messages, memberReadMap, userId])
+  }, [messages, memberReadMap, userId, isLargeRoom])
+
+  // Large-room "Seen by N": the user's own most-recent (non-system) message.
+  const latestOwnMsg = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender_id === userId && messages[i].message_type !== "system") return messages[i]
+    }
+    return null
+  }, [messages, userId])
+
+  // Fetch the aggregate count ONCE per latest-own-message (large rooms only). A new
+  // own message → new id → refetch. Point-in-time; never auto-refreshed live.
+  useEffect(() => {
+    if (!isLargeRoom || !latestOwnMsg) { setSeenByCount(null); return }
+    setSeenByOpen(false)
+    setSeenByList(null)
+    let cancelled = false
+    supabase
+      .from("group_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("group_id", groupId)
+      .neq("user_id", userId)
+      .gte("last_read_at", latestOwnMsg.created_at)
+      .then(({ count }) => { if (!cancelled) setSeenByCount(count ?? 0) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLargeRoom, latestOwnMsg?.id, groupId, userId])
+
+  // Expand/collapse the reader list — fetched on demand the first time it's opened.
+  async function toggleSeenBy() {
+    if (!latestOwnMsg) return
+    if (seenByOpen) { setSeenByOpen(false); return }
+    setSeenByOpen(true)
+    if (seenByList === null) {
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
+        .eq("group_id", groupId)
+        .neq("user_id", userId)
+        .gte("last_read_at", latestOwnMsg.created_at)
+        .order("last_read_at", { ascending: false })
+        .limit(50)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const list = (data ?? []).map((m: any) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+        return { name: (p as { name: string } | null)?.name ?? "?", avatarUrl: (p as { avatar_url: string | null } | null)?.avatar_url ?? null }
+      })
+      setSeenByList(list)
+    }
+  }
 
   function openSearch() {
     setSearchMode(true)
@@ -2034,11 +2198,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
   }
 
-  const memberCount = Object.keys(memberReadMap).length + 1
+  // Header member summary — derived from the roster SWR (not memberReadMap, which is
+  // empty in large rooms). Self first, then everyone else, to match prior ordering.
   const memberFirstNames = useMemo(() => {
-    const others = Object.values(memberReadMap).map(m => m.name.split(" ")[0])
-    return [userName.split(" ")[0], ...others]
-  }, [memberReadMap, userName])
+    const self = roster.filter(m => m.id === userId).map(m => m.name.split(" ")[0])
+    const others = roster.filter(m => m.id !== userId).map(m => m.name.split(" ")[0])
+    return [...self, ...others]
+  }, [roster, userId])
 
   // Settings is now an in-content subpage (SubpageShell), not a portal sibling.
   // Early-return it so it REPLACES the chat in the same slot: on desktop it fills
@@ -2205,7 +2371,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
 
       {/* ── Messages area ── */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
+      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
@@ -2774,6 +2940,40 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           </div>
                         )}
                         <span className="text-[11px] text-[#B0A9A0]">{formatMessageTime(msg.created_at)}</span>
+                      </div>
+                    )}
+
+                    {/* Large-room aggregated read receipt — on-demand "Seen by N",
+                        rendered only under the user's own most-recent message. */}
+                    {isLargeRoom && isOwn && latestOwnMsg?.id === msg.id && seenByCount !== null && seenByCount > 0 && (
+                      <div className="flex flex-col items-end gap-1 mt-1 pr-1" onPointerDown={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleSeenBy() }}
+                          className="text-[11px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors"
+                          style={{ padding: "4px 10px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--cream-panel)" }}
+                        >
+                          Seen by {seenByCount}
+                        </button>
+                        {seenByOpen && seenByList && (
+                          <div
+                            className="flex flex-col gap-1.5 items-end"
+                            style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--cream-panel)", maxWidth: 220 }}
+                          >
+                            {seenByList.map((r, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <span className="text-[12px] text-[var(--body)] truncate">{r.name}</span>
+                                <MonogramChip
+                                  initials={r.name.charAt(0).toUpperCase()}
+                                  avatarUrl={r.avatarUrl || undefined}
+                                  className="w-5 h-5 text-[8px] font-bold"
+                                />
+                              </div>
+                            ))}
+                            {seenByCount > seenByList.length && (
+                              <span className="text-[11px] text-[var(--muted-text)]">+{seenByCount - seenByList.length} more</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
