@@ -1216,6 +1216,15 @@ export function StudentOrgTeamHome({
   const [deleting, setDeleting] = useState(false)
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
 
+  // Sub-event body-swap: when a sub-event is opened from EventPlanWorkspace's
+  // Sub-events tab, it reuses the SAME parent SubpageShell (body + extended
+  // crumbs) instead of nesting a second shell. Cleared whenever the parent
+  // event changes or closes, so closing the parent also drops the child.
+  const [planningChild, setPlanningChild] = useState<CalendarEvent | null>(null)
+  useEffect(() => {
+    setPlanningChild(null)
+  }, [planningEvent?.id])
+
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
 
@@ -1311,20 +1320,42 @@ export function StudentOrgTeamHome({
     // Central / Workspace / {team} / {event} with no duplicate — and the team
     // crumb's onClick gives the mobile back row a "← {team}" target.
     // EventPlanWorkspace runs `bare` so its own px doesn't double-pad under the shell.
+    // Body-swap: a single SubpageShell renders either the parent event or, when
+    // a sub-event is open, the child — extending the crumb trail to
+    // Central / Workspace / {team} / {event} / {sub-event}. The {team} crumb
+    // closes everything; the {event} crumb returns to the parent. Nesting is
+    // capped at one level: onOpenChild is only passed while viewing the parent,
+    // so a sub-event offers no further drill affordance.
+    const activeEvent = planningChild ?? planningEvent
+    const crumbs = planningChild
+      ? [
+          { label: teamName, onClick: () => { setPlanningChild(null); onPlanningEventChange(null) } },
+          { label: planningEvent.title, onClick: () => setPlanningChild(null) },
+          { label: planningChild.title },
+        ]
+      : [
+          { label: teamName, onClick: () => onPlanningEventChange(null) },
+          { label: planningEvent.title },
+        ]
     return (
-      <SubpageShell crumbs={[{ label: teamName, onClick: () => onPlanningEventChange(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
+      <SubpageShell crumbs={crumbs} title={activeEvent.title} width="full">
+        {/* key on the event id: remount when switching parent<->sub-event so the
+            section state re-inits (a sub-event has no Sub-events tab → lands on
+            Overview instead of inheriting the parent's ?evtab=sub_events). */}
         <EventPlanWorkspace
+          key={activeEvent.id}
           inline
           bare
-          calendarEvent={planningEvent}
+          calendarEvent={activeEvent}
           ministryId={ministryId}
           userId={userId}
           canEdit={canEdit}
           canEditBudget={canEditBudget}
           teamId={teamId}
-          onClose={() => onPlanningEventChange(null)}
+          onClose={() => planningChild ? setPlanningChild(null) : onPlanningEventChange(null)}
           onOpenChat={onOpenChat}
           onEditEvent={onEditEvent}
+          onOpenChild={planningChild ? undefined : setPlanningChild}
         />
       </SubpageShell>
     )
@@ -6167,6 +6198,7 @@ export function EventPlanWorkspace({
   teamId,
   onOpenChat,
   onEditEvent,
+  onOpenChild,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -6182,6 +6214,10 @@ export function EventPlanWorkspace({
   teamId?: string | null
   onOpenChat?: (id: string, name: string, type?: string) => void
   onEditEvent?: () => void
+  // Sub-event drill: when provided, the Sub-events tab opens a child by lifting
+  // it to the parent (StudentOrgTeamHome) for a single-shell body-swap. Omitted
+  // while already viewing a child, which caps nesting at one level.
+  onOpenChild?: (ev: CalendarEvent) => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -7112,6 +7148,7 @@ export function EventPlanWorkspace({
                 ministryId={ministryId}
                 userId={userId}
                 canEdit={canEdit}
+                onOpenChild={onOpenChild}
               />
             )}
 
@@ -7179,17 +7216,21 @@ function SubEventsTab({
   ministryId,
   userId,
   canEdit,
+  onOpenChild,
 }: {
   parentEvent: CalendarEvent
   ministryId: string
   userId: string
   canEdit: boolean
+  // Opening a sub-event lifts it to StudentOrgTeamHome for a single-shell
+  // body-swap. Omitted when already viewing a child (nesting capped at one
+  // level) — rows then render without a drill affordance.
+  onOpenChild?: (ev: CalendarEvent) => void
 }) {
   const supabase = createClient()
   const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
-  const [planningChild, setPlanningChild] = useState<CalendarEvent | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -7204,24 +7245,6 @@ function SubEventsTab({
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentEvent.id])
-
-  if (planningChild) {
-    return (
-      <div>
-        <button onClick={() => setPlanningChild(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--body)", fontSize: 13, padding: "0 0 16px", display: "flex", alignItems: "center", gap: 6 }}>
-          ← Back to {parentEvent.title}
-        </button>
-        <EventPlanWorkspace
-          inline
-          calendarEvent={planningChild}
-          ministryId={ministryId}
-          userId={userId}
-          canEdit={canEdit}
-          onClose={() => setPlanningChild(null)}
-        />
-      </div>
-    )
-  }
 
   return (
     <div>
@@ -7244,11 +7267,13 @@ function SubEventsTab({
         {subEvents.map(ev => {
           const evCfg = getEventConfig(ev)
           const d = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+          const drillable = !!onOpenChild
           return (
             <button
               key={ev.id}
-              onClick={() => setPlanningChild(ev)}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--ivory)", cursor: "pointer", textAlign: "left", width: "100%" }}
+              onClick={drillable ? () => onOpenChild(ev) : undefined}
+              disabled={!drillable}
+              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--ivory)", cursor: drillable ? "pointer" : "default", textAlign: "left", width: "100%" }}
             >
               <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -7258,7 +7283,7 @@ function SubEventsTab({
               <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "var(--plum)" : ev.status === "active" ? "#2D5445" : "var(--body)" }}>
                 {ev.status.charAt(0).toUpperCase() + ev.status.slice(1)}
               </span>
-              <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>
+              {drillable && <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>}
             </button>
           )
         })}
