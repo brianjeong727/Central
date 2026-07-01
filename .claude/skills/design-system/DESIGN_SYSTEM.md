@@ -36,6 +36,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
 | `--faint`       | `#A09A8C` | Disabled, helper text, timestamps |
 | `--cream`       | `#FDFCF8` | Primary surface (page bg, cards) |
+| `--cream-panel` | `#FBF8F2` | Card / panel / overlay surface — the de-facto surface across cards, dropdowns, and modals (one step warmer than `--cream`) |
+| `--cream-on-dark` | `#F6F4EF` | Cream text / fill **on** plum or dark surfaces — slightly muted from `--cream` for legibility |
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
 | `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface. **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
