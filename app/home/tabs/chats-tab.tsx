@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
 import useSWR, { useSWRConfig } from "swr"
 import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
@@ -9,9 +10,9 @@ import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
 import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
-import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile } from "../types"
+import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb } from "../types"
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
@@ -325,17 +326,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
-  const [pendingAddMembers, setPendingAddMembers] = useState<GroupMember[]>([])
-  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(new Set())
   const [muted, setMuted] = useState(false)
-  const [savedMuted, setSavedMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
-  const [savedPinned, setSavedPinned] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | null>(null)
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
+  // Portal-safe mount flag for the destructive-action confirm dialog (rendered to
+  // document.body so a transformed content-enter ancestor can't trap position:fixed).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const isDM = groupType === "dm"
@@ -388,20 +390,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   useEffect(() => {
     if (!settingsData) return
-    // Seed locally-editable state (members can be added/removed; muted/pinned are
-    // toggles) from the SWR cache. This is a deliberate "controlled-from-server,
-    // then locally edited" seed — not derivable during render — hence the disable.
+    // Seed locally-editable state from the SWR cache. Autosave keeps DB and local
+    // state in lockstep, so there is no separate "saved" snapshot to track.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMembers(settingsData.members)
-    const pref = settingsData.pref
-    setMuted(pref?.muted ?? false)
-    setSavedMuted(pref?.muted ?? false)
-    setPinned(pref?.pinned ?? false)
-    setSavedPinned(pref?.pinned ?? false)
+    setMuted(settingsData.pref?.muted ?? false)
+    setPinned(settingsData.pref?.pinned ?? false)
   }, [settingsData])
 
   async function loadAllProfiles() {
-    const existingIds = new Set([...members.map((m) => m.user_id), ...pendingAddMembers.map(m => m.user_id)])
+    const existingIds = new Set(members.map((m) => m.user_id))
     const { data } = await supabase
       .from("profiles")
       .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
@@ -415,8 +413,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const trimmed = newName.trim()
     if (!trimmed || trimmed === displayGroupName) { setRenaming(false); return }
     setSaving(true)
-    const { error } = await supabase.from("groups").update({ name: trimmed }).eq("id", groupId).eq("ministry_id", ministryId)
-    if (!error) {
+    const { error: err } = await supabase.from("groups").update({ name: trimmed }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!err) {
       setDisplayGroupName(trimmed)
       onNameChange(trimmed)
       await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `Chat renamed to "${trimmed}"`, message_type: "system" })
@@ -425,79 +423,60 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setRenaming(false)
   }
 
-  function stageRemoveMember(memberId: string) {
-    setPendingRemoveIds(prev => new Set([...prev, memberId]))
+  // ── Autosave: every pref toggle / member change persists immediately
+  //    (optimistic update + rollback on failure). No Save/Discard step. ──
+  async function handleToggleMuted() {
+    const next = !muted
+    setMuted(next)
+    const { error: err } = await supabase.from("group_members").update({ muted: next }).eq("group_id", groupId).eq("user_id", userId)
+    if (err) { setMuted(!next); return }
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: next, pinned: cur.pref?.pinned ?? pinned } } : cur, { revalidate: false })
+  }
+
+  async function handleTogglePinned() {
+    const next = !pinned
+    setPinned(next)
+    const { error: err } = await supabase.from("group_members").update({ pinned: next }).eq("group_id", groupId).eq("user_id", userId)
+    if (err) { setPinned(!next); return }
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: cur.pref?.muted ?? muted, pinned: next } } : cur, { revalidate: false })
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    const removed = members.find((m) => m.user_id === memberId)
+    const snapshot = members
+    setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
     setConfirmRemoveMemberId(null)
     setMobileRevealMemberId(null)
+    const { error: err } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", memberId)
+    if (err) { setMembers(snapshot); return }
+    await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} removed ${removed?.name.split(" ")[0] ?? "someone"}`, message_type: "system" })
+    await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds: [], removeUserIds: [memberId] })
+    mutateSettings((cur) => cur ? { ...cur, members: cur.members.filter((m) => m.user_id !== memberId) } : cur, { revalidate: false })
   }
 
-  function unstageRemoveMember(memberId: string) {
-    setPendingRemoveIds(prev => { const n = new Set(prev); n.delete(memberId); return n })
-  }
-
-  function stageAddMembers() {
+  async function handleAddMembers() {
     if (selectedToAdd.length === 0) return
-    const toStage = allProfiles
-      .filter(p => selectedToAdd.includes(p.id))
-      .map(p => ({ user_id: p.id, name: p.name, role: p.role, graduation_year: p.graduation_year ?? null, avatar_url: p.avatar_url ?? null }))
-    setPendingAddMembers(prev => {
-      const existingIds = new Set([...members.map(m => m.user_id), ...prev.map(m => m.user_id)])
-      return [...prev, ...toStage.filter(m => !existingIds.has(m.user_id))]
-    })
+    const toAdd = allProfiles
+      .filter((p) => selectedToAdd.includes(p.id))
+      .map((p) => ({ user_id: p.id, name: p.name, role: p.role, graduation_year: p.graduation_year ?? null, avatar_url: p.avatar_url ?? null }))
+    if (toAdd.length === 0) return
+    setError(null)
+    // Optimistic (Convention #4): reflect the new members + return to settings immediately.
+    setMembers((prev) => [...prev, ...toAdd])
     setSelectedToAdd([])
-    setShowAddMembers(false)
     setSearchAdd("")
-  }
-
-  function unstagePendingAdd(memberId: string) {
-    setPendingAddMembers(prev => prev.filter(m => m.user_id !== memberId))
-  }
-
-  const hasChanges = pendingAddMembers.length > 0 || pendingRemoveIds.size > 0 || muted !== savedMuted || pinned !== savedPinned
-
-  async function handleSaveChanges() {
-    setSaving(true)
-    const actorFirstName = userName.split(" ")[0]
-    const addUserIds = pendingAddMembers.map(m => m.user_id)
-    const removeUserIds = [...pendingRemoveIds]
-    if (removeUserIds.length > 0) {
-      const removedNames = removeUserIds.map(id => members.find(m => m.user_id === id)?.name.split(" ")[0] ?? "Someone")
-      await Promise.all(removeUserIds.map(id =>
-        supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", id)
-      ))
-      setMembers(prev => prev.filter(m => !pendingRemoveIds.has(m.user_id)))
-      setPendingRemoveIds(new Set())
-      await Promise.all(removedNames.map(name =>
-        supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${actorFirstName} removed ${name}`, message_type: "system" })
-      ))
+    setShowAddMembers(false)
+    const { error: err } = await supabase.from("group_members").insert(toAdd.map((m) => ({ group_id: groupId, user_id: m.user_id })))
+    if (err) {
+      setError(err.message)
+      setMembers((prev) => prev.filter((m) => !toAdd.some((a) => a.user_id === m.user_id))) // rollback
+      return
     }
-    if (pendingAddMembers.length > 0) {
-      await supabase.from("group_members").insert(pendingAddMembers.map(m => ({ group_id: groupId, user_id: m.user_id })))
-      setMembers(prev => [...prev, ...pendingAddMembers])
-      await Promise.all(pendingAddMembers.map(m =>
-        supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${actorFirstName} added ${m.name.split(" ")[0]}`, message_type: "system" })
-      ))
-      setPendingAddMembers([])
-    }
-    await supabase.from("group_members").update({ muted, pinned }).eq("group_id", groupId).eq("user_id", userId)
-    setSavedMuted(muted)
-    setSavedPinned(pinned)
-    // Sync member changes back to any linked small group
-    if (addUserIds.length > 0 || removeUserIds.length > 0) {
-      await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds, removeUserIds })
-    }
-    // Keep the SWR settings cache consistent with the writes above.
+    await Promise.all(toAdd.map((m) =>
+      supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} added ${m.name.split(" ")[0]}`, message_type: "system" })
+    ))
+    await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds: toAdd.map((m) => m.user_id), removeUserIds: [] })
     mutateSettings()
-    setSaving(false)
-  }
-
-  function handleDiscard() {
-    setPendingRemoveIds(new Set())
-    setPendingAddMembers([])
-    setMuted(savedMuted)
-    setPinned(savedPinned)
-    setConfirmRemoveMemberId(null)
-    setMobileRevealMemberId(null)
   }
 
   async function handleLeave() {
@@ -507,60 +486,77 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleArchive() {
-    const { error } = await supabase.from("groups").update({ archived: true }).eq("id", groupId).eq("ministry_id", ministryId)
-    if (!error) onClose()
+    const { error: err } = await supabase.from("groups").update({ archived: true }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!err) onClose()
   }
 
   async function handleUnarchive() {
-    const { error } = await supabase.from("groups").update({ archived: false }).eq("id", groupId).eq("ministry_id", ministryId)
-    if (!error) onClose()
+    const { error: err } = await supabase.from("groups").update({ archived: false }).eq("id", groupId).eq("ministry_id", ministryId)
+    if (!err) onClose()
   }
 
   async function handleDelete() {
-    const { error } = await deleteGroup(groupId)
-    if (!error) onClose()
+    const { error: err } = await deleteGroup(groupId)
+    if (!err) onClose()
   }
 
   const filteredProfiles = allProfiles.filter((p) =>
     p.name.toLowerCase().includes(searchAdd.toLowerCase())
   )
+  const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
 
-  if (showAddMembers) {
+  // Body-swap + extend-crumbs: a SINGLE SubpageShell renders either the settings
+  // body or the add-members body; the trail lengthens rather than nesting a shell.
+  const crumbs: Crumb[] = showAddMembers
+    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) } }, { label: "Add members" }]
+    : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+
+  function roleBadge(role: string, size: "sm" | "md") {
+    const r = role.toLowerCase()
+    const isAdminTier = ["admin", "leader", "deacon", "elder"].includes(r)
+    const isVisitor = r === "visitor"
     return (
-      <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-      <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
+      <span style={{
+        fontSize: size === "sm" ? 9 : 11, fontWeight: 600,
+        padding: size === "sm" ? "2px 6px" : "3px 10px", borderRadius: 999,
+        background: isAdminTier ? "color-mix(in srgb, var(--plum) 8%, transparent)" : isVisitor ? "var(--cream)" : "var(--ivory)",
+        color: isAdminTier ? "var(--plum)" : "var(--muted-text)",
+        border: isVisitor ? "1px solid var(--line-2)" : "1px solid transparent",
+        letterSpacing: "0.04em", textTransform: "uppercase",
+      }}>
+        {role.charAt(0).toUpperCase() + role.slice(1)}
+      </span>
+    )
+  }
 
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:pt-5 bg-[#FDFCF8] border-b border-[var(--line)]">
-          <button
-            onClick={() => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }}
-            className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
-          </button>
-          <h2 className="flex-1 text-[15px] font-bold text-[var(--ink)] tracking-tight">Add Members</h2>
-          {selectedToAdd.length > 0 && (
-            <span className="text-[12px] font-semibold text-[var(--plum)]">{selectedToAdd.length} selected</span>
-          )}
+  return (
+    <SubpageShell title={showAddMembers ? "Add members" : "Settings"} crumbs={crumbs} width="full">
+      {error && (
+        <div className="rounded-xl px-4 py-3 mb-4 text-[13px] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>
+          {error}
         </div>
+      )}
 
-        <div className="px-4 pt-4 pb-2">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
+      {showAddMembers ? (
+        /* ── Add-members body (body-swap; single shell) ── */
+        <div className="md:pt-7">
+          {/* Title is owned by SubpageShell ("Add members"); no hand-rolled header (§4.18). */}
+          <p className="mb-5" style={{ fontSize: 15, color: "var(--body)" }}>Select people from your ministry to add to this chat.</p>
+          <div className="relative mb-3">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
             <input
               type="text"
               placeholder="Search members…"
               value={searchAdd}
               onChange={(e) => setSearchAdd(e.target.value)}
               autoFocus
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FBF8F2] text-[13px] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl text-[13px] focus:outline-none border transition-all"
+              style={{ background: "var(--cream)", borderColor: "var(--line)", color: "var(--ink)" }}
             />
           </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-2">
           {filteredProfiles.length === 0 ? (
             <div className="flex items-center justify-center h-24">
-              <p className="text-[13px] text-[#8A8497]/40">No members to add</p>
+              <p className="text-[13px]" style={{ color: "var(--muted-text)" }}>No members to add</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -569,413 +565,103 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 return (
                   <button
                     key={profile.id}
-                    onClick={() => setSelectedToAdd((prev) =>
-                      selected ? prev.filter((id) => id !== profile.id) : [...prev, profile.id]
-                    )}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
-                      selected
-                        ? "bg-[#3E1540]/6 border-[#3E1540]/20"
-                        : "bg-[#FDFCF8] border-[var(--line)]"
-                    }`}
+                    onClick={() => setSelectedToAdd((prev) => selected ? prev.filter((id) => id !== profile.id) : [...prev, profile.id])}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left"
+                    style={{ background: selected ? "color-mix(in srgb, var(--plum) 6%, transparent)" : "var(--cream)", borderColor: selected ? "color-mix(in srgb, var(--plum) 20%, transparent)" : "var(--line)" }}
                   >
                     <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[var(--ink)] truncate">{profile.name}</p>
+                      <p className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {profile.role && (
-                          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(profile.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : profile.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[var(--plum)] border-transparent"}`}>
-                            {profile.role}
-                          </span>
-                        )}
-                        {profile.graduation_year && (
-                          <span className="text-[11px] text-[#8A8497]/50">Class of {profile.graduation_year}</span>
-                        )}
+                        {profile.role && roleBadge(profile.role, "sm")}
+                        {profile.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
                       </div>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      selected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-muted-foreground/20"
-                    }`}>
-                      {selected && <Check className="w-3 h-3 text-white" />}
+                    <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all" style={{ background: selected ? "var(--plum)" : "transparent", borderColor: selected ? "var(--plum)" : "var(--line-2)" }}>
+                      {selected && <Check className="w-3 h-3" style={{ color: "var(--cream)" }} />}
                     </div>
                   </button>
                 )
               })}
             </div>
           )}
-        </div>
-
-        <div className="flex-shrink-0 bg-[#FDFCF8] border-t border-[var(--line)] px-5 py-4">
-          <button
-            onClick={stageAddMembers}
-            disabled={selectedToAdd.length === 0}
-            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-colors text-[14px] tracking-wide"
-          >
-            {selectedToAdd.length > 0
-              ? `Add ${selectedToAdd.length} Member${selectedToAdd.length !== 1 ? "s" : ""}`
-              : "Add Members"}
-          </button>
-        </div>
-      </div>
-      </div>
-    )
-  }
-
-  const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
-
-  return (
-    <div className="fixed inset-0 z-[110] bg-[#FBF8F2] flex flex-col md:left-[var(--shell-offset)]">
-    <div className="max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none">
-
-      {/* ── Mobile header (hidden on desktop) ── */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-3 md:hidden bg-[#FDFCF8] border-b border-[var(--line)]">
-        <button onClick={onBack} className="size-8 bg-[#FBF8F2] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0">
-          <ArrowLeft className="w-4 h-4 text-[var(--ink)]" />
-        </button>
-        <h2 className="flex-1 text-[15px] font-bold text-[var(--ink)] tracking-tight">Chat Info</h2>
-        {hasChanges && (
-          <button onClick={handleSaveChanges} disabled={saving} style={{ height: 32, padding: "0 12px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-        )}
-      </div>
-
-      {/* ── Desktop settings header ── */}
-      <div className="hidden md:flex h-12 px-7 items-center gap-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
-        <div className="flex items-center gap-1.5 text-[12px]" style={{ flex: 1 }}>
-          <span style={{ color: "var(--muted-text)" }}>Central</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--muted-text)" }}>Chats</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--muted-text)" }}>{displayGroupName}</span>
-          <span style={{ color: "var(--line-2)" }}>/</span>
-          <span style={{ color: "var(--ink)", fontWeight: 500 }}>Info</span>
-        </div>
-        {hasChanges ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={handleDiscard} style={{ height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: 8, color: "var(--body)", fontSize: 13, cursor: "pointer" }}>Discard</button>
-            <button onClick={handleSaveChanges} disabled={saving} style={{ height: 34, padding: "0 20px", background: "var(--plum-2)", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-          </div>
-        ) : (
-          <button onClick={onBack} className="flex items-center gap-1.5 text-[13px] hover:text-[var(--plum)] transition-colors px-3 py-1.5 rounded-lg border border-[var(--line)] bg-[#FDFCF8]" style={{ color: "var(--muted-text)" }}>
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to chat
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-
-        {/* ── Desktop: page title block (§11.3) ── */}
-        <div className="hidden md:block px-10 pt-8 pb-6">
-          <p style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>
-            {typeLabel.toUpperCase()}
-          </p>
-          {renaming ? (
-            <input
-              autoFocus
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
-              onBlur={handleRename}
-              style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", lineHeight: 1.05, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }}
-            />
-          ) : (
-            <div
-              className="group flex items-center gap-2"
-              style={{ cursor: canManage && !isCentralChat ? "text" : "default" }}
-              onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
-            >
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", lineHeight: 1.05, fontWeight: 400 }}>{displayGroupName}</h2>
-              {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 4 }} />}
+          {selectedToAdd.length > 0 && (
+            <div className="py-4 pb-8 md:pb-5 mt-5" style={{ borderTop: "1px solid var(--line)" }}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[14px]" style={{ color: "var(--body)", margin: 0 }}>
+                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedToAdd.length}</span> {selectedToAdd.length === 1 ? "person" : "people"} selected
+                </p>
+                <ContentActionButton label={saving ? "Adding…" : `Add ${selectedToAdd.length} ${selectedToAdd.length === 1 ? "member" : "members"}`} onClick={handleAddMembers} disabled={saving} />
+              </div>
             </div>
           )}
-          <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
-            {members.length} member{members.length !== 1 ? "s" : ""}
-          </p>
         </div>
-
-        {/* ── Desktop: two-column body ── */}
-        <div className="hidden md:grid px-10 pb-10 gap-6" style={{ gridTemplateColumns: "1.4fr 1fr" }}>
-
-          {/* Members */}
-          <div>
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MEMBERS · {members.length + pendingAddMembers.length - pendingRemoveIds.size} PEOPLE</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Members</h3>
-            {loading ? <Spinner /> : (() => {
-              const allRows = [...members, ...pendingAddMembers]
-              return (
-              <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
-                {allRows.map((member, i) => {
-                  const isPendingRemove = pendingRemoveIds.has(member.user_id)
-                  const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
-                  const isConfirming = confirmRemoveMemberId === member.user_id
-                  const isHovered = hoveredMemberId === member.user_id
-                  return (
-                  <div key={member.user_id}
-                    onMouseEnter={() => setHoveredMemberId(member.user_id)}
-                    onMouseLeave={() => setHoveredMemberId(null)}
-                    style={{
-                      display: "grid", gridTemplateColumns: "40px 1fr auto auto",
-                      alignItems: "center", gap: 14, padding: "15px 20px",
-                      borderBottom: i < allRows.length - 1 ? "1px solid #EFE9DA" : "none",
-                      background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "#FDFCF8",
-                      transition: "background 0.1s",
-                    }}>
-                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p style={{ fontSize: 14, color: isPendingRemove ? "#9F3030" : "var(--ink)", fontWeight: 500, textDecoration: isPendingRemove ? "line-through" : "none" }}>{member.name}</p>
-                        {member.user_id === userId && (
-                          <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "#FBF8F2", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>
-                        )}
-                        {isPendingRemove && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
-                        {isPendingAdd && <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
-                      </div>
-                      {member.graduation_year && (
-                        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {member.role && (
-                        <span style={{
-                          fontSize: 11, padding: "3px 10px", borderRadius: 999,
-                          background: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "rgba(62,21,64,0.08)" : member.role.toLowerCase() === "visitor" ? "white" : "#FBF8F2",
-                          color: ["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "var(--plum)" : "var(--muted-text)",
-                          border: member.role.toLowerCase() === "visitor" ? "1px solid #D8D3C8" : "none",
-                          letterSpacing: "0.04em", textTransform: "uppercase" as const,
-                        }}>
-                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                        </span>
-                      )}
-                    </div>
-                    {canManage && member.user_id !== userId && (
-                      isPendingAdd ? (
-                        <button onClick={() => unstagePendingAdd(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}>
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : isPendingRemove ? (
-                        <button onClick={() => unstageRemoveMember(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}>
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : isConfirming ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                          <button onClick={() => stageRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
-                            <Check style={{ width: 14, height: 14 }} />
-                          </button>
-                          <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}>
-                            <X style={{ width: 14, height: 14 }} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmRemoveMemberId(member.user_id)}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
-                        >
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                  )
-                })}
-                {canManage && (
-                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "13px 20px", color: "var(--plum)", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", borderTop: "1px solid #EFE9DA", cursor: "pointer", textAlign: "left" }}>
-                    <Plus style={{ width: 14, height: 14 }} /> Add members from directory
-                  </button>
-                )}
-              </div>
-              )
-            })()}
-            {isChurch && canManage && (
-              <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>
-                Member changes sync to the small group home page if this chat is linked to a group.
-              </p>
-            )}
-          </div>
-
-          {/* Preferences + Manage */}
-          <div>
-            {/* Preferences */}
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>PREFERENCES</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Preferences</h3>
-            <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #EFE9DA" }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
-                </div>
-                <div
-                  onClick={() => setMuted(!muted)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "var(--plum)" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
-                >
-                  <div style={{ position: "absolute", top: 2, ...(muted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
-                </div>
-                <div
-                  onClick={() => setPinned(!pinned)}
-                  style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "var(--plum)" : "#D6D0C0", position: "relative", cursor: "pointer", flexShrink: 0 }}
-                >
-                  <div style={{ position: "absolute", top: 2, ...(pinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "#FDFCF8" }} />
-                </div>
-              </div>
-            </div>
-
-            {canManage && (
-              <>
-                <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
-                <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, color: "var(--ink)", fontWeight: 400, marginBottom: 14 }}>Manage</h3>
-                <div style={{ background: "#FDFCF8", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 14 }}>
-                  <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, background: "transparent", border: "none", cursor: "pointer" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 10, background: "#FDFCF8", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--plum)", flexShrink: 0 }}>
-                      <Plus style={{ width: 13, height: 13 }} />
-                    </div>
-                    <div style={{ flex: 1, textAlign: "left" }}>
-                      <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Add members</p>
-                      <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Invite from the directory</p>
-                    </div>
-                    <ChevronRight style={{ width: 14, height: 14, color: "#C4C4C4" }} />
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Danger */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {isCentralChat && (
-                <p className="text-[12px] text-[var(--muted-text)]" style={{ lineHeight: 1.5, margin: 0 }}>
-                  Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.
-                </p>
-              )}
-              {canArchive && (
-                <button onClick={() => setConfirmAction("archive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "var(--body)", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer" }}>
-                  Archive chat
-                </button>
-              )}
-              {canUnarchive && (
-                <button onClick={() => setConfirmAction("unarchive")} style={{ width: "100%", padding: "11px 0", background: "#FDFCF8", color: "var(--body)", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid var(--line)", cursor: "pointer" }}>
-                  Unarchive chat
-                </button>
-              )}
-              {canLeave && (
-                <button onClick={handleLeave} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "none", cursor: "pointer" }}>
-                  Leave conversation
-                </button>
-              )}
-              {canDelete && (
-                <button onClick={() => setConfirmAction("delete")} style={{ width: "100%", padding: "11px 0", background: "transparent", color: "#B0413E", borderRadius: 12, fontSize: 13.5, fontWeight: 500, border: "1px solid #FFD7D7", cursor: "pointer" }}>
-                  Delete chat
-                </button>
-              )}
-              {confirmAction && (
-                <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>
-                    {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
-                     confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
-                     "Delete this chat and all its messages? This cannot be undone."}
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                    <button
-                      onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
-                      style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
-                    >
-                      {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Mobile: original layout ── */}
+      ) : (
+        /* ── Settings body ── */
+        <>
+        {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
-          {/* CHAT INFO */}
-          <div className="px-5 pt-6 pb-2">
-            <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>CHAT INFO</p>
-            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>
-              Chat info
-            </h3>
-            <div className="bg-[#FDFCF8] rounded-2xl border border-[var(--line)] p-5 mb-4 flex items-center gap-4">
-              <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-bold text-[16px] tracking-wide" />
-              <div className="flex-1 min-w-0">
-                {renaming ? (
-                  <input
-                    autoFocus
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
-                    onBlur={handleRename}
-                    className="text-[16px] font-bold text-[var(--ink)] tracking-tight bg-transparent outline-none border-none w-full"
-                    style={{ borderBottom: "1px solid var(--line-2)", padding: 0 }}
-                  />
-                ) : (
-                  <div
-                    className="group flex items-center gap-1.5"
-                    style={{ cursor: canManage && !isCentralChat ? "text" : "default" }}
-                    onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}
-                  >
-                    <h3 className="text-[16px] font-bold text-[var(--ink)] tracking-tight">{displayGroupName}</h3>
-                    {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
-                  </div>
-                )}
-                <p className="text-[12px] text-[#8A8497]/60 mt-0.5">{members.length + pendingAddMembers.length - pendingRemoveIds.size} member{members.length + pendingAddMembers.length - pendingRemoveIds.size !== 1 ? "s" : ""}</p>
-              </div>
+          <div className="flex items-center gap-4 mb-6" style={{ paddingTop: 4 }}>
+            <MonogramChip initials={getInitials(displayGroupName)} className="w-12 h-12 font-bold text-[14px]" />
+            <div className="flex-1 min-w-0">
+              {renaming ? (
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+                  onBlur={handleRename}
+                  className="text-[17px] font-bold bg-transparent outline-none border-none w-full"
+                  style={{ color: "var(--ink)", borderBottom: "1px solid var(--line-2)", padding: 0 }}
+                />
+              ) : (
+                <div className="group flex items-center gap-1.5" style={{ cursor: canManage && !isCentralChat ? "text" : "default" }} onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}>
+                  <h2 className="text-[17px] font-bold truncate" style={{ color: "var(--ink)" }}>{displayGroupName}</h2>
+                  {canManage && !isCentralChat && <Pencil style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
+                </div>
+              )}
+              <p className="text-[12px] mt-0.5" style={{ color: "var(--muted-text)" }}>{typeLabel} · {members.length} member{members.length !== 1 ? "s" : ""}</p>
             </div>
-            {loading ? <Spinner /> : (
-              <div className="flex flex-col gap-2 mb-6">
-                {[...members, ...pendingAddMembers].map((member) => {
-                  const isPendingRemove = pendingRemoveIds.has(member.user_id)
-                  const isPendingAdd = pendingAddMembers.some(m => m.user_id === member.user_id)
-                  const isConfirming = confirmRemoveMemberId === member.user_id
-                  const isRevealed = mobileRevealMemberId === member.user_id
-                  return (
+          </div>
+
+          <div className="flex items-center justify-between mb-3">
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Members</span>
+            {canManage && (
+              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[12px] font-semibold" style={{ color: "var(--plum)" }}>+ Add</button>
+            )}
+          </div>
+          {loading ? <Spinner /> : (
+            <div className="flex flex-col gap-1.5 mb-6">
+              {members.map((member) => {
+                const isConfirming = confirmRemoveMemberId === member.user_id
+                const isRevealed = mobileRevealMemberId === member.user_id
+                return (
                   <div
                     key={member.user_id}
-                    className="rounded-xl border border-[var(--line)] p-3.5 flex items-center gap-3"
-                    style={{ background: isPendingRemove ? "#FDF0F0" : isConfirming ? "#FDF0F0" : isPendingAdd ? "rgba(62,21,64,0.03)" : "#FDFCF8", transition: "background 0.1s" }}
-                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming && !isPendingRemove && !isPendingAdd) setMobileRevealMemberId(id => id === member.user_id ? null : member.user_id) }}
+                    className="rounded-xl border p-3.5 flex items-center gap-3"
+                    style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", borderColor: "var(--line)", transition: "background 0.1s" }}
+                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className={`text-[13px] font-semibold truncate ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[var(--ink)]"}`}>{member.name}</p>
-                        {member.user_id === userId && <span className="text-[9px] bg-[#3E1540]/8 text-[var(--plum)] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0">You</span>}
-                        {isPendingRemove && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "#9F3030", background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 4, padding: "1px 5px" }}>REMOVING</span>}
-                        {isPendingAdd && <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px" }}>ADDING</span>}
+                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>{member.name}</p>
+                        {member.user_id === userId && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F3EDE6] text-[var(--plum)] border-transparent"}`}>{member.role}</span>}
-                        {member.graduation_year && <span className="text-[11px] text-[#8A8497]/50">Class of {member.graduation_year}</span>}
+                        {member.role && roleBadge(member.role, "sm")}
+                        {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       </div>
                     </div>
                     {canManage && member.user_id !== userId && (
-                      isPendingAdd ? (
-                        <button onClick={e => { e.stopPropagation(); unstagePendingAdd(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)" }}>
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : isPendingRemove ? (
-                        <button onClick={e => { e.stopPropagation(); unstageRemoveMember(member.user_id) }} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)" }}>
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : isConfirming ? (
+                      isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                          <button onClick={e => { e.stopPropagation(); stageRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}>
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}>
-                            <X className="w-4 h-4" />
-                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                         </div>
                       ) : (
                         <button
-                          onClick={e => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
+                          onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
                           style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
                         >
                           <X style={{ width: 14, height: 14 }} />
@@ -983,69 +669,181 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       )
                     )}
                   </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-          {isChurch && canManage && (
-            <div className="px-5 pb-2">
-              <p style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.5 }}>
-                Member changes sync to the small group home page if this chat is linked to a group.
-              </p>
+                )
+              })}
             </div>
           )}
-          {canManage && (
-            <div className="px-5 pb-4">
-              <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600, marginBottom: 6 }}>MANAGE</p>
-              <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "20px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, marginBottom: "16px" }}>Manage chat</h3>
-              <div className="bg-[#FDFCF8] rounded-2xl border border-[var(--line)] overflow-hidden">
-                <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="w-full p-4 flex items-center gap-3 hover:bg-[#FBF8F2] transition-colors">
-                  <div className="w-8 h-8 rounded-xl bg-[#F3EDE6] flex items-center justify-center flex-shrink-0"><Plus className="w-3.5 h-3.5 text-[var(--plum)]" /></div>
-                  <span className="flex-1 text-[14px] font-semibold text-[var(--ink)] text-left">Add Members</span>
-                  <ChevronRight className="w-4 h-4 text-[#8A8497]/30" />
-                </button>
-              </div>
-            </div>
+          {isChurch && canManage && (
+            <p className="mb-6" style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
           )}
           {isCentralChat && (
-            <div className="px-5 pb-10">
-              <p className="text-[12px] text-[var(--muted-text)]" style={{ lineHeight: 1.5, margin: 0 }}>
-                Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.
-              </p>
-            </div>
+            <p className="text-[12px] mb-6" style={{ color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
-            <div className="px-5 pb-10 flex flex-col gap-3">
-              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Archive chat</button>}
-              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Unarchive chat</button>}
-              {canLeave && <button onClick={handleLeave} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[var(--body)] font-semibold text-[13px] hover:bg-[#F6F2EC] transition-colors border border-[var(--line)]">Leave chat</button>}
-              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#FDFCF8] text-[#B0413E] font-semibold text-[13px] border border-red-200">Delete chat</button>}
-              {confirmAction && (
-                <div style={{ background: "#FDF0F0", border: "1px solid #F0C8C8", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>
-                    {confirmAction === "archive" ? "Archive this chat? Members won't be able to send new messages." :
-                     confirmAction === "unarchive" ? "Unarchive this chat and allow messages again?" :
-                     "Delete this chat and all its messages? This cannot be undone."}
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    <button onClick={() => setConfirmAction(null)} style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                    <button
-                      onClick={() => { if (confirmAction === "archive") handleArchive(); else if (confirmAction === "unarchive") handleUnarchive(); else handleDelete() }}
-                      style={{ height: 32, padding: "0 14px", background: "#9F3030", color: "#FBF8F2", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
-                    >
-                      {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
-                    </button>
-                  </div>
-                </div>
-              )}
+            <div className="flex flex-col gap-3 pb-4">
+              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9F3030", margin: 0 }}>Danger zone</p>
+              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Archive chat</button>}
+              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Unarchive chat</button>}
+              {canLeave && <button onClick={handleLeave} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
+              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-semibold text-[13px]" style={{ background: "transparent", color: "#B0413E", border: "1px solid rgba(176,65,62,0.25)" }}>Delete chat</button>}
             </div>
           )}
         </div>
 
-      </div>
-    </div>
-    </div>
+        {/* Desktop */}
+        <div className="hidden md:block" style={{ paddingTop: 28 }}>
+          {loading ? <Spinner /> : (
+            <>
+            {/* Hero strip — chat identity + inline rename (page title "Settings" is
+                supplied by SubpageShell, so this name stays ≤ PageTitle scale). */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 32 }}>
+              <MonogramChip initials={getInitials(displayGroupName)} className="w-[52px] h-[52px] font-bold text-[16px]" />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>{typeLabel}</p>
+                {renaming ? (
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
+                    onBlur={handleRename}
+                    style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0 }}
+                  />
+                ) : (
+                  <div className="group flex items-center gap-2" style={{ cursor: canManage && !isCentralChat ? "text" : "default" }} onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}>
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1 }}>{displayGroupName}</p>
+                    {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 6 }} />}
+                  </div>
+                )}
+                <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>{members.length} {members.length === 1 ? "member" : "members"}</p>
+              </div>
+            </div>
+
+            {/* Preferences — autosaved on toggle */}
+            <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Preferences</p>
+            <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--line-3)" }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
+                </div>
+                <div onClick={handleToggleMuted} style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "var(--plum)" : "var(--line)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
+                  <div style={{ position: "absolute", top: 2, ...(muted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
+                </div>
+                <div onClick={handleTogglePinned} style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "var(--plum)" : "var(--line)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
+                  <div style={{ position: "absolute", top: 2, ...(pinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Members — Add lives in the ContentHeader action slot (§3.2) */}
+            <div style={{ marginBottom: 12 }}>
+              <ContentHeader
+                label="Members"
+                action={canManage ? (
+                  <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add members" onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
+                ) : undefined}
+              />
+            </div>
+            <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+              {members.map((member, i) => {
+                const isConfirming = confirmRemoveMemberId === member.user_id
+                const isHovered = hoveredMemberId === member.user_id
+                return (
+                  <div
+                    key={member.user_id}
+                    onMouseEnter={() => setHoveredMemberId(member.user_id)}
+                    onMouseLeave={() => setHoveredMemberId(null)}
+                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "#FDF0F0" : "transparent", transition: "background 0.1s" }}
+                  >
+                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{member.name}</p>
+                        {member.user_id === userId && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--cream)", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>}
+                      </div>
+                      {member.graduation_year && <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {member.role && roleBadge(member.role, "md")}
+                    </div>
+                    {canManage && member.user_id !== userId ? (
+                      isConfirming ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <button onClick={() => handleRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check style={{ width: 14, height: 14 }} /></button>
+                          <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X style={{ width: 14, height: 14 }} /></button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmRemoveMemberId(member.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}><X style={{ width: 14, height: 14 }} /></button>
+                      )
+                    ) : <span />}
+                  </div>
+                )
+              })}
+            </div>
+            {isChurch && canManage && (
+              <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
+            )}
+
+            {isCentralChat && (
+              <p className="text-[12px]" style={{ color: "var(--muted-text)", lineHeight: 1.5, marginTop: 28 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
+            )}
+            {(canArchive || canUnarchive || canLeave || canDelete) && (
+              <div style={{ marginTop: 36 }}>
+                <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9F3030", margin: "0 0 12px" }}>Danger zone</p>
+                <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {canArchive && <button onClick={() => setConfirmAction("archive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Archive chat</button>}
+                  {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Unarchive chat</button>}
+                  {canLeave && <button onClick={handleLeave} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Leave chat</button>}
+                  {canDelete && <button onClick={() => setConfirmAction("delete")} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: "var(--r-chip)", color: "#B0413E", fontSize: 14, cursor: "pointer" }}><Trash2 style={{ width: 14, height: 14 }} /> Delete chat</button>}
+                </div>
+              </div>
+            )}
+            </>
+          )}
+        </div>
+        </>
+      )}
+
+      {/* Destructive-action confirm — top-layer portal (transform-safe), matching
+          the team-settings migration's delete dialog. */}
+      {mounted && confirmAction && createPortal(
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center animate-backdrop-in"
+          style={{ background: "rgba(20,16,26,0.32)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmAction(null) }}
+        >
+          <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
+            <div style={{ padding: "26px 26px 20px" }}>
+              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>{confirmAction === "delete" ? "Danger zone" : "Confirm"}</p>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>
+                {confirmAction === "archive" ? "Archive this chat?" : confirmAction === "unarchive" ? "Unarchive this chat?" : "Delete this chat?"}
+              </h2>
+              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+                {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : "This chat and all its messages will be permanently removed. This can't be undone."}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+              <button onClick={() => setConfirmAction(null)} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+              <button
+                onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === "archive") handleArchive(); else if (a === "unarchive") handleUnarchive(); else handleDelete() }}
+                style={{ height: 38, padding: "0 20px", background: confirmAction === "unarchive" ? "var(--plum-2)" : "#9F3030", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
+              >
+                {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </SubpageShell>
   )
 }
 
@@ -2241,6 +2039,35 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const others = Object.values(memberReadMap).map(m => m.name.split(" ")[0])
     return [userName.split(" ")[0], ...others]
   }, [memberReadMap, userName])
+
+  // Settings is now an in-content subpage (SubpageShell), not a portal sibling.
+  // Early-return it so it REPLACES the chat in the same slot: on desktop it fills
+  // the inline content area (shell breadcrumb is the back); off desktop the chat is
+  // a full-screen overlay, so the settings inherit the same fixed frame (mobile
+  // back row comes from SubpageShell). onClose closes the whole chat unchanged.
+  if (showSettings) {
+    const settingsEl = (
+      <ChatSettings
+        groupId={groupId}
+        groupName={displayName}
+        groupType={groupType}
+        groupArchived={groupArchived}
+        userId={userId}
+        userName={userName}
+        ministryId={ministryId}
+        ministryName={ministryName}
+        userRole={userRole}
+        onBack={() => setShowSettings(false)}
+        onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}
+        onClose={() => { setShowSettings(false); onClose() }}
+      />
+    )
+    return inline ? settingsEl : (
+      <div className="fixed inset-0 z-[110] overflow-y-auto pt-12 md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
+        {settingsEl}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -3455,23 +3282,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
     </div>
     </AnimateIn>
-
-    {showSettings && (
-      <ChatSettings
-        groupId={groupId}
-        groupName={displayName}
-        groupType={groupType}
-        groupArchived={groupArchived}
-        userId={userId}
-        userName={userName}
-        ministryId={ministryId}
-        ministryName={ministryName}
-        userRole={userRole}
-        onBack={() => setShowSettings(false)}
-        onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}
-        onClose={() => { setShowSettings(false); onClose() }}
-      />
-    )}
 
     {/* Image lightbox */}
     {lightboxUrl && (
