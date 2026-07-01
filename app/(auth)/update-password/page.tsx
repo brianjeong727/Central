@@ -54,12 +54,12 @@ export default function UpdatePasswordPage() {
         <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%, rgba(246,244,239,0.07) 0%, transparent 50%)", pointerEvents: "none" }} />
 
         <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, position: "relative", textDecoration: "none", color: "inherit" }}>
-          <RingCrossLogo size={26} color="#F6F4EF" />
-          <span style={{ fontFamily: SERIF, fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
+          <RingCrossLogo size={26} color="var(--cream-on-dark)" />
+          <span style={{ fontFamily: SERIF, fontSize: 22, color: "var(--cream-on-dark)", letterSpacing: "-0.01em" }}>Central</span>
         </Link>
 
         <div style={{ position: "relative" }}>
-          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "#F6F4EF", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
+          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "var(--cream-on-dark)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
             One place for your ministry to gather.
           </h2>
           <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 15, color: "rgba(246,244,239,0.6)", lineHeight: 1.7, margin: "0 0 10px" }}>

@@ -67,6 +67,7 @@
   /* Cream surface family */
   --cream:       #FDFCF8;
   --cream-panel: #FBF8F2;  /* de-facto card/panel/overlay surface — between cream and cream-2 */
+  --cream-on-dark: #F6F4EF; /* cream text/fill on plum/dark surfaces — slightly muted for legibility */
   --cream-2:     #F8F4EA;
   --cream-3:     #F6F2E8;
   --body-bg:     #F4F1E8;  /* desktop body/sidebar surface — between cream-3 and ivory */

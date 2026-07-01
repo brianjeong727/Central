@@ -179,7 +179,7 @@ export function LinkForm({
         <button
           onClick={onSave}
           disabled={saving || !form.title.trim() || !form.url.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[var(--cream-on-dark)] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
         >
           <Check className="w-3.5 h-3.5" />
           {saving ? "Saving…" : isNew ? "Add Link" : "Save"}
@@ -356,7 +356,7 @@ export function StudentOrgRoleTabContent({
               <button
                 onClick={saveDescription}
                 disabled={savingDesc}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[#F6F4EF] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[var(--cream-on-dark)] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" />
                 {savingDesc ? "Saving…" : "Save"}
@@ -1506,7 +1506,7 @@ export function StudentOrgTeamHome({
                 {canEdit && (
                   <button
                     onClick={() => setShowAddModal(true)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
                   >
                     <Plus className="w-3.5 h-3.5" /> New Event
                   </button>
@@ -1613,7 +1613,7 @@ export function StudentOrgTeamHome({
                         padding: "6px 14px", borderRadius: 9999, border: "1.5px solid",
                         borderColor: activeResourcesRole === role ? "var(--plum)" : "var(--line)",
                         background: activeResourcesRole === role ? "var(--plum)" : "transparent",
-                        color: activeResourcesRole === role ? "#F6F4EF" : "var(--body)",
+                        color: activeResourcesRole === role ? "var(--cream-on-dark)" : "var(--body)",
                         fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)",
                         transition: "border-color 150ms, background-color 150ms, color 150ms",
                       }}
@@ -2148,7 +2148,7 @@ export function PlanTab({
         </div>
         {isAdmin && (
           <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
-            <Plus className="w-4 h-4 text-[#F6F4EF]" />
+            <Plus className="w-4 h-4 text-[var(--cream-on-dark)]" />
           </button>
         )}
       </div>
@@ -2602,7 +2602,7 @@ export function PlanTab({
                         onClick={() => openSettings(team)}
                         className="w-full bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
                       >
-                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="#F6F4EF" />
+                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="var(--cream-on-dark)" />
                         <div className="flex-1 min-w-0">
                           <p className="text-[14px] font-semibold text-[var(--ink)]">{team.name}</p>
                           <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
@@ -3317,7 +3317,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
             {canManageSchedule && !showAddWeek && (
               <button
                 onClick={() => setShowAddWeek(true)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add week
@@ -3345,7 +3345,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                             padding: "5px 11px", borderRadius: 20,
                             border: isSelected ? "1.5px solid var(--plum)" : "1px solid var(--line-2)",
                             background: isSelected ? "var(--plum)" : alreadyExists ? "#F4F1EA" : "white",
-                            color: isSelected ? "#F6F4EF" : alreadyExists ? "#C5C0CC" : "var(--ink)",
+                            color: isSelected ? "var(--cream-on-dark)" : alreadyExists ? "#C5C0CC" : "var(--ink)",
                             fontSize: 12, fontWeight: isSelected ? 600 : 400,
                             cursor: alreadyExists ? "default" : "pointer",
                             fontFamily: "inherit",
@@ -3373,7 +3373,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={handleAddWeek} disabled={!newDate || addingWeek}
-                    style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
+                    style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
                     {addingWeek ? "Adding…" : "Add"}
                   </button>
                   <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); setAddWeekError(null) }}
@@ -3530,7 +3530,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           </select>
                           <div style={{ display: "flex", gap: 6 }}>
                             <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
-                              style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
+                              style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
                               {addingMember ? "Adding…" : "Add"}
                             </button>
                             <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
@@ -3570,7 +3570,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         {worshipWeekDateLabel(week.week_date)}
                       </p>
                       {canManage && (
-                        <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isUploadingThis ? "not-allowed" : "pointer", opacity: isUploadingThis ? 0.6 : 1 }}>
+                        <label style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: isUploadingThis ? "not-allowed" : "pointer", opacity: isUploadingThis ? 0.6 : 1 }}>
                           <Plus className="w-3.5 h-3.5" />
                           {isUploadingThis ? "Uploading…" : "Upload Chart"}
                           <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={isUploadingThis}
@@ -3993,12 +3993,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
         <p style={monoStyle}>Events · {events.length}</p>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowMembers(!showMembers)}
-            style={{ padding: "6px 14px", background: showMembers ? "var(--plum)" : "transparent", color: showMembers ? "#F6F4EF" : "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+            style={{ padding: "6px 14px", background: showMembers ? "var(--plum)" : "transparent", color: showMembers ? "var(--cream-on-dark)" : "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
             Members
           </button>
           {canManage && !showAddEvent && (
             <button onClick={() => setShowAddEvent(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
               <Plus className="w-3.5 h-3.5" /> Add event
             </button>
           )}
@@ -4037,7 +4037,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
               )}
               {addMemberId && (
                 <button onClick={handleAddTeamMember} disabled={addingMember}
-                  style={{ marginTop: 8, padding: "8px 16px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
+                  style={{ marginTop: 8, padding: "8px 16px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
                   {addingMember ? "Adding…" : "Add"}
                 </button>
               )}
@@ -4058,7 +4058,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
               </button>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate("") }}
@@ -4142,7 +4142,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
                           {addingRole ? "Adding…" : "Add"}
                         </button>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
@@ -4159,7 +4159,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
                         <Plus className="w-3 h-3" />
                         {uploadingEventId === event.id ? "Uploading…" : "Chart"}
                         <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
@@ -4399,7 +4399,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
         <p style={monoStyle}>Events · {events.length}</p>
         {canManage && !showAddEvent && (
           <button onClick={() => setShowAddEvent(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
             <Plus className="w-3.5 h-3.5" /> Add event
           </button>
         )}
@@ -4421,7 +4421,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "#F6F4EF", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
               </button>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate(""); setNewEventName("") }}
@@ -4504,7 +4504,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
                           {addingRole ? "Adding…" : "Add"}
                         </button>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
@@ -4520,7 +4520,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: uploadingEventId === event.id ? "not-allowed" : "pointer", opacity: uploadingEventId === event.id ? 0.6 : 1 }}>
                         <Plus className="w-3 h-3" />
                         {uploadingEventId === event.id ? "Uploading…" : "Chart"}
                         <input type="file" accept="application/pdf" style={{ display: "none" }} disabled={uploadingEventId === event.id}
@@ -4671,7 +4671,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
 
   function handleExportSlides(songs: WorshipSong[]) {
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plum);page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:#F6F4EF;text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plum);page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:var(--cream-on-dark);text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
     const blob = new Blob([html], { type: "text/html" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a"); a.href = url; a.download = "worship-slides.html"
@@ -4741,7 +4741,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
               <button
                 onClick={() => slidesDeck && slidesEventLabel === label ? setSlidesOverlayOpen(true) : handleGenerateSlides(songs, label)}
                 disabled={slidesGenerating}
-                style={{ padding: "6px 14px", background: "var(--plum)", color: "#F6F4EF", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
+                style={{ padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
                 {slidesGenerating && slidesEventLabel === label ? "…" : "Slides"}
               </button>
               <button onClick={() => handleExportSlides(songs)}
@@ -4773,7 +4773,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--plum)", display: "flex", flexDirection: "column" }}>
             <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
-            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#F6F4EF" }}>
+            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--cream-on-dark)" }}>
               <X className="w-5 h-5" />
             </button>
             <div onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))} style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }} />
@@ -4782,14 +4782,14 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
               {slide.isTitle ? (
                 <>
                   <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.62)", marginBottom: 20 }}>{slide.songKey ? `Key of ${slide.songKey}` : ""}</p>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "#F6F4EF", lineHeight: 1.15, fontWeight: 400 }}>{slide.songTitle}</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "var(--cream-on-dark)", lineHeight: 1.15, fontWeight: 400 }}>{slide.songTitle}</p>
                   <div style={{ width: 40, height: 1.5, background: "rgba(246,244,239,0.32)", margin: "28px auto 0" }} />
                 </>
               ) : (
                 <>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6 }}>{slide.songTitle}</p>
                   {slide.section && <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>}
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "#F6F4EF", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>{slide.lyrics}</p>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "var(--cream-on-dark)", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>{slide.lyrics}</p>
                 </>
               )}
             </div>
@@ -4967,11 +4967,11 @@ function SetListPdfViewer({
               onChange={e => setEditValue(e.target.value)}
               onBlur={handleSaveFieldEdit}
               onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
-              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#F6F4EF", padding: "2px 0" }}
+              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--cream-on-dark)", padding: "2px 0" }}
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("title"); setEditValue(song.title) } : undefined}
-              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "#F6F4EF", padding: 0, textAlign: "left", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" }}>
+              style={{ background: "transparent", border: "none", cursor: canManage ? "text" : "default", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--cream-on-dark)", padding: 0, textAlign: "left", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, display: "block" }}>
               {song.title || <span style={{ color: "var(--body)" }}>Untitled</span>}
             </button>
           )}
@@ -4982,7 +4982,7 @@ function SetListPdfViewer({
               onChange={e => setEditValue(e.target.value)}
               onBlur={handleSaveFieldEdit}
               onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
-              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "#F6F4EF", padding: "2px 0", width: 60 }}
+              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "var(--cream-on-dark)", padding: "2px 0", width: 60 }}
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("key"); setEditValue(song.key) } : undefined}
@@ -5056,7 +5056,7 @@ function SetListPdfViewer({
                 />
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={handleSaveAnnotation} disabled={savingAnnotation || !pendingText.trim()}
-                    style={{ flex: 1, padding: "5px 8px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
+                    style={{ flex: 1, padding: "5px 8px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
                     Save
                   </button>
                   <button onClick={() => setPendingAnnotation(null)}
@@ -5608,7 +5608,7 @@ export function EventDetailPopover({
           onClick={() => onPlan(event)}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            background: "var(--plum)", color: "#F6F4EF",
+            background: "var(--plum)", color: "var(--cream-on-dark)",
             border: "none", borderRadius: 8, padding: "8px 16px",
             cursor: "pointer", fontSize: 13, fontWeight: 500,
             marginBottom: 8, width: "100%", justifyContent: "center"
@@ -5947,7 +5947,7 @@ export function AddEventModal({
             <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--plum)", color: "#F6F4EF", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
               {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
             </button>
           </div>
@@ -6080,7 +6080,7 @@ export function MinistryCalendar({
           {canEdit && (
             <button
               onClick={() => setShowAdd(true)}
-              style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+              style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
             >
               <Plus className="w-3 h-3" /> Add event
             </button>
@@ -7021,7 +7021,7 @@ export function EventPlanWorkspace({
                           </div>
                           <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "var(--plum-2)", color: "#F6F4EF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
+                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
                             <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
@@ -11132,7 +11132,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("keep")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Keep roster
                 </button>
@@ -11295,7 +11295,7 @@ function SmallGroupLeadersTab({
                     <button
                       onClick={handleConfirmRoster}
                       disabled={confirmingRoster || pendingRosterIds.size === 0}
-                      style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
+                      style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
                     >
                       {confirmingRoster ? "Confirming…" : `Confirm (${pendingRosterIds.size})`}
                     </button>
@@ -11424,7 +11424,7 @@ function SmallGroupLeadersTab({
                     <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
+                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
                     </div>
                   </div>
                 )}
@@ -11564,7 +11564,7 @@ function SmallGroupLeadersTab({
                                         disabled={isSavingThis}
                                         style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid #D4CEDF", background: isBusy ? "var(--plum)" : "transparent", cursor: isSavingThis ? "not-allowed" : "pointer", opacity: isSavingThis ? 0.4 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
                                       >
-                                        {isBusy && <X style={{ width: 10, height: 10, color: "#F6F4EF" }} />}
+                                        {isBusy && <X style={{ width: 10, height: 10, color: "var(--cream-on-dark)" }} />}
                                       </button>
                                     ) : (
                                       <div style={{ width: 22, height: 22, borderRadius: 5, border: isBusy ? "none" : "1.5px solid var(--line)", background: isBusy ? (isPast ? "#D4CEDF" : "var(--line)") : "transparent", opacity: isPast ? 0.5 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -11591,7 +11591,7 @@ function SmallGroupLeadersTab({
                       ) : (
                         <button
                           onClick={handleMarkReady}
-                          style={{ padding: "9px 18px", background: "var(--plum-2)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ padding: "9px 18px", background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                         >
                           Done filling out →
                         </button>
@@ -11638,7 +11638,7 @@ function SmallGroupLeadersTab({
                         <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                           <Shuffle style={{ width: 11, height: 11 }} /> Re-generate
                         </button>
-                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "var(--plum)", color: rotationPhase === "published" ? "var(--plum)" : "#F6F4EF", border: rotationPhase === "published" ? "1px solid var(--plum)" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
+                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "var(--plum)", color: rotationPhase === "published" ? "var(--plum)" : "var(--cream-on-dark)", border: rotationPhase === "published" ? "1px solid var(--plum)" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
                           {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
                         </button>
                       </>
@@ -11691,7 +11691,7 @@ function SmallGroupLeadersTab({
                       <p className="text-[13px] text-[var(--muted-text)] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
                       </p>
-                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </button>
                     </div>
@@ -11783,7 +11783,7 @@ function SmallGroupLeadersTab({
                         >
                           Discard
                         </button>
-                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
                           {isSaving ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</> : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
                         </button>
                       </div>
@@ -12268,7 +12268,7 @@ function BibleStudySubTab({
                       fontWeight: isActive ? 600 : 400,
                       border: isActive ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
                       background: isActive ? "var(--plum)" : "transparent",
-                      color: isActive ? "#F6F4EF" : "var(--body)",
+                      color: isActive ? "var(--cream-on-dark)" : "var(--body)",
                       cursor: "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit",
                     }}
                   >
@@ -12327,7 +12327,7 @@ function BibleStudySubTab({
           <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
           {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
+            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
               {saving ? "Saving…" : "Save"}
             </button>
             <button onClick={() => { setCreating(false); setCreateError(null); setNewTitle(""); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
@@ -12430,9 +12430,9 @@ function BibleStudySubTab({
                         style={{
                           position: "absolute", left: `${ann.x * 100}%`, top: `${ann.y * 100}%`,
                           transform: "translate(-50%, -50%)", width: 22, height: 22, borderRadius: "50%",
-                          background: "var(--plum)", border: "2px solid #F6F4EF", cursor: "pointer", zIndex: 10,
+                          background: "var(--plum)", border: "2px solid var(--cream-on-dark)", cursor: "pointer", zIndex: 10,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 10, fontWeight: 700, color: "#F6F4EF",
+                          fontSize: 10, fontWeight: 700, color: "var(--cream-on-dark)",
                           boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
                         }}
                         onMouseEnter={() => setHoveredAnnotation(gIdx)}
@@ -12443,7 +12443,7 @@ function BibleStudySubTab({
                         {hoveredAnnotation === gIdx && (
                           <div style={{
                             position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
-                            background: "var(--ink)", color: "#F6F4EF", fontSize: 11, padding: "4px 8px", borderRadius: 6,
+                            background: "var(--ink)", color: "var(--cream-on-dark)", fontSize: 11, padding: "4px 8px", borderRadius: 6,
                             whiteSpace: "nowrap" as const, maxWidth: 200, zIndex: 20, pointerEvents: "none" as const,
                           }}>
                             {ann.text}
@@ -12476,7 +12476,7 @@ function BibleStudySubTab({
                 style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
               />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
+                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
                   {savingAnnotation ? "Saving…" : "Save note"}
                 </button>
                 <button onClick={() => { setPendingAnnotation(null); setAnnotationText("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
@@ -12514,7 +12514,7 @@ function BibleStudySubTab({
               {!finalizeConfirm ? (
                 <button
                   onClick={() => setFinalizeConfirm(true)}
-                  style={{ padding: "10px 24px", background: "var(--plum-2)", color: "#F6F4EF", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "10px 24px", background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Finalize &amp; Export PDF →
                 </button>
@@ -12531,7 +12531,7 @@ function BibleStudySubTab({
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "#F6F4EF", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                       {finalizing ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Exporting…</> : "Confirm"}
                     </button>
                     <button onClick={() => { setFinalizeConfirm(false); setFinalizeError(null) }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>

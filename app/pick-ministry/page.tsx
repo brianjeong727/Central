@@ -85,12 +85,12 @@ export default function PickMinistryPage() {
                 background: selecting === m.id ? "rgba(246,244,239,0.15)" : "var(--plum)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "#F6F4EF" }}>
+                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--cream-on-dark)" }}>
                   {m.name[0]}
                 </span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "#F6F4EF" : "var(--ink)", margin: 0, marginBottom: 2 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "var(--cream-on-dark)" : "var(--ink)", margin: 0, marginBottom: 2 }}>
                   {selecting === m.id ? "Opening…" : m.name}
                 </p>
                 <p style={{ fontSize: 12, color: selecting === m.id ? "rgba(246,244,239,0.65)" : "var(--muted-text)", margin: 0 }}>

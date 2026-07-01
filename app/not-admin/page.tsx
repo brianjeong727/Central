@@ -19,12 +19,12 @@ export default function NotAdminPage() {
         <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%, rgba(246,244,239,0.07) 0%, transparent 50%)", pointerEvents: "none" }} />
 
         <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, position: "relative", textDecoration: "none", color: "inherit" }}>
-          <RingCrossLogo size={26} color="#F6F4EF" />
-          <span style={{ fontFamily: SERIF, fontSize: 22, color: "#F6F4EF", letterSpacing: "-0.01em" }}>Central</span>
+          <RingCrossLogo size={26} color="var(--cream-on-dark)" />
+          <span style={{ fontFamily: SERIF, fontSize: 22, color: "var(--cream-on-dark)", letterSpacing: "-0.01em" }}>Central</span>
         </Link>
 
         <div style={{ position: "relative" }}>
-          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "#F6F4EF", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
+          <h2 style={{ fontFamily: SERIF, fontSize: 48, fontWeight: 400, color: "var(--cream-on-dark)", lineHeight: 1.05, letterSpacing: "-0.02em", margin: "0 0 36px" }}>
             Your ministry, all in one place.
           </h2>
           <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 15, color: "rgba(246,244,239,0.6)", lineHeight: 1.7, margin: "0 0 10px" }}>
@@ -56,7 +56,7 @@ export default function NotAdminPage() {
               background: "var(--plum)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F6F4EF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--cream-on-dark)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
@@ -78,7 +78,7 @@ export default function NotAdminPage() {
               style={{
                 display: "block", textAlign: "center",
                 padding: "14px 0", borderRadius: 12,
-                background: "var(--plum)", color: "#F6F4EF",
+                background: "var(--plum)", color: "var(--cream-on-dark)",
                 fontSize: 15, fontWeight: 600, textDecoration: "none",
                 transition: "background 0.15s",
               }}

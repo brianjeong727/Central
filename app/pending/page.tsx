@@ -85,7 +85,7 @@ export default function PendingPage() {
           <button
             onClick={checkStatus}
             disabled={checking}
-            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[#F6F4EF] font-bold text-[14px] transition-colors"
+            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
           >
             {checking ? "Checking…" : "Check status"}
           </button>

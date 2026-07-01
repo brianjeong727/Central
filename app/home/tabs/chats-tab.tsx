@@ -2584,7 +2584,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                               ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
                               : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                             : isOwn
-                              ? `bg-[var(--plum-2)] text-[#F6F4EF] ${outgoingRadius}`
+                              ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
                               : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
                         } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
                       >
@@ -2599,7 +2599,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                   onClick={() => scrollToMessage(msg.reply_to_id!)}
                                   className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                                     isOwn
-                                      ? "bg-white/10 border-l-[2px] border-[#F6F4EF]/50"
+                                      ? "bg-white/10 border-l-[2px] border-[var(--cream-on-dark)]/50"
                                       : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
                                   }`}
                                 >
@@ -2739,7 +2739,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             }`}
                           >
                             <span>{emoji}</span>
-                            <span className={`text-[11px] font-medium ${userReacted ? "text-[#F6F4EF]" : "text-[var(--muted-text)]"}`}>{count}</span>
+                            <span className={`text-[11px] font-medium ${userReacted ? "text-[var(--cream-on-dark)]" : "text-[var(--muted-text)]"}`}>{count}</span>
                           </button>
                         ))}
                       </div>
@@ -3112,7 +3112,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         closeFn()
                       }}
                       className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
-                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "#F6F4EF" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
+                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "var(--cream-on-dark)" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
                     >
                       {hasPending ? confirmLabel : "Select an option"}
                     </button>

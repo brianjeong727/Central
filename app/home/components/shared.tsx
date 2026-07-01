@@ -154,7 +154,7 @@ const ICON_SVG: Record<string, React.ReactNode> = {
   "dollar":    <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
 }
 
-export function PlanLineIcon({ iconKey, bg = "var(--plum)", fg = "#F6F4EF", size = 40, radius = 999 }: { iconKey: string; bg?: string; fg?: string; size?: number; radius?: number }) {
+export function PlanLineIcon({ iconKey, bg = "var(--plum)", fg = "var(--cream-on-dark)", size = 40, radius = 999 }: { iconKey: string; bg?: string; fg?: string; size?: number; radius?: number }) {
   const paths = ICON_SVG[iconKey] ?? ICON_SVG["clipboard"]
   return (
     <div style={{ width: size, height: size, borderRadius: radius, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

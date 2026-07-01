@@ -191,11 +191,11 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                     cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
                     border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
                     background: selected ? 'var(--plum)' : 'var(--cream)',
-                    color: selected ? '#F6F4EF' : 'var(--ink)',
+                    color: selected ? 'var(--cream-on-dark)' : 'var(--ink)',
                   }}>
                     <span style={{
                       width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                      border: `2px solid ${selected ? '#F6F4EF' : '#C4C0B0'}`,
+                      border: `2px solid ${selected ? 'var(--cream-on-dark)' : '#C4C0B0'}`,
                       background: selected ? 'rgba(246,244,239,0.25)' : 'transparent',
                     }} />
                     {opt}
@@ -214,15 +214,15 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                     cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
                     border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
                     background: checked ? 'var(--plum)' : 'var(--cream)',
-                    color: checked ? '#F6F4EF' : 'var(--ink)',
+                    color: checked ? 'var(--cream-on-dark)' : 'var(--ink)',
                   }}>
                     <span style={{
                       width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                      border: `2px solid ${checked ? '#F6F4EF' : '#C4C0B0'}`,
+                      border: `2px solid ${checked ? 'var(--cream-on-dark)' : '#C4C0B0'}`,
                       background: checked ? 'rgba(246,244,239,0.25)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      {checked && <Check style={{ width: 10, height: 10, color: '#F6F4EF' }} />}
+                      {checked && <Check style={{ width: 10, height: 10, color: 'var(--cream-on-dark)' }} />}
                     </span>
                     {opt}
                   </button>
@@ -237,7 +237,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         disabled={submitting}
         style={{
           width: '100%', padding: '14px', borderRadius: 10, background: 'var(--plum-2)',
-          color: '#F6F4EF', fontSize: 14, fontWeight: 500, border: 'none',
+          color: 'var(--cream-on-dark)', fontSize: 14, fontWeight: 500, border: 'none',
           cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1,
         }}
       >
