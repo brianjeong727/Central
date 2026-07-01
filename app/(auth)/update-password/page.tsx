@@ -50,9 +50,6 @@ export default function UpdatePasswordPage() {
         flexDirection: "column", justifyContent: "space-between",
         padding: "52px 56px", position: "relative", overflow: "hidden",
       }}>
-        <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, rgba(246,244,239,0.1) 1px, transparent 1px)", backgroundSize: "22px 22px", pointerEvents: "none" }} />
-        <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 20%, rgba(246,244,239,0.07) 0%, transparent 50%)", pointerEvents: "none" }} />
-
         <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 10, position: "relative", textDecoration: "none", color: "inherit" }}>
           <RingCrossLogo size={26} color="var(--cream-on-dark)" />
           <span style={{ fontFamily: SERIF, fontSize: 22, color: "var(--cream-on-dark)", letterSpacing: "-0.01em" }}>Central</span>

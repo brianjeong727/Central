@@ -442,13 +442,9 @@ function JoinContent() {
         {/* ── Plum hero band ── */}
         <div style={{
           flexShrink: 0, position: "relative", overflow: "hidden", color: "var(--cream-panel)",
-          background: "radial-gradient(120% 130% at 0% 0%, #5A2860 0%, var(--plum) 55%, #2A0E2C 100%)",
+          background: "var(--plum)",
           padding: "28px 0 32px",
         }}>
-          <div aria-hidden style={{
-            position: "absolute", inset: 0, opacity: 0.16, pointerEvents: "none",
-            background: "radial-gradient(rgba(251,248,242,0.6) 1px, transparent 1.4px) 0 0 / 14px 14px",
-          }}/>
           <div style={{ position: "relative", maxWidth: 520, margin: "0 auto", padding: "0 24px" }}>
             <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", textDecoration: "none", color: "inherit" }}>
               <Wordmark tone="plum"/>
