@@ -30,7 +30,12 @@ const MONO: React.CSSProperties = {
 
 export function DesktopTopbar({ crumbs, right }: DesktopTopbarProps) {
   const extra = useBreadcrumbExtra()
-  const allCrumbs = [...crumbs, ...extra]
+  // Dedupe: when a locally-owned subpage pushes its own [parent, …] crumbs, the
+  // last base crumb (resolved by getShellCrumbs) can match the first pushed crumb.
+  // Drop the base one and keep the pushed one — it carries the close onClick.
+  const allCrumbs = extra.length && crumbs.length && crumbs[crumbs.length - 1].label === extra[0].label
+    ? [...crumbs.slice(0, -1), ...extra]
+    : [...crumbs, ...extra]
   return (
     <div
       className="hidden md:flex h-12 px-14 items-center justify-between gap-4 flex-shrink-0"

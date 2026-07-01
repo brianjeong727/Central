@@ -2406,6 +2406,7 @@ export function PlanTab({
             <MinistryCalendar
               ministryId={ministryId}
               teamId={activeTeamId}
+              teamName={activeTeamName}
               userId={userId}
               canEdit={perms.includes("can_plan_events") || govWrite}
               onOpenChat={onOpenChat}
@@ -5936,12 +5937,14 @@ export function AddEventModal({
 export function MinistryCalendar({
   ministryId,
   teamId,
+  teamName,
   userId,
   canEdit,
   onOpenChat,
 }: {
   ministryId: string
   teamId: string | null
+  teamName: string
   userId: string
   canEdit: boolean
   onOpenChat?: (id: string, name: string, type?: string) => void
@@ -5968,38 +5971,23 @@ export function MinistryCalendar({
   }
 
   // Event planning view — replaces the calendar while an event is open.
-  // Cream TabPageHeader + PageTitle supply the event header; EventPlanWorkspace
-  // renders the body (status selector + section tabs + content). Back button
-  // returns to the calendar. Rendered un-wrapped so TabPageHeader /
-  // EventPlanWorkspace apply their own px-14 inset (matching StudentOrgTeamHome).
+  // SubpageShell consumes the page body (cream, in-content) and supplies the
+  // only horizontal inset + the canonical event title header + the mobile back
+  // row. It pushes [team (closes the event), event title]; the team crumb's
+  // onClick gives the mobile back row a "← {team}" target, and DesktopTopbar
+  // dedupes the team crumb against the shell-resolved trail (planningEvent is
+  // local to MinistryCalendar, invisible to getShellCrumbs). key={planningEvent.id}
+  // re-inits the workspace to Overview per event. EventPlanWorkspace runs `bare`
+  // so its own px doesn't double-pad under the shell. No onEditEvent — MinistryCalendar
+  // has no edit-event flow (AddEventModal here is create-only), so the gated
+  // "Edit event" button simply won't render.
   if (planningEvent) {
-    const evStart = new Date(planningEvent.start_date)
-    const evDateStr = evStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()
-    const evCfg = getEventConfig(planningEvent)
     return (
-      <div>
-        <div className="px-14" style={{ paddingTop: 24 }}>
-          <button
-            onClick={() => setPlanningEvent(null)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--body)", fontSize: 13, padding: "0 0 16px" }}
-          >
-            ← Back to calendar
-          </button>
-        </div>
-        <TabPageHeader>
-          <PageTitle
-            eyebrow={`${evCfg.label.toUpperCase()} · ${evDateStr}`}
-            title={planningEvent.title}
-          >
-            {(planningEvent.description || planningEvent.location) && (
-              <p style={{ marginTop: 6, fontSize: 14, color: "var(--muted-text)" }}>
-                {[planningEvent.description, planningEvent.location].filter(Boolean).join(" · ")}
-              </p>
-            )}
-          </PageTitle>
-        </TabPageHeader>
+      <SubpageShell crumbs={[{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
         <EventPlanWorkspace
+          key={planningEvent.id}
           inline
+          bare
           calendarEvent={planningEvent}
           ministryId={ministryId}
           userId={userId}
@@ -6008,7 +5996,7 @@ export function MinistryCalendar({
           onClose={() => setPlanningEvent(null)}
           onOpenChat={onOpenChat}
         />
-      </div>
+      </SubpageShell>
     )
   }
 
