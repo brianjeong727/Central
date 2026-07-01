@@ -63,7 +63,7 @@ const EV_WK: CSSProperties = {
 // the approved §1.3 "Date anchor" exception (scoped to this featured card).
 const BIG_SERIF_DATE: CSSProperties = {
   fontFamily: "var(--serif)",
-  fontSize: 46,
+  fontSize: 36,
   fontWeight: 600,
   letterSpacing: "-0.02em",
   lineHeight: 1,
@@ -402,10 +402,10 @@ export function UpNextCard({
     <h2
       style={{
         fontFamily: "var(--serif)",
-        fontSize: 46,
-        fontWeight: 400,
+        fontSize: 30,
+        fontWeight: 600,
         letterSpacing: "-0.02em",
-        lineHeight: 1.02,
+        lineHeight: 1.08,
         color: "var(--ink)",
         margin: 0,
       }}

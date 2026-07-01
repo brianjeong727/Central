@@ -162,7 +162,7 @@
 
   /* ── Home hero carousel — single source of truth for the shared frame height.
      Every slide type (photo / event / announcement) reads this; never hardcode. */
-  --hero-h: 500px;
+  --hero-h: 375px;
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */

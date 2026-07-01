@@ -75,7 +75,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
 | Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
 | Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
-| Date anchor | serif | 42–46 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** and the **announcement detail aside** may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
+| Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — tuned to match the Home page H1 so the page header stays the size ceiling; the card title sits one step below at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
