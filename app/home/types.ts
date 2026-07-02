@@ -305,23 +305,29 @@ export interface ChatsTabProps {
   fallbackChats?: ChatGroup[]
 }
 
+// Slim list-row + detail-header shape — fetched for EVERY member on directory
+// load, so it must stay light (no free-text profile fields).
 export interface DirectoryMember {
   id: string
   name: string
   graduation_year: number | null
   role: string
+  avatar_url: string | null
+}
+
+// Full profile shape — fetched on demand (per member) when a detail view opens.
+export interface DirectoryMemberDetail extends DirectoryMember {
   email: string
+  phone: string | null
   about_me: string | null
+  bio: string | null
   bible_verse: string | null
+  favorite_verse: string | null
   prayer_request: string | null
   pray_for_me: string | null
-  phone?: string | null
-  bio?: string | null
-  testimony?: string | null
-  favorite_worship_song?: string | null
-  favorite_verse?: string | null
-  favorite_book_of_bible?: string | null
-  avatar_url: string | null
+  testimony: string | null
+  favorite_worship_song: string | null
+  favorite_book_of_bible: string | null
 }
 
 export interface UserTeam {
