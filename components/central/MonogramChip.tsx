@@ -28,7 +28,7 @@ export function MonogramChip({ initials, avatarUrl, className = "", style, title
       }}
     >
       {avatarUrl
-        ? <img src={avatarUrl} alt={initials} className="w-full h-full object-cover" />
+        ? <img src={avatarUrl} alt={initials} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         : (initials && initials.trim())
           ? initials
           : <Users style={{ width: "55%", height: "55%" }} strokeWidth={2} />
