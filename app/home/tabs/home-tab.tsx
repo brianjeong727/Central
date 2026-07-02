@@ -236,20 +236,8 @@ export function HomeTab({
 
     const slides: HeroSlide[] = []
     for (const r of rows) {
-      if (r.slide_type === "photo") {
-        if (!r.image_url) continue
-        slides.push({
-          kind: "photo",
-          key: r.id,
-          imageUrl: r.image_url,
-          caption: r.caption ?? "",
-          eyebrow: r.eyebrow ?? "Featured",
-          panelColor: r.panel_color,
-          meta: r.created_at
-            ? `Posted ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : null,
-        })
-      } else if (r.slide_type === "announcement") {
+      if (r.slide_type === "photo") continue // photo slides shelved — coming soon (soft-hidden; rows kept in DB)
+      if (r.slide_type === "announcement") {
         const a = annMap.get(r.announcement_id ?? "")
         if (!a) continue
         slides.push({
