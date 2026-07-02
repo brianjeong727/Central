@@ -109,6 +109,8 @@ launcher refuses to reclaim a slot holding uncommitted or unmerged work (`--forc
 announces your slot+port (or warns if you're in the shared checkout); `SessionEnd` frees the slot. Ports are bound to the
 directory, not the session. Full guide: `scripts/SESSIONS.md`.
 
+18. **Read receipts scale by a member-count threshold:** chats with `memberCount < 30` keep live per-member read receipts (reader avatars under each own message); chats with `memberCount >= 30` instead show an on-demand aggregated "Seen by N" affordance (tap to expand the reader list) and do **not** open the `read-receipts-{groupId}` `group_members`-UPDATE subscription — this escapes the O(members²) read-receipt fan-out at scale. The switch lives in `ChatScreen` (`isLargeRoom = memberCount >= 30`), where `memberCount` comes from the single cached roster SWR keyed `["chat-roster", groupId]` (also the source for @mentions and small-room read state — the three duplicate roster joins were collapsed into it).
+
 Drop it right after Critical Convention #16. If you'd rather it read as a Workflow item than a numbered convention, say so
 and I'll reformat — but as a hard "always do X" rule it belongs with the conventions.
 
@@ -254,6 +256,12 @@ Every workspace is a **ministry**. All tenant data carries a `ministry_id` FK. R
 - `auth_ministry_id()` — returns current user's `ministry_id`
 - `auth_is_admin_or_leader()` — returns `true` if role is admin or leader
 
+A third SECURITY DEFINER helper, `is_group_member(group_id, user_id)`, gates the messaging tables (Convention #9):
+- `messages`, `message_reactions`, and `group_members` RLS use `is_group_member()` instead of correlated per-row `EXISTS` subqueries.
+- Blanket permissive policies (`auth.uid() IS NOT NULL`) were removed from all three — they had silently OR'd away every scoped policy, exposing every row platform-wide.
+- `message_reactions` INSERT requires membership of the target message's group (closed a cross-ministry reaction gap).
+- `group_members` INSERT allows admin/leader, the group creator, self, **or any existing member of a non-church group** (mirrors the chat UI's `canManage`).
+
 New users with no `ministry_id` are redirected to `/join` by middleware.
 
 ### Routing flow
@@ -314,8 +322,9 @@ HomeApp (root — owns all global state)
 |---------|-------|--------|----------|
 | `group-messages-{groupId}` | `messages` | INSERT | `ChatScreen` |
 | `reactions-{groupId}` | `message_reactions` | INSERT, DELETE | `ChatScreen` |
-| `home-app-recent-chats` | `messages` | INSERT | `HomeApp` |
-| `read-receipts-{groupId}` | `group_members` | UPDATE | `ChatScreen` |
+| `home-app-recent-chats` | `messages` | INSERT — **filtered to the user's own group IDs** (`group_id=in.(…)`), not the whole table | `HomeApp` |
+| `read-receipts-{groupId}` | `group_members` | UPDATE — **only subscribed for chats with < 30 members** (≥30 use on-demand "Seen by N") | `ChatScreen` |
+| `own-memberships-{userId}` | `group_members` | INSERT, UPDATE, DELETE — filtered to `user_id=eq.{userId}` | `HomeApp` — refreshes the scoped `home-app-recent-chats` filter when the user creates/joins/leaves a chat |
 | `typing-{groupId}` | — | broadcast | `ChatScreen` (typing indicator) |
 
 ### Supabase project
