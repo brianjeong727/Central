@@ -659,7 +659,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         async () => {
           const groups = await fetchChatList(["chat-list", userId, ministryId])
           const openId = globalOpenChatRef.current?.id
-          return openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
+          const adjusted = openId ? groups.map((g) => (g.id === openId ? { ...g, unread_count: 0 } : g)) : groups
+          // Single fetch feeds BOTH consumers: the SWR cache (via the return below)
+          // AND the plain-state fallbackChats workaround (chatListData) — so a
+          // realtime event no longer fires a second, unthrottled get_chat_list RPC
+          // just to keep the fallback fresh. setChatListData is a stable setter.
+          setChatListData(adjusted)
+          return adjusted
         },
         { revalidate: false },
       ).catch(() => {})
@@ -675,6 +681,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }, [globalMutate, userId, ministryId])
 
+  // Sender-name cache for the recent-chats preview: the same sender re-appears on
+  // every message they send, so we resolve their name from profiles ONCE per session
+  // and serve cache hits synchronously (no per-event select). Own messages skip the
+  // network entirely — initialProfile.name is already local. Only a successful lookup
+  // is cached, so a transient failure can't poison an id with "" forever.
+  const senderNameCache = useRef(new Map<string, string>())
+
   // Realtime: keep recentChats preview fresh as messages arrive.
   // Scoped server-side to the user's own groups via a `group_id=in.(...)` filter —
   // without it every online session wakes + evaluates RLS on every message insert
@@ -689,47 +702,62 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         { event: "INSERT", schema: "public", table: "messages", filter: `group_id=in.(${memberGroupKey})` },
         (payload) => {
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
-          // Drive the Messages sidebar live (order, preview, unread badges).
+          // Drive the Messages sidebar live (order, preview, unread badges). This
+          // throttled refetch ALSO refreshes the plain-fetch fallback (chatListData)
+          // from the same RPC result — no separate loadChatList() needed here.
           refetchChatList()
-          // Also refresh the plain-fetch fallback that the panels render directly.
-          loadChatList()
-          supabase
-            .from("profiles")
-            .select("name")
-            .eq("id", msg.sender_id)
-            .single()
-            .then(({ data: prof }) => {
-              const isOwnMessage = msg.sender_id === userId
-              setRecentChats((prev) => {
-                const existing = prev.find((c) => c.id === msg.group_id)
-                if (!existing) return prev
-                const updated = prev.map((c) =>
-                  c.id === msg.group_id
-                    ? {
-                        ...c,
-                        lastMessage: msg.content,
-                        lastMessageSender: prof?.name ?? "",
-                        time: formatRelativeTime(msg.created_at),
-                        _ts: msg.created_at,
-                        unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
-                      } as ChatPreview & { _ts: string }
-                    : c
-                )
-                // Re-sort so the updated chat bubbles to the top
-                return [...updated].sort((a, b) => {
-                  const ta = (a as ChatPreview & { _ts: string })._ts ?? ""
-                  const tb = (b as ChatPreview & { _ts: string })._ts ?? ""
-                  return tb.localeCompare(ta)
-                })
+          const isOwnMessage = msg.sender_id === userId
+          const applyPreview = (senderName: string) => {
+            setRecentChats((prev) => {
+              const existing = prev.find((c) => c.id === msg.group_id)
+              if (!existing) return prev
+              const updated = prev.map((c) =>
+                c.id === msg.group_id
+                  ? {
+                      ...c,
+                      lastMessage: msg.content,
+                      lastMessageSender: senderName,
+                      time: formatRelativeTime(msg.created_at),
+                      _ts: msg.created_at,
+                      unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
+                    } as ChatPreview & { _ts: string }
+                  : c
+              )
+              // Re-sort so the updated chat bubbles to the top
+              return [...updated].sort((a, b) => {
+                const ta = (a as ChatPreview & { _ts: string })._ts ?? ""
+                const tb = (b as ChatPreview & { _ts: string })._ts ?? ""
+                return tb.localeCompare(ta)
               })
             })
+          }
+          // Resolve the sender name: own message → local profile name (no query);
+          // cache hit → synchronous; cache miss → one profiles select, then cached.
+          if (isOwnMessage) {
+            applyPreview(initialProfile.name)
+          } else {
+            const cached = senderNameCache.current.get(msg.sender_id)
+            if (cached !== undefined) {
+              applyPreview(cached)
+            } else {
+              supabase
+                .from("profiles")
+                .select("name")
+                .eq("id", msg.sender_id)
+                .single()
+                .then(({ data: prof }) => {
+                  if (prof?.name) senderNameCache.current.set(msg.sender_id, prof.name)
+                  applyPreview(prof?.name ?? "")
+                })
+            }
+          }
         }
       )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, memberGroupKey, refetchChatList, loadChatList])
+  }, [userId, memberGroupKey, refetchChatList, initialProfile.name])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {
