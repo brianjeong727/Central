@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import { Users } from "lucide-react"
 
 interface MonogramChipProps {
   initials: string
@@ -28,7 +29,9 @@ export function MonogramChip({ initials, avatarUrl, className = "", style, title
     >
       {avatarUrl
         ? <img src={avatarUrl} alt={initials} className="w-full h-full object-cover" />
-        : initials
+        : (initials && initials.trim())
+          ? initials
+          : <Users style={{ width: "55%", height: "55%" }} strokeWidth={2} />
       }
     </div>
   )

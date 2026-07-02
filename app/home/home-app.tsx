@@ -72,6 +72,37 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   }, [userId, ministryId])
   useEffect(() => { loadChatList() }, [loadChatList])
 
+  // The current user's member group IDs — used to scope the global recent-chats
+  // realtime channel so a session only wakes on inserts into ITS OWN groups
+  // (vs. every message insert platform-wide). Stored as a stable sorted-join key
+  // so the subscription effect resubscribes only when the id SET changes.
+  const [memberGroupKey, setMemberGroupKey] = useState<string>("")
+  const refreshMemberGroups = useCallback(async () => {
+    if (!userId) return
+    const { data } = await supabase
+      .from("group_members")
+      .select("group_id")
+      .eq("user_id", userId)
+    const ids = (data ?? []).map((r: { group_id: string }) => r.group_id).sort()
+    setMemberGroupKey(ids.join(","))
+  }, [userId])
+  useEffect(() => { refreshMemberGroups() }, [refreshMemberGroups])
+  // Keep the scoped recent-chats filter fresh as the user's OWN membership changes
+  // (created/added-to/left a chat). Filtered to `user_id=eq.${userId}` so this is
+  // O(1) per session — only the user's own group_members rows, never all rows.
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel(`own-memberships-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_members", filter: `user_id=eq.${userId}` },
+        () => { refreshMemberGroups() }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, refreshMemberGroups])
+
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
   const rawTab = searchParams.get("tab")
@@ -644,13 +675,18 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }, [globalMutate, userId, ministryId])
 
-  // Realtime: keep recentChats preview fresh as messages arrive
+  // Realtime: keep recentChats preview fresh as messages arrive.
+  // Scoped server-side to the user's own groups via a `group_id=in.(...)` filter —
+  // without it every online session wakes + evaluates RLS on every message insert
+  // platform-wide. Uses the FULL membership set (not just recentChats) so a message
+  // in a rarely-active group still bubbles up live.
   useEffect(() => {
+    if (!memberGroupKey) return
     const channel = supabase
       .channel("home-app-recent-chats")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
+        { event: "INSERT", schema: "public", table: "messages", filter: `group_id=in.(${memberGroupKey})` },
         (payload) => {
           const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
           // Drive the Messages sidebar live (order, preview, unread badges).
@@ -693,7 +729,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
     return () => { supabase.removeChannel(channel) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, refetchChatList, loadChatList])
+  }, [userId, memberGroupKey, refetchChatList, loadChatList])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {
@@ -1157,6 +1193,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Global ChatScreen overlay — mobile always, desktop only when not on chats tab */}
       {globalOpenChat && !(isDesktop && activeTab === "chats") && (
         <ChatScreen
+          key={globalOpenChat.id}
           groupId={globalOpenChat.id}
           groupName={globalOpenChat.name}
           userId={userId}
