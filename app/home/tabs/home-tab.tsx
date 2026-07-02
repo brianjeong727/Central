@@ -8,7 +8,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeTabSkeleton } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 import { HomeSlideManager } from "../components/home-slide-manager"
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
@@ -543,30 +543,409 @@ export function HomeTab({
         </div>
       )}
 
-      {loading ? (
-        <HomeTabSkeleton />
-      ) : (
-        <>
-          {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
+      {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
 
-          {/* Desktop: hero header */}
-          <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
-            <PageTitle eyebrow={dateLabel} title={greetingNode} style={{ maxWidth: 640 }} />
-            {canCurateHome && <HeaderActionButton label="Curate hero" onClick={() => setManagerOpen(true)} />}
-          </TabPageHeader>
+      {/* Desktop: hero header */}
+      <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
+        <PageTitle eyebrow={dateLabel} title={greetingNode} style={{ maxWidth: 640 }} />
+        {canCurateHome && <HeaderActionButton label="Curate hero" onClick={() => setManagerOpen(true)} />}
+      </TabPageHeader>
 
-          {/* Desktop: main content */}
-          <div
-            className="hidden md:block px-14"
-            style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
+      {/* Desktop: main content */}
+      <div
+        className="hidden md:block px-14"
+        style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
+      >
+
+        {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement.
+            "Featured" section eyebrow is the constant frame element above every state.
+            While the home payload loads, only this region skeletons (same --hero-h
+            footprint) — the header/chat strip around it paint immediately from props. */}
+        {loading ? (
+          <HomeHeroSkeleton />
+        ) : (
+          <HeroSectionLabel offsetForArrows={slides.length > 1} breathe />
+        )}
+        {!loading && (slides.length > 0 ? (
+          <HomeHeroCarousel
+            slides={slides}
+            rsvpedIds={slideRsvpedIds}
+            rsvpCounts={slideRsvpCounts}
+            rsvpAttendees={slideRsvpAttendees}
+            showAttendeesIds={slideShowAttendeesIds}
+            isLeaderOrAdmin={isLeaderOrAdmin}
+            rsvping={slideRsvping}
+            onRsvp={handleSlideRsvp}
+            onDetails={handleSlideDetails}
+          />
+        ) : heroAnn ? (
+          <HeroFrame>
+            <UpNextCard
+              fill
+              label="Up next"
+              labelAccent
+              title={heroAnn.title}
+              body={heroAnn.body}
+              isEvent={heroAnn.is_event}
+              imageUrl={heroAnn.image_url}
+              postedDate={heroAnn.created_at}
+              eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
+              userHasRsvped={userHasRsvped}
+              rsvping={rsvping}
+              rsvpCount={rsvpCount}
+              attendees={rsvpAttendees}
+              showAttendees={showAttendeeList}
+              onRsvp={handleHomeRsvp}
+              onDetails={() => onOpenAnnouncement(heroAnn.id)}
+            />
+          </HeroFrame>
+        ) : latestAnn ? (
+          <HeroFrame>
+            <UpNextCard
+              fill
+              label="Latest"
+              labelAccent={false}
+              title={latestAnn.title}
+              body={latestAnn.body}
+              isEvent={false}
+              imageUrl={latestAnn.image_url}
+              postedDate={latestAnn.created_at}
+              onDetails={() => onOpenAnnouncement(latestAnn.id)}
+            />
+          </HeroFrame>
+        ) : (
+          <HeroFrame
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              textAlign: "center",
+              background: "var(--ivory)",
+            }}
           >
+            <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>No upcoming events</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
+                Check the announcements tab for updates.
+              </p>
+            </div>
+            <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
+              See announcements
+            </CentralButton>
+          </HeroFrame>
+        ))}
 
-            {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement.
-                "Featured" section eyebrow is the constant frame element above every state. */}
-            <HeroSectionLabel offsetForArrows={slides.length > 1} breathe />
-            {slides.length > 0 ? (
+        {/* Your chats — horizontal strip below hero */}
+        <ChatStrip
+          chats={top3}
+          totalUnread={totalUnread}
+          onOpenChat={onOpenChat}
+          onSeeAll={onSeeChats}
+          style={{ marginTop: "var(--space-8)" }}
+        />
+
+        {/* ── Pastor Pulse — desktop ── */}
+        {activeQuestion && !hasResponded && !isPastorRole && (
+          <CentralCard variant="callout" radius="var(--r-callout)" style={{ marginTop: 22 }} padding="28px 32px">
+            {pulseSubmitted ? (
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
+                <CardTitle size={22}>Thanks for sharing.</CardTitle>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
+                  Your response was received anonymously.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36, alignItems: "start" }}>
+                <div>
+                  <div style={EYEBROW}>
+                    Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
+                  </div>
+                  <CardTitle size={24} style={{ marginTop: 8 }}>
+                    {activeQuestion.question_text}
+                  </CardTitle>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {activeQuestion.question_type === "poll" && activeQuestion.options && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {activeQuestion.options.map((opt, i) => (
+                        <button
+                          key={`${opt}-${i}`}
+                          onClick={() => setPulseOption(opt)}
+                          style={{
+                            padding: "9px 14px",
+                            borderRadius: "var(--r-input)",
+                            border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
+                            background: pulseOption === opt ? "var(--ivory)" : "transparent",
+                            color: pulseOption === opt ? "var(--plum)" : "var(--body)",
+                            fontSize: 14,
+                            fontWeight: pulseOption === opt ? 500 : 400,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            fontFamily: "var(--sans)",
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {activeQuestion.question_type === "scale" && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setPulseScale(n)}
+                          style={{
+                            flex: 1,
+                            aspectRatio: "1",
+                            borderRadius: "var(--r-input)",
+                            border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
+                            background: pulseScale === n ? "var(--ivory)" : "transparent",
+                            color: pulseScale === n ? "var(--plum)" : "var(--ink)",
+                            fontSize: 16,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "var(--sans)",
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
+                    <textarea
+                      value={pulseInput}
+                      onChange={e => setPulseInput(e.target.value)}
+                      placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
+                      rows={3}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: "var(--r-input)",
+                        border: "1px solid var(--line-2)",
+                        background: "var(--cream-2)",
+                        color: "var(--ink)",
+                        fontSize: 14,
+                        fontFamily: "var(--sans)",
+                        resize: "none",
+                        boxSizing: "border-box",
+                        outline: "none",
+                      }}
+                    />
+                  )}
+                  <CentralButton
+                    onClick={handlePulseSubmit}
+                    disabled={pulseSubmitting || pulseAnswered}
+                    style={{ justifyContent: "center" }}
+                  >
+                    {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
+                  </CentralButton>
+                </div>
+              </div>
+            )}
+          </CentralCard>
+        )}
+
+        {/* ── For You section — desktop ── */}
+        {forYouItems.length > 0 && (
+          <div style={{ marginTop: 36 }}>
+            <SectionHeader
+              eyebrow="Announcements"
+              title="For you"
+              action={
+                <button
+                  onClick={onSeeAnnouncements}
+                  style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                >
+                  See all →
+                </button>
+              }
+              style={{ marginBottom: 18 }}
+            />
+
+            <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-6)" }}>
+              {forYouItems.map((a) => (
+                <CentralCard
+                  key={a.id}
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
+                  {/* Type badge + RSVP */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: "0.5px",
+                        fontWeight: 500,
+                        textTransform: "uppercase",
+                        padding: "3px 10px",
+                        borderRadius: 999,
+                        background: "var(--ivory)",
+                        border: "1px solid var(--line-2)",
+                        color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
+                        whiteSpace: "nowrap",
+                        fontFamily: "var(--sans)",
+                      }}
+                    >
+                      {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
+                    </span>
+                    {a.is_event && (
+                      <button
+                        onClick={() => handleForYouRsvp(a.id)}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 500,
+                          padding: "3px 10px",
+                          borderRadius: 999,
+                          border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
+                          background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
+                          color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          fontFamily: "var(--sans)",
+                        }}
+                      >
+                        {rsvpedAnnIds.has(a.id) ? "Going ✓" : "RSVP"}
+                      </button>
+                    )}
+                  </div>
+
+                  <CardTitle size={20}>{a.title}</CardTitle>
+
+                  {/* Body — flex: 1 so all cards in a row push actions to the same baseline */}
+                  <p
+                    className="line-clamp-2"
+                    style={{
+                      fontSize: 12,
+                      color: "var(--body)",
+                      lineHeight: 1.55,
+                      flex: 1,
+                      margin: 0,
+                      fontFamily: "var(--sans)",
+                    }}
+                  >
+                    {previewBody(a.body)}
+                  </p>
+
+                  {/* View action — always at bottom */}
+                  <button
+                    onClick={() => onOpenAnnouncement(a.id)}
+                    style={{
+                      fontSize: 11,
+                      color: "var(--muted-text)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      padding: 0,
+                      fontFamily: "var(--sans)",
+                    }}
+                  >
+                    See announcement →
+                  </button>
+                </CentralCard>
+              ))}
+            </div>
+
+            {/* Leader prompt: event has 0 RSVPs */}
+            {isLeaderOrAdmin && heroAnn && rsvpCount === 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 16px",
+                  background: "var(--cream)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--r-card)",
+                }}
+              >
+                <Bell style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0 }} />
+                <p style={{ fontSize: 12, color: "var(--body)", margin: 0, fontFamily: "var(--sans)" }}>
+                  No one has RSVPed to{" "}
+                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{heroAnn.title}</span>{" "}
+                  yet — share the details with your group.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Daily verse — desktop ── */}
+        {homeVerse && (
+          <CentralCard
+            style={{
+              marginTop: "var(--space-8)",
+              display: "grid",
+              gridTemplateColumns: "1fr 2fr",
+              alignItems: "center",
+              gap: "var(--space-9)",
+            }}
+            padding="22px 28px"
+          >
+            <div>
+              <div style={EYEBROW}>Today&apos;s verse</div>
+              <CardTitle size={20} style={{ marginTop: 4 }}>{homeVerse.reference}</CardTitle>
+            </div>
+            <CardTitle size={17} italic style={{ lineHeight: 1.5 }}>
+              &ldquo;{homeVerse.text}&rdquo;
+            </CardTitle>
+          </CentralCard>
+        )}
+
+      </div>
+
+      {/* ══════════════════════════════════════════════════════ MOBILE ══ */}
+
+      <div className="md:hidden px-5 pb-4">
+
+        {/* Mobile greeting header */}
+        <PageTitle eyebrow={dateLabel} title={greetingNode} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
+          {(eventCount > 0 || totalUnread > 0) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+              {eventCount > 0 && (
+                <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                  {eventCount} event{eventCount !== 1 ? "s" : ""}
+                </span>
+              )}
+              {totalUnread > 0 && (
+                <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
+                  {totalUnread} unread
+                </span>
+              )}
+            </div>
+          )}
+        </PageTitle>
+
+        <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
+
+          {/* ── Up Next — mobile ── */}
+          <section>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>
+                Up next
+              </div>
+              <button
+                onClick={onSeeAnnouncements}
+                style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+              >
+                See all <ChevronRight style={{ width: 12, height: 12 }} />
+              </button>
+            </div>
+
+            {/* Section header above paints immediately; only the fetch-dependent
+                card area skeletons (label lives in the real header, so hide it). */}
+            {loading ? (
+              <HomeHeroSkeleton showLabel={false} />
+            ) : slides.length > 0 ? (
               <HomeHeroCarousel
                 slides={slides}
+                mobile
                 rsvpedIds={slideRsvpedIds}
                 rsvpCounts={slideRsvpCounts}
                 rsvpAttendees={slideRsvpAttendees}
@@ -577,635 +956,260 @@ export function HomeTab({
                 onDetails={handleSlideDetails}
               />
             ) : heroAnn ? (
-              <HeroFrame>
-                <UpNextCard
-                  fill
-                  label="Up next"
-                  labelAccent
-                  title={heroAnn.title}
-                  body={heroAnn.body}
-                  isEvent={heroAnn.is_event}
-                  imageUrl={heroAnn.image_url}
-                  postedDate={heroAnn.created_at}
-                  eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
-                  userHasRsvped={userHasRsvped}
-                  rsvping={rsvping}
-                  rsvpCount={rsvpCount}
-                  attendees={rsvpAttendees}
-                  showAttendees={showAttendeeList}
-                  onRsvp={handleHomeRsvp}
-                  onDetails={() => onOpenAnnouncement(heroAnn.id)}
-                />
-              </HeroFrame>
+              <UpNextCard
+                label="Up next"
+                labelAccent
+                title={heroAnn.title}
+                body={heroAnn.body}
+                isEvent={heroAnn.is_event}
+                imageUrl={heroAnn.image_url}
+                postedDate={heroAnn.created_at}
+                eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
+                userHasRsvped={userHasRsvped}
+                rsvping={rsvping}
+                rsvpCount={rsvpCount}
+                attendees={rsvpAttendees}
+                showAttendees={showAttendeeList}
+                onRsvp={handleHomeRsvp}
+                onDetails={() => onOpenAnnouncement(heroAnn.id)}
+                mobile
+              />
             ) : latestAnn ? (
-              <HeroFrame>
-                <UpNextCard
-                  fill
-                  label="Latest"
-                  labelAccent={false}
-                  title={latestAnn.title}
-                  body={latestAnn.body}
-                  isEvent={false}
-                  imageUrl={latestAnn.image_url}
-                  postedDate={latestAnn.created_at}
-                  onDetails={() => onOpenAnnouncement(latestAnn.id)}
-                />
-              </HeroFrame>
+              <UpNextCard
+                label="Latest"
+                labelAccent={false}
+                title={latestAnn.title}
+                body={latestAnn.body}
+                isEvent={false}
+                imageUrl={latestAnn.image_url}
+                postedDate={latestAnn.created_at}
+                onDetails={() => onOpenAnnouncement(latestAnn.id)}
+                mobile
+              />
             ) : (
-              <HeroFrame
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 12,
-                  textAlign: "center",
-                  background: "var(--ivory)",
-                }}
+              <CentralCard
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
+                padding="32px 24px"
               >
-                <Calendar style={{ width: 32, height: 32, color: "var(--dashed)" }} />
-                <div>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>No upcoming events</p>
-                  <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
-                    Check the announcements tab for updates.
-                  </p>
-                </div>
-                <CentralButton variant="plum-outline" onClick={onSeeAnnouncements} style={{ marginTop: 4 }}>
-                  See announcements
-                </CentralButton>
-              </HeroFrame>
-            )}
-
-            {/* Your chats — horizontal strip below hero */}
-            <ChatStrip
-              chats={top3}
-              totalUnread={totalUnread}
-              onOpenChat={onOpenChat}
-              onSeeAll={onSeeChats}
-              style={{ marginTop: "var(--space-8)" }}
-            />
-
-            {/* ── Pastor Pulse — desktop ── */}
-            {activeQuestion && !hasResponded && !isPastorRole && (
-              <CentralCard variant="callout" radius="var(--r-callout)" style={{ marginTop: 22 }} padding="28px 32px">
-                {pulseSubmitted ? (
-                  <div style={{ textAlign: "center", padding: "16px 0" }}>
-                    <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                    <CardTitle size={22}>Thanks for sharing.</CardTitle>
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
-                      Your response was received anonymously.
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36, alignItems: "start" }}>
-                    <div>
-                      <div style={EYEBROW}>
-                        Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
-                      </div>
-                      <CardTitle size={24} style={{ marginTop: 8 }}>
-                        {activeQuestion.question_text}
-                      </CardTitle>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {activeQuestion.question_type === "poll" && activeQuestion.options && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {activeQuestion.options.map((opt, i) => (
-                            <button
-                              key={`${opt}-${i}`}
-                              onClick={() => setPulseOption(opt)}
-                              style={{
-                                padding: "9px 14px",
-                                borderRadius: "var(--r-input)",
-                                border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
-                                background: pulseOption === opt ? "var(--ivory)" : "transparent",
-                                color: pulseOption === opt ? "var(--plum)" : "var(--body)",
-                                fontSize: 14,
-                                fontWeight: pulseOption === opt ? 500 : 400,
-                                cursor: "pointer",
-                                textAlign: "left",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {activeQuestion.question_type === "scale" && (
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <button
-                              key={n}
-                              onClick={() => setPulseScale(n)}
-                              style={{
-                                flex: 1,
-                                aspectRatio: "1",
-                                borderRadius: "var(--r-input)",
-                                border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
-                                background: pulseScale === n ? "var(--ivory)" : "transparent",
-                                color: pulseScale === n ? "var(--plum)" : "var(--ink)",
-                                fontSize: 16,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
-                        <textarea
-                          value={pulseInput}
-                          onChange={e => setPulseInput(e.target.value)}
-                          placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
-                          rows={3}
-                          style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: "var(--r-input)",
-                            border: "1px solid var(--line-2)",
-                            background: "var(--cream-2)",
-                            color: "var(--ink)",
-                            fontSize: 14,
-                            fontFamily: "var(--sans)",
-                            resize: "none",
-                            boxSizing: "border-box",
-                            outline: "none",
-                          }}
-                        />
-                      )}
-                      <CentralButton
-                        onClick={handlePulseSubmit}
-                        disabled={pulseSubmitting || pulseAnswered}
-                        style={{ justifyContent: "center" }}
-                      >
-                        {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                      </CentralButton>
-                    </div>
-                  </div>
-                )}
+                <Calendar style={{ width: 28, height: 28, color: "var(--dashed)" }} />
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--sans)" }}>No upcoming events</p>
+                <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>Check back when events are posted.</p>
               </CentralCard>
             )}
+          </section>
 
-            {/* ── For You section — desktop ── */}
-            {forYouItems.length > 0 && (
-              <div style={{ marginTop: 36 }}>
-                <SectionHeader
-                  eyebrow="Announcements"
-                  title="For you"
-                  action={
-                    <button
-                      onClick={onSeeAnnouncements}
-                      style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
-                    >
-                      See all →
-                    </button>
-                  }
-                  style={{ marginBottom: 18 }}
-                />
+          {/* ── Pastor Pulse — mobile ── */}
+          {activeQuestion && !hasResponded && !isPastorRole && (
+            <section>
+              {pulseSubmitted ? (
+                <CentralCard variant="callout" padding="24px" style={{ textAlign: "center" }}>
+                  <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
+                  <CardTitle size={20}>Thanks for sharing.</CardTitle>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6, fontFamily: "var(--sans)" }}>
+                    Your response was received anonymously.
+                  </p>
+                </CentralCard>
+              ) : (
+                <CentralCard variant="callout" padding="24px">
+                  <div style={EYEBROW}>
+                    Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
+                  </div>
+                  <CardTitle size={22} style={{ margin: "8px 0 14px" }}>
+                    {activeQuestion.question_text}
+                  </CardTitle>
 
-                <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-6)" }}>
-                  {forYouItems.map((a) => (
-                    <CentralCard
-                      key={a.id}
-                      style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                    >
-                      {/* Type badge + RSVP */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span
+                  {activeQuestion.question_type === "poll" && activeQuestion.options && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {activeQuestion.options.map((opt, i) => (
+                        <button
+                          key={`${opt}-${i}`}
+                          onClick={() => setPulseOption(opt)}
                           style={{
-                            fontSize: 10,
-                            letterSpacing: "0.5px",
-                            fontWeight: 500,
-                            textTransform: "uppercase",
-                            padding: "3px 10px",
-                            borderRadius: 999,
-                            background: "var(--ivory)",
-                            border: "1px solid var(--line-2)",
-                            color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
-                            whiteSpace: "nowrap",
+                            padding: "10px 14px",
+                            borderRadius: "var(--r-input)",
+                            border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
+                            background: pulseOption === opt ? "var(--ivory)" : "transparent",
+                            color: pulseOption === opt ? "var(--plum)" : "var(--body)",
+                            fontSize: 14,
+                            fontWeight: pulseOption === opt ? 500 : 400,
+                            cursor: "pointer",
+                            textAlign: "left",
                             fontFamily: "var(--sans)",
                           }}
                         >
-                          {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
-                        </span>
-                        {a.is_event && (
-                          <button
-                            onClick={() => handleForYouRsvp(a.id)}
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 500,
-                              padding: "3px 10px",
-                              borderRadius: 999,
-                              border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
-                              background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
-                              color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
-                              cursor: "pointer",
-                              flexShrink: 0,
-                              fontFamily: "var(--sans)",
-                            }}
-                          >
-                            {rsvpedAnnIds.has(a.id) ? "Going ✓" : "RSVP"}
-                          </button>
-                        )}
-                      </div>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                      <CardTitle size={20}>{a.title}</CardTitle>
+                  {activeQuestion.question_type === "scale" && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setPulseScale(n)}
+                          style={{
+                            flex: 1,
+                            aspectRatio: "1",
+                            borderRadius: "var(--r-input)",
+                            border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
+                            background: pulseScale === n ? "var(--ivory)" : "transparent",
+                            color: pulseScale === n ? "var(--plum)" : "var(--ink)",
+                            fontSize: 16,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "var(--sans)",
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                      {/* Body — flex: 1 so all cards in a row push actions to the same baseline */}
-                      <p
-                        className="line-clamp-2"
-                        style={{
-                          fontSize: 12,
-                          color: "var(--body)",
-                          lineHeight: 1.55,
-                          flex: 1,
-                          margin: 0,
-                          fontFamily: "var(--sans)",
-                        }}
-                      >
-                        {previewBody(a.body)}
-                      </p>
+                  {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
+                    <textarea
+                      value={pulseInput}
+                      onChange={e => setPulseInput(e.target.value)}
+                      placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
+                      rows={3}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: "var(--r-input)",
+                        border: "1px solid var(--line-2)",
+                        background: "var(--cream-2)",
+                        color: "var(--ink)",
+                        fontSize: 14,
+                        fontFamily: "var(--sans)",
+                        resize: "none",
+                        boxSizing: "border-box",
+                        outline: "none",
+                      }}
+                    />
+                  )}
 
-                      {/* View action — always at bottom */}
-                      <button
-                        onClick={() => onOpenAnnouncement(a.id)}
-                        style={{
-                          fontSize: 11,
-                          color: "var(--muted-text)",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          padding: 0,
-                          fontFamily: "var(--sans)",
-                        }}
-                      >
-                        See announcement →
-                      </button>
-                    </CentralCard>
-                  ))}
-                </div>
-
-                {/* Leader prompt: event has 0 RSVPs */}
-                {isLeaderOrAdmin && heroAnn && rsvpCount === 0 && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "12px 16px",
-                      background: "var(--cream)",
-                      border: "1px solid var(--line)",
-                      borderRadius: "var(--r-card)",
-                    }}
+                  <CentralButton
+                    onClick={handlePulseSubmit}
+                    disabled={pulseSubmitting || pulseAnswered}
+                    style={{ marginTop: 12, width: "100%", justifyContent: "center" }}
                   >
-                    <Bell style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0 }} />
-                    <p style={{ fontSize: 12, color: "var(--body)", margin: 0, fontFamily: "var(--sans)" }}>
-                      No one has RSVPed to{" "}
-                      <span style={{ fontWeight: 600, color: "var(--ink)" }}>{heroAnn.title}</span>{" "}
-                      yet — share the details with your group.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Daily verse — desktop ── */}
-            {homeVerse && (
-              <CentralCard
-                style={{
-                  marginTop: "var(--space-8)",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 2fr",
-                  alignItems: "center",
-                  gap: "var(--space-9)",
-                }}
-                padding="22px 28px"
-              >
-                <div>
-                  <div style={EYEBROW}>Today&apos;s verse</div>
-                  <CardTitle size={20} style={{ marginTop: 4 }}>{homeVerse.reference}</CardTitle>
-                </div>
-                <CardTitle size={17} italic style={{ lineHeight: 1.5 }}>
-                  &ldquo;{homeVerse.text}&rdquo;
-                </CardTitle>
-              </CentralCard>
-            )}
-
-          </div>
-
-          {/* ══════════════════════════════════════════════════════ MOBILE ══ */}
-
-          <div className="md:hidden px-5 pb-4">
-
-            {/* Mobile greeting header */}
-            <PageTitle eyebrow={dateLabel} title={greetingNode} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
-              {(eventCount > 0 || totalUnread > 0) && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-                  {eventCount > 0 && (
-                    <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                      {eventCount} event{eventCount !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {totalUnread > 0 && (
-                    <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                      {totalUnread} unread
-                    </span>
-                  )}
-                </div>
+                    {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
+                  </CentralButton>
+                </CentralCard>
               )}
-            </PageTitle>
+            </section>
+          )}
 
-            <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
-
-              {/* ── Up Next — mobile ── */}
-              <section>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>
-                    Up next
-                  </div>
+          {/* ── For You — mobile ── */}
+          {forYouItems.length > 0 && (
+            <section>
+              <SectionHeader
+                eyebrow="Announcements"
+                title="For you"
+                titleSize={22}
+                action={
                   <button
                     onClick={onSeeAnnouncements}
                     style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
                   >
                     See all <ChevronRight style={{ width: 12, height: 12 }} />
                   </button>
-                </div>
+                }
+                style={{ marginBottom: 12 }}
+              />
 
-                {slides.length > 0 ? (
-                  <HomeHeroCarousel
-                    slides={slides}
-                    mobile
-                    rsvpedIds={slideRsvpedIds}
-                    rsvpCounts={slideRsvpCounts}
-                    rsvpAttendees={slideRsvpAttendees}
-                    showAttendeesIds={slideShowAttendeesIds}
-                    isLeaderOrAdmin={isLeaderOrAdmin}
-                    rsvping={slideRsvping}
-                    onRsvp={handleSlideRsvp}
-                    onDetails={handleSlideDetails}
-                  />
-                ) : heroAnn ? (
-                  <UpNextCard
-                    label="Up next"
-                    labelAccent
-                    title={heroAnn.title}
-                    body={heroAnn.body}
-                    isEvent={heroAnn.is_event}
-                    imageUrl={heroAnn.image_url}
-                    postedDate={heroAnn.created_at}
-                    eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
-                    userHasRsvped={userHasRsvped}
-                    rsvping={rsvping}
-                    rsvpCount={rsvpCount}
-                    attendees={rsvpAttendees}
-                    showAttendees={showAttendeeList}
-                    onRsvp={handleHomeRsvp}
-                    onDetails={() => onOpenAnnouncement(heroAnn.id)}
-                    mobile
-                  />
-                ) : latestAnn ? (
-                  <UpNextCard
-                    label="Latest"
-                    labelAccent={false}
-                    title={latestAnn.title}
-                    body={latestAnn.body}
-                    isEvent={false}
-                    imageUrl={latestAnn.image_url}
-                    postedDate={latestAnn.created_at}
-                    onDetails={() => onOpenAnnouncement(latestAnn.id)}
-                    mobile
-                  />
-                ) : (
-                  <CentralCard
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
-                    padding="32px 24px"
-                  >
-                    <Calendar style={{ width: 28, height: 28, color: "var(--dashed)" }} />
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--sans)" }}>No upcoming events</p>
-                    <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>Check back when events are posted.</p>
-                  </CentralCard>
-                )}
-              </section>
-
-              {/* ── Pastor Pulse — mobile ── */}
-              {activeQuestion && !hasResponded && !isPastorRole && (
-                <section>
-                  {pulseSubmitted ? (
-                    <CentralCard variant="callout" padding="24px" style={{ textAlign: "center" }}>
-                      <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                      <CardTitle size={20}>Thanks for sharing.</CardTitle>
-                      <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6, fontFamily: "var(--sans)" }}>
-                        Your response was received anonymously.
-                      </p>
-                    </CentralCard>
-                  ) : (
-                    <CentralCard variant="callout" padding="24px">
-                      <div style={EYEBROW}>
-                        Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
-                      </div>
-                      <CardTitle size={22} style={{ margin: "8px 0 14px" }}>
-                        {activeQuestion.question_text}
-                      </CardTitle>
-
-                      {activeQuestion.question_type === "poll" && activeQuestion.options && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {activeQuestion.options.map((opt, i) => (
-                            <button
-                              key={`${opt}-${i}`}
-                              onClick={() => setPulseOption(opt)}
-                              style={{
-                                padding: "10px 14px",
-                                borderRadius: "var(--r-input)",
-                                border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
-                                background: pulseOption === opt ? "var(--ivory)" : "transparent",
-                                color: pulseOption === opt ? "var(--plum)" : "var(--body)",
-                                fontSize: 14,
-                                fontWeight: pulseOption === opt ? 500 : 400,
-                                cursor: "pointer",
-                                textAlign: "left",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {activeQuestion.question_type === "scale" && (
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <button
-                              key={n}
-                              onClick={() => setPulseScale(n)}
-                              style={{
-                                flex: 1,
-                                aspectRatio: "1",
-                                borderRadius: "var(--r-input)",
-                                border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
-                                background: pulseScale === n ? "var(--ivory)" : "transparent",
-                                color: pulseScale === n ? "var(--plum)" : "var(--ink)",
-                                fontSize: 16,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
-                        <textarea
-                          value={pulseInput}
-                          onChange={e => setPulseInput(e.target.value)}
-                          placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
-                          rows={3}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {forYouItems.map((a) => (
+                  <CentralCard key={a.id} padding={16}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span
                           style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: "var(--r-input)",
-                            border: "1px solid var(--line-2)",
-                            background: "var(--cream-2)",
-                            color: "var(--ink)",
-                            fontSize: 14,
+                            fontSize: 10,
+                            letterSpacing: "0.5px",
+                            fontWeight: 500,
+                            textTransform: "uppercase",
+                            color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
                             fontFamily: "var(--sans)",
-                            resize: "none",
-                            boxSizing: "border-box",
-                            outline: "none",
                           }}
-                        />
-                      )}
-
-                      <CentralButton
-                        onClick={handlePulseSubmit}
-                        disabled={pulseSubmitting || pulseAnswered}
-                        style={{ marginTop: 12, width: "100%", justifyContent: "center" }}
-                      >
-                        {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                      </CentralButton>
-                    </CentralCard>
-                  )}
-                </section>
-              )}
-
-              {/* ── For You — mobile ── */}
-              {forYouItems.length > 0 && (
-                <section>
-                  <SectionHeader
-                    eyebrow="Announcements"
-                    title="For you"
-                    titleSize={22}
-                    action={
-                      <button
-                        onClick={onSeeAnnouncements}
-                        style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
-                      >
-                        See all <ChevronRight style={{ width: 12, height: 12 }} />
-                      </button>
-                    }
-                    style={{ marginBottom: 12 }}
-                  />
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {forYouItems.map((a) => (
-                      <CentralCard key={a.id} padding={16}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                letterSpacing: "0.5px",
-                                fontWeight: 500,
-                                textTransform: "uppercase",
-                                color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
-                                fontFamily: "var(--sans)",
-                              }}
-                            >
-                              {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
-                            </span>
-                            <CardTitle
-                              size={18}
-                              style={{
-                                marginTop: 4,
-                                overflow: "hidden",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 1,
-                                WebkitBoxOrient: "vertical",
-                              } as React.CSSProperties}
-                            >
-                              {a.title}
-                            </CardTitle>
-                          </div>
-                          {a.is_event ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                              <button
-                                onClick={() => handleForYouRsvp(a.id)}
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 500,
-                                  padding: "5px 12px",
-                                  borderRadius: 999,
-                                  border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
-                                  background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
-                                  color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
-                                  cursor: "pointer",
-                                  fontFamily: "var(--sans)",
-                                }}
-                              >
-                                {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
-                              </button>
-                              <button
-                                onClick={() => onOpenAnnouncement(a.id)}
-                                style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
-                              >
-                                View →
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => onOpenAnnouncement(a.id)}
-                              style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
-                            >
-                              See →
-                            </button>
-                          )}
-                        </div>
-                        {!a.is_event && (
-                          <p
-                            className="line-clamp-2"
-                            style={{ marginTop: 6, fontSize: 12, color: "var(--body)", lineHeight: 1.5, fontFamily: "var(--sans)" }}
+                        >
+                          {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
+                        </span>
+                        <CardTitle
+                          size={18}
+                          style={{
+                            marginTop: 4,
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: "vertical",
+                          } as React.CSSProperties}
+                        >
+                          {a.title}
+                        </CardTitle>
+                      </div>
+                      {a.is_event ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <button
+                            onClick={() => handleForYouRsvp(a.id)}
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              padding: "5px 12px",
+                              borderRadius: 999,
+                              border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
+                              background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
+                              color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
+                              cursor: "pointer",
+                              fontFamily: "var(--sans)",
+                            }}
                           >
-                            {previewBody(a.body)}
-                          </p>
-                        )}
-                      </CentralCard>
-                    ))}
-                  </div>
-                </section>
-              )}
+                            {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
+                          </button>
+                          <button
+                            onClick={() => onOpenAnnouncement(a.id)}
+                            style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                          >
+                            View →
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => onOpenAnnouncement(a.id)}
+                          style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
+                        >
+                          See →
+                        </button>
+                      )}
+                    </div>
+                    {!a.is_event && (
+                      <p
+                        className="line-clamp-2"
+                        style={{ marginTop: 6, fontSize: 12, color: "var(--body)", lineHeight: 1.5, fontFamily: "var(--sans)" }}
+                      >
+                        {previewBody(a.body)}
+                      </p>
+                    )}
+                  </CentralCard>
+                ))}
+              </div>
+            </section>
+          )}
 
-              {/* ── Chats — mobile ── */}
-              {top3.length > 0 && (
-                <ChatsSection
-                  chats={top3}
-                  totalUnread={totalUnread}
-                  onSeeAll={onSeeChats}
-                  onOpenChat={onOpenChat}
-                />
-              )}
+          {/* ── Chats — mobile ── */}
+          {top3.length > 0 && (
+            <ChatsSection
+              chats={top3}
+              totalUnread={totalUnread}
+              onSeeAll={onSeeChats}
+              onOpenChat={onOpenChat}
+            />
+          )}
 
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+      </div>
 
       {managerOpen && (
         <HomeSlideManager

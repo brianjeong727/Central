@@ -47,32 +47,23 @@ function SkeletonTitleBlock() {
   )
 }
 
-// ── Home tab — full skeleton (header + featured hero + recent chats) ──────────
-// Replaces the full-tab Spinner in home-tab (no header is shown during its load).
-export function HomeTabSkeleton() {
+// ── Home hero — skeleton for ONLY the fetch-dependent Featured region ──────────
+// The greeting header and chat strip paint immediately from props; this covers
+// just the hero slot. Footprint matches the loaded state exactly: the
+// HeroSectionLabel eyebrow row + the fixed --hero-h HeroFrame — so the swap to
+// the real carousel/UpNextCard causes no layout shift.
+// `showLabel={false}` for contexts that render their own real eyebrow (mobile
+// "Up next" section header).
+export function HomeHeroSkeleton({ showLabel = true }: { showLabel?: boolean }) {
   return (
-    <div className="px-5 md:px-14 pt-8">
-      <SkeletonTitleBlock />
-      <div style={{ marginTop: "var(--space-9)" }}>
-        {/* "Featured" eyebrow above the hero */}
+    <div>
+      {/* "Featured" eyebrow above the hero */}
+      {showLabel && (
         <SkeletonBlock width={84} height={11} radius="var(--r-pill)" style={{ marginBottom: "var(--space-6)" }} />
-        <HeroFrame style={{ border: "1px solid var(--line-2)" }}>
-          <SkeletonBlock width="100%" height="100%" radius={0} className="" style={{ background: "var(--cream-3)" }} />
-        </HeroFrame>
-      </div>
-      {/* Recent chats section */}
-      <div style={{ marginTop: "var(--space-9)", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-        <SkeletonBlock width={140} height={14} radius="var(--r-chip)" />
-        {[0, 1, 2].map((i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-5)" }}>
-            <SkeletonBlock width={40} height={40} radius="var(--r-pill-lg)" />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-              <SkeletonBlock width="38%" height={12} radius="var(--r-pill)" />
-              <SkeletonBlock width="68%" height={11} radius="var(--r-pill)" />
-            </div>
-          </div>
-        ))}
-      </div>
+      )}
+      <HeroFrame style={{ border: "1px solid var(--line-2)" }}>
+        <SkeletonBlock width="100%" height="100%" radius={0} className="" style={{ background: "var(--cream-3)" }} />
+      </HeroFrame>
     </div>
   )
 }

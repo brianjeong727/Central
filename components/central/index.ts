@@ -18,7 +18,7 @@ export { PlanSubTabStrip } from "./plan-sub-tab-strip"
 export { FilterDropdown } from "./filter-dropdown"
 export {
   SkeletonBlock,
-  HomeTabSkeleton,
+  HomeHeroSkeleton,
   AnnouncementsListSkeleton,
   AnnouncementsTabSkeleton,
   DirectoryListSkeleton,
