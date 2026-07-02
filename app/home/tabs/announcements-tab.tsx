@@ -776,9 +776,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       supabase.from("announcement_forms").select("id, announcement_id").in("announcement_id", ids),
     ])
 
-    supabase.from("announcement_views")
-      .upsert(ids.map((id) => ({ announcement_id: id, user_id: userId })), { onConflict: "announcement_id,user_id" })
-      .then()
+    // A "view" means the user OPENED the announcement — recorded on detail open
+    // (see AnnouncementDetailView). We deliberately do NOT mark every announcement
+    // viewed just because it rendered in the feed: that was a per-load write storm
+    // (one upsert per announcement per feed load per user) and made view_count
+    // measure "appeared in feed" instead of "was opened".
 
     // Build the cross-row lookups that the next two queries depend on, then run
     // both in parallel — form_responses (needs formIds) and profiles (needs
