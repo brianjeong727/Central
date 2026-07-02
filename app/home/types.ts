@@ -27,6 +27,7 @@ export interface Profile {
   show_journal_entries?: boolean
   show_journal_streak?: boolean
   seen_workspace_nav_hint?: boolean
+  grad_prompt_dismissed?: boolean
 }
 
 export interface Devotional {
