@@ -365,6 +365,13 @@
   .greeting-dot-breathe { animation: none; }
 }
 
+/* ── Pastor Pulse hero slide (PulseSlideCard) ────────────────────────────────
+   The translucent textarea on the flat-plum card — placeholder can't be styled
+   inline, so this one rule carries the cream-50 placeholder tint. */
+.pulse-slide-textarea::placeholder {
+  color: color-mix(in srgb, var(--cream) 50%, transparent);
+}
+
 /* ── Skeleton loading — static soft pulse (calm, no shimmer sweep) ───────── */
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }
