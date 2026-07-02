@@ -389,7 +389,7 @@ export function DesktopSidebar({
         >
           {userAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+            <img src={userAvatarUrl} alt="" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--cream)", fontFamily: "var(--sans)" }}>
               {userInitials}

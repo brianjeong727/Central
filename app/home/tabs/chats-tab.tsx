@@ -3271,7 +3271,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                   {optVoters.map((v, vi) => (
                                     <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0${vi > 0 ? " -ml-1.5" : ""}`} style={{ background: "var(--plum)" }}>
                                       {v.avatar_url
-                                        ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                        ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                         : <span className="font-bold flex items-center justify-center h-full" style={{ fontSize: 7, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                                       }
                                     </div>
@@ -3356,7 +3356,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           <div key={v.user_id} className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: "var(--plum)" }}>
                               {v.avatar_url
-                                ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                 : <span className="font-bold" style={{ fontSize: 10, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                               }
                             </div>
