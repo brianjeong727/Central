@@ -75,29 +75,10 @@ const SIZE_LABELS: Record<string, string> = {
 type Ministry = { id: string; name: string; university: string; size: string; location: string | null }
 type Tab = "browse" | "code"
 
-function readPendingJoinState(): { tab: Tab; inviteCode: string; selected: Ministry | null } {
-  if (typeof window === "undefined") return { tab: "browse", inviteCode: "", selected: null }
-
-  const inviteCode = sessionStorage.getItem("pending_invite_code") ?? ""
-  const browseRaw = sessionStorage.getItem("pending_browse_ministry")
-  let selected: Ministry | null = null
-
-  if (browseRaw) {
-    try {
-      selected = JSON.parse(browseRaw) as Ministry
-    } catch {
-      selected = null
-    }
-  }
-
-  return { tab: inviteCode ? "code" : "browse", inviteCode, selected }
-}
-
 function JoinContent() {
-  const pendingJoin = useState(readPendingJoinState)[0]
-  const [tab, setTab] = useState<Tab>(pendingJoin.tab)
+  const [tab, setTab] = useState<Tab>("browse")
 
-  const [inviteCode, setInviteCode] = useState(pendingJoin.inviteCode)
+  const [inviteCode, setInviteCode] = useState("")
   const [joining, setJoining] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
 
@@ -105,7 +86,7 @@ function JoinContent() {
   const [ministries, setMinistries] = useState<Ministry[]>([])
   const [browsing, setBrowsing] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Ministry | null>(pendingJoin.selected)
+  const [selected, setSelected] = useState<Ministry | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [myMinistryIds, setMyMinistryIds] = useState<Set<string>>(new Set())
@@ -131,8 +112,6 @@ function JoinContent() {
   const [pendingSchoolRedirect, setPendingSchoolRedirect] = useState<(() => void) | null>(null)
 
   useEffect(() => {
-    sessionStorage.removeItem("pending_invite_code")
-    sessionStorage.removeItem("pending_browse_ministry")
     getUserMinistries().then(({ data }) => {
       if (data) setMyMinistryIds(new Set(data.map((m) => m.id)))
     })

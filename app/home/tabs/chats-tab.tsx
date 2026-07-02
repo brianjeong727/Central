@@ -3458,8 +3458,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         </button>
       </div>
 
-      {/* Sub-tab switcher — mobile only */}
-      <div className="flex items-center gap-1 bg-[var(--cream-panel)] rounded-xl p-1 mb-5 md:hidden">
+      {/* Sub-tab switcher — mobile only (underline tabs per DESIGN_SYSTEM §4.2; matches the desktop tab bar above) */}
+      <div className="flex mb-5 md:hidden" style={{ borderBottom: "1px solid var(--line)" }}>
         {(["church", "my"] as const).map((t) => (
           <button
             key={t}
@@ -3468,11 +3468,14 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               setSearch("")
               setParam("chats", t === "church" ? null : t)
             }}
-            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
-              subTab === t
-                ? "bg-white text-[var(--plum)] shadow-sm"
-                : "text-[var(--muted-text)] hover:text-[#3E1540]/70"
-            }`}
+            style={{
+              flex: 1, padding: "12px 0", fontSize: "13px",
+              fontWeight: subTab === t ? 600 : 400,
+              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
+              background: "transparent", border: "none",
+              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
+              marginBottom: -1, cursor: "pointer", transition: "color 0.15s",
+            }}
           >
             {t === "church" ? "Church Chats" : "My Chats"}
           </button>
