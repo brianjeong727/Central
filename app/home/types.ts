@@ -181,6 +181,90 @@ export interface Reaction {
   emoji: string
 }
 
+// ── MessageRow (memoized chat message row — app/home/tabs/message-row.tsx) ──
+
+export interface LinkPreviewData {
+  title: string | null
+  description: string | null
+  image: string | null
+  hostname: string
+  url: string
+}
+
+export interface ReadReceiptEntry {
+  name: string
+  avatarUrl: string | null
+}
+
+/** Message enriched by ChatScreen's processedMessages memo (grouped vote receipts). */
+export type ProcessedMessage = Message & { _voteGroup?: string[] }
+
+export interface MessageRowProps {
+  msg: ProcessedMessage
+  isOwn: boolean
+  /** True only for the very first message in the list — popovers open downward instead of upward. */
+  isFirstMessage: boolean
+  isFirstInGroup: boolean
+  isLastInGroup: boolean
+  showDateSep: boolean
+  showGroupGap: boolean
+  senderDeparted: boolean
+  userId: string
+  canPin: boolean
+  isAdminOrLeader: boolean
+  // Per-row booleans (never the shared open-id — keeps React.memo effective)
+  isEmojiPickerOpen: boolean
+  isFullPickerOpen: boolean
+  isContextMenuOpen: boolean
+  isDeleting: boolean
+  isEditing: boolean
+  isPollMenuOpen: boolean
+  isPinned: boolean
+  /** Present only on the row currently being edited. */
+  editText?: string
+  /** Present only when this row is a search match while search is active. */
+  highlightQuery?: string
+  isActiveSearchMatch: boolean
+  // Per-row data slices (stable references for unchanged rows)
+  reactions?: Reaction[]
+  linkPreview?: LinkPreviewData
+  readReceipts?: ReadReceiptEntry[]
+  poll?: { question: string; options: string[] }
+  pollUserVote?: number
+  pollCounts?: number[]
+  isChangingVote: boolean
+  // Large-room "Seen by N" — gated by the parent to the latest own message only
+  isLargeRoom: boolean
+  isLatestOwn: boolean
+  seenByCount: number | null
+  seenByOpen: boolean
+  seenByList: ReadReceiptEntry[] | null
+  onToggleSeenBy?: () => void
+  // Stable callbacks (useCallback in ChatScreen, or bare setState setters)
+  registerMessageRef: (id: string, el: HTMLDivElement | null) => void
+  onPointerDown: (msg: Message) => void
+  onPointerUp: (msg: Message) => void
+  onPointerCancel: () => void
+  onReact: (messageId: string, emoji: string) => void
+  onDeleteMessage: (msgId: string) => void
+  onDeletePoll: (msgId: string, pollId: string) => void
+  onSaveEdit: () => void
+  onStartEdit: (msg: Message) => void
+  onForward: (msg: Message) => void
+  onPin: (msgId: string) => void
+  onUnpin: () => void
+  onScrollToMessage: (id: string) => void
+  onOpenVoteSheet: (pollId: string, hasVoted: boolean) => void
+  setEmojiPickerFor: (id: string | null) => void
+  setFullReactionPickerFor: (id: string | null) => void
+  setContextMenuFor: (id: string | null) => void
+  setDeletingId: (id: string | null) => void
+  setEditingId: (id: string | null) => void
+  setEditText: (text: string) => void
+  setReplyingTo: (msg: Message | null) => void
+  setPollMenuFor: (id: string | null) => void
+}
+
 export interface CongregationQuestion {
   id: string
   ministry_id: string
