@@ -472,9 +472,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       setMembers((prev) => prev.filter((m) => !toAdd.some((a) => a.user_id === m.user_id))) // rollback
       return
     }
-    await Promise.all(toAdd.map((m) =>
-      supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} added ${m.name.split(" ")[0]}`, message_type: "system" })
-    ))
+    // One aggregated system message (not one per person) — each insert fans out over realtime to every member.
+    const addedLabel = toAdd.length === 1 ? toAdd[0].name.split(" ")[0] : `${toAdd.length} people`
+    await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} added ${addedLabel}`, message_type: "system" })
     await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds: toAdd.map((m) => m.user_id), removeUserIds: [] })
     mutateSettings()
   }
@@ -2316,7 +2316,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   ))}
                 </div>
                 <p className="hidden md:block text-[12px] text-[var(--muted-text)] truncate">
-                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
+                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
                 </p>
               </div>
               <p className="md:hidden text-[12px] text-[var(--muted-text)] mt-0.5">
