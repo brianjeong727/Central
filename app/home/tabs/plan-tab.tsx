@@ -46,7 +46,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1504,12 +1504,13 @@ export function StudentOrgTeamHome({
                   <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Events</h2>
                 </div>
                 {canEdit && (
-                  <button
+                  <CentralButton
+                    variant="primary" size="sm"
                     onClick={() => setShowAddModal(true)}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: "pointer", flexShrink: 0, marginBottom: 4 }}
+                    style={{ flexShrink: 0, marginBottom: 4 }}
                   >
                     <Plus className="w-3.5 h-3.5" /> New Event
-                  </button>
+                  </CentralButton>
                 )}
               </div>
             )}
@@ -2333,12 +2334,12 @@ export function PlanTab({
                     : "Ask a leader to add you to a team."}
                 </p>
                 {isAdmin && (
-                  <button
+                  <CentralButton
+                    variant="primary" size="md"
                     onClick={() => setShowCreateTeam(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 22px", background: "var(--plum-2)", color: "var(--cream-panel)", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer" }}
                   >
                     <Plus style={{ width: 14, height: 14 }} /> Add a workspace
-                  </button>
+                  </CentralButton>
                 )}
               </div>
             </div>
@@ -3315,13 +3316,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <p style={{ ...monoStyle, fontSize: 11 }}>{monthLabel}</p>
             {canManageSchedule && !showAddWeek && (
-              <button
+              <CentralButton
+                variant="primary" size="sm"
                 onClick={() => setShowAddWeek(true)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add week
-              </button>
+              </CentralButton>
             )}
           </div>
 
@@ -3372,10 +3373,10 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                   </select>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleAddWeek} disabled={!newDate || addingWeek}
-                    style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newDate || addingWeek ? 0.6 : 1 }}>
+                  <CentralButton variant="primary" size="sm" onClick={handleAddWeek} disabled={!newDate || addingWeek}
+                    style={{ flex: 1 }}>
                     {addingWeek ? "Adding…" : "Add"}
-                  </button>
+                  </CentralButton>
                   <button onClick={() => { setShowAddWeek(false); setNewDate(""); setNewLeaderId(""); setAddWeekError(null) }}
                     style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                     Cancel
@@ -3529,10 +3530,10 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                             {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
-                              style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addMemberUserId || addingMember ? 0.6 : 1 }}>
+                            <CentralButton variant="primary" size="sm" onClick={() => handleAddMember(week.id)} disabled={!addMemberUserId || addingMember}
+                              style={{ flex: 1 }}>
                               {addingMember ? "Adding…" : "Add"}
-                            </button>
+                            </CentralButton>
                             <button onClick={() => { setAddMemberToWeekId(null); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberFocused(false) }}
                               style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                               Cancel
@@ -3997,10 +3998,9 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             Members
           </button>
           {canManage && !showAddEvent && (
-            <button onClick={() => setShowAddEvent(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+            <CentralButton variant="primary" size="sm" onClick={() => setShowAddEvent(true)}>
               <Plus className="w-3.5 h-3.5" /> Add event
-            </button>
+            </CentralButton>
           )}
         </div>
       </div>
@@ -4036,10 +4036,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 </div>
               )}
               {addMemberId && (
-                <button onClick={handleAddTeamMember} disabled={addingMember}
-                  style={{ marginTop: 8, padding: "8px 16px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: addingMember ? 0.6 : 1 }}>
+                <CentralButton variant="primary" size="sm" onClick={handleAddTeamMember} disabled={addingMember}
+                  style={{ marginTop: 8 }}>
                   {addingMember ? "Adding…" : "Add"}
-                </button>
+                </CentralButton>
               )}
             </div>
           )}
@@ -4057,10 +4057,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+              <CentralButton variant="primary" size="sm" onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
+                style={{ flex: 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
-              </button>
+              </CentralButton>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate("") }}
                 style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                 Cancel
@@ -4141,10 +4141,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                           style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                        <CentralButton variant="primary" size="sm" onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
+                          style={{ flex: 1 }}>
                           {addingRole ? "Adding…" : "Add"}
-                        </button>
+                        </CentralButton>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
                           style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                           Cancel
@@ -4398,10 +4398,9 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <p style={monoStyle}>Events · {events.length}</p>
         {canManage && !showAddEvent && (
-          <button onClick={() => setShowAddEvent(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+          <CentralButton variant="primary" size="sm" onClick={() => setShowAddEvent(true)}>
             <Plus className="w-3.5 h-3.5" /> Add event
-          </button>
+          </CentralButton>
         )}
       </div>
 
@@ -4420,10 +4419,10 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                 style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
-                style={{ flex: 1, padding: 10, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 10, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", opacity: !newEventDate || addingEvent ? 0.6 : 1 }}>
+              <CentralButton variant="primary" size="sm" onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
+                style={{ flex: 1 }}>
                 {addingEvent ? "Adding…" : "Add"}
-              </button>
+              </CentralButton>
               <button onClick={() => { setShowAddEvent(false); setNewEventDate(""); setNewEventName("") }}
                 style={{ padding: "10px 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>
                 Cancel
@@ -4503,10 +4502,10 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                           style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
-                          style={{ flex: 1, padding: 8, background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", opacity: !addRoleUserId || addingRole ? 0.6 : 1 }}>
+                        <CentralButton variant="primary" size="sm" onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
+                          style={{ flex: 1 }}>
                           {addingRole ? "Adding…" : "Add"}
-                        </button>
+                        </CentralButton>
                         <button onClick={() => { setAddRoleToEventId(null); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleFocused(false) }}
                           style={{ padding: "8px 12px", background: "transparent", color: "var(--muted-text)", borderRadius: 8, fontSize: 12, border: "1px solid var(--line-2)", cursor: "pointer" }}>
                           Cancel
@@ -4738,12 +4737,12 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
           </div>
           {songs.length > 0 && canManage && (
             <div style={{ display: "flex", gap: 8 }}>
-              <button
+              <CentralButton
+                variant="primary" size="sm"
                 onClick={() => slidesDeck && slidesEventLabel === label ? setSlidesOverlayOpen(true) : handleGenerateSlides(songs, label)}
-                disabled={slidesGenerating}
-                style={{ padding: "6px 14px", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: slidesGenerating ? "not-allowed" : "pointer", opacity: slidesGenerating ? 0.6 : 1 }}>
+                disabled={slidesGenerating}>
                 {slidesGenerating && slidesEventLabel === label ? "…" : "Slides"}
-              </button>
+              </CentralButton>
               <button onClick={() => handleExportSlides(songs)}
                 style={{ padding: "6px 12px", background: "transparent", color: "var(--plum)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid var(--plum)", cursor: "pointer" }}>
                 Export
@@ -5055,10 +5054,10 @@ function SetListPdfViewer({
                   style={{ width: "100%", border: "none", outline: "none", fontSize: 12, color: "var(--ink)", marginBottom: 8, boxSizing: "border-box" as const }}
                 />
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={handleSaveAnnotation} disabled={savingAnnotation || !pendingText.trim()}
-                    style={{ flex: 1, padding: "5px 8px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !pendingText.trim() ? 0.5 : 1 }}>
+                  <CentralButton variant="primary" size="sm" onClick={handleSaveAnnotation} disabled={savingAnnotation || !pendingText.trim()}
+                    style={{ flex: 1 }}>
                     Save
-                  </button>
+                  </CentralButton>
                   <button onClick={() => setPendingAnnotation(null)}
                     style={{ padding: "5px 8px", background: "#F0EDE8", color: "var(--body)", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
                     Cancel
@@ -5604,18 +5603,13 @@ export function EventDetailPopover({
         {event.description && (
           <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 16px" }}>{event.description}</p>
         )}
-        <button
+        <CentralButton
+          variant="primary" size="sm"
           onClick={() => onPlan(event)}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: "var(--plum)", color: "var(--cream-on-dark)",
-            border: "none", borderRadius: 8, padding: "8px 16px",
-            cursor: "pointer", fontSize: 13, fontWeight: 500,
-            marginBottom: 8, width: "100%", justifyContent: "center"
-          }}
+          style={{ marginBottom: 8, width: "100%" }}
         >
           Plan this event →
-        </button>
+        </CentralButton>
         {(canEdit || event.created_by === userId) && (
           <button
             onClick={() => onDelete(event.id)}
@@ -5947,9 +5941,9 @@ export function AddEventModal({
             <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 14, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
               {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
-            </button>
+            </CentralButton>
           </div>
         </div>
       </div>
@@ -6078,12 +6072,12 @@ export function MinistryCalendar({
             </button>
           </div>
           {canEdit && (
-            <button
+            <CentralButton
+              variant="primary" size="sm"
               onClick={() => setShowAdd(true)}
-              style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
             >
               <Plus className="w-3 h-3" /> Add event
-            </button>
+            </CentralButton>
           )}
         </div>
       </div>
@@ -6947,13 +6941,13 @@ export function EventPlanWorkspace({
                                     onChange={(e) => setNewTaskDue(e.target.value)}
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
-                                  <button
+                                  <CentralButton
+                                    variant="primary" size="sm"
                                     onClick={() => handleAddTask(phase.key)}
                                     disabled={addingTask}
-                                    style={{ padding: "5px 12px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 12, cursor: addingTask ? "not-allowed" : "pointer", fontWeight: 500, opacity: addingTask ? 0.5 : 1 }}
                                   >
                                     Add
-                                  </button>
+                                  </CentralButton>
                                 </>
                               )}
                             </div>
@@ -6975,12 +6969,12 @@ export function EventPlanWorkspace({
                   action={canEdit ? (
                     <>
                       {planningGroupId ? (
-                        <button
+                        <CentralButton
+                          variant="primary" size="sm"
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}
                         >
                           <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
-                        </button>
+                        </CentralButton>
                       ) : (
                         <button
                           onClick={handleCreatePlanningChat}
@@ -7021,7 +7015,7 @@ export function EventPlanWorkspace({
                           </div>
                           <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => handleSaveRoleEdit(role.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Save</button>
+                            <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
                             <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                           </div>
                         </div>
@@ -7084,13 +7078,13 @@ export function EventPlanWorkspace({
                         <option value="">Unassigned</option>
                         {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
-                      <button
+                      <CentralButton
+                        variant="primary" size="sm"
                         onClick={handleAddRole}
                         disabled={addingRole || !newRoleName.trim()}
-                        style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: addingRole || !newRoleName.trim() ? "not-allowed" : "pointer", opacity: addingRole || !newRoleName.trim() ? 0.5 : 1 }}
                       >
                         Add
-                      </button>
+                      </CentralButton>
                     </div>
                   )}
                 </div>
@@ -7139,13 +7133,13 @@ export function EventPlanWorkspace({
                     />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                       <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
-                      <button
+                      <CentralButton
+                        variant="primary" size="sm"
                         onClick={handleAddNote}
                         disabled={addingNote || !newNote.trim()}
-                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: addingNote || !newNote.trim() ? "not-allowed" : "pointer", opacity: addingNote || !newNote.trim() ? 0.5 : 1 }}
                       >
                         {addingNote ? "Adding…" : "Add to record"}
-                      </button>
+                      </CentralButton>
                     </div>
                   </div>
                 </aside>
@@ -7441,7 +7435,7 @@ function NewFolksTab({
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }} />
           <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
           <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <button onClick={handleAdd} disabled={adding || !newName.trim()} style={{ padding: "7px 14px", borderRadius: 999, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 12, fontWeight: 500, cursor: adding || !newName.trim() ? "not-allowed" : "pointer", opacity: adding || !newName.trim() ? 0.5 : 1 }}>Add</button>
+          <CentralButton variant="primary" size="sm" onClick={handleAdd} disabled={adding || !newName.trim()}>Add</CentralButton>
         </div>
       )}
     </div>
@@ -9106,36 +9100,24 @@ function GroupGeneratorWizard({
             </button>
           )}
           {step < 3 && (
-            <button
+            <CentralButton
+              variant="primary" size="md"
               onClick={step === 1 ? () => setStep(2) : handleGenerate}
               disabled={(step === 1 && !step1Ready) || generating}
-              style={{
-                padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream-panel)",
-                borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
-                cursor: generating || (step === 1 && !step1Ready) ? "not-allowed" : "pointer",
-                opacity: (step === 1 && !step1Ready) ? 0.5 : 1,
-                display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit",
-              }}
             >
               {generating ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : null}
               {step === 1 ? "Next" : generating ? "Generating…" : "Generate"}
-            </button>
+            </CentralButton>
           )}
           {step === 3 && !sgConfirmResult && (
-            <button
+            <CentralButton
+              variant="primary" size="md"
               onClick={handleSave}
               disabled={saving || confirmingSG || !sessionName.trim()}
-              style={{
-                padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream-panel)",
-                borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none",
-                cursor: saving || confirmingSG || !sessionName.trim() ? "not-allowed" : "pointer",
-                opacity: !sessionName.trim() ? 0.5 : 1,
-                display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit",
-              }}
             >
               {(saving || confirmingSG) ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> : <Check style={{ width: 14, height: 14 }} />}
               {saving ? "Saving…" : confirmingSG ? "Confirming…" : sgGroups.length > 0 ? "Confirm groups" : "Save grouping"}
-            </button>
+            </CentralButton>
           )}
         </div>
         </div>
@@ -9871,13 +9853,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             </div>
             <div className="flex items-center gap-2">
               {canCreateGroupChat && (chatCreated ? (
-                <button
+                <CentralButton
+                  variant="primary" size="sm"
                   onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
-                  className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-[13px] font-semibold"
-                  style={{ background: "var(--plum-2)", color: "var(--cream)", border: "none", cursor: "pointer" }}
+                  style={{ height: 36 }}
                 >
                   <MessageCircle className="w-3.5 h-3.5" /> Open chat
-                </button>
+                </CentralButton>
               ) : (
                 <button
                   onClick={handleCreateGroupChat}
@@ -10345,13 +10327,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
               <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
             </p>
-            <button
+            <CentralButton
+              variant="primary" size="md"
               onClick={handleAddMembers}
               disabled={saving}
-              style={{ padding: "10px 22px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
             >
               {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
-            </button>
+            </CentralButton>
           </div>
         </div>
       )}
@@ -10432,9 +10414,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
               </div>
               <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
                 <button onClick={close} disabled={replacing} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: replacing ? "not-allowed" : "pointer" }}>Cancel</button>
-                <button onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: confirmDisabled ? "not-allowed" : "pointer", opacity: confirmDisabled ? 0.6 : 1 }}>
+                <CentralButton variant="primary" size="md" onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px" }}>
                   {replacing ? "Replacing…" : "Replace"}
-                </button>
+                </CentralButton>
               </div>
             </div>
           </div>
@@ -11129,13 +11111,14 @@ function SmallGroupLeadersTab({
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
               </p>
               <div className="flex gap-2">
-                <button
+                <CentralButton
+                  variant="primary" size="sm"
                   onClick={() => handleRosterRenewal("keep")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1 }}
                 >
                   Keep roster
-                </button>
+                </CentralButton>
                 <button
                   onClick={() => handleRosterRenewal("fresh")}
                   disabled={renewalLoading}
@@ -11292,13 +11275,14 @@ function SmallGroupLeadersTab({
                     >
                       Cancel
                     </button>
-                    <button
+                    <CentralButton
+                      variant="primary" size="sm"
                       onClick={handleConfirmRoster}
                       disabled={confirmingRoster || pendingRosterIds.size === 0}
-                      style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (confirmingRoster || pendingRosterIds.size === 0) ? "not-allowed" : "pointer", opacity: (confirmingRoster || pendingRosterIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}
+                      style={{ flex: 1 }}
                     >
                       {confirmingRoster ? "Confirming…" : `Confirm (${pendingRosterIds.size})`}
-                    </button>
+                    </CentralButton>
                   </div>
                 </div>
               )}
@@ -11424,7 +11408,7 @@ function SmallGroupLeadersTab({
                     <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                      <button onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1, padding: "9px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? "not-allowed" : "pointer", opacity: editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0) ? 0.6 : 1, fontFamily: "inherit" }}>{editSaving ? "Saving…" : "Save changes"}</button>
+                      <CentralButton variant="primary" size="sm" onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1 }}>{editSaving ? "Saving…" : "Save changes"}</CentralButton>
                     </div>
                   </div>
                 )}
@@ -11589,12 +11573,12 @@ function SmallGroupLeadersTab({
                           <Check style={{ width: 14, height: 14 }} /> Marked as done — the president will be notified.
                         </span>
                       ) : (
-                        <button
+                        <CentralButton
+                          variant="primary" size="sm"
                           onClick={handleMarkReady}
-                          style={{ padding: "9px 18px", background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                         >
                           Done filling out →
-                        </button>
+                        </CentralButton>
                       )}
                     </div>
                   )}
@@ -11691,9 +11675,9 @@ function SmallGroupLeadersTab({
                       <p className="text-[13px] text-[var(--muted-text)] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
                       </p>
-                      <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "10px 22px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", opacity: isGenerating ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <CentralButton variant="primary" size="md" onClick={handleGenerate} disabled={isGenerating}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
-                      </button>
+                      </CentralButton>
                     </div>
                   )}
 
@@ -11783,9 +11767,9 @@ function SmallGroupLeadersTab({
                         >
                           Discard
                         </button>
-                        <button onClick={handleSave} disabled={isSaving} style={{ padding: "9px 20px", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8 }}>
+                        <CentralButton variant="primary" size="sm" onClick={handleSave} disabled={isSaving}>
                           {isSaving ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</> : <><Check style={{ width: 13, height: 13 }} /> Save Draft</>}
-                        </button>
+                        </CentralButton>
                       </div>
                     </div>
                   )}
@@ -12202,13 +12186,13 @@ function BibleStudySubTab({
                         style={{ fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1.5px solid #C4B8CC", outline: "none", fontFamily: "inherit", color: "var(--ink)", width: "100%", boxSizing: "border-box" as const }}
                       />
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button
+                        <CentralButton
+                          variant="primary" size="sm"
                           onClick={() => void saveProgressNote(myNote)}
                           disabled={savingProgressNote}
-                          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 7, background: "var(--plum)", color: "white", border: "none", cursor: savingProgressNote ? "not-allowed" : "pointer", opacity: savingProgressNote ? 0.6 : 1, fontFamily: "inherit" }}
                         >
                           {savingProgressNote ? "Saving…" : "Save"}
-                        </button>
+                        </CentralButton>
                         <button
                           onClick={() => { setEditingNote(false); setMyNote(progress.find(r => r.user_id === userId)?.progress_note ?? "") }}
                           style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, background: "none", border: "1px solid #C4B8CC", color: "var(--body)", cursor: "pointer", fontFamily: "inherit" }}
@@ -12327,9 +12311,9 @@ function BibleStudySubTab({
           <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
           {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleCreate} disabled={saving} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>
+            <CentralButton variant="primary" size="sm" onClick={handleCreate} disabled={saving} style={{ flex: 1 }}>
               {saving ? "Saving…" : "Save"}
-            </button>
+            </CentralButton>
             <button onClick={() => { setCreating(false); setCreateError(null); setNewTitle(""); setNewDocUrl("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
               Cancel
             </button>
@@ -12476,9 +12460,9 @@ function BibleStudySubTab({
                 style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
               />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: (!annotationText.trim() || savingAnnotation) ? "not-allowed" : "pointer", opacity: (!annotationText.trim() || savingAnnotation) ? 0.6 : 1, fontFamily: "inherit" }}>
+                <CentralButton variant="primary" size="sm" onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1 }}>
                   {savingAnnotation ? "Saving…" : "Save note"}
-                </button>
+                </CentralButton>
                 <button onClick={() => { setPendingAnnotation(null); setAnnotationText("") }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                   Cancel
                 </button>
@@ -12512,12 +12496,12 @@ function BibleStudySubTab({
           {isPastor && sheet.status === "draft" && (
             <div>
               {!finalizeConfirm ? (
-                <button
+                <CentralButton
+                  variant="primary" size="sm"
                   onClick={() => setFinalizeConfirm(true)}
-                  style={{ padding: "10px 24px", background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Finalize &amp; Export PDF →
-                </button>
+                </CentralButton>
               ) : (
                 <div style={{ padding: "14px 16px", background: "var(--cream-panel)", border: "1.5px solid var(--line)", borderRadius: 12 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
@@ -12531,9 +12515,9 @@ function BibleStudySubTab({
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleFinalize} disabled={finalizing} style={{ flex: 1, padding: "8px 0", background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: finalizing ? "not-allowed" : "pointer", opacity: finalizing ? 0.6 : 1, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <CentralButton variant="primary" size="sm" onClick={handleFinalize} disabled={finalizing} style={{ flex: 1 }}>
                       {finalizing ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Exporting…</> : "Confirm"}
-                    </button>
+                    </CentralButton>
                     <button onClick={() => { setFinalizeConfirm(false); setFinalizeError(null) }} style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1.5px solid var(--line)", borderRadius: 9, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                       Cancel
                     </button>
