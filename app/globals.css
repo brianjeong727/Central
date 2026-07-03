@@ -428,6 +428,8 @@
 .central-icon-btn { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
 .central-icon-btn:not(:disabled):hover { background: var(--ivory); color: var(--ink); }
 .central-icon-btn:not(:disabled):active { transform: scale(0.94); }
+/* Destructive icon affordance (remove responsibility / delete link) → danger on hover */
+.central-icon-btn.resource-remove-btn:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger); }
 
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
