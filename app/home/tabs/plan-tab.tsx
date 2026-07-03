@@ -6,7 +6,7 @@ import { createPortal } from "react-dom"
 import useSWR from "swr"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
-  Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
+  Edit3, ArrowLeft, ArrowRight, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, IconButton } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -7815,6 +7815,18 @@ export function EventPlanWorkspace({
 
 // ── SubEventsTab ──────────────────────────────────────────────────────────────
 
+// Readiness status → dot color. Kept as a small LOCAL map so it's swappable when
+// the amber ramp decision lands. Deliberately compliant/neutral for now: only
+// "Ready" earns --success; everything in-flight stays neutral --muted-text
+// (no --gold / --warm-tan, which are documented off-label here).
+function subEventStatus(done: number, total: number): { label: string; color: string; empty?: boolean } {
+  if (total === 0) return { label: "No checklist", color: "var(--muted-text)", empty: true }
+  const pct = Math.round((done / total) * 100)
+  if (done === total) return { label: "Ready", color: "var(--success)" }
+  if (pct >= 50) return { label: "In progress", color: "var(--muted-text)" }
+  return { label: "Needs attention", color: "var(--muted-text)" }
+}
+
 function SubEventsTab({
   parentEvent,
   ministryId,
@@ -7833,8 +7845,11 @@ function SubEventsTab({
 }) {
   const supabase = createClient()
   const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
+  // childId → checklist progress, batched (never N+1).
+  const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -7843,18 +7858,53 @@ function SubEventsTab({
         .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
         .eq("parent_event_id", parentEvent.id)
         .order("start_date", { ascending: true })
-      setSubEvents((data ?? []) as CalendarEvent[])
+      const rows = (data ?? []) as CalendarEvent[]
+      setSubEvents(rows)
+
+      // Batch readiness: child events → their event_plans → event_tasks
+      // done/total, aggregated client-side. Two queries total (no per-row).
+      // Scope the plan lookup by ministry_id (event_tasks has no ministry_id
+      // column, so it's scoped transitively through these plan ids).
+      const childIds = rows.map((e) => e.id)
+      if (childIds.length) {
+        const { data: plans } = await supabase
+          .from("event_plans")
+          .select("id, calendar_event_id")
+          .in("calendar_event_id", childIds)
+          .eq("ministry_id", ministryId)
+        const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
+        const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
+        const map: Record<string, { done: number; total: number }> = {}
+        childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
+        if (planRows.length) {
+          const { data: taskRows } = await supabase
+            .from("event_tasks")
+            .select("event_plan_id, completed")
+            .in("event_plan_id", planRows.map((p) => p.id))
+          ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
+            const childId = planToChild.get(t.event_plan_id)
+            if (!childId) return
+            map[childId].total++
+            if (t.completed) map[childId].done++
+          })
+        }
+        setReadiness(map)
+      }
       setLoading(false)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentEvent.id])
 
+  // Day-grouped, sorted-ascending rows (query already orders by start_date).
+  let lastDayKey: string | null = null
+  let firstHeaderRendered = false
+
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 20 }}>
         <ContentHeader
-          eyebrow="Welcome Week"
+          eyebrow={parentEvent.title}
           label="Sub-events"
           action={canEdit ? (
             <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
@@ -7864,31 +7914,100 @@ function SubEventsTab({
 
       {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
       {!loading && subEvents.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No sub-events yet. Add the individual events that make up Welcome Week.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No sub-events yet. Add the individual events that make up {parentEvent.title}.</p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {subEvents.map(ev => {
+      <div>
+        {subEvents.map((ev) => {
           const evCfg = getEventConfig(ev)
-          const d = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+          const dt = new Date(ev.start_date)
+          const dayKey = dt.toDateString()
+          const showHeader = dayKey !== lastDayKey
+          const isFirstHeader = showHeader && !firstHeaderRendered
+          if (showHeader) { lastDayKey = dayKey; firstHeaderRendered = true }
+          const dayLabel = `${dt.toLocaleDateString("en-US", { weekday: "short" })} · ${dt.toLocaleDateString("en-US", { month: "short" })} ${dt.getDate()}`.toUpperCase()
+
+          const r = readiness[ev.id] ?? { done: 0, total: 0 }
+          const st = subEventStatus(r.done, r.total)
+          const filled = r.total > 0 ? Math.round((r.done / r.total) * 6) : 0
           const drillable = !!onOpenChild
+
           return (
-            <button
-              key={ev.id}
-              onClick={drillable ? () => onOpenChild(ev) : undefined}
-              disabled={!drillable}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--ivory)", cursor: drillable ? "pointer" : "default", textAlign: "left", width: "100%" }}
-            >
-              <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{ev.title}</p>
-                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>{d}{ev.location ? ` · ${ev.location}` : ""}</p>
+            <Fragment key={ev.id}>
+              {showHeader && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, margin: isFirstHeader ? "0 0 12px" : "26px 0 12px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", flexShrink: 0 }}>{dayLabel}</span>
+                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                </div>
+              )}
+
+              <div
+                onMouseEnter={() => setHoveredId(ev.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  padding: "15px 16px",
+                  border: `1px solid ${hoveredId === ev.id ? "var(--dashed)" : "var(--line)"}`,
+                  borderRadius: "var(--r-card)",
+                  background: "var(--cream)",
+                  marginBottom: 10,
+                  transition: "border-color .15s",
+                }}
+              >
+                {/* emoji badge — derived from event_type via getEventConfig */}
+                <span style={{ width: 36, height: 36, display: "grid", placeItems: "center", background: "var(--ivory)", borderRadius: "var(--r-input)", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{evCfg.icon ?? "📅"}</span>
+
+                {/* info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                  <p style={{ fontSize: 13, margin: "3px 0 0" }}>
+                    {ev.location
+                      ? <span style={{ color: "var(--body)" }}>{ev.location}</span>
+                      : <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Location TBD</span>}
+                  </p>
+                  {/* mobile-only compact readiness (segmented bar hidden < sm) */}
+                  <div className="sm:hidden" style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--body)" }}>{st.label}</span>
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--muted-text)", marginLeft: "auto" }}>{r.done}/{r.total}</span>}
+                  </div>
+                </div>
+
+                {/* desktop readiness widget */}
+                <div className="hidden sm:block" style={{ width: 190, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--body)" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+                      {st.label}
+                    </span>
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.done}/{r.total}</span>}
+                  </div>
+                  {st.empty ? (
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--line-2)" }} />
+                  ) : (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 999, background: i < filled ? "var(--plum)" : "var(--line-2)" }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* drill affordance — omitted when nesting-capped (non-drillable) */}
+                {drillable && (
+                  <IconButton
+                    dim={34}
+                    onClick={() => onOpenChild!(ev)}
+                    title="Open planning"
+                    style={{ borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)" }}
+                  >
+                    <ArrowRight style={{ width: 16, height: 16 }} />
+                  </IconButton>
+                )}
               </div>
-              <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "var(--plum)" : ev.status === "active" ? "#2D5445" : "var(--body)" }}>
-                {ev.status.charAt(0).toUpperCase() + ev.status.slice(1)}
-              </span>
-              {drillable && <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>}
-            </button>
+            </Fragment>
           )
         })}
       </div>
