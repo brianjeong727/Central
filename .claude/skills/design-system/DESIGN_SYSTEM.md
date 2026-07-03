@@ -28,7 +28,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Token | Hex | Use |
 |---|---|---|
 | `--plum`        | `#3E1540` | Active borders, monogram chips, active tab underline, checkbox fill, focus ring — surgical accent; at most 1–2 moments per view |
-| `--plum-2`      | `#2D0F2E` | Single primary CTA button, active breadcrumb text, identity hero gradient base (rare) |
+| `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
 | `--ink`         | `#13101A` | Primary text |
@@ -589,7 +589,7 @@ Ask before shipping any new page:
 - [ ] Hero banner only if this is an identity page?
 - [ ] Underline tabs (never pill)?
 - [ ] Verse callout still in the sidebar?
-- [ ] Primary CTA is plum-2 (or cream-on-plum if inside hero)?
+- [ ] Primary CTA is plum (or cream-on-plum if inside hero)?
 - [ ] All dividers 1px and in the cream-line palette?
 - [ ] Editorial helper text in body color, not muted?
 - [ ] No modal where a navigation should be?
