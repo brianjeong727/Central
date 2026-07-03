@@ -1350,6 +1350,7 @@ export function StudentOrgTeamHome({
           onOpenChat={onOpenChat}
           onEditEvent={onEditEvent}
           onOpenChild={planningChild ? undefined : setPlanningChild}
+          refreshSignal={refreshSignal}
         />
       </SubpageShell>
     )
@@ -2103,6 +2104,9 @@ export function PlanTab({
           onClose={() => setShowEditEvent(false)}
           onSaved={(updated) => {
             onStudentOrgPlanningEventChange?.(updated)
+            // Bump the refresh signal so EventPlanWorkspace re-fetches the plan's
+            // plan_start_date / crunch_date after the modal writes them.
+            setStudentOrgRefreshSignal(s => s + 1)
             setShowEditEvent(false)
           }}
           onDelete={() => {
@@ -5601,10 +5605,35 @@ export function AddEventModal({
   const [endDateStr, setEndDateStr] = useState(existing ? parseDateStr(existing.end_date) : "")
   const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : "10:00")
   const [allDay, setAllDay] = useState(existing?.all_day ?? false)
+  // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
+  // mode only (a new event's plan is seeded lazily by the overview). Crunch is
+  // optional — an empty string saves as null (no crunch phase).
+  const [planStartDate, setPlanStartDate] = useState("")
+  const [crunchDate, setCrunchDate] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Seed plan/crunch from the event's plan (or the event−1mo / event−1wk defaults)
+  // when editing an existing event.
+  useEffect(() => {
+    if (!isEditing || !existing) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from("event_plans")
+        .select("plan_start_date, crunch_date")
+        .eq("calendar_event_id", existing.id)
+        .maybeSingle()
+      if (cancelled) return
+      const ev = new Date(existing.start_date)
+      setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
+      setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleDelete() {
     if (!existing) return
@@ -5681,6 +5710,24 @@ export function AddEventModal({
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
+
+        // Persist plan/crunch dates to this event's plan row. Update first; if no
+        // plan exists yet (0 rows), insert one. Crunch empty → null (no phase).
+        const { data: planUpd } = await supabase
+          .from("event_plans")
+          .update({ plan_start_date: planStartDate || null, crunch_date: crunchDate || null })
+          .eq("calendar_event_id", existing.id)
+          .eq("ministry_id", ministryId)
+          .select("id")
+        if (!planUpd || planUpd.length === 0) {
+          await supabase.from("event_plans").insert({
+            ministry_id: ministryId,
+            calendar_event_id: existing.id,
+            created_by: userId,
+            plan_start_date: planStartDate || null,
+            crunch_date: crunchDate || null,
+          })
+        }
       } else {
         // Create new event
         const { data, error: evErr } = await supabase
@@ -5846,6 +5893,32 @@ export function AddEventModal({
               <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
             </div>
           </div>
+
+          {/* Planning window — edit mode only; persisted to the event's plan row */}
+          {isEditing && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Plan start date</label>
+                <input type="date" style={inputStyle} value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ ...labelStyle, display: "flex", alignItems: "baseline", gap: 6 }}>
+                  Crunch date
+                  <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span>
+                </label>
+                <input type="date" style={inputStyle} value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
+                {crunchDate && (
+                  <button
+                    type="button"
+                    onClick={() => setCrunchDate("")}
+                    style={{ marginTop: 6, background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
+                  >
+                    Clear crunch date
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {error && <p style={{ fontSize: 13, color: "#C0392B" }}>{error}</p>}
 
@@ -6216,6 +6289,7 @@ export function EventPlanWorkspace({
   onOpenChat,
   onEditEvent,
   onOpenChild,
+  refreshSignal,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -6235,6 +6309,10 @@ export function EventPlanWorkspace({
   // it to the parent (StudentOrgTeamHome) for a single-shell body-swap. Omitted
   // while already viewing a child, which caps nesting at one level.
   onOpenChild?: (ev: CalendarEvent) => void
+  // Bumped by the parent after the Edit-event modal saves; re-fetches the plan's
+  // plan_start_date / crunch_date so the overview facts + checklist windows
+  // reflect edits made in the modal without a manual reload.
+  refreshSignal?: number
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -6314,11 +6392,10 @@ export function EventPlanWorkspace({
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
 
-  // Plan/crunch date state — drives the checklist section windows.
+  // Plan/crunch date state — drives the checklist section windows. Display-only
+  // in the overview facts now; edited via the Edit-event modal (AddEventModal).
   const [planStartDate, setPlanStartDate] = useState("")
   const [crunchDate, setCrunchDate] = useState("")
-  const [editingPlanStart, setEditingPlanStart] = useState(false)
-  const [editingCrunch, setEditingCrunch] = useState(false)
 
   // Task inline edit state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -6535,12 +6612,24 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
-  async function handleSavePlanDates(patch: { plan_start_date?: string | null; crunch_date?: string | null }) {
-    if (!plan || !canEdit) return
-    await supabase.from("event_plans").update(patch).eq("id", plan.id).eq("ministry_id", ministryId)
-    if (patch.plan_start_date !== undefined) setPlanStartDate(patch.plan_start_date ?? "")
-    if (patch.crunch_date !== undefined) setCrunchDate(patch.crunch_date ?? "")
-  }
+  // Re-fetch plan/crunch dates when the parent bumps refreshSignal (after the
+  // Edit-event modal saves). Skips the initial mount run (plan not yet loaded).
+  useEffect(() => {
+    if (!plan) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from("event_plans")
+        .select("plan_start_date, crunch_date")
+        .eq("calendar_event_id", calendarEvent.id)
+        .maybeSingle()
+      if (cancelled || !data) return
+      setPlanStartDate((data.plan_start_date as string | null) ?? "")
+      setCrunchDate((data.crunch_date as string | null) ?? "")
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal])
 
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
@@ -7197,17 +7286,23 @@ export function EventPlanWorkspace({
                 : pct === 100 ? { color: "var(--success)", label: "Ready" }
                 : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
                 : { color: "var(--gold)", label: "Needs attention" }
-              // Identity facts — omit any empty value
+              // Identity facts — display-only. Two columns: LEFT Time + Location,
+              // RIGHT Plan start + Crunch start (dates are edited in the Edit-event
+              // modal, not here). Time omits when empty (all-day); Location and
+              // Crunch start show a muted em-dash when unset.
               const dateOnly = startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
               const timeVal = calendarEvent.all_day ? "" :
                 startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
                 " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              // Where always shows below Time, sourced from the Edit-event location field
-              // (muted em-dash when unset); Time/What omit when empty.
-              const facts: { k: string; v: string; muted?: boolean }[] = [
+              const locationVal = calendarEvent.location?.trim() || ""
+              const descVal = calendarEvent.description?.trim() || ""
+              const leftFacts: { k: string; v: string; muted?: boolean }[] = [
                 ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
-                { k: "Where", v: calendarEvent.location?.trim() || "—", muted: !calendarEvent.location?.trim() },
-                ...(calendarEvent.description?.trim() ? [{ k: "What", v: calendarEvent.description.trim() }] : []),
+                { k: "Location", v: locationVal || "—", muted: !locationVal },
+              ]
+              const rightFacts: { k: string; v: string; muted?: boolean }[] = [
+                { k: "Plan start", v: planStartDate ? fmtMD(planStartDate) : "—", muted: !planStartDate },
+                { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate },
               ]
 
               const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
@@ -7215,9 +7310,13 @@ export function EventPlanWorkspace({
               const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
               const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
-              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }
-              const factDateInput: React.CSSProperties = { background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 8, padding: "4px 10px", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }
-              const factLink: React.CSSProperties = { fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)" }
+              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
+              const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
+                <div key={f.k} style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                  <span style={{ ...factKey, width: keyW, flexShrink: 0 }}>{f.k}</span>
+                  <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                </div>
+              )
 
               return (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
@@ -7227,73 +7326,17 @@ export function EventPlanWorkspace({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
                     <div>
                       <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
-                        {facts.map(f => (
-                          <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                            <span style={factKey}>{f.k}</span>
-                            <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
-                          </div>
-                        ))}
-
-                        {/* Plan start — planning begins; always set, not removable */}
-                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                          <span style={factKey}>Plan</span>
-                          {canEdit && editingPlanStart ? (
-                            <input
-                              type="date"
-                              autoFocus
-                              value={planStartDate}
-                              max={eventYMD}
-                              onChange={(e) => { if (e.target.value) handleSavePlanDates({ plan_start_date: e.target.value }) }}
-                              onBlur={() => setEditingPlanStart(false)}
-                              style={factDateInput}
-                            />
-                          ) : (
-                            <span
-                              onClick={() => { if (canEdit) setEditingPlanStart(true) }}
-                              style={{ fontSize: 15, color: planStartDate ? "var(--ink)" : "var(--faint)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
-                            >{planStartDate ? fmtMD(planStartDate) : "—"}</span>
-                          )}
+                      <div style={{ display: "grid", gridTemplateColumns: "300px auto", columnGap: "var(--space-12)", rowGap: 16, marginTop: 18, justifyContent: "start" }} className="max-md:!grid-cols-1">
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                          {leftFacts.map(f => renderFact(f, 72))}
                         </div>
-
-                        {/* Crunch — busy phase begins; optional (removable) */}
-                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                          <span style={factKey}>Crunch</span>
-                          {crunchDate ? (
-                            canEdit && editingCrunch ? (
-                              <input
-                                type="date"
-                                autoFocus
-                                value={crunchDate}
-                                min={planStartDate || undefined}
-                                max={eventYMD}
-                                onChange={(e) => { if (e.target.value) handleSavePlanDates({ crunch_date: e.target.value }) }}
-                                onBlur={() => setEditingCrunch(false)}
-                                style={factDateInput}
-                              />
-                            ) : (
-                              <span style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                                <span
-                                  onClick={() => { if (canEdit) setEditingCrunch(true) }}
-                                  style={{ fontSize: 15, color: "var(--ink)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
-                                >{fmtMD(crunchDate)}</span>
-                                {canEdit && (
-                                  <button onClick={() => handleSavePlanDates({ crunch_date: null })} style={{ ...factLink, color: "var(--muted-text)" }}>Remove</button>
-                                )}
-                              </span>
-                            )
-                          ) : (
-                            canEdit ? (
-                              <button
-                                onClick={() => handleSavePlanDates({ crunch_date: addDaysYMD(startDate, -7) })}
-                                style={factLink}
-                              >+ Add crunch phase</button>
-                            ) : (
-                              <span style={{ fontSize: 15, color: "var(--faint)", lineHeight: 1.5 }}>—</span>
-                            )
-                          )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                          {rightFacts.map(f => renderFact(f, 104))}
                         </div>
                       </div>
+                      {descVal && (
+                        <div style={{ marginTop: 16 }}>{renderFact({ k: "What", v: descVal }, 72)}</div>
+                      )}
                     </div>
                     {canEdit && onEditEvent && (
                       <button
