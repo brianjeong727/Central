@@ -313,8 +313,9 @@ export function PulseSlideCard({
         {question.question_text}
       </div>
 
-      {/* answer area */}
-      <div style={{ marginTop: "var(--space-8)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      {/* answer area — grows to fill the fixed-height card so the free-text
+          submit can pin to the bottom (see marginTop:auto on the button) */}
+      <div style={{ flex: 1, marginTop: "var(--space-8)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
         {type === "poll" && options.length > 0 && (
           useChips ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
@@ -431,6 +432,10 @@ export function PulseSlideCard({
           disabled={!canSubmit || pulseSubmitting}
           style={{
             alignSelf: "flex-start",
+            // Free-text types (open/prayer) have a short textarea, so pin the
+            // submit to the bottom of the card instead of leaving dead space
+            // below it. Poll/scale keep the button directly under their content.
+            marginTop: type === "open" || type === "prayer" ? "auto" : undefined,
             background: "var(--cream)",
             color: "var(--plum-2)",
             border: "none",
