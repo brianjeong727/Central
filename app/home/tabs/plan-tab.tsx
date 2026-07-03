@@ -10,6 +10,7 @@ import {
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
+  UserPlus, Sparkles, Layers, Bus, Clock,
 } from "lucide-react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import { Editor } from "@tiptap/core"
@@ -6510,6 +6511,42 @@ export function MinistryCalendar({
 
 // ── EventPlanWorkspace ────────────────────────────────────────────────────────
 
+// A single Launchpad link row on the event Overview — an ivory icon-chip, a
+// serif title + subtitle, and an optional right-side metric before the chevron.
+// Hover lifts the card slightly and warms the border to plum.
+function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
+  icon: typeof Users
+  title: string
+  subtitle: string
+  right?: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--plum)"; e.currentTarget.style.transform = "translateX(2px)" }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)"; e.currentTarget.style.transform = "translateX(0)" }}
+      style={{
+        display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", textAlign: "left",
+        background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-card)",
+        padding: "16px 18px", cursor: "pointer", transition: "border-color .15s ease, transform .15s ease",
+      }}
+    >
+      <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ivory)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+        <Icon style={{ width: 18, height: 18, color: "var(--plum)" }} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--body)", marginTop: 2 }}>{subtitle}</span>
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        {right}
+        <ChevronRight style={{ width: 18, height: 18, color: "var(--faint)" }} />
+      </span>
+    </button>
+  )
+}
+
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -6582,6 +6619,9 @@ export function EventPlanWorkspace({
   const [budget, setBudget] = useState("")
   const [overviewNotes, setOverviewNotes] = useState("")
   const [savingOverview, setSavingOverview] = useState(false)
+  // Overview click-to-edit toggles for the turnout / budget stat numbers
+  const [editingTurnout, setEditingTurnout] = useState(false)
+  const [editingBudget, setEditingBudget] = useState(false)
 
   // Task add state
   const [newTaskTitle, setNewTaskTitle] = useState("")
@@ -6610,11 +6650,6 @@ export function EventPlanWorkspace({
 
   const startDate = new Date(calendarEvent.start_date)
   const endDate = new Date(calendarEvent.end_date)
-  const dateStr = calendarEvent.all_day
-    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 
   useEffect(() => {
     async function init() {
@@ -6904,6 +6939,17 @@ export function EventPlanWorkspace({
     teams: "Teams", transport: "Transport", program: "Program",
   }
 
+  // Launchpad metadata for the dynamic extra-tab rows on Overview: an icon +
+  // a one-line subtitle per planning tab this event actually carries.
+  const EXTRA_TAB_META: Record<EventExtraTab, { icon: typeof Users; subtitle: string }> = {
+    sub_events: { icon: Calendar, subtitle: "Nights & activities inside the week" },
+    new_folks: { icon: UserPlus, subtitle: "Track first-timers and follow-up" },
+    acts: { icon: Sparkles, subtitle: "Performances & skits for the night" },
+    teams: { icon: Layers, subtitle: "Split attendees into teams" },
+    transport: { icon: Bus, subtitle: "Rides & carpools to the venue" },
+    program: { icon: Clock, subtitle: "Run-of-show & schedule" },
+  }
+
   const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
@@ -6999,105 +7045,187 @@ export function EventPlanWorkspace({
         ) : (
           <>
             {/* ── Overview ── */}
-            {activeSection === 'overview' && (
-              <>
-              <ContentHeader
-                label="Overview"
-                action={canEdit && onEditEvent ? (
-                  <ContentActionButton variant="ghost" icon={<Pencil style={{ width: 14, height: 14 }} />} label="Edit event" onClick={onEditEvent} />
-                ) : undefined}
-              />
-              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start", marginTop: 24 }} className="max-md:!block">
-                {/* Left: planning details (section header is the ContentHeader above) */}
+            {activeSection === 'overview' && (() => {
+              // ── Derived overview metrics ──────────────────────────────────
+              const taskTotal = tasks.length
+              const taskDone = tasks.filter(t => t.completed).length
+              const rolesTotal = roles.length
+              const rolesAssigned = roles.filter(r => r.assigned_to).length
+              const pct = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0
+              const filledSegs = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 5) : 0
+              // Readiness status from checklist progress
+              const readiness = taskTotal === 0
+                ? { color: "var(--faint)", label: "No checklist yet" }
+                : pct === 100 ? { color: "var(--success)", label: "Ready" }
+                : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
+                : { color: "var(--gold)", label: "Needs attention" }
+              // Identity facts — omit any empty value
+              const dateOnly = startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+              const timeVal = calendarEvent.all_day ? "" :
+                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              // Where always shows below Time, sourced from the Edit-event location field
+              // (muted em-dash when unset); Time/What omit when empty.
+              const facts: { k: string; v: string; muted?: boolean }[] = [
+                ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
+                { k: "Where", v: calendarEvent.location?.trim() || "—", muted: !calendarEvent.location?.trim() },
+                ...(calendarEvent.description?.trim() ? [{ k: "What", v: calendarEvent.description.trim() }] : []),
+              ]
+
+              const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
+              const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
+              const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
+
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
+                {/* ── LEFT column ── */}
                 <section>
-                  {calendarEvent.description && (
-                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, maxWidth: 540 }}>
-                      {calendarEvent.description}
-                    </p>
-                  )}
-                  <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "120px 1fr", rowGap: 14, columnGap: 24, fontSize: 14 }}>
-                    <span style={{ color: "var(--muted-text)" }}>When</span>
-                    <span style={{ color: "var(--ink)" }}>{dateStr}</span>
-                    {calendarEvent.location && (
-                      <>
-                        <span style={{ color: "var(--muted-text)" }}>Where</span>
-                        <span style={{ color: "var(--ink)" }}>{calendarEvent.location}</span>
-                      </>
+                  {/* Event identity header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
+                    <div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
+                      {facts.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
+                          {facts.map(f => (
+                            <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }}>{f.k}</span>
+                              <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {canEdit && onEditEvent && (
+                      <button
+                        onClick={onEditEvent}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
+                      >
+                        <Pencil style={{ width: 14, height: 14 }} /> Edit event
+                      </button>
                     )}
                   </div>
 
-                  {/* Planning notes */}
-                  <div style={{ marginTop: 28 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Planning Notes</p>
+                  {/* Launchpad */}
+                  <div>
+                    <p style={eyebrow}>Jump into planning</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+                      <LaunchpadRow
+                        icon={ClipboardList}
+                        title="Checklist"
+                        subtitle="Tasks to prepare before the event"
+                        onClick={() => setActiveSectionAndUrl('checklist')}
+                        right={
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 90, height: 5, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+                              <span style={{ display: "block", height: "100%", width: `${taskTotal > 0 ? (taskDone / taskTotal) * 100 : 0}%`, background: "var(--plum)" }} />
+                            </span>
+                            <span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{taskDone} / {taskTotal}</span>
+                          </span>
+                        }
+                      />
+                      <LaunchpadRow
+                        icon={Users}
+                        title="Roles & Leads"
+                        subtitle="Assign who owns each part"
+                        onClick={() => setActiveSectionAndUrl('roles')}
+                        right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesAssigned} / {rolesTotal} assigned</span>}
+                      />
+                      {extraTabs.map(t => (
+                        <LaunchpadRow
+                          key={t}
+                          icon={EXTRA_TAB_META[t].icon}
+                          title={EXTRA_TAB_LABELS[t]}
+                          subtitle={EXTRA_TAB_META[t].subtitle}
+                          onClick={() => setActiveSectionAndUrl(t)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Planning notes (demoted) */}
+                  <div style={{ marginTop: "var(--space-9)" }}>
+                    <p style={eyebrow}>Planning notes</p>
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
                         onChange={e => setOverviewNotes(e.target.value)}
                         onBlur={handleSaveOverview}
                         placeholder="Add context, key decisions, or reminders for this event…"
-                        rows={4}
-                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "15px 17px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                       />
                     ) : overviewNotes ? (
                       <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
                     ) : (
-                      <p style={{ fontSize: 14, color: "#A09A8C", fontStyle: "italic" }}>No planning notes yet.</p>
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>No planning notes yet.</p>
                     )}
                   </div>
                 </section>
 
-                {/* Right: stat cards */}
-                <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
-                  {/* Expected Turnout */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Expected Turnout</p>
-                    {canEdit ? (
+                {/* ── RIGHT column — stat cards ── */}
+                <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
+                  {/* Expected turnout */}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Expected turnout</p>
+                    {canEdit && editingTurnout ? (
                       <input
                         type="number"
+                        autoFocus
                         value={turnout}
                         onChange={(e) => setTurnout(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingTurnout(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingTurnout(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
+                      <p
+                        onClick={() => { if (canEdit) setEditingTurnout(true) }}
+                        style={{ ...bigNumber, color: turnout ? "var(--ink)" : "var(--faint)", cursor: canEdit ? "pointer" : "default" }}
+                      >{turnout || "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>guests</p>
                     {rsvpCount !== null && (
                       <p style={{ fontSize: 12, color: "var(--body)", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                        <span style={{ fontWeight: 600, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
+                        <span style={{ fontWeight: 500, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
                   </div>
+
                   {/* Budget */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
+                  <div style={statCard}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Budget</p>
-                      {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
+                      <p style={monoLabel}>Budget</p>
+                      {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
                     </div>
-                    {canEditBudget ? (
+                    {canEditBudget && editingBudget ? (
                       <input
                         type="number"
+                        autoFocus
                         value={budget}
                         onChange={(e) => setBudget(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingBudget(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingBudget(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
+                      <p
+                        onClick={() => { if (canEditBudget) setEditingBudget(true) }}
+                        style={{ ...bigNumber, color: budget ? "var(--ink)" : "var(--faint)", cursor: canEditBudget ? "pointer" : "default" }}
+                      >{budget ? `$${budget}` : "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>allocated for this event</p>
                     {typeCfg.budgetCategory && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                          Ministry Allocation · {calendarEvent.title}
-                        </p>
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                        <p style={{ ...monoLabel, letterSpacing: "0.08em" }}>Ministry allocation · {calendarEvent.title}</p>
                         {ministryBudget ? (
                           <>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
-                              ${ministryBudget.total.toFixed(2)} total
+                            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
+                              ${ministryBudget.total.toFixed(2)}
                             </p>
                             <p style={{ fontSize: 12, color: "var(--body)", marginTop: 2 }}>
                               {Object.entries(ministryBudget.byFund)
@@ -7106,46 +7234,37 @@ export function EventPlanWorkspace({
                             </p>
                           </>
                         ) : (
-                          <p style={{ fontSize: 12, color: "#A09A8C", fontStyle: "italic", marginTop: 6 }}>
+                          <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", marginTop: 6 }}>
                             No ministry budget set
                           </p>
                         )}
                       </div>
                     )}
                   </div>
+
                   {/* Readiness */}
-                  {(() => {
-                    const total = tasks.length
-                    const done = tasks.filter(t => t.completed).length
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                    const onTrack = total === 0 || pct >= 50
-                    return (
-                      <div style={{ padding: 22, background: "var(--ivory)", borderColor: "var(--line-2)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Readiness</p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 99, background: onTrack ? "#7FA67F" : "#D4855C", flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
-                        </div>
-                        {total > 0 && (
-                          <>
-                            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                              {Array.from({ length: Math.min(total, 4) }).map((_, i) => (
-                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "var(--plum)" : "var(--line-2)" }} />
-                              ))}
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "var(--body)" }}>
-                              <span>{done} of {total} done</span>
-                              <span>{pct}%</span>
-                            </div>
-                          </>
-                        )}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Readiness</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{readiness.label}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: i < filledSegs ? (pct === 100 ? "var(--success)" : "var(--plum)") : "var(--line-2)" }} />
+                      ))}
+                    </div>
+                    {taskTotal > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{taskDone} of {taskTotal} done</span>
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
                       </div>
-                    )
-                  })()}
+                    )}
+                  </div>
                 </aside>
               </div>
-              </>
-            )}
+              )
+            })()}
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (

@@ -398,6 +398,17 @@ The team **Events** section is an **agenda/timeline list** (not a calendar grid 
 
 **Past events** — events before today are split out below the upcoming list behind a **collapsed** "Past events (N)" toggle divider (centered mono label + rotating chevron + `--ivory` count pill, flanked by `--line` hairlines). Expanded, past events list **reverse-chronologically** (most recent first, not month-grouped) and **de-emphasized**: `--cream-2` card at `opacity .82` (hover → 1), title `--body`/500, meta `--faint`, a muted date block, and a `--line-2` spine node carrying a small cream "done" check. Each shows an "Ended · {relative}" mono `--faint` label instead of a countdown, and no sub-events disclosure. The toggle defaults open only when there are zero upcoming events (so an all-past list isn't hidden).
 
+### 4.22 Event overview (EventPlanWorkspace overview tab)
+
+The **Overview** tab of an event's plan workspace is a **two-column** layout (`1fr 336px`) shared by all standard team events (worship weeks use their own workspace, not this). Under the serif event title + underline tabs:
+
+**Left column** —
+- **Identity header:** the serif event date + a compact facts list (mono key `Time` / `Where` / `What` + value; empty facts omitted), with an **"Edit event"** outline button (edits the calendar-event identity) — bottom hairline.
+- **Launchpad** ("Jump into planning"): a column of link rows into the event's OWN planning tabs, built dynamically per event template — **Checklist** and **Roles & Leads** always first (each with a metric: a mini `--plum` progress bar + "N / M" for checklist, "N / M assigned" for roles), then one row per the event type's `extraTabs` (Sub-events, New Folks, Acts, Teams, Transport, Program). Each row: ivory icon-chip (plum icon) + serif title + subtitle + right-side metric/arrow; hover → `--plum` border + slight translateX. **No left-border on the primary rows** — they're distinguished by position + the progress metric, not a border (the §8.7 exception is NOT extended here).
+- **Planning notes** (demoted): an editable `--cream-2` box for free-form context.
+
+**Right column** — three stat cards (`--cream`, `--r-callout`): **Expected turnout** (serif number or `—`, click-to-edit), **Budget** (allocated number, click-to-edit; divider; ministry-allocation sub-line or "No ministry budget set"), and **Readiness** (a status dot — `--gold` needs-attention → `--success`/`--sage` ready — + a 5-segment bar + "X of N done · P%", derived from checklist completion).
+
 ---
 
 ## 5. Page header recipe
