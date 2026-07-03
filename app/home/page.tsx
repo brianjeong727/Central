@@ -94,23 +94,8 @@ export default async function HomePage() {
     }]
   })
 
-  // Member counts for the user's teams, so the workspace picker shows "N members"
-  // on first paint (the client loadUserTeams refetch is skip-guarded on mount).
-  const userTeamIds = initialUserTeams.map((t) => t.teamId)
-  if (userTeamIds.length > 0) {
-    const { data: memberRows } = await supabase
-      .from("team_members")
-      .select("team_id")
-      .in("team_id", userTeamIds)
-    const counts: Record<string, number> = {}
-    for (const row of (memberRows ?? []) as { team_id: string }[]) {
-      counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
-    }
-    for (const ut of initialUserTeams) ut.memberCount = counts[ut.teamId] ?? 0
-  }
-
-  // Active question + whether this user already responded (sequential — depends on question)
   // Global governance roster — defaults to "all admins govern" when unset.
+  // (Pure computation off the Promise.all result — no round trip.)
   const rawGov = (ministryResult.data as { governance_settings?: unknown } | null)?.governance_settings as
     | Partial<GovernanceSettings>
     | null
@@ -120,17 +105,36 @@ export default async function HomePage() {
     roster_ids: Array.isArray(rawGov?.roster_ids) ? rawGov!.roster_ids : [],
   }
 
+  const userTeamIds = initialUserTeams.map((t) => t.teamId)
   const initialActiveQuestion = (questionResult.data ?? null) as CongregationQuestion | null
-  let initialHasResponded = false
-  if (initialActiveQuestion) {
-    const { data: resp } = await supabase
-      .from("congregation_responses")
-      .select("id")
-      .eq("question_id", initialActiveQuestion.id)
-      .eq("user_id", user.id)
-      .maybeSingle()
-    initialHasResponded = !!resp
+
+  // Two independent follow-ups: team member counts (so the workspace picker shows
+  // "N members" on first paint) and whether this user already answered the active
+  // congregation question. Each depends only on the Promise.all results above, not
+  // on the other — so run them together to save a sequential server round trip.
+  const [teamCountResult, respondedResult] = await Promise.all([
+    userTeamIds.length > 0
+      ? supabase.from("team_members").select("team_id").in("team_id", userTeamIds)
+      : Promise.resolve({ data: [] as { team_id: string }[] }),
+    initialActiveQuestion
+      ? supabase
+          .from("congregation_responses")
+          .select("id")
+          .eq("question_id", initialActiveQuestion.id)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+
+  if (userTeamIds.length > 0) {
+    const counts: Record<string, number> = {}
+    for (const row of (teamCountResult.data ?? []) as { team_id: string }[]) {
+      counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+    }
+    for (const ut of initialUserTeams) ut.memberCount = counts[ut.teamId] ?? 0
   }
+
+  const initialHasResponded = !!respondedResult.data
 
   const safeProfile = profile ?? {
     id: user.id,

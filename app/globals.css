@@ -372,6 +372,34 @@
   color: color-mix(in srgb, var(--cream) 50%, transparent);
 }
 
+/* ── Events agenda "up next" spine node — subtle plum pulse ring ─────────────
+   The up-next event's timeline node emits a soft ring that scales out and fades,
+   marking "this is the next thing" without shouting. Reduced-motion users get a
+   still, faint ring instead of the animation. */
+@keyframes eventUpNextRing {
+  0%   { transform: scale(0.55); opacity: 0.7; }
+  70%  { opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.event-upnext-node::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--plum) 45%, transparent);
+  animation: eventUpNextRing 2.4s var(--ease-out) infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .event-upnext-node::after {
+    animation: none;
+    transform: none;
+    opacity: 1;
+    inset: -4px;
+    border-color: color-mix(in srgb, var(--plum) 20%, transparent);
+  }
+}
+
 /* ── Skeleton loading — static soft pulse (calm, no shimmer sweep) ───────── */
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }

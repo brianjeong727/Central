@@ -2,66 +2,21 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
-import dynamic from "next/dynamic"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronRight, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, MoreHorizontal, Trash2, CornerUpLeft, Plus, Users, Pencil, Info, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
-import { getInitials, formatRelativeTime, formatMessageTime, REACTION_EMOJIS } from "../utils"
-import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb } from "../types"
+import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
+import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
-
-// emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
-// Picker component and its data lazily — only when a picker actually opens — so
-// nothing emoji-mart ships in the chats chunk until the user reaches for it.
-const EmojiMartPicker = dynamic(() => import("@emoji-mart/react"), { ssr: false })
-
-function LazyEmojiPicker({
-  onEmojiSelect,
-  theme = "light",
-  previewPosition = "none",
-  skinTonePosition = "none",
-}: {
-  onEmojiSelect: (e: { native: string }) => void
-  theme?: string
-  previewPosition?: string
-  skinTonePosition?: string
-}) {
-  const [emojiData, setEmojiData] = useState<unknown>(null)
-  useEffect(() => {
-    let active = true
-    import("@emoji-mart/data").then((m) => { if (active) setEmojiData(m.default) })
-    return () => { active = false }
-  }, [])
-  if (!emojiData) {
-    return (
-      <div
-        style={{
-          width: 280, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)",
-          boxShadow: "0 8px 30px color-mix(in srgb, var(--ink) 12%, transparent)",
-        }}
-      >
-        <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--plum)", animation: "spin 0.7s linear infinite" }} />
-      </div>
-    )
-  }
-  return (
-    <EmojiMartPicker
-      data={emojiData}
-      onEmojiSelect={onEmojiSelect}
-      theme={theme}
-      previewPosition={previewPosition}
-      skinTonePosition={skinTonePosition}
-    />
-  )
-}
+import { MessageRow } from "./message-row"
+import { Composer } from "./composer"
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
@@ -472,9 +427,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       setMembers((prev) => prev.filter((m) => !toAdd.some((a) => a.user_id === m.user_id))) // rollback
       return
     }
-    await Promise.all(toAdd.map((m) =>
-      supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} added ${m.name.split(" ")[0]}`, message_type: "system" })
-    ))
+    // One aggregated system message (not one per person) — each insert fans out over realtime to every member.
+    const addedLabel = toAdd.length === 1 ? toAdd[0].name.split(" ")[0] : `${toAdd.length} people`
+    await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} added ${addedLabel}`, message_type: "system" })
     await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds: toAdd.map((m) => m.user_id), removeUserIds: [] })
     mutateSettings()
   }
@@ -851,6 +806,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 // keyset page so both build identical enriched Message rows.
 const MESSAGE_SELECT = "id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))"
 
+// Two adjacent messages render as one visual group when they're from the same
+// sender within a minute (never for system/poll rows).
+const sameMinute = (a: Message, b: Message) =>
+  a.message_type !== "system" && b.message_type !== "system" &&
+  a.message_type !== "poll" && b.message_type !== "poll" &&
+  a.sender_id === b.sender_id &&
+  Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
+
 export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
@@ -860,7 +823,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // reading it). Patches the SAME shared key the sidebar reads, so the row jumps
   // instantly with no round-trip. The home-app realtime refetch later reconciles
   // from get_chat_list (and re-forces this open group to 0).
-  function bumpChatListForOwnSend(previewText: string) {
+  const bumpChatListForOwnSend = useCallback((previewText: string) => {
     mutateGlobal(
       ["chat-list", userId, ministryId],
       (cur: ChatGroup[] | undefined) => {
@@ -878,10 +841,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       },
       { revalidate: false },
     )
-  }
+  }, [mutateGlobal, userId, ministryId, groupId, userName])
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
-  const [inputText, setInputText] = useState("")
   const [sending, setSending] = useState(false)
   const [displayName, setDisplayName] = useState(groupName)
   // Re-seed the header name whenever the groupName prop changes (chat switch through
@@ -903,13 +865,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
   const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
   const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
-  const [showComposerEmojiPicker, setShowComposerEmojiPicker] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; avatarUrl: string | null }>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
   const avatarCache = useRef<Record<string, string | null>>({})
   const messagesRef = useRef<Message[]>([])
+  const reactionsRef = useRef<Record<string, Reaction[]>>({})
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
@@ -925,8 +886,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null } | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   // SWR-cached group roster — the SINGLE source for @mention names, member count,
   // and (small-room) seed read state. Read-only lookup, pure fetcher. Replaces the
   // old @mention-only join AND the standalone loadMemberReadStates fetch.
@@ -953,8 +912,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // per-member read-receipt fan-out (the O(members²) source) for an on-demand
   // "Seen by N" pill; <30 keep today's live per-member receipts exactly.
   const isLargeRoom = memberCount >= 30
-  const [mentionIndex, setMentionIndex] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   // Polls
   const [showPollCreator, setShowPollCreator] = useState(false)
   const [pollQuestion, setPollQuestion] = useState("")
@@ -968,12 +925,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [pollMenuFor, setPollMenuFor] = useState<string | null>(null)
   const [pollVoters, setPollVoters] = useState<Record<string, { option_index: number; user_id: string; name: string; avatar_url: string | null }[]>>({})
   const [votersPollId, setVotersPollId] = useState<string | null>(null)
-  // GIFs
-  const [showGifPicker, setShowGifPicker] = useState(false)
-  const [gifSearch, setGifSearch] = useState("")
-  const [gifResults, setGifResults] = useState<{ id: string; previewUrl: string; fullUrl: string }[]>([])
-  const [gifLoading, setGifLoading] = useState(false)
-  const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevMsgCountRef = useRef(0)
   const suppressScrollRef = useRef(false)
   // Upward (older-message) pagination — keyset cursor is the oldest loaded message.
@@ -1013,7 +964,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
   )
   // Link previews
-  const [linkPreviews, setLinkPreviews] = useState<Record<string, { title: string | null; description: string | null; image: string | null; hostname: string; url: string }>>({})
+  const [linkPreviews, setLinkPreviews] = useState<Record<string, LinkPreviewData>>({})
 
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -1023,54 +974,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const filteredMentions = useMemo(() => {
-    if (mentionQuery === null) return []
-    const q = mentionQuery.toLowerCase()
-    return mentionMembers.filter(m => m.name.split(" ")[0].toLowerCase().startsWith(q)).slice(0, 5)
-  }, [mentionQuery, mentionMembers])
-
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
 
-  function replyPreviewLabel(content?: string | null, attachmentType?: string | null, attachmentName?: string | null): string {
-    if (content && content.trim()) return content
-    if (attachmentType?.startsWith("image/")) return "Photo"
-    if (attachmentType) return attachmentName || "File"
-    return ""
-  }
-
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  function renderMentions(content: string, isOwn: boolean): React.ReactNode {
-    const parts = content.split(/(@\S+)/g)
-    return <>{parts.map((part, i) =>
-      part.startsWith("@")
-        ? <span key={i} style={{ fontWeight: 700, color: isOwn ? "#F6C96A" : "#8B5E1A" }}>{part}</span>
-        : part
-    )}</>
-  }
-
-  // @mention member list is loaded via useSWR above (see mentionData/mentionMembers).
-
-  // Load trending GIFs when GIF picker opens
-  useEffect(() => {
-    if (!showGifPicker) return
-    if (gifResults.length > 0) return
-    handleGifSearch("")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showGifPicker])
-
-  // Debounced GIF search
-  useEffect(() => {
-    if (!showGifPicker) return
-    if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current)
-    gifDebounceRef.current = setTimeout(() => handleGifSearch(gifSearch), 400)
-    return () => { if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current) }
-  }, [gifSearch, showGifPicker])
+  // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
+  // The @mention dropdown, GIF picker, and input state now live in <Composer>.
 
   // Fetch link previews for URLs found in messages
   useEffect(() => {
@@ -1101,9 +1009,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   }, [messages])
 
   // Group consecutive vote receipt system messages within 2 minutes into one row
-  type PMsg = Message & { _voteGroup?: string[] }
-  const processedMessages = useMemo((): PMsg[] => {
-    const result: PMsg[] = []
+  const processedMessages = useMemo((): ProcessedMessage[] => {
+    const result: ProcessedMessage[] = []
     const skip = new Set<string>()
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i]
@@ -1129,11 +1036,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
   }, [])
 
-  function scrollToMessage(id: string) {
+  const scrollToMessage = useCallback((id: string) => {
     messageRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "center" })
-  }
+  }, [])
 
-  function handlePointerDown(msg: Message) {
+  // Registers each row's root element so search / reply-jump / pinned-banner
+  // scrollIntoView keep working. Stable identity — safe for the memoized rows.
+  const registerMessageRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    messageRefs.current[id] = el
+  }, [])
+
+  // Convention #7: < 400ms tap = emoji picker, ≥ 400ms long-press = context menu.
+  // Timer + fired flag stay here in ChatScreen; rows call these with their msg.
+  const handlePointerDown = useCallback((msg: Message) => {
     if (msg.deleted) return
     longPressFiredRef.current = false
     longPressTimer.current = setTimeout(() => {
@@ -1141,9 +1056,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       longPressTimer.current = null
       setContextMenuFor(msg.id)
     }, 400)
-  }
+  }, [])
 
-  function handlePointerUp(msg: Message) {
+  const handlePointerUp = useCallback((msg: Message) => {
     if (msg.deleted) return
     if (longPressTimer.current !== null) {
       // Timer still pending — this is a short tap
@@ -1162,45 +1077,60 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       }
     }
     // If timer already fired (long press), do nothing here
-  }
+  }, [])
 
-  function handlePointerCancel() {
+  const handlePointerCancel = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-  }
+  }, [])
 
-  async function handleDeleteMessage(msgId: string) {
+  const handleDeleteMessage = useCallback(async (msgId: string) => {
     setDeletingId(null)
     setContextMenuFor(null)
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
     await supabase.from("messages").update({ deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null }).eq("id", msgId).eq("sender_id", userId)
     await supabase.from("message_reactions").delete().eq("message_id", msgId)
-  }
+  }, [supabase, userId])
 
-  async function handleDeletePoll(msgId: string, pollId: string) {
+  const handleDeletePoll = useCallback(async (msgId: string, pollId: string) => {
     setPollMenuFor(null)
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, deleted: true, poll_id: null } : m))
     // Delete message before poll — messages.poll_id FK prevents deleting poll while message exists
     await supabase.from("poll_votes").delete().eq("poll_id", pollId)
     await supabase.from("messages").delete().eq("id", msgId)
     await supabase.from("polls").delete().eq("id", pollId)
-  }
+  }, [supabase])
 
-  async function handleEditMessage() {
-    const trimmed = editText.trim()
-    const id = editingId
+  // Edit state is read through a ref (synced below) so this callback stays
+  // referentially stable while the user types in the edit textarea — otherwise
+  // every edit keystroke would change onSaveEdit and re-render all rows.
+  const editStateRef = useRef({ editText: "", editingId: null as string | null, editOriginalText: "" })
+  useEffect(() => {
+    editStateRef.current = { editText, editingId, editOriginalText }
+  }, [editText, editingId, editOriginalText])
+
+  const handleEditMessage = useCallback(async () => {
+    const { editText: currentText, editingId: id, editOriginalText: originalText } = editStateRef.current
+    const trimmed = currentText.trim()
     if (!trimmed || !id) return
     setEditingId(null)
     setEditText("")
     setEditOriginalText("")
-    if (trimmed === editOriginalText.trim()) return
+    if (trimmed === originalText.trim()) return
     suppressScrollRef.current = true
     setMessages((prev) => prev.map((m) => m.id === id ? { ...m, content: trimmed, is_edited: true } : m))
     await supabase.from("messages").update({ content: trimmed, is_edited: true, edited_at: new Date().toISOString() }).eq("id", id).eq("sender_id", userId)
-  }
+  }, [supabase, userId])
+
+  const startEdit = useCallback((msg: Message) => {
+    setContextMenuFor(null)
+    setEditingId(msg.id)
+    setEditText(msg.content)
+    setEditOriginalText(msg.content)
+  }, [])
 
   async function handleForward(targetGroupId: string) {
     if (!forwardingMsg) return
@@ -1216,7 +1146,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setTimeout(() => { setForwardingMsg(null); setForwardSentTo(null) }, 1000)
   }
 
-  async function openForwardSheet(msg: Message) {
+  const openForwardSheet = useCallback(async (msg: Message) => {
     setForwardingMsg(msg)
     setContextMenuFor(null)
     setForwardSentTo(null)
@@ -1228,48 +1158,36 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       })
       .filter((g): g is { id: string; name: string } => g !== null && g.id !== groupId)
     setForwardGroups(groups)
-  }
+  }, [supabase, userId, groupId])
 
-  function stagePendingAttachment(file: File) {
-    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
-    setPendingAttachment({ file, previewUrl: URL.createObjectURL(file) })
-  }
-
-  function clearPendingAttachment() {
-    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
-    setPendingAttachment(null)
-  }
-
-  async function handlePin(msgId: string) {
+  const handlePin = useCallback(async (msgId: string) => {
     setContextMenuFor(null)
-    const msg = messages.find(m => m.id === msgId)
+    // Read messages through the ref (kept in sync below) so this callback stays
+    // referentially stable — reads are event-time-fresh.
+    const msg = messagesRef.current.find(m => m.id === msgId)
     setPinnedMessageId(msgId)
     if (msg) setPinnedMessage({ id: msg.id, content: msg.content, sender_name: msg.sender_name, attachment_url: msg.attachment_url ?? null, attachment_type: msg.attachment_type ?? null, attachment_name: msg.attachment_name ?? null })
     await supabase.from("groups").update({ pinned_message_id: msgId }).eq("id", groupId).eq("ministry_id", ministryId)
     // Keep the SWR group-meta cache in sync so the pinned state survives re-open.
     mutateGroupMeta((cur) => cur ? { ...cur, pinned_message_id: msgId } : cur, { revalidate: false })
-  }
+  }, [supabase, groupId, ministryId, mutateGroupMeta])
 
-  async function handleUnpin() {
+  const handleUnpin = useCallback(async () => {
     setPinnedMessageId(null)
     setPinnedMessage(null)
     await supabase.from("groups").update({ pinned_message_id: null }).eq("id", groupId).eq("ministry_id", ministryId)
     // Keep the SWR group-meta cache in sync so the pinned state survives re-open.
     mutateGroupMeta((cur) => cur ? { ...cur, pinned_message_id: null } : cur, { revalidate: false })
-  }
+  }, [supabase, groupId, ministryId, mutateGroupMeta])
 
-  function handleMentionSelect(name: string) {
-    const firstName = name.split(" ")[0]
-    const el = textareaRef.current
-    const pos = el?.selectionStart ?? inputText.length
-    const before = inputText.slice(0, pos)
-    const after = inputText.slice(pos)
-    const atIdx = before.lastIndexOf("@")
-    const newText = before.slice(0, atIdx) + `@${firstName} ` + after
-    setInputText(newText)
-    setMentionQuery(null)
-    requestAnimationFrame(() => el?.focus())
-  }
+  // Opens the vote modal for a poll (row-level "Vote" / "Change vote" button).
+  const openVoteSheet = useCallback((pollId: string, hasVoted: boolean) => {
+    setPollMenuFor(null)
+    setPendingVoteOption(undefined)
+    if (hasVoted) setChangingVotePollIds(prev => new Set([...prev, pollId]))
+    setVotingPollId(pollId)
+  }, [])
+
 
   // ─── Phase 3 handlers ────────────────────────────────────────────────────
 
@@ -1393,27 +1311,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     loadPollsData([pollId])
   }
 
-  async function handleGifSearch(query: string) {
-    setGifLoading(true)
-    try {
-      const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY
-      const endpoint = query.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(query)}&limit=24&rating=g`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=g`
-      const res = await fetch(endpoint)
-      const json = await res.json()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setGifResults((json.data ?? []).map((g: any) => ({
-        id: g.id,
-        previewUrl: g.images?.fixed_height_small?.url ?? g.images?.preview_gif?.url ?? "",
-        fullUrl: g.images?.original?.url ?? "",
-      })))
-    } catch { /* swallow */ }
-    setGifLoading(false)
-  }
-
-  function handleSendGif(fullUrl: string) {
-    setShowGifPicker(false)
+  // GIF send — optimistic insert stays in ChatScreen (owns messages); <Composer>
+  // closes the picker itself after calling this. Stable for the memoized child.
+  const handleSendGif = useCallback((fullUrl: string) => {
     if (!fullUrl) return
     const optimisticId = `optimistic-gif-${Date.now()}`
     const now = new Date().toISOString()
@@ -1426,7 +1326,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setMessages(prev => [...prev, optimisticMsg])
     supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", attachment_url: fullUrl, attachment_type: "image/gif" }).select("id").single()
       .then(({ data }) => { if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m)) })
-  }
+  }, [supabase, groupId, userId, userName])
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1699,6 +1599,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     messagesRef.current = messages
   }, [messages])
 
+  // Keep reactionsRef current so handleReact can stay referentially stable
+  // (reads are event-time-fresh) without taking `reactions` as a dep.
+  useEffect(() => {
+    reactionsRef.current = reactions
+  }, [reactions])
+
   // Scroll to bottom after initial load
   useEffect(() => {
     if (!loading) scrollToBottom(false)
@@ -1818,6 +1724,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         { event: "INSERT", schema: "public", table: "message_reactions" },
         (payload) => {
           const rx = payload.new as Reaction
+          // The channel receives ALL message_reactions (the table has no group_id
+          // to filter on), so ignore reactions for messages not currently loaded in
+          // THIS chat — otherwise every reaction in every visible chat re-renders us
+          // and grows the map with entries for unloaded messages. Reactions for
+          // messages loaded later (scroll-up) are fetched fresh by mergeReactionsFor.
+          if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => {
             const list = prev[rx.message_id] ?? []
             // Replace optimistic temp entry if present, otherwise append
@@ -1840,6 +1752,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         (payload) => {
           const rx = payload.old as Reaction
           if (!rx.message_id) return
+          // Same scoping as the INSERT handler: skip reactions for messages not
+          // loaded here (avoids re-renders + empty map entries for other chats).
+          if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => ({
             ...prev,
             [rx.message_id]: (prev[rx.message_id] ?? []).filter((r) => r.id !== rx.id),
@@ -1866,23 +1781,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (matchId) messageRefs.current[matchId]?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [searchMatchIndex, searchMatches])
 
-  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const val = e.target.value
-    setInputText(val)
-    // Auto-resize textarea to fit content
-    const el = e.target
-    el.style.height = "auto"
-    el.style.height = el.scrollHeight + "px"
-    // @mention detection
-    const pos = e.target.selectionStart ?? val.length
-    const before = val.slice(0, pos)
-    const atMatch = before.match(/@(\w*)$/)
-    if (atMatch) {
-      setMentionQuery(atMatch[1])
-      setMentionIndex(0)
-    } else if (mentionQuery !== null) {
-      setMentionQuery(null)
-    }
+  // Throttled typing broadcast — the realtime channel lives here in ChatScreen;
+  // <Composer> calls this on every input change. Stable for the memoized child.
+  const onTyping = useCallback((val: string) => {
     if (typingChannelRef.current && val.trim()) {
       // Throttle the isTyping:true SEND to at most ~1/sec while held — every keystroke
       // firing a broadcast is needless fan-out at scale. The 2500ms stop-typing reset
@@ -1896,37 +1797,33 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
       }, 2500)
     }
-  }
+  }, [userId, userName])
 
-  async function handleSend() {
-    const content = inputText.trim()
-    const pa = pendingAttachment
-    if (!content && !pa) return
-    if (sending || groupArchived) return
+  const onClearReply = useCallback(() => setReplyingTo(null), [])
+  const onSetPollOpen = useCallback((open: boolean) => setShowPollCreator(open), [])
+
+  // Optimistic send (Convention #4) stays here — <Composer> clears its own input +
+  // attachment locally, then hands { content, attachment, replyTo } up. Stable for
+  // the memoized child: reads everything from the payload + refs/stable deps.
+  const handleSend = useCallback(async ({ content, attachment, replyTo }: { content: string; attachment: File | null; replyTo: Message | null }) => {
+    if (!content && !attachment) return
 
     // Clear own typing status
     if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
     typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
 
     setSending(true)
-    setInputText("")
-    setMentionQuery(null)
-    setPendingAttachment(null)
-    if (pa) URL.revokeObjectURL(pa.previewUrl)
-    // Reset textarea height after clearing
-    if (textareaRef.current) { textareaRef.current.style.height = "auto" }
-
-    const replyTarget = replyingTo
+    const replyTarget = replyTo
     setReplyingTo(null)
 
     // Attachment message — no caption embedded; caption sent as separate message below
-    if (pa) {
+    if (attachment) {
       setUploading(true)
-      const ext = pa.file.name.split(".").pop() ?? "bin"
+      const ext = attachment.name.split(".").pop() ?? "bin"
       const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: storageData, error } = await supabase.storage
         .from("chat-attachments")
-        .upload(path, pa.file, { cacheControl: "3600", upsert: false })
+        .upload(path, attachment, { cacheControl: "3600", upsert: false })
       if (!error && storageData) {
         const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
         const optimisticId = `optimistic-att-${Date.now()}`
@@ -1936,15 +1833,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
           reply_to_sender: replyTarget?.sender_name ?? null,
           message_type: "user", attachment_url: publicUrl,
-          attachment_type: pa.file.type, attachment_name: pa.file.name, attachment_size: pa.file.size,
+          attachment_type: attachment.type, attachment_name: attachment.name, attachment_size: attachment.size,
         }
         setMessages(prev => [...prev, optimisticMsg])
-        bumpChatListForOwnSend(content || pa.file.name)
+        bumpChatListForOwnSend(content || attachment.name)
         const { data } = await supabase.from("messages").insert({
           group_id: groupId, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
-          attachment_url: publicUrl, attachment_type: pa.file.type,
-          attachment_name: pa.file.name, attachment_size: pa.file.size,
+          attachment_url: publicUrl, attachment_type: attachment.type,
+          attachment_name: attachment.name, attachment_size: attachment.size,
         }).select("id").single()
         if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
 
@@ -1994,76 +1891,43 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
-  }
+  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend])
 
-  function insertEmojiAtCursor(native: string) {
-    const el = textareaRef.current
-    const start = el?.selectionStart ?? inputText.length
-    const end = el?.selectionEnd ?? inputText.length
-    const newText = inputText.slice(0, start) + native + inputText.slice(end)
-    setInputText(newText)
-    requestAnimationFrame(() => {
-      if (el) {
-        const pos = start + native.length
-        el.selectionStart = pos
-        el.selectionEnd = pos
-        el.focus()
-      }
-    })
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (mentionQuery !== null && filteredMentions.length > 0) {
-      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredMentions.length - 1)); return }
-      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
-      if (e.key === "Escape") { setMentionQuery(null); return }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
-  function formatDateLabel(dateStr: string): string {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const isToday = date.toDateString() === today.toDateString()
-    const month = date.toLocaleString("en-US", { month: "long" }).toUpperCase()
-    const day = date.getDate()
-    return isToday ? `TODAY · ${month} ${day}` : `${date.toLocaleString("en-US", { weekday: "short" }).toUpperCase()} · ${month} ${day}`
-  }
-
-  function groupedReactions(msgId: string) {
-    const list = reactions[msgId] ?? []
-    const map: Record<string, { count: number; userReacted: boolean }> = {}
-    for (const rx of list) {
-      if (!map[rx.emoji]) map[rx.emoji] = { count: 0, userReacted: false }
-      map[rx.emoji].count++
-      if (rx.user_id === userId) map[rx.emoji].userReacted = true
-    }
-    return Object.entries(map).map(([emoji, v]) => ({ emoji, ...v }))
-  }
-
-  // For each own message: which other members have it as their most-recently-read own message
+  // For each own message: which other members have it as their most-recently-read own message.
+  // Reuses the PRIOR array reference for any message whose receipts didn't change, so
+  // memoized own-message rows don't re-render when an unrelated message/read event
+  // rebuilds the map.
+  const prevReadReceiptMapRef = useRef<Record<string, { name: string; avatarUrl: string | null }[]>>({})
   const readReceiptMap = useMemo(() => {
     const map: Record<string, { name: string; avatarUrl: string | null }[]> = {}
     // Large rooms don't do live per-member receipts — skip the members×messages walk.
-    if (isLargeRoom) return map
-    const ownMsgs = messages.filter((m) => m.sender_id === userId)
-    if (ownMsgs.length === 0) return map
-    for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
-      if (!lastReadAt) continue
-      let target: Message | null = null
-      for (const m of ownMsgs) {
-        if (m.created_at <= lastReadAt) target = m
-        else break
-      }
-      if (target) {
-        if (!map[target.id]) map[target.id] = []
-        map[target.id].push({ name, avatarUrl })
+    if (!isLargeRoom) {
+      const ownMsgs = messages.filter((m) => m.sender_id === userId)
+      if (ownMsgs.length > 0) {
+        for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
+          if (!lastReadAt) continue
+          let target: Message | null = null
+          for (const m of ownMsgs) {
+            if (m.created_at <= lastReadAt) target = m
+            else break
+          }
+          if (target) {
+            if (!map[target.id]) map[target.id] = []
+            map[target.id].push({ name, avatarUrl })
+          }
+        }
       }
     }
+    // Reconcile against the previous map: reuse the old array ref when the
+    // receipts for a message are unchanged (cheap signature comparison).
+    const prev = prevReadReceiptMapRef.current
+    const signature = (arr: { name: string; avatarUrl: string | null }[]) =>
+      arr.map((r) => r.name + " " + (r.avatarUrl ?? "")).join("")
+    for (const id of Object.keys(map)) {
+      const prevArr = prev[id]
+      if (prevArr && signature(prevArr) === signature(map[id])) map[id] = prevArr
+    }
+    prevReadReceiptMapRef.current = map
     return map
   }, [messages, memberReadMap, userId, isLargeRoom])
 
@@ -2094,7 +1958,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   }, [isLargeRoom, latestOwnMsg?.id, groupId, userId])
 
   // Expand/collapse the reader list — fetched on demand the first time it's opened.
-  async function toggleSeenBy() {
+  // Passed only to the latest-own row (others receive undefined), so its changing
+  // identity never breaks the memo for the rest of the list.
+  const toggleSeenBy = useCallback(async () => {
     if (!latestOwnMsg) return
     if (seenByOpen) { setSeenByOpen(false); return }
     setSeenByOpen(true)
@@ -2114,7 +1980,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       })
       setSeenByList(list)
     }
-  }
+  }, [latestOwnMsg, seenByOpen, seenByList, supabase, groupId, userId])
 
   function openSearch() {
     setSearchMode(true)
@@ -2139,30 +2005,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setSearchMatchIndex(i => (i - 1 + searchMatches.length) % searchMatches.length)
   }
 
-  function highlightText(text: string, query: string, isCurrent: boolean): React.ReactNode {
-    const q = query.toLowerCase().trim()
-    if (!q) return text
-    const lower = text.toLowerCase()
-    const parts: React.ReactNode[] = []
-    let i = 0
-    let key = 0
-    while (i < text.length) {
-      const idx = lower.indexOf(q, i)
-      if (idx === -1) { parts.push(text.slice(i)); break }
-      if (idx > i) parts.push(text.slice(i, idx))
-      parts.push(
-        <mark key={key++} style={{ background: isCurrent ? "#D4A45C" : "rgba(212,164,92,0.45)", color: "var(--ink)", borderRadius: 2, padding: "0 1px" }}>
-          {text.slice(idx, idx + q.length)}
-        </mark>
-      )
-      i = idx + q.length
-    }
-    return <>{parts}</>
-  }
-
-  async function handleReact(messageId: string, emoji: string) {
+  const handleReact = useCallback(async (messageId: string, emoji: string) => {
     setEmojiPickerFor(null)
-    const existing = (reactions[messageId] ?? []).find(
+    // Read reactions through the ref (synced above) so this callback stays
+    // referentially stable — reads are event-time-fresh.
+    const existing = (reactionsRef.current[messageId] ?? []).find(
       (r) => r.user_id === userId && r.emoji === emoji
     )
     if (existing) {
@@ -2196,7 +2043,24 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         }))
       }
     }
-  }
+  }, [supabase, userId])
+
+  // O(1) per-row search-match lookup for the memoized rows.
+  const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches])
+
+  // Per-message resolved link preview — each row receives ONE object (or
+  // undefined) instead of the whole linkPreviews map, so an unrelated preview
+  // resolving doesn't re-render every row.
+  const previewByMsgId = useMemo(() => {
+    const map: Record<string, LinkPreviewData | undefined> = {}
+    for (const msg of processedMessages) {
+      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll") continue
+      const urls = msg.content.match(/https?:\/\/[^\s<>"']+/gi) ?? []
+      const preview = urls.map((u) => linkPreviews[u]).find((p) => p && p.title)
+      if (preview) map[msg.id] = preview
+    }
+    return map
+  }, [processedMessages, linkPreviews])
 
   // Header member summary — derived from the roster SWR (not memberReadMap, which is
   // empty in large rooms). Self first, then everyone else, to match prior ordering.
@@ -2316,7 +2180,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   ))}
                 </div>
                 <p className="hidden md:block text-[12px] text-[var(--muted-text)] truncate">
-                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.join(", ")}
+                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
                 </p>
               </div>
               <p className="md:hidden text-[12px] text-[var(--muted-text)] mt-0.5">
@@ -2384,600 +2248,75 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         ) : (
           <div className="flex flex-col gap-0.5">
             {processedMessages.map((msg, i) => {
+              // Cheap neighbor-derivations only — all row rendering lives in the
+              // memoized <MessageRow/> (app/home/tabs/message-row.tsx).
               const isOwn = msg.sender_id === userId
               const prevMsg = i > 0 ? processedMessages[i - 1] : null
               const nextMsg = i < processedMessages.length - 1 ? processedMessages[i + 1] : null
-
-              const sameMinute = (a: Message, b: Message) =>
-                a.message_type !== "system" && b.message_type !== "system" &&
-                a.message_type !== "poll" && b.message_type !== "poll" &&
-                a.sender_id === b.sender_id &&
-                Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
-
               const isFirstInGroup = !prevMsg || !sameMinute(msg, prevMsg)
               const isLastInGroup = !nextMsg || !sameMinute(msg, nextMsg)
-
-              // Date separator
-              const prevDate = prevMsg ? new Date(prevMsg.created_at).toDateString() : null
-              const thisDate = new Date(msg.created_at).toDateString()
-              const showDateSep = !prevMsg || prevDate !== thisDate
-
-              const incomingRadius = isFirstInGroup && isLastInGroup
-                ? "rounded-[14px] rounded-tl-[4px]"
-                : isFirstInGroup
-                  ? "rounded-[14px] rounded-tl-[4px] rounded-bl-[6px]"
-                  : isLastInGroup
-                    ? "rounded-[14px] rounded-tl-[6px]"
-                    : "rounded-[14px] rounded-l-[6px]"
-              const outgoingRadius = isFirstInGroup && isLastInGroup
-                ? "rounded-[14px] rounded-tr-[4px]"
-                : isFirstInGroup
-                  ? "rounded-[14px] rounded-tr-[4px] rounded-br-[6px]"
-                  : isLastInGroup
-                    ? "rounded-[14px] rounded-tr-[6px]"
-                    : "rounded-[14px] rounded-r-[6px]"
-
-              const rxGroups = groupedReactions(msg.id)
-              const groupGap = isFirstInGroup && i > 0 && !showDateSep ? "mt-3" : ""
-
-              // Deleted poll tombstone
-              if (msg.message_type === "poll" && msg.deleted) {
-                return (
-                  <div key={msg.id} className={`flex justify-center ${groupGap}`}>
-                    <span style={{ fontStyle: "italic", fontSize: 12, color: "var(--muted-text)", padding: "5px 14px", border: "1px solid var(--line)", borderRadius: 999 }}>
-                      Poll deleted
-                    </span>
-                  </div>
-                )
-              }
-
-              // Poll message — full-width card with vote buttons
-              if (msg.message_type === "poll" && msg.poll_id) {
-                const poll = pollsData[msg.poll_id]
-                const userVote = pollVotes[msg.poll_id]
-                const isChanging = changingVotePollIds.has(msg.poll_id)
-                const counts = pollCounts[msg.poll_id] ?? []
-                const totalVotes = counts.reduce((s, c) => s + c, 0)
-                const hasVoted = userVote !== undefined && !isChanging
-
-                return (
-                  <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
-                    {showDateSep && (
-                      <div className="flex justify-center my-6">
-                        <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                          {formatDateLabel(msg.created_at)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex flex-col items-center mt-4 mb-1">
-                      <div className="w-full max-w-[290px] bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm">
-                        {poll ? (
-                          <>
-                            {/* Card header */}
-                            <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6] flex items-start gap-2">
-                              <div className="flex-1 text-center">
-                                <p className="text-[15px] font-bold text-[var(--ink)] leading-snug">{poll.question}</p>
-                                <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
-                              </div>
-                              {/* Delete button — visible to creator or admin/leader */}
-                              {(msg.sender_id === userId || isAdminOrLeader) && (
-                                <div className="relative flex-shrink-0 -mt-1 -mr-1">
-                                  <button
-                                    onClick={e => { e.stopPropagation(); setPollMenuFor(pollMenuFor === msg.id ? null : msg.id) }}
-                                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F0EDE6] transition-colors"
-                                  >
-                                    <MoreHorizontal className="w-3.5 h-3.5 text-[var(--muted-text)]" />
-                                  </button>
-                                  {pollMenuFor === msg.id && (
-                                    <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] shadow-lg overflow-hidden min-w-[130px]">
-                                      <button
-                                        onClick={() => handleDeletePoll(msg.id, msg.poll_id!)}
-                                        className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        Delete poll
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {/* Preview — first 3 options, read-only */}
-                            <div className="px-4 pt-3 pb-2 flex flex-col gap-2.5">
-                              {poll.options.slice(0, 3).map((opt, oi) => {
-                                const count = counts[oi] ?? 0
-                                const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
-                                const isSelected = userVote === oi
-                                return (
-                                  <div key={oi}>
-                                    <div className="flex items-center justify-between mb-1">
-                                      {hasVoted ? (
-                                        <>
-                                          <span className={`text-[13px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
-                                            {isSelected && <Check className="w-3 h-3 text-[var(--plum)]" />}
-                                            <span className={`text-[12px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count}</span>
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#D8D3C8] flex-shrink-0" />
-                                          <span className="text-[13px] text-[var(--ink)]">{opt}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {hasVoted && (
-                                      <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                              {poll.options.length > 3 && (
-                                <p className="text-[12px] text-[var(--muted-text)] mt-0.5">and {poll.options.length - 3} more option{poll.options.length - 3 !== 1 ? "s" : ""}…</p>
-                              )}
-                            </div>
-                            <div className="px-4 pb-4 pt-1">
-                              <button
-                                onClick={() => {
-                                  setPollMenuFor(null)
-                                  setPendingVoteOption(undefined)
-                                  if (hasVoted) setChangingVotePollIds(prev => new Set([...prev, msg.poll_id!]))
-                                  setVotingPollId(msg.poll_id!)
-                                }}
-                                className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[#F4F1E8] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
-                              >
-                                {hasVoted ? "Change vote" : "Vote"}
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="px-4 py-4 flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
-                            <span className="text-[13px] text-[var(--muted-text)]">Loading poll…</span>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-[#B0A9A0] mt-1.5">{formatMessageTime(msg.created_at)}</p>
-                    </div>
-                  </div>
-                )
-              }
-
-              // System message — centered event note, no bubble
-              if (msg.message_type === "system") {
-                const voteGroup = (msg as PMsg)._voteGroup
-                let displayContent = msg.content
-                if (voteGroup && voteGroup.length > 1) {
-                  if (voteGroup.length <= 3) displayContent = `${voteGroup.join(", ")} voted in the poll`
-                  else displayContent = `${voteGroup.slice(0, 2).join(", ")} and ${voteGroup.length - 2} others voted in the poll`
-                }
-                return (
-                  <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
-                    {showDateSep && (
-                      <div className="flex justify-center my-6">
-                        <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                          {formatDateLabel(msg.created_at)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-3 my-2 px-1">
-                      <div className="flex-1 h-px bg-[#E8E2D2]/70" />
-                      <span style={{ fontSize: "12px", color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
-                        {displayContent}
-                      </span>
-                      <div className="flex-1 h-px bg-[#E8E2D2]/70" />
-                    </div>
-                  </div>
-                )
-              }
-
+              const showDateSep = !prevMsg || new Date(prevMsg.created_at).toDateString() !== new Date(msg.created_at).toDateString()
+              const isLatestOwn = latestOwnMsg?.id === msg.id
               return (
-                <div key={msg.id} ref={(el) => { messageRefs.current[msg.id] = el }}>
-                  {/* Date separator */}
-                  {showDateSep && (
-                    <div className="flex justify-center my-6">
-                      <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                        {formatDateLabel(msg.created_at)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"} ${groupGap}`}>
-                    {/* Emoji picker */}
-                    {emojiPickerFor === msg.id && (
-                      <div
-                        className={`absolute z-[160] ${i === 0 ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <div className="bg-[var(--cream-panel)] rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
-                          {REACTION_EMOJIS.map((emoji) => (
-                            <button
-                              key={emoji}
-                              onClick={(e) => { e.stopPropagation(); handleReact(msg.id, emoji) }}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onPointerUp={(e) => e.stopPropagation()}
-                              className="text-[22px] hover:scale-125 active:scale-95 transition-transform"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setEmojiPickerFor(null); setFullReactionPickerFor(msg.id) }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Full reaction picker — independent of entry point (emoji bar or context menu) */}
-                    {fullReactionPickerFor === msg.id && (
-                      <div
-                        className={`absolute z-[161] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { handleReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
-                      </div>
-                    )}
-
-                    {/* Context menu */}
-                    {contextMenuFor === msg.id && (
-                      <div
-                        className={`absolute z-[160] ${i === 0 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <div className="bg-[var(--cream-panel)] rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
-                          {!msg.deleted && (
-                            <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[#F3EDE6]">
-                              {REACTION_EMOJIS.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => { e.stopPropagation(); handleReact(msg.id, emoji); setContextMenuFor(null) }}
-                                  className="text-[20px] hover:scale-125 active:scale-95 transition-transform"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                              <button
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setFullReactionPickerFor(msg.id) }}
-                                className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                          <button
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
-                          >
-                            <CornerUpLeft className="w-4 h-4 text-[var(--body)]" />
-                            Reply
-                          </button>
-                          <button
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); openForwardSheet(msg) }}
-                            className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
-                          >
-                            <Forward className="w-4 h-4 text-[var(--body)]" />
-                            Forward
-                          </button>
-                          {!msg.deleted && canPin && (
-                            <button
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); pinnedMessageId === msg.id ? handleUnpin() : handlePin(msg.id) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
-                            >
-                              <Pin className="w-4 h-4 text-[var(--body)]" />
-                              {pinnedMessageId === msg.id ? "Unpin" : "Pin"}
-                            </button>
-                          )}
-                          {isOwn && !msg.deleted && msg.content && (
-                            <button
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setEditingId(msg.id); setEditText(msg.content); setEditOriginalText(msg.content) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
-                            >
-                              <Pencil className="w-4 h-4 text-[var(--body)]" />
-                              Edit
-                            </button>
-                          )}
-                          {isOwn && !msg.deleted && (
-                            <button
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setDeletingId(msg.id) }}
-                              className="w-full text-left px-4 py-3 text-[14px] text-red-500 flex items-center gap-2.5 hover:bg-red-50 active:bg-red-100 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pinned indicator */}
-                    {msg.id === pinnedMessageId && (
-                      <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
-                        <Pin className="w-3 h-3 text-[#C9A34B]" />
-                        <span className="text-[11px] text-[#C9A34B] font-medium">Pinned</span>
-                      </div>
-                    )}
-                    {/* Forwarded indicator */}
-                    {msg.message_type === "forwarded" && (
-                      <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
-                        <Forward className="w-3 h-3 text-[var(--muted-text)]" />
-                        <span className="text-[11px] text-[var(--muted-text)]">Forwarded</span>
-                      </div>
-                    )}
-                    {!isOwn && isFirstInGroup && (
-                      <div className="flex items-baseline gap-1.5 mb-1 ml-9">
-                        <span className="text-[13px] font-semibold text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
-                        {msg.sender_id && departedIds.has(msg.sender_id) && (
-                          <span className="text-[11px] text-[#A09A8C] italic">· left the ministry</span>
-                        )}
-                        <span className="text-[12px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
-                      </div>
-                    )}
-
-                    {/* Avatar + bubble row */}
-                    <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-                      {/* Avatar — shown for every incoming message */}
-                      {!isOwn && (
-                        <MonogramChip
-                          initials={(msg.sender_name || "?").charAt(0).toUpperCase()}
-                          avatarUrl={!(msg.sender_id && departedIds.has(msg.sender_id)) ? (msg.sender_avatar_url || undefined) : undefined}
-                          className="w-7 h-7 text-[11px] font-bold"
-                          style={{ alignSelf: "flex-end", opacity: (msg.sender_id && departedIds.has(msg.sender_id)) || !msg.sender_id ? 0.4 : 1 }}
-                        />
-                      )}
-
-                      <div
-                        title="Long-press for reply and reactions"
-                        onPointerDown={() => handlePointerDown(msg)}
-                        onPointerUp={() => handlePointerUp(msg)}
-                        onPointerLeave={handlePointerCancel}
-                        onPointerCancel={handlePointerCancel}
-                        className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
-                          msg.deleted
-                            ? isOwn
-                              ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
-                              : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
-                            : isOwn
-                              ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
-                              : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
-                        } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
-                      >
-                        {msg.deleted ? (
-                          <span className="italic text-[13px]">Message deleted</span>
-                        ) : (
-                          <>
-                            {msg.reply_to_id && msg.reply_to_content && (
-                              <div className="px-3 pt-2.5 pb-0">
-                                <button
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={() => scrollToMessage(msg.reply_to_id!)}
-                                  className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
-                                    isOwn
-                                      ? "bg-[var(--cream-panel)]/10 border-l-[2px] border-[var(--cream-on-dark)]/50"
-                                      : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
-                                  }`}
-                                >
-                                  <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[var(--plum)]"}`}>
-                                    <CornerUpLeft className="w-3 h-3" />
-                                    {msg.reply_to_sender}
-                                  </span>
-                                  <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[var(--muted-text)]"}`}>
-                                    {msg.reply_to_content.slice(0, 80)}
-                                  </span>
-                                </button>
-                              </div>
-                            )}
-                            {editingId === msg.id ? (
-                              <div
-                                className={msg.reply_to_id ? "px-3 pb-2.5 pt-1.5" : ""}
-                                onPointerDown={(e) => e.stopPropagation()}
-                              >
-                                {/* Ghost text maintains bubble's natural width/height; textarea overlays it */}
-                                <div className="relative">
-                                  <div
-                                    aria-hidden
-                                    className="text-[14px] leading-[1.4] invisible select-none whitespace-pre-wrap break-words"
-                                    style={{ fontFamily: "inherit", wordBreak: "break-word" }}
-                                  >
-                                    {editText || " "}
-                                  </div>
-                                  <textarea
-                                    autoFocus
-                                    value={editText}
-                                    onChange={(e) => setEditText(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditMessage() } else if (e.key === "Escape") { setEditingId(null) } }}
-                                    className="absolute inset-0 w-full h-full resize-none bg-transparent text-inherit text-[14px] leading-[1.4] outline-none"
-                                    style={{ fontFamily: "inherit", border: "none", padding: 0, margin: 0 }}
-                                  />
-                                </div>
-                                <div className="flex gap-2 justify-end mt-1.5">
-                                  <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
-                                  <button onClick={handleEditMessage} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[var(--plum)]"}`}>Save</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                {/* Image attachment */}
-                                {msg.attachment_url && msg.attachment_type?.startsWith("image/") && (
-                                  <div
-                                    className={msg.reply_to_id ? "mt-2 mb-0.5" : ""}
-                                  >
-                                    <img
-                                      src={msg.attachment_url}
-                                      alt="Image"
-                                      className="w-full max-h-[280px] object-cover cursor-pointer"
-                                    />
-                                  </div>
-                                )}
-                                {/* File attachment */}
-                                {msg.attachment_url && msg.attachment_type && !msg.attachment_type.startsWith("image/") && (
-                                  <div
-                                    className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1 cursor-pointer"
-                                  >
-                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-[var(--cream-panel)]/10" : "bg-[var(--ivory)]"}`}>
-                                      <FileDown className="w-4 h-4" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-[13px] font-medium truncate">{msg.attachment_name ?? "File"}</p>
-                                      {msg.attachment_size != null && (
-                                        <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{formatFileSize(msg.attachment_size)}</p>
-                                      )}
-                                    </div>
-                                    <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[#C4C4C4]"}`} />
-                                  </div>
-                                )}
-                                {/* Text content */}
-                                {msg.content && (() => {
-                                  const urlRe = /https?:\/\/[^\s<>"']+/gi
-                                  const urls = msg.content.match(urlRe) ?? []
-                                  const preview = urls.map(u => linkPreviews[u]).find(p => p && p.title)
-                                  return (
-                                    <>
-                                      <div
-                                        className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}
-                                        style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
-                                      >
-                                        {searchMode && searchQuery.trim() && searchMatches.includes(msg.id)
-                                          ? highlightText(msg.content, searchQuery, searchMatches[searchMatchIndex] === msg.id)
-                                          : renderMentions(msg.content, isOwn)}
-                                      </div>
-                                      {preview && (
-                                        <a
-                                          href={preview.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onPointerDown={(e) => e.stopPropagation()}
-                                          onClick={(e) => e.stopPropagation()}
-                                          className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[#F4F1E8]"}`}
-                                          style={{ textDecoration: "none" }}
-                                        >
-                                          {preview.image && (
-                                            <img src={preview.image} alt="" className="w-full max-h-[120px] object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
-                                          )}
-                                          <div className="px-3 py-2">
-                                            <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{preview.hostname}</p>
-                                            {preview.title && <p className={`text-[13px] font-semibold leading-snug ${isOwn ? "text-white" : "text-[var(--ink)]"}`}>{preview.title.slice(0, 80)}</p>}
-                                            {preview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[var(--body)]"}`}>{preview.description.slice(0, 120)}</p>}
-                                          </div>
-                                        </a>
-                                      )}
-                                    </>
-                                  )
-                                })()}
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Edited label */}
-                    {msg.is_edited && !msg.deleted && (
-                      <div className={`mt-0.5 ${isOwn ? "pr-1 text-right" : "pl-9 text-left"}`}>
-                        <span className="text-[10px]" style={{ color: "var(--muted-text)", fontFamily: "var(--sans)" }}>edited</span>
-                      </div>
-                    )}
-
-                    {/* Reactions */}
-                    {!msg.deleted && rxGroups.length > 0 && (
-                      <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
-                        {rxGroups.map(({ emoji, count, userReacted }) => (
-                          <button
-                            key={emoji}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={() => handleReact(msg.id, emoji)}
-                            className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
-                              userReacted
-                                ? "bg-[var(--plum)] border-[var(--plum)]"
-                                : "bg-[var(--cream-panel)] border-[var(--line)]"
-                            }`}
-                          >
-                            <span>{emoji}</span>
-                            <span className={`text-[11px] font-medium ${userReacted ? "text-[var(--cream-on-dark)]" : "text-[var(--muted-text)]"}`}>{count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Delete confirmation */}
-                    {deletingId === msg.id && (
-                      <div
-                        className={`flex items-center gap-2 mt-1 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <span className="text-[12px] text-[var(--body)]">Delete this message?</span>
-                        <button onClick={() => handleDeleteMessage(msg.id)} className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors">Delete</button>
-                        <button onClick={() => setDeletingId(null)} className="text-[12px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors">Cancel</button>
-                      </div>
-                    )}
-
-                    {/* Timestamp + read receipts (own messages: every message; incoming: skip since time is in header) */}
-                    {isOwn && (
-                      <div className="flex items-center gap-1.5 mt-1 pr-1">
-                        {(readReceiptMap[msg.id]?.length ?? 0) > 0 && (
-                          <div className="flex items-center">
-                            {readReceiptMap[msg.id].map(({ name, avatarUrl }, idx) => (
-                              <MonogramChip
-                                key={`${name}-${idx}`}
-                                initials={name.charAt(0).toUpperCase()}
-                                avatarUrl={avatarUrl || undefined}
-                                title={`Read by ${name}`}
-                                className={`w-4 h-4 border border-[#F1EDE6] text-[6px] font-bold${idx > 0 ? " -ml-1" : ""}`}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        <span className="text-[11px] text-[#B0A9A0]">{formatMessageTime(msg.created_at)}</span>
-                      </div>
-                    )}
-
-                    {/* Large-room aggregated read receipt — on-demand "Seen by N",
-                        rendered only under the user's own most-recent message. */}
-                    {isLargeRoom && isOwn && latestOwnMsg?.id === msg.id && seenByCount !== null && seenByCount > 0 && (
-                      <div className="flex flex-col items-end gap-1 mt-1 pr-1" onPointerDown={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleSeenBy() }}
-                          className="text-[11px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors"
-                          style={{ padding: "4px 10px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--cream-panel)" }}
-                        >
-                          Seen by {seenByCount}
-                        </button>
-                        {seenByOpen && seenByList && (
-                          <div
-                            className="flex flex-col gap-1.5 items-end"
-                            style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--cream-panel)", maxWidth: 220 }}
-                          >
-                            {seenByList.map((r, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <span className="text-[12px] text-[var(--body)] truncate">{r.name}</span>
-                                <MonogramChip
-                                  initials={r.name.charAt(0).toUpperCase()}
-                                  avatarUrl={r.avatarUrl || undefined}
-                                  className="w-5 h-5 text-[8px] font-bold"
-                                />
-                              </div>
-                            ))}
-                            {seenByCount > seenByList.length && (
-                              <span className="text-[11px] text-[var(--muted-text)]">+{seenByCount - seenByList.length} more</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <MessageRow
+                  key={msg.id}
+                  msg={msg}
+                  isOwn={isOwn}
+                  isFirstMessage={i === 0}
+                  isFirstInGroup={isFirstInGroup}
+                  isLastInGroup={isLastInGroup}
+                  showDateSep={showDateSep}
+                  showGroupGap={isFirstInGroup && i > 0 && !showDateSep}
+                  senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
+                  userId={userId}
+                  canPin={canPin}
+                  isAdminOrLeader={isAdminOrLeader}
+                  isEmojiPickerOpen={emojiPickerFor === msg.id}
+                  isFullPickerOpen={fullReactionPickerFor === msg.id}
+                  isContextMenuOpen={contextMenuFor === msg.id}
+                  isDeleting={deletingId === msg.id}
+                  isEditing={editingId === msg.id}
+                  isPollMenuOpen={pollMenuFor === msg.id}
+                  isPinned={pinnedMessageId === msg.id}
+                  editText={editingId === msg.id ? editText : undefined}
+                  highlightQuery={searchMode && searchQuery.trim() && searchMatchSet.has(msg.id) ? searchQuery : undefined}
+                  isActiveSearchMatch={searchMatches[searchMatchIndex] === msg.id}
+                  reactions={reactions[msg.id]}
+                  linkPreview={previewByMsgId[msg.id]}
+                  readReceipts={readReceiptMap[msg.id]}
+                  poll={msg.poll_id ? pollsData[msg.poll_id] : undefined}
+                  pollUserVote={msg.poll_id ? pollVotes[msg.poll_id] : undefined}
+                  pollCounts={msg.poll_id ? pollCounts[msg.poll_id] : undefined}
+                  isChangingVote={msg.poll_id ? changingVotePollIds.has(msg.poll_id) : false}
+                  isLargeRoom={isLargeRoom}
+                  isLatestOwn={isLatestOwn}
+                  seenByCount={isLatestOwn ? seenByCount : null}
+                  seenByOpen={isLatestOwn ? seenByOpen : false}
+                  seenByList={isLatestOwn ? seenByList : null}
+                  onToggleSeenBy={isLatestOwn ? toggleSeenBy : undefined}
+                  registerMessageRef={registerMessageRef}
+                  onPointerDown={handlePointerDown}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
+                  onReact={handleReact}
+                  onDeleteMessage={handleDeleteMessage}
+                  onDeletePoll={handleDeletePoll}
+                  onSaveEdit={handleEditMessage}
+                  onStartEdit={startEdit}
+                  onForward={openForwardSheet}
+                  onPin={handlePin}
+                  onUnpin={handleUnpin}
+                  onScrollToMessage={scrollToMessage}
+                  onOpenVoteSheet={openVoteSheet}
+                  setEmojiPickerFor={setEmojiPickerFor}
+                  setFullReactionPickerFor={setFullReactionPickerFor}
+                  setContextMenuFor={setContextMenuFor}
+                  setDeletingId={setDeletingId}
+                  setEditingId={setEditingId}
+                  setEditText={setEditText}
+                  setReplyingTo={setReplyingTo}
+                  setPollMenuFor={setPollMenuFor}
+                />
               )
             })}
 
@@ -2999,206 +2338,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         )}
       </div>
 
-      {/* ── Reply preview bar ── */}
-      {replyingTo && (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
-          <div className="flex-1 border-l-2 border-[var(--plum)] pl-2.5 min-w-0">
-            <p className="text-[11px] font-semibold text-[var(--plum)] flex items-center gap-1 mb-0.5">
-              <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
-              {replyingTo.sender_name}
-            </p>
-            <p className="text-[12px] text-[var(--muted-text)] truncate">{replyPreviewLabel(replyingTo.content, replyingTo.attachment_type, replyingTo.attachment_name).slice(0, 60)}</p>
-          </div>
-          <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <Composer
+        groupArchived={groupArchived}
+        displayName={displayName}
+        mentionMembers={mentionMembers}
+        replyingTo={replyingTo}
+        sending={sending}
+        uploading={uploading}
+        pollActive={showPollCreator}
+        onSend={handleSend}
+        onSendGif={handleSendGif}
+        onTyping={onTyping}
+        onClearReply={onClearReply}
+        onSetPollOpen={onSetPollOpen}
+      />
 
-
-      {/* ── GIF Picker panel ── */}
-      {showGifPicker && !groupArchived && (
-        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
-          <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
-            <input
-              autoFocus
-              value={gifSearch}
-              onChange={e => setGifSearch(e.target.value)}
-              placeholder="Search GIFs…"
-              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[var(--line)] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
-            />
-            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="overflow-y-auto h-[188px]">
-            {gifLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : gifResults.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-[13px] text-[var(--muted-text)]">No GIFs found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-1 p-1">
-                {gifResults.map(gif => (
-                  <button
-                    key={gif.id}
-                    onClick={() => handleSendGif(gif.fullUrl)}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-[#F4F1E8] hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    <img src={gif.previewUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Input bar ── */}
-      {groupArchived ? (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center justify-center">
-          <p className="text-[13px] text-[var(--muted-text)]">This chat is archived</p>
-        </div>
-      ) : (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
-          {/* @mention dropdown */}
-          {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
-              {filteredMentions.map((member, idx) => (
-                <button
-                  key={member.id}
-                  onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => handleMentionSelect(member.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[var(--cream-panel)]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
-                >
-                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
-                  <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf,.doc,.docx,.txt,.xlsx,.pptx"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
-            />
-            {/* Left icons — outside the bubble */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="flex-shrink-0 text-[var(--body)] hover:text-[var(--ink)] transition-colors disabled:opacity-40 mb-2"
-              title="Attach file"
-            >
-              {uploading
-                ? <div className="w-4 h-4 border-2 border-[var(--body)] border-t-transparent rounded-full animate-spin" />
-                : <Paperclip className="w-4 h-4" />
-              }
-            </button>
-            <button
-              onClick={() => { setShowGifPicker(p => !p); setShowPollCreator(false) }}
-              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
-              title="Send a GIF"
-            >
-              GIF
-            </button>
-            <button
-              onClick={() => { setShowPollCreator(p => !p); setShowGifPicker(false) }}
-              className={`flex-shrink-0 transition-colors mb-2 ${showPollCreator ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
-              title="Create a poll"
-            >
-              <BarChart2 className="w-4 h-4" />
-            </button>
-            {/* Textarea bubble — its own bordered component */}
-            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
-              {/* Attachment preview — inside the bubble, above the textarea */}
-              {pendingAttachment && (
-                <div className="mb-2">
-                  {pendingAttachment.file.type.startsWith("image/") ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={pendingAttachment.previewUrl}
-                        alt="Preview"
-                        className="w-16 h-16 rounded-xl object-cover border border-[var(--line)]"
-                      />
-                      <button
-                        onClick={clearPendingAttachment}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--ink)] flex items-center justify-center"
-                      >
-                        <X className="w-2.5 h-2.5 text-white" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-[#EDE9DF] rounded-xl px-2.5 py-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[var(--line)] flex items-center justify-center flex-shrink-0">
-                        <FileDown className="w-3.5 h-3.5 text-[var(--body)]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-medium text-[var(--ink)] truncate">{pendingAttachment.file.name}</p>
-                        <p className="text-[10px] text-[var(--muted-text)]">{formatFileSize(pendingAttachment.file.size)}</p>
-                      </div>
-                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              <textarea
-                ref={textareaRef}
-                value={inputText}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder={`Message ${displayName}`}
-                rows={1}
-                className="w-full resize-none bg-transparent text-[14px] text-[var(--ink)] placeholder:text-[var(--muted-text)] focus:outline-none border-none max-h-36 overflow-y-auto block"
-                style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
-              />
-            </div>
-            {/* Right icons — outside the bubble */}
-            <div className="relative mb-2">
-              <button
-                onClick={() => setShowComposerEmojiPicker(p => !p)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--body)] hover:bg-[var(--line)] transition-colors"
-              >
-                <Smile className="w-4 h-4" />
-              </button>
-              {showComposerEmojiPicker && (
-                <div className="absolute bottom-full right-0 mb-2 z-[160]">
-                  <LazyEmojiPicker
-                    onEmojiSelect={(emoji: { native: string }) => {
-                      insertEmojiAtCursor(emoji.native)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleSend}
-              disabled={(!inputText.trim() && !pendingAttachment) || sending}
-              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)] mb-2"
-              style={{ width: 34, height: 34, borderRadius: 10 }}
-            >
-              <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
-            </button>
-          </div>
-          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[#A09A8C]">
-            <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
-            <span>End-to-end visible to {displayName} members</span>
-          </div>
-        </div>
-      )}
-
-      {/* Overlay to dismiss emoji / context menu / GIF picker */}
-      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker || pollMenuFor) && (
+      {/* Overlay to dismiss message-row emoji / context menu / poll menu. The
+          composer's own GIF + emoji pickers render their dismiss overlay in <Composer>. */}
+      {(emojiPickerFor || contextMenuFor || fullReactionPickerFor || pollMenuFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[var(--shell-offset)]"
-          onPointerDown={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
+          onPointerDown={() => { setEmojiPickerFor(null); setContextMenuFor(null); setFullReactionPickerFor(null); setPollMenuFor(null) }}
         />
       )}
 
@@ -3271,7 +2431,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                   {optVoters.map((v, vi) => (
                                     <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0${vi > 0 ? " -ml-1.5" : ""}`} style={{ background: "var(--plum)" }}>
                                       {v.avatar_url
-                                        ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                        ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                         : <span className="font-bold flex items-center justify-center h-full" style={{ fontSize: 7, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                                       }
                                     </div>
@@ -3356,7 +2516,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                           <div key={v.user_id} className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: "var(--plum)" }}>
                               {v.avatar_url
-                                ? <img src={v.avatar_url} alt={v.name} className="w-full h-full object-cover" />
+                                ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                 : <span className="font-bold" style={{ fontSize: 10, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
                               }
                             </div>

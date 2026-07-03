@@ -1,10 +1,19 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
-import { DirectoryMemberListPanel } from "../tabs/directory-tab"
+import { DirectoryListSkeleton } from "@/components/central"
 import { useBreadcrumbExtra } from "../breadcrumb-context"
+
+// Lazy — pulls the 631-line directory-tab module into its own async chunk instead
+// of the main shell chunk (desktop-nav is statically imported by home-app). Only
+// loads when the user opens the Directory tab, where this panel renders.
+const DirectoryMemberListPanel = dynamic(
+  () => import("../tabs/directory-tab").then((m) => m.DirectoryMemberListPanel),
+  { loading: () => <DirectoryListSkeleton />, ssr: false }
+)
 import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../types"
 
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
@@ -389,7 +398,7 @@ export function DesktopSidebar({
         >
           {userAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+            <img src={userAvatarUrl} alt="" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--cream)", fontFamily: "var(--sans)" }}>
               {userInitials}

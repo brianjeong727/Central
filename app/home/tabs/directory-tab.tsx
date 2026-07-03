@@ -8,21 +8,38 @@ import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
 import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell } from "@/components/central"
 import { getInitials } from "../utils"
-import type { DirectoryMember } from "../types"
+import type { DirectoryMember, DirectoryMemberDetail } from "../types"
 
 // Shared directory fetcher — both the desktop panel and the mobile list key on
 // ["directory-members", ministryId], so they dedupe to a single request and
-// share one cache entry (instant on tab revisit).
+// share one cache entry (instant on tab revisit). Slim columns only — the heavy
+// free-text profile fields are fetched per-member by loadMemberDetail.
 async function loadDirectoryMembers(
   supabase: ReturnType<typeof createClient>,
   ministryId: string
 ): Promise<DirectoryMember[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, graduation_year, role, email, about_me, bible_verse, prayer_request, pray_for_me, bio, testimony, favorite_verse, favorite_worship_song, favorite_book_of_bible, avatar_url")
+    .select("id, name, graduation_year, role, avatar_url")
     .eq("ministry_id", ministryId)
     .order("name")
   return data ?? []
+}
+
+// Per-member detail fetcher — full profile fields for the detail views only,
+// keyed by ["member-detail", memberId] so revisits hit the SWR cache.
+async function loadMemberDetail(
+  supabase: ReturnType<typeof createClient>,
+  memberId: string,
+  ministryId: string
+): Promise<DirectoryMemberDetail | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, name, graduation_year, role, avatar_url, email, phone, about_me, bio, bible_verse, favorite_verse, prayer_request, pray_for_me, testimony, favorite_worship_song, favorite_book_of_bible")
+    .eq("id", memberId)
+    .eq("ministry_id", ministryId)
+    .single()
+  return data ?? null
 }
 
 // ── DirectoryMemberListPanel — lives in the shell context panel on desktop ─────
@@ -201,6 +218,7 @@ export function DirectoryTab({
           {selectedMember ? (
             <MemberDetailPanel
               member={selectedMember}
+              ministryId={ministryId}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               onOpenChat={onOpenChat}
@@ -303,6 +321,7 @@ export function DirectoryTab({
         <div className="md:hidden">
           <MemberSheet
             member={mobileSelected}
+            ministryId={ministryId}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
             onClose={() => setMobileSelected(null)}
@@ -319,8 +338,9 @@ export function DirectoryTab({
 
 // ── Desktop inline detail panel ─────────────────────────────────────────────
 
-function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat }: {
+function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName, onOpenChat }: {
   member: DirectoryMember
+  ministryId: string
   currentUserId: string
   currentUserName: string
   onOpenChat: (id: string, name: string, type?: string) => void
@@ -329,6 +349,12 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
   const [dmLoading, setDmLoading] = useState(false)
   const [prayingFor, setPrayingFor] = useState(false)
   const isOwnProfile = member.id === currentUserId
+  // Header renders instantly from the slim `member` row; the heavy profile
+  // fields stream in per-member (SWR-cached, so revisits are instant).
+  const { data: detail, isLoading: detailLoading } = useSWR(
+    ["member-detail", member.id],
+    () => loadMemberDetail(supabase, member.id, ministryId)
+  )
 
   async function handleMessage() {
     setDmLoading(true)
@@ -371,8 +397,8 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
   }
 
   const infoRows = [
-    { label: "EMAIL", value: member.email },
-    { label: "PHONE", value: member.phone || null },
+    { label: "EMAIL", value: detail?.email || null },
+    { label: "PHONE", value: detail?.phone || null },
     { label: "ROLE", value: member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null },
     { label: "CLASS", value: member.graduation_year ? `Class of ${member.graduation_year}` : null },
   ].filter(r => r.value)
@@ -448,15 +474,22 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
         ))}
 
         {(() => {
-          const aboutVal = member.bio || member.about_me
-          const verseVal = member.favorite_verse || member.bible_verse
+          if (detailLoading) {
+            return (
+              <div style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
+                <span style={{ fontSize: 14, color: "var(--muted-text)", opacity: 0.5 }}>…</span>
+              </div>
+            )
+          }
+          const aboutVal = detail?.bio || detail?.about_me
+          const verseVal = detail?.favorite_verse || detail?.bible_verse
           const rows: { label: string; value: string; italic?: boolean }[] = []
           if (aboutVal) rows.push({ label: "ABOUT", value: aboutVal })
-          if (member.testimony) rows.push({ label: "TESTIMONY", value: member.testimony })
+          if (detail?.testimony) rows.push({ label: "TESTIMONY", value: detail.testimony })
           if (verseVal) rows.push({ label: "VERSE", value: verseVal, italic: true })
-          if (member.favorite_worship_song) rows.push({ label: "WORSHIP SONG", value: member.favorite_worship_song })
-          if (member.favorite_book_of_bible) rows.push({ label: "FAVORITE BOOK", value: member.favorite_book_of_bible })
-          if (member.prayer_request) rows.push({ label: "PRAYER", value: member.prayer_request })
+          if (detail?.favorite_worship_song) rows.push({ label: "WORSHIP SONG", value: detail.favorite_worship_song })
+          if (detail?.favorite_book_of_bible) rows.push({ label: "FAVORITE BOOK", value: detail.favorite_book_of_bible })
+          if (detail?.prayer_request) rows.push({ label: "PRAYER", value: detail.prayer_request })
           return rows.map(row => (
             <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
               <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
@@ -473,12 +506,14 @@ function MemberDetailPanel({ member, currentUserId, currentUserName, onOpenChat 
 
 export function MemberSheet({
   member,
+  ministryId,
   currentUserId,
   currentUserName,
   onClose,
   onOpenChat,
 }: {
   member: DirectoryMember
+  ministryId: string
   currentUserId: string
   currentUserName: string
   onClose: () => void
@@ -487,6 +522,12 @@ export function MemberSheet({
   const supabase = createClient()
   const [dmLoading, setDmLoading] = useState(false)
   const isOwnProfile = member.id === currentUserId
+  // Identity block renders instantly from the slim `member` row; heavy profile
+  // fields stream in per-member (SWR-cached, so revisits are instant).
+  const { data: detail, isLoading: detailLoading } = useSWR(
+    ["member-detail", member.id],
+    () => loadMemberDetail(supabase, member.id, ministryId)
+  )
 
   async function handleSendMessage() {
     setDmLoading(true)
@@ -557,15 +598,24 @@ export function MemberSheet({
 
           {(() => {
             const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0, marginBottom: 4 }
-            const aboutVal = member.bio || member.about_me
-            const verseVal = member.favorite_verse || member.bible_verse
+
+            if (detailLoading) {
+              return (
+                <div className="flex items-center justify-center py-10">
+                  <p className="text-[13px]" style={{ color: "var(--muted-text)", opacity: 0.6 }}>…</p>
+                </div>
+              )
+            }
+
+            const aboutVal = detail?.bio || detail?.about_me
+            const verseVal = detail?.favorite_verse || detail?.bible_verse
 
             const sections: { id: string; label: string; fields: { label: string; value: string; italic?: boolean }[] }[] = [
               {
                 id: "contact", label: "Contact",
                 fields: [
                   member.graduation_year ? { label: "Graduation year", value: String(member.graduation_year) } : null,
-                  member.phone ? { label: "Phone", value: member.phone } : null,
+                  detail?.phone ? { label: "Phone", value: detail.phone } : null,
                 ].filter(Boolean) as { label: string; value: string }[]
               },
               {
@@ -575,15 +625,15 @@ export function MemberSheet({
               {
                 id: "faith", label: "Faith",
                 fields: [
-                  member.testimony ? { label: "Testimony", value: member.testimony } : null,
+                  detail?.testimony ? { label: "Testimony", value: detail.testimony } : null,
                   verseVal ? { label: "Favorite verse", value: verseVal, italic: true } : null,
-                  member.favorite_worship_song ? { label: "Favorite worship song", value: member.favorite_worship_song } : null,
-                  member.favorite_book_of_bible ? { label: "Favorite book of the Bible", value: member.favorite_book_of_bible } : null,
+                  detail?.favorite_worship_song ? { label: "Favorite worship song", value: detail.favorite_worship_song } : null,
+                  detail?.favorite_book_of_bible ? { label: "Favorite book of the Bible", value: detail.favorite_book_of_bible } : null,
                 ].filter(Boolean) as { label: string; value: string; italic?: boolean }[]
               },
               {
                 id: "prayer", label: "Prayer",
-                fields: member.prayer_request ? [{ label: "Prayer request", value: member.prayer_request }] : []
+                fields: detail?.prayer_request ? [{ label: "Prayer request", value: detail.prayer_request }] : []
               }
             ].filter(s => s.fields.length > 0)
 

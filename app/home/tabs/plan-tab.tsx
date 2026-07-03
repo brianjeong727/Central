@@ -1,24 +1,18 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react"
+import dynamic from "next/dynamic"
 import { createPortal } from "react-dom"
 import useSWR from "swr"
 import {
-  ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
+  ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
-  Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
+  ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
+  UserPlus, Sparkles, Layers, Bus, Clock,
 } from "lucide-react"
-import { useEditor, EditorContent } from "@tiptap/react"
-import { Editor } from "@tiptap/core"
-import StarterKit from "@tiptap/starter-kit"
-import { Underline as TiptapUnderline } from "@tiptap/extension-underline"
-import { TextAlign } from "@tiptap/extension-text-align"
-import { TextStyle } from "@tiptap/extension-text-style"
-import { Color } from "@tiptap/extension-color"
-import { Placeholder } from "@tiptap/extension-placeholder"
+import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
@@ -40,8 +34,6 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import * as Y from "yjs"
-import Collaboration from "@tiptap/extension-collaboration"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -58,6 +50,23 @@ import type {
   EventType, EventExtraTab, EventNewFolk,
 } from "../types"
 import { teamAccessLevel, type TeamAccess } from "../governance"
+
+// Rich-text / collaborative note editors are lazy-loaded so the heavy @tiptap/*
+// and yjs runtime deps stay OUT of plan-tab's static module graph. They sit behind
+// user interaction (opening a meeting note, editing a role description), so ssr:false
+// with a light fallback is safe. See ./note-editors.
+const RoleDescriptionEditor = dynamic(
+  () => import("./note-editors").then(m => m.RoleDescriptionEditor),
+  { ssr: false, loading: () => <div style={{ minHeight: 44 }} /> },
+)
+const TiptapToolbar = dynamic(
+  () => import("./note-editors").then(m => m.TiptapToolbar),
+  { ssr: false, loading: () => null },
+)
+const MeetingNoteEditor = dynamic(
+  () => import("./note-editors").then(m => m.MeetingNoteEditor),
+  { ssr: false, loading: () => <div style={{ padding: "20px 32px 44px" }}><Spinner /></div> },
+)
 
 const PERMISSION_LABELS: Record<string, string> = {
   can_manage_worship_set: "Manage worship set",
@@ -191,44 +200,6 @@ export function LinkForm({
           <X className="w-3.5 h-3.5" />
           Cancel
         </button>
-      </div>
-    </div>
-  )
-}
-
-export function RoleDescriptionEditor({
-  initialContent,
-  onChange,
-  placeholder,
-  children,
-  minHeight,
-}: {
-  initialContent: string
-  onChange: (html: string) => void
-  placeholder?: string
-  children?: React.ReactNode
-  minHeight?: number
-}) {
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit,
-      TiptapUnderline,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      TextStyle,
-      Color,
-      Placeholder.configure({ placeholder: placeholder ?? "Describe this role…" }),
-    ],
-    content: initialContent || "",
-    onUpdate: ({ editor: e }) => { onChange(e.getHTML()) },
-  })
-
-  return (
-    <div className="role-description-editor">
-      <TiptapToolbar editor={editor} />
-      {children}
-      <div style={{ padding: "14px 16px", minHeight: minHeight ? minHeight + 28 : undefined }}>
-        <EditorContent editor={editor} />
       </div>
     </div>
   )
@@ -464,365 +435,6 @@ export function StudentOrgRoleTabContent({
             )}
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-const NOTE_COLORS = [
-  "#000000", "#374151", "#6B7280",
-  "#EF4444", "#F97316", "#EAB308",
-  "#22C55E", "#3B82F6", "#8B5CF6",
-  "#EC4899", "var(--plum)",
-]
-
-export function TiptapToolbar({ editor }: { editor: Editor | null }) {
-  const [showColors, setShowColors] = useState(false)
-  const colorRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (colorRef.current && !colorRef.current.contains(e.target as Node)) setShowColors(false)
-    }
-    document.addEventListener("mousedown", onDown)
-    return () => document.removeEventListener("mousedown", onDown)
-  }, [])
-
-  if (!editor) return null
-
-  const btn = (active: boolean, action: () => void, title: string, icon: React.ReactNode) => (
-    <button
-      key={title}
-      type="button"
-      title={title}
-      onMouseDown={e => { e.preventDefault(); action() }}
-      style={{
-        padding: "4px 5px",
-        borderRadius: 5,
-        border: "none",
-        background: active ? "rgba(62,21,64,0.10)" : "transparent",
-        color: active ? "var(--plum)" : "var(--body)",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        lineHeight: 1,
-      }}
-    >
-      {icon}
-    </button>
-  )
-
-  const div = <div style={{ width: 1, height: 14, background: "var(--line)", margin: "0 3px", flexShrink: 0 }} />
-  const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid #F0EDE8", flexWrap: "wrap", background: "#FDFBF7" }}>
-      {btn(editor.isActive("bold"),      () => editor.chain().focus().toggleBold().run(),   "Bold",          <Bold size={12} />)}
-      {btn(editor.isActive("italic"),    () => editor.chain().focus().toggleItalic().run(), "Italic",        <Italic size={12} />)}
-      {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "Underline",  <UnderlineIcon size={12} />)}
-      {btn(editor.isActive("strike"),    () => editor.chain().focus().toggleStrike().run(), "Strikethrough", <Strikethrough size={12} />)}
-      {div}
-      {btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), "Heading 1",
-        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H1</span>)}
-      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2",
-        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H2</span>)}
-      {div}
-      {btn(editor.isActive("bulletList"),  () => editor.chain().focus().toggleBulletList().run(),  "Bullet List",   <List size={12} />)}
-      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List",  <ListOrdered size={12} />)}
-      {btn(false, () => editor.chain().focus().sinkListItem("listItem").run(),  "Indent",  <Indent size={12} />)}
-      {btn(false, () => editor.chain().focus().liftListItem("listItem").run(),  "Outdent", <Outdent size={12} />)}
-      {div}
-      {btn(editor.isActive({ textAlign: "left" }),   () => editor.chain().focus().setTextAlign("left").run(),   "Align Left",   <AlignLeft size={12} />)}
-      {btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), "Align Center", <AlignCenter size={12} />)}
-      {btn(editor.isActive({ textAlign: "right" }),  () => editor.chain().focus().setTextAlign("right").run(),  "Align Right",  <AlignRight size={12} />)}
-      {div}
-      {/* Color picker */}
-      <div ref={colorRef} style={{ position: "relative" }}>
-        <button
-          type="button"
-          title="Text color"
-          onMouseDown={e => { e.preventDefault(); setShowColors(v => !v) }}
-          style={{
-            padding: "3px 5px",
-            borderRadius: 5,
-            border: "none",
-            background: showColors ? "rgba(62,21,64,0.10)" : "transparent",
-            cursor: "pointer",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--body)", lineHeight: 1 }}>A</span>
-          <div style={{ width: 14, height: 2.5, borderRadius: 2, background: currentColor ?? "#374151" }} />
-        </button>
-        {showColors && (
-          <div style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "white",
-            border: "1px solid var(--line)",
-            borderRadius: 8,
-            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
-            padding: 8,
-            display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
-            gap: 4,
-            zIndex: 200,
-            minWidth: 136,
-          }}>
-            {NOTE_COLORS.map(c => (
-              <button
-                key={c}
-                type="button"
-                onMouseDown={e => { e.preventDefault(); editor.chain().focus().setColor(c).run(); setShowColors(false) }}
-                style={{
-                  width: 18, height: 18, borderRadius: 4,
-                  background: c,
-                  border: currentColor === c ? "2px solid var(--plum)" : "1.5px solid rgba(0,0,0,0.10)",
-                  cursor: "pointer", padding: 0,
-                }}
-              />
-            ))}
-            <button
-              type="button"
-              title="Remove color"
-              onMouseDown={e => { e.preventDefault(); editor.chain().focus().unsetColor().run(); setShowColors(false) }}
-              style={{
-                width: 18, height: 18, borderRadius: 4,
-                background: "white", border: "1.5px solid var(--line)",
-                cursor: "pointer", fontSize: 9, color: "var(--muted-text)",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-              }}
-            >✕</button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Collab presence colors ────────────────────────────────────────────────────
-interface CollabUser { userId: string; userName: string }
-
-// ── Live collab hook ──────────────────────────────────────────────────────────
-function useNoteCollab(noteId: string, userId: string, userName: string) {
-  const supabase = createClient()
-  const ydoc = useMemo(() => new Y.Doc(), [noteId]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [activeUsers, setActiveUsers] = useState<CollabUser[]>([])
-  const receivedStateRef = useRef(false)
-  const initDoneRef = useRef(false)
-  const isApplyingRemote = useRef(false)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-
-  useEffect(() => {
-    receivedStateRef.current = false
-    initDoneRef.current = false
-
-    const channel = supabase.channel(`meeting-note-${noteId}`, {
-      config: { presence: { key: userId }, broadcast: { self: false } },
-    })
-    channelRef.current = channel
-
-    // Receive Y.Doc incremental updates from other clients
-    channel.on("broadcast", { event: "ydoc-update" }, ({ payload }: { payload: { update: number[] } }) => {
-      Y.applyUpdate(ydoc, new Uint8Array(payload.update), "remote")
-    })
-
-    // Another client requesting our full state (they just joined)
-    channel.on("broadcast", { event: "request-state" }, ({ payload }: { payload: { forUserId: string } }) => {
-      const state = Y.encodeStateAsUpdate(ydoc)
-      channel.send({ type: "broadcast", event: "state-response", payload: { update: Array.from(state), forUserId: payload.forUserId } })
-    })
-
-    // Full state response arriving for us
-    channel.on("broadcast", { event: "state-response" }, ({ payload }: { payload: { update: number[]; forUserId: string } }) => {
-      if (payload.forUserId !== userId) return
-      Y.applyUpdate(ydoc, new Uint8Array(payload.update), "remote")
-      // If the doc has content, we don't need to init from DB
-      const frag = ydoc.getXmlFragment("default")
-      if (frag.length > 0) receivedStateRef.current = true
-    })
-
-    // Live title broadcast
-    channel.on("broadcast", { event: "title" }, ({ payload }: { payload: { title: string; userId: string } }) => {
-      if (payload.userId === userId) return
-      // Emit a custom DOM event that MeetingNoteDetail listens to
-      window.dispatchEvent(new CustomEvent(`note-title-${noteId}`, { detail: { title: payload.title } }))
-    })
-
-    // Presence: who's viewing/editing this note
-    // Guard: presence listeners cannot be added after subscribe() — skip if channel already joined
-    try {
-      channel.on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState()
-        const users = (Object.values(state).flat() as unknown as CollabUser[]).filter(u => u.userId !== userId)
-        setActiveUsers(users)
-      })
-    } catch {
-      // Channel already subscribed (React Strict Mode double-invoke) — presence will sync on next mount
-    }
-
-    // Broadcast our own Y.Doc updates to others (skip remote-origin updates and when applying fallback content)
-    const onYUpdate = (update: Uint8Array, origin: unknown) => {
-      if (origin === "remote" || isApplyingRemote.current) return
-      channel.send({ type: "broadcast", event: "ydoc-update", payload: { update: Array.from(update) } })
-    }
-    ydoc.on("update", onYUpdate)
-
-    channel.subscribe(async (status: string) => {
-      if (status !== "SUBSCRIBED") return
-      await channel.track({ userId, userName })
-      // Ask existing clients for their current state
-      channel.send({ type: "broadcast", event: "request-state", payload: { forUserId: userId } })
-    })
-
-    return () => {
-      ydoc.off("update", onYUpdate)
-      channel.untrack()
-      // Synchronously remove from the realtime client's channel list so that
-      // the next supabase.channel() call creates a fresh (unsubscribed) channel
-      // rather than returning the still-subscribed existing one (React Strict Mode issue)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rt = (supabase as any).realtime as { channels: unknown[]; _schedulePendingDisconnect?: () => void } | undefined
-      if (rt) {
-        rt.channels = rt.channels.filter((c: unknown) => c !== channel)
-        if (rt.channels.length === 0) rt._schedulePendingDisconnect?.()
-      }
-      channel.unsubscribe().catch(() => {})
-      channelRef.current = null
-      ydoc.destroy()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteId, userId, userName])
-
-  return { ydoc, activeUsers, receivedStateRef, initDoneRef, channelRef, isApplyingRemote }
-}
-
-export function MeetingNoteEditor({
-  noteId,
-  userId,
-  userName,
-  initialContent,
-  onSave,
-  onEditorReady,
-  canWrite = true,
-}: {
-  noteId: string
-  userId: string
-  userName: string
-  initialContent: string
-  onSave: (html: string) => Promise<void>
-  onEditorReady?: (editor: Editor | null) => void
-  canWrite?: boolean
-}) {
-  const { ydoc, activeUsers, receivedStateRef, initDoneRef, isApplyingRemote } = useNoteCollab(noteId, userId, userName)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastLocalEditRef = useRef(0)
-  const editorRef = useRef<Editor | null>(null)
-
-  const editor = useEditor({
-    editable: canWrite,
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({ undoRedo: false }), // Collaboration handles undo/redo
-      TiptapUnderline,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      TextStyle,
-      Color,
-      Placeholder.configure({ placeholder: "Start writing your meeting notes here…" }),
-      Collaboration.configure({ document: ydoc }),
-    ],
-    onUpdate: ({ editor: e }) => {
-      if (isApplyingRemote.current) return
-      lastLocalEditRef.current = Date.now()
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => onSave(e.getHTML()), 800)
-    },
-  })
-
-  // Keep editorRef current so the postgres_changes handler can access the editor
-  useEffect(() => { editorRef.current = editor }, [editor])
-
-  // Init content from DB only if no other clients sent us their state
-  useEffect(() => {
-    if (!editor || initDoneRef.current) return
-    const timer = setTimeout(() => {
-      initDoneRef.current = true
-      const frag = ydoc.getXmlFragment("default")
-      if (!receivedStateRef.current && frag.length === 0 && initialContent) {
-        isApplyingRemote.current = true
-        editor.commands.setContent(initialContent)
-        isApplyingRemote.current = false
-      }
-    }, 700)
-    return () => clearTimeout(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor])
-
-  // Fallback: postgres_changes catches updates that broadcast missed
-  useEffect(() => {
-    const supabase = createClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ch = supabase.channel(`db-note-${noteId}`) as any
-    try {
-      ch.on("postgres_changes", { event: "UPDATE", schema: "public", table: "meeting_notes", filter: `id=eq.${noteId}` },
-        (payload: { new: { body?: string } }) => {
-          const newBody = payload.new?.body
-          const ed = editorRef.current
-          if (!newBody || !ed) return
-          if (Date.now() - lastLocalEditRef.current < 2000) return // user actively typing
-          if (newBody === ed.getHTML()) return // already up to date
-          isApplyingRemote.current = true
-          ed.commands.setContent(newBody)
-          isApplyingRemote.current = false
-        },
-      ).subscribe()
-    } catch {
-      // Channel already subscribed (React Strict Mode double-invoke) — skip gracefully
-    }
-    return () => {
-      // Synchronously remove from realtime channels list before async unsubscribe
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rt = (supabase as any).realtime as { channels: unknown[] } | undefined
-      if (rt) rt.channels = rt.channels.filter((c: unknown) => c !== ch)
-      ch.unsubscribe?.().catch?.(() => {})
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteId])
-
-  useEffect(() => { onEditorReady?.(editor) }, [editor]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div className="meeting-note-editor">
-      {/* Presence bar */}
-      {activeUsers.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "#FDFBF7" }}>
-          <div style={{ display: "flex" }}>
-            {activeUsers.slice(0, 4).map((u, i) => (
-              <MonogramChip
-                key={u.userId}
-                title={u.userName}
-                initials={getInitials(u.userName)}
-                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 700, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
-              />
-            ))}
-          </div>
-          <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
-            {activeUsers.length === 1
-              ? `${activeUsers[0].userName.split(" ")[0]} is also editing`
-              : `${activeUsers.length} others are editing`}
-          </span>
-          {/* Live pulse dot */}
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0, boxShadow: "0 0 0 2px rgba(34,197,94,0.25)" }} />
-        </div>
-      )}
-      <div style={{ padding: "20px 32px 44px" }}>
-        <EditorContent editor={editor} />
       </div>
     </div>
   )
@@ -1155,6 +767,386 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   return { events, plannedIds, tableReady }
 }
 
+// ── Events agenda helpers ──────────────────────────────────────────────────────
+// Whole-day difference between two dates (calendar days, sign-preserving).
+function daysUntil(start: Date, now: Date): number {
+  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const n = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((s.getTime() - n.getTime()) / 86400000)
+}
+// Humanised countdown for a future event; null for past events (caller shows no pill).
+function countdownLabel(start: Date, now: Date): { label: string; soon: boolean } | null {
+  const days = daysUntil(start, now)
+  if (days < 0) return null
+  let label: string
+  if (days === 0) label = "Today"
+  else if (days === 1) label = "Tomorrow"
+  else if (days < 30) label = `in ${days} days`
+  else { const m = Math.round(days / 30); label = `in ${m} month${m === 1 ? "" : "s"}` }
+  return { label, soon: days <= 7 }
+}
+// Humanised "Ended · …" label for a past event (day/week/month granularity).
+function endedAgoLabel(start: Date, now: Date): string {
+  const days = -daysUntil(start, now) // positive = days in the past
+  if (days <= 0) return "Ended · today"
+  if (days === 1) return "Ended · yesterday"
+  if (days < 7) return `Ended · ${days} days ago`
+  if (days < 14) return "Ended · last week"
+  if (days < 30) { const w = Math.round(days / 7); return `Ended · ${w} weeks ago` }
+  if (days < 60) return "Ended · last month"
+  const m = Math.round(days / 30)
+  return `Ended · ${m} months ago`
+}
+
+// ── EventsAgendaList ───────────────────────────────────────────────────────────
+// Agenda/timeline view for a team's Events section (redesign per cdesign handoff).
+// Groups top-level events by month with a spine + node rail; the earliest upcoming
+// event is emphasised as an "up next" callout with an optional sub-events disclosure.
+function EventsAgendaList({
+  events, allEvents, onOpenEvent, canEdit, onDelete, deleteConfirmId, setDeleteConfirmId, deleting, plannedIds,
+}: {
+  events: CalendarEvent[]
+  allEvents: CalendarEvent[]
+  onOpenEvent: (ev: CalendarEvent) => void
+  canEdit: boolean
+  onDelete: (id: string) => void
+  deleteConfirmId: string | null
+  setDeleteConfirmId: (id: string | null) => void
+  deleting: boolean
+  plannedIds: Set<string>
+}) {
+  const now = useMemo(() => new Date(), [])
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  // null = user hasn't toggled anything → fall back to the derived default (up-next open).
+  const [openSubs, setOpenSubs] = useState<Set<string> | null>(null)
+  // null = user hasn't toggled → derived default (collapsed unless there are no upcoming events).
+  const [showPastOverride, setShowPastOverride] = useState<boolean | null>(null)
+  const [pastBarHover, setPastBarHover] = useState(false)
+
+  const sorted = useMemo(
+    () => [...events].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
+    [events],
+  )
+  // Split by the same "today" cutoff countdownLabel uses: on/after today = upcoming.
+  const upcoming = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) >= 0), [sorted, now])
+  const past = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) < 0), [sorted, now])
+  const upNextId = upcoming[0]?.id ?? null
+  const showPast = showPastOverride ?? (upcoming.length === 0)
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, CalendarEvent[]>()
+    for (const e of allEvents) {
+      if (!e.parent_event_id) continue
+      const arr = m.get(e.parent_event_id) ?? []
+      arr.push(e); m.set(e.parent_event_id, arr)
+    }
+    for (const arr of m.values()) arr.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+    return m
+  }, [allEvents])
+
+  // Derived open set: until the user toggles, the up-next event's panel defaults open.
+  const effectiveOpenSubs = openSubs ?? new Set<string>(upNextId ? [upNextId] : [])
+
+  function toggleSubs(id: string) {
+    setOpenSubs(prev => {
+      const base = prev ?? new Set<string>(upNextId ? [upNextId] : [])
+      const next = new Set(base)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  if (events.length === 0) {
+    return (
+      <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
+        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
+          No events yet. Click &ldquo;New Event&rdquo; to get started.
+        </p>
+      </div>
+    )
+  }
+
+  const monoBase: React.CSSProperties = { fontFamily: "var(--mono)", textTransform: "uppercase" }
+  const dot = <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--faint)", flexShrink: 0 }} />
+
+  // Shared bits reused by both the upcoming and past lists.
+  const renderPlannedCheck = (isPlanned: boolean) => isPlanned ? (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ) : null
+  const renderDeleteBtn = (evId: string, isHovered: boolean) => canEdit ? (
+    <button
+      onClick={e => { e.stopPropagation(); setDeleteConfirmId(evId) }}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--muted-text)", flexShrink: 0, display: "flex", alignItems: "center", opacity: isHovered ? 1 : 0, transition: "opacity 120ms" }}
+      title="Delete event"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  ) : null
+  const renderConfirmBody = (ev: CalendarEvent) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "17px 20px", borderRadius: "var(--r-card)", background: "color-mix(in srgb, var(--danger) 5%, var(--cream))", border: "1px solid color-mix(in srgb, var(--danger) 28%, var(--line-2))" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--danger)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+        <p style={{ fontSize: 13, color: "color-mix(in srgb, var(--danger) 60%, var(--body))", margin: "4px 0 0", fontFamily: "var(--sans)" }}>Delete this event and all its planning data?</p>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}>Cancel</button>
+        <button onClick={e => { e.stopPropagation(); onDelete(ev.id) }} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+      </div>
+    </div>
+  )
+
+  // ── Upcoming list (month-grouped; first entry is the emphasised Up-Next) ──────
+  const upcomingNodes: ReactNode[] = []
+  let lastMonthKey = ""
+  upcoming.forEach((ev, i) => {
+    const d = new Date(ev.start_date)
+    const end = new Date(ev.end_date)
+    const monthKey = `${d.getFullYear()}-${d.getMonth()}`
+    if (monthKey !== lastMonthKey) {
+      lastMonthKey = monthKey
+      upcomingNodes.push(
+        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: "var(--space-9) 0 var(--space-6)" }}>
+          <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.16em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+            {d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </span>
+          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        </div>,
+      )
+    }
+
+    const isFirst = i === 0
+    const isLast = i === upcoming.length - 1
+    const isUpNext = ev.id === upNextId
+    const isConfirmDelete = deleteConfirmId === ev.id
+    const isHovered = hoveredId === ev.id
+    const isPlanned = plannedIds.has(ev.id)
+    const cd = countdownLabel(d, now)
+    const kids = childrenByParent.get(ev.id) ?? []
+    const hasKids = kids.length > 0
+    const subsOpen = effectiveOpenSubs.has(ev.id)
+
+    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
+    const multiDay = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() !== new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() && !isNaN(end.getTime())
+    const rangeStr = multiDay
+      ? `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : dtStr
+
+    const dayNum = daysUntil(d, now)
+    const bigNum = dayNum >= 30 ? String(Math.round(dayNum / 30)) : String(Math.max(dayNum, 0))
+    const bigUnit = dayNum <= 0 ? "today" : dayNum < 30 ? (dayNum === 1 ? "day away" : "days away") : (Math.round(dayNum / 30) === 1 ? "month away" : "months away")
+
+    // Body: confirm-delete swap, up-next callout, or standard card.
+    let body: ReactNode
+    if (isConfirmDelete) {
+      body = renderConfirmBody(ev)
+    } else if (isUpNext) {
+      body = (
+        <div
+          onClick={() => onOpenEvent(ev)}
+          onMouseEnter={() => setHoveredId(ev.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderLeft: "3px solid var(--plum)", borderRadius: "var(--r-callout)", padding: "18px 22px", cursor: "pointer" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
+            <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              {renderPlannedCheck(isPlanned)}
+              {renderDeleteBtn(ev.id, isHovered)}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {rangeStr}</span>
+                {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+              </div>
+            </div>
+            <div style={{ marginLeft: "auto", textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--plum)", lineHeight: 1, letterSpacing: "-0.02em" }}>{bigNum}</div>
+              <div style={{ ...monoBase, fontSize: 10, color: "var(--muted-text)", marginTop: 3 }}>{bigUnit}</div>
+            </div>
+          </div>
+        </div>
+      )
+    } else {
+      const isPast = cd === null
+      body = (
+        <div
+          onClick={() => onOpenEvent(ev)}
+          onMouseEnter={() => setHoveredId(ev.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream)", border: `1px solid ${isHovered ? "var(--dashed)" : "var(--line-2)"}`, cursor: "pointer", transition: "border-color 120ms ease" }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
+              {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {!isPast && cd && (
+              <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
+            )}
+            {renderPlannedCheck(isPlanned)}
+            {renderDeleteBtn(ev.id, isHovered)}
+          </div>
+        </div>
+      )
+    }
+
+    // Sub-events disclosure (only when the event has children).
+    const subsBlock = hasKids ? (
+      <div style={{ marginTop: 10 }}>
+        <button
+          onClick={() => toggleSubs(ev.id)}
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", color: "var(--plum)", fontFamily: "var(--sans)", fontSize: 12.5, padding: 0 }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: subsOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease" }}>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+          <span>Sub-events</span>
+          <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--plum)" }}>{kids.length}</span>
+        </button>
+        <div style={{ overflow: "hidden", maxHeight: subsOpen ? 2000 : 0, transition: "max-height 260ms ease" }}>
+          <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            {kids.map(c => {
+              const cd2 = new Date(c.start_date)
+              const cTime = c.all_day ? "All day" : cd2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              return (
+                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px 1fr", cursor: "pointer" }}>
+                  <div style={{ textAlign: "center", paddingTop: 4 }}>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{cd2.getDate()}</div>
+                    <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{cd2.toLocaleDateString("en-US", { month: "short" })}</div>
+                  </div>
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--line-2)", transform: "translateX(-50%)" }} />
+                    <div style={{ position: "absolute", left: "50%", top: "50%", width: 7, height: 7, borderRadius: "50%", background: "var(--cream)", border: "2px solid var(--dashed)", transform: "translate(-50%,-50%)", boxSizing: "border-box" }} />
+                  </div>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0, fontFamily: "var(--sans)" }}>{c.title}</p>
+                      {c.description && <p style={{ fontSize: 12, color: "var(--body)", margin: "2px 0 0", fontFamily: "var(--sans)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.description}</p>}
+                    </div>
+                    <span style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", flexShrink: 0 }}>{cTime}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    ) : null
+
+    upcomingNodes.push(
+      <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
+        {/* Date block */}
+        <div style={{ textAlign: "center", paddingTop: 20 }}>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: isUpNext ? "var(--plum)" : "var(--ink)", lineHeight: 1 }}>{d.getDate()}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+        </div>
+        {/* Spine */}
+        <div style={{ position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 2, background: "var(--line)", top: isFirst ? 28 : 0, bottom: isLast ? "auto" : 0, height: isLast ? 28 : "auto" }} />
+          <div className={isUpNext ? "event-upnext-node" : undefined} style={{ position: "absolute", top: 28, left: "50%", transform: "translate(-50%,-50%)", width: 11, height: 11, borderRadius: "50%", background: isUpNext ? "var(--plum)" : "var(--cream)", border: `2px solid ${isUpNext ? "var(--plum)" : "var(--dashed)"}`, boxSizing: "border-box" }} />
+        </div>
+        {/* Body */}
+        <div style={{ paddingTop: 14, minWidth: 0 }}>
+          {body}
+          {subsBlock}
+        </div>
+      </div>,
+    )
+  })
+
+  // ── Past list (reverse-chronological, de-emphasised; no month grouping, no subs) ──
+  const pastDesc = [...past].reverse()
+  const pastNodes: ReactNode[] = pastDesc.map((ev, i) => {
+    const d = new Date(ev.start_date)
+    const isFirst = i === 0
+    const isLast = i === pastDesc.length - 1
+    const isConfirmDelete = deleteConfirmId === ev.id
+    const isHovered = hoveredId === ev.id
+    const isPlanned = plannedIds.has(ev.id)
+    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
+
+    const body = isConfirmDelete ? renderConfirmBody(ev) : (
+      <div
+        onClick={() => onOpenEvent(ev)}
+        onMouseEnter={() => setHoveredId(ev.id)}
+        onMouseLeave={() => setHoveredId(null)}
+        style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: `1px solid ${isHovered ? "var(--line-2)" : "var(--line)"}`, opacity: isHovered ? 1 : 0.82, cursor: "pointer", transition: "opacity 120ms ease, border-color 120ms ease" }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--faint)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
+            {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--faint)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now)}</span>
+          {renderPlannedCheck(isPlanned)}
+          {renderDeleteBtn(ev.id, isHovered)}
+        </div>
+      </div>
+    )
+
+    return (
+      <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
+        {/* Date block — de-emphasised */}
+        <div style={{ textAlign: "center", paddingTop: 20 }}>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--muted-text)", lineHeight: 1 }}>{d.getDate()}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+        </div>
+        {/* Spine — done node */}
+        <div style={{ position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 2, background: "var(--line)", top: isFirst ? 28 : 0, bottom: isLast ? "auto" : 0, height: isLast ? 28 : "auto" }} />
+          <div style={{ position: "absolute", top: 28, left: "50%", transform: "translate(-50%,-50%)", width: 11, height: 11, borderRadius: "50%", background: "var(--line-2)", border: "2px solid var(--line-2)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Check style={{ width: 8, height: 8, color: "var(--cream)" }} strokeWidth={3} />
+          </div>
+        </div>
+        {/* Body */}
+        <div style={{ paddingTop: 14, minWidth: 0 }}>{body}</div>
+      </div>
+    )
+  })
+
+  return (
+    <div>
+      {upcomingNodes}
+      {past.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
+            onMouseEnter={() => setPastBarHover(true)}
+            onMouseLeave={() => setPastBarHover(false)}
+            style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: "var(--space-10)" }}
+          >
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ChevronDown className="w-3.5 h-3.5" style={{ color: "var(--muted-text)", transform: showPast ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+              <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.14em", color: pastBarHover ? "var(--body)" : "var(--muted-text)", transition: "color 120ms ease" }}>Past events</span>
+              <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--muted-text)" }}>{past.length}</span>
+            </span>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </button>
+          {showPast && <div style={{ paddingTop: "var(--space-6)" }}>{pastNodes}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── StudentOrgTeamHome ─────────────────────────────────────────────────────────
 // Full redesign per design spec: plum hero → General/Plan/Roster/Resources tabs →
 // General = month calendar (click → EventPlanWorkspace directly) + UP NEXT + QUICK ADD + notes timeline
@@ -1214,7 +1206,6 @@ export function StudentOrgTeamHome({
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
 
   // Sub-event body-swap: when a sub-event is opened from EventPlanWorkspace's
   // Sub-events tab, it reuses the SAME parent SubpageShell (body + extended
@@ -1514,77 +1505,17 @@ export function StudentOrgTeamHome({
                 )}
               </div>
             )}
-            {calEvents.length === 0 ? (
-              <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Click &ldquo;New Event&rdquo; to get started.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {calEvents.map(ev => {
-                  const isPlanned = plannedIds.has(ev.id)
-                  const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
-                  const isConfirmDelete = deleteConfirmId === ev.id
-                  const isHovered = hoveredEventId === ev.id
-                  return (
-                    <div
-                      key={ev.id}
-                      onClick={() => !isConfirmDelete && onPlanningEventChange(ev)}
-                      onMouseEnter={() => !isConfirmDelete && setHoveredEventId(ev.id)}
-                      onMouseLeave={() => setHoveredEventId(null)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 16,
-                        padding: "16px 20px", borderRadius: 12,
-                        border: `1px solid ${isConfirmDelete ? "#F0C8C8" : "var(--line)"}`,
-                        background: isConfirmDelete ? "#FEF7F7" : isHovered ? "var(--ivory)" : "var(--body-bg)",
-                        cursor: isConfirmDelete ? "default" : "pointer",
-                        transition: "background 120ms ease, border-color 120ms ease",
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: isConfirmDelete ? "#9F3030" : "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
-                        <p style={{ fontSize: 12, color: isConfirmDelete ? "#C08080" : "var(--muted-text)", margin: "3px 0 0", fontFamily: "var(--sans)" }}>
-                          {isConfirmDelete ? "Delete this event and all its planning data?" : `${dateStr}${ev.location ? ` · ${ev.location}` : ""}`}
-                        </p>
-                      </div>
-                      {isConfirmDelete ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button
-                            onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }}
-                            style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id) }}
-                            disabled={deleting}
-                            style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#9F3030", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}
-                          >
-                            {deleting ? "Deleting…" : "Delete"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          {isPlanned && (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                          {canEdit && (
-                            <button
-                              onClick={e => { e.stopPropagation(); setDeleteConfirmId(ev.id) }}
-                              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--muted-text)", flexShrink: 0, display: "flex", alignItems: "center", opacity: isHovered ? 1 : 0, transition: "opacity 120ms" }}
-                              title="Delete event"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <EventsAgendaList
+              events={calEvents}
+              allEvents={calData?.events ?? []}
+              onOpenEvent={onPlanningEventChange}
+              canEdit={canEdit}
+              onDelete={handleDeleteEvent}
+              deleteConfirmId={deleteConfirmId}
+              setDeleteConfirmId={setDeleteConfirmId}
+              deleting={deleting}
+              plannedIds={plannedIds}
+            />
           </div>
         )}
 
@@ -6191,6 +6122,58 @@ export function MinistryCalendar({
 
 // ── EventPlanWorkspace ────────────────────────────────────────────────────────
 
+// Date helpers for the plan/crunch checklist windows. Format is "YYYY-MM-DD" in
+// LOCAL time (never UTC) so day-granularity comparisons never off-by-one, and
+// month/day arithmetic uses the Date constructor's own overflow normalization.
+function toLocalYMD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+function addMonthsYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth() + n, d.getDate()))
+}
+function addDaysYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
+}
+
+// A single Launchpad link row on the event Overview — an ivory icon-chip, a
+// serif title + subtitle, and an optional right-side metric before the chevron.
+// Hover lifts the card slightly and warms the border to plum.
+function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
+  icon: typeof Users
+  title: string
+  subtitle: string
+  right?: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--plum)"; e.currentTarget.style.transform = "translateX(2px)" }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)"; e.currentTarget.style.transform = "translateX(0)" }}
+      style={{
+        display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", textAlign: "left",
+        background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-card)",
+        padding: "16px 18px", cursor: "pointer", transition: "border-color .15s ease, transform .15s ease",
+      }}
+    >
+      <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ivory)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+        <Icon style={{ width: 18, height: 18, color: "var(--plum)" }} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--body)", marginTop: 2 }}>{subtitle}</span>
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        {right}
+        <ChevronRight style={{ width: 18, height: 18, color: "var(--faint)" }} />
+      </span>
+    </button>
+  )
+}
+
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -6241,6 +6224,13 @@ export function EventPlanWorkspace({
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
 
+  // Assignee pool = team members ∪ anyone assigned to a role on this event, deduped by id
+  const assigneePool = useMemo(() => {
+    const map = new Map<string, string>(members.map(m => [m.id, m.name]))
+    for (const r of roles) if (r.assigned_to && r.assigned_name) map.set(r.assigned_to, r.assigned_name)
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [members, roles])
+
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
@@ -6263,15 +6253,32 @@ export function EventPlanWorkspace({
   const [budget, setBudget] = useState("")
   const [overviewNotes, setOverviewNotes] = useState("")
   const [savingOverview, setSavingOverview] = useState(false)
+  // Overview click-to-edit toggles for the turnout / budget stat numbers
+  const [editingTurnout, setEditingTurnout] = useState(false)
+  const [editingBudget, setEditingBudget] = useState(false)
 
-  // Task add state
+  // Task add state — newTaskSection is the date-derived checklist section the
+  // inline add-row is currently active in ("" = none focused yet).
   const [newTaskTitle, setNewTaskTitle] = useState("")
   const [newTaskAssignee, setNewTaskAssignee] = useState("")
   const [newTaskDue, setNewTaskDue] = useState("")
-  const [newTaskPhase, setNewTaskPhase] = useState<EventTask["phase"]>("pre_event")
+  const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
+
+  // Plan/crunch date state — drives the checklist section windows.
+  const [planStartDate, setPlanStartDate] = useState("")
+  const [crunchDate, setCrunchDate] = useState("")
+  const [editingPlanStart, setEditingPlanStart] = useState(false)
+  const [editingCrunch, setEditingCrunch] = useState(false)
+
+  // Task inline edit state
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState("")
+  const [editTaskAssignee, setEditTaskAssignee] = useState("")
+  const [editTaskDue, setEditTaskDue] = useState("")
+  const [savingTaskEdit, setSavingTaskEdit] = useState(false)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -6291,11 +6298,6 @@ export function EventPlanWorkspace({
 
   const startDate = new Date(calendarEvent.start_date)
   const endDate = new Date(calendarEvent.end_date)
-  const dateStr = calendarEvent.all_day
-    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 
   useEffect(() => {
     async function init() {
@@ -6319,13 +6321,29 @@ export function EventPlanWorkspace({
 
       if (!planData) { setLoading(false); return }
 
+      const planId = planData.id
+
+      // Plan/crunch dates. First-time init: when plan_start_date is null, seed
+      // plan-start = event − 1 month and crunch = event − 1 week (local YMD),
+      // persist once, and use them. After this one-time write plan_start_date is
+      // always set; a later null crunch_date means the user REMOVED the crunch phase.
+      let psd = planData.plan_start_date as string | null
+      let cd = planData.crunch_date as string | null
+      if (!psd) {
+        const eventDate = new Date(calendarEvent.start_date)
+        psd = addMonthsYMD(eventDate, -1)
+        cd = addDaysYMD(eventDate, -7)
+        await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
+        planData = { ...planData, plan_start_date: psd, crunch_date: cd }
+      }
+      setPlanStartDate(psd ?? "")
+      setCrunchDate(cd ?? "")
+
       setPlan(planData as EventPlan)
       setPlanningGroupId((planData as EventPlan).planning_group_id ?? null)
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
       setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
-
-      const planId = planData.id
 
       // Fetch tasks with assignee name
       const { data: tasksData } = await supabase
@@ -6378,21 +6396,12 @@ export function EventPlanWorkspace({
         created_at: n.created_at as string,
       })))
 
-      // Fetch assignee list: team roster if teamId given, else all ministry members
-      if (teamId) {
-        const { data: rosterData } = await supabase
-          .from("team_members")
-          .select("user_id, profiles(id, name)")
-          .eq("team_id", teamId)
-        setMembers((rosterData ?? []).map((r: Record<string, unknown>) => {
-          const p = r.profiles as { id?: string; name?: string } | null
-          return { id: p?.id ?? r.user_id as string, name: p?.name ?? "Unknown" }
-        }).filter(m => m.name !== "Unknown"))
-      } else {
-        const { data: membersData } = await supabase
-          .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
-        setMembers(membersData ?? [])
-      }
+      // Assignee list = the entire ministry (student org) member list — the team
+      // roster is often unpopulated, and tasks should be assignable to anyone in
+      // the org. assigneePool (memo) additionally unions in this event's role-assignees.
+      const { data: membersData } = await supabase
+        .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+      setMembers(membersData ?? [])
 
       // Fetch RSVP count if linked to an announcement
       if ((calendarEvent as { linked_announcement_id?: string | null }).linked_announcement_id) {
@@ -6433,6 +6442,13 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
+  async function handleSavePlanDates(patch: { plan_start_date?: string | null; crunch_date?: string | null }) {
+    if (!plan || !canEdit) return
+    await supabase.from("event_plans").update(patch).eq("id", plan.id).eq("ministry_id", ministryId)
+    if (patch.plan_start_date !== undefined) setPlanStartDate(patch.plan_start_date ?? "")
+    if (patch.crunch_date !== undefined) setCrunchDate(patch.crunch_date ?? "")
+  }
+
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
@@ -6442,10 +6458,11 @@ export function EventPlanWorkspace({
       .eq("id", task.id)
   }
 
-  async function handleAddTask(phaseOverride?: EventTask["phase"]) {
+  async function handleAddTask(section: { defaultDue: string; phase: EventTask["phase"] }) {
     if (!plan || !newTaskTitle.trim()) return
-    const phase = phaseOverride ?? newTaskPhase
-    const maxSort = tasks.filter(t => t.phase === phase).reduce((m, t) => Math.max(m, t.sort_order), -1)
+    const phase = section.phase
+    const due = newTaskDue || section.defaultDue || null
+    const maxSort = tasks.reduce((m, t) => Math.max(m, t.sort_order), -1)
     setAddingTask(true)
     const { data } = await supabase
       .from("event_tasks")
@@ -6453,7 +6470,7 @@ export function EventPlanWorkspace({
         event_plan_id: plan.id,
         title: newTaskTitle.trim(),
         assigned_to: newTaskAssignee || null,
-        due_date: newTaskDue || null,
+        due_date: due,
         completed: false,
         phase,
         sort_order: maxSort + 1,
@@ -6478,12 +6495,38 @@ export function EventPlanWorkspace({
     setNewTaskTitle("")
     setNewTaskAssignee("")
     setNewTaskDue("")
+    setNewTaskSection("")
     setAddingTask(false)
   }
 
   async function handleDeleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     await supabase.from("event_tasks").delete().eq("id", id)
+  }
+
+  function startEditTask(task: EventTask) {
+    setConfirmDeleteTaskId(null)
+    setEditingTaskId(task.id)
+    setEditTaskTitle(task.title)
+    setEditTaskAssignee(task.assigned_to ?? "")
+    setEditTaskDue(task.due_date ?? "")
+  }
+
+  async function handleUpdateTask() {
+    if (!editingTaskId || !editTaskTitle.trim()) return
+    setSavingTaskEdit(true)
+    const id = editingTaskId
+    const newTitle = editTaskTitle.trim()
+    const newAssignee = editTaskAssignee || null
+    const newDue = editTaskDue || null
+    await supabase
+      .from("event_tasks")
+      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue })
+      .eq("id", id)
+    const assignedName = newAssignee ? assigneePool.find(a => a.id === newAssignee)?.name : undefined
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, assigned_name: assignedName } : t))
+    setEditingTaskId(null)
+    setSavingTaskEdit(false)
   }
 
   async function handleAddRole() {
@@ -6585,6 +6628,17 @@ export function EventPlanWorkspace({
     teams: "Teams", transport: "Transport", program: "Program",
   }
 
+  // Launchpad metadata for the dynamic extra-tab rows on Overview: an icon +
+  // a one-line subtitle per planning tab this event actually carries.
+  const EXTRA_TAB_META: Record<EventExtraTab, { icon: typeof Users; subtitle: string }> = {
+    sub_events: { icon: Calendar, subtitle: "Nights & activities inside the week" },
+    new_folks: { icon: UserPlus, subtitle: "Track first-timers and follow-up" },
+    acts: { icon: Sparkles, subtitle: "Performances & skits for the night" },
+    teams: { icon: Layers, subtitle: "Split attendees into teams" },
+    transport: { icon: Bus, subtitle: "Rides & carpools to the venue" },
+    program: { icon: Clock, subtitle: "Run-of-show & schedule" },
+  }
+
   const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
@@ -6593,15 +6647,41 @@ export function EventPlanWorkspace({
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
-  // Phase config: use typeCfg phases if available, else defaults
-  const phaseConfig: { key: EventTask["phase"]; label: string }[] = typeCfg.defaultPhases.length > 0
-    ? typeCfg.defaultPhases.map(p => ({ key: p.key as EventTask["phase"], label: p.label }))
-    : [
-        { key: "pre_event", label: "Pre-Event" },
-        { key: "day_of", label: "Day-of" },
-        { key: "post_event", label: "Post-Event" },
-        { key: "followup", label: "Follow-up" },
-      ]
+  // ── Date-driven checklist sections ──────────────────────────────────────────
+  // Window anchors (local YMD): plan-start … [crunch] … event day … event+2mo cap.
+  const eventYMD = toLocalYMD(startDate)
+  const eventPlusOneYMD = addDaysYMD(startDate, 1)
+  const eventPlusTwoMonthsYMD = addMonthsYMD(startDate, 2)
+  const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+
+  // Map a task to its section. If dated, compare day-granularity YMD strings to
+  // the plan-start / crunch / event anchors; otherwise fall back to the stored
+  // phase (dateless tasks never land in "crunch").
+  type ChecklistSection = "planning" | "crunch" | "day_of" | "post"
+  function sectionOf(task: EventTask): ChecklistSection {
+    const due = task.due_date
+    if (due) {
+      if (due >= eventPlusOneYMD) return "post"
+      if (due === eventYMD) return "day_of"
+      if (crunchDate && due >= crunchDate && due < eventYMD) return "crunch"
+      return "planning"
+    }
+    switch (task.phase) {
+      case "day_of": return "day_of"
+      case "post_event":
+      case "followup": return "post"
+      default: return "planning" // pre_event
+    }
+  }
+
+  // Rendered sections in order — Crunch only appears when a crunch date is set.
+  // defaultDue/phase seed the section's inline add-row so a new task lands here.
+  const sectionDefs: { key: ChecklistSection; label: string; defaultDue: string; phase: EventTask["phase"] }[] = [
+    { key: "planning", label: "Planning phase", defaultDue: planStartDate, phase: "pre_event" },
+    ...(crunchDate ? [{ key: "crunch" as ChecklistSection, label: "Crunch phase", defaultDue: crunchDate, phase: "day_of" as EventTask["phase"] }] : []),
+    { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
+    { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
+  ]
 
   const inputStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
@@ -6680,105 +6760,247 @@ export function EventPlanWorkspace({
         ) : (
           <>
             {/* ── Overview ── */}
-            {activeSection === 'overview' && (
-              <>
-              <ContentHeader
-                label="Overview"
-                action={canEdit && onEditEvent ? (
-                  <ContentActionButton variant="ghost" icon={<Pencil style={{ width: 14, height: 14 }} />} label="Edit event" onClick={onEditEvent} />
-                ) : undefined}
-              />
-              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start", marginTop: 24 }} className="max-md:!block">
-                {/* Left: planning details (section header is the ContentHeader above) */}
+            {activeSection === 'overview' && (() => {
+              // ── Derived overview metrics ──────────────────────────────────
+              const taskTotal = tasks.length
+              const taskDone = tasks.filter(t => t.completed).length
+              const rolesTotal = roles.length
+              const rolesAssigned = roles.filter(r => r.assigned_to).length
+              const pct = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0
+              const filledSegs = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 5) : 0
+              // Readiness status from checklist progress
+              const readiness = taskTotal === 0
+                ? { color: "var(--faint)", label: "No checklist yet" }
+                : pct === 100 ? { color: "var(--success)", label: "Ready" }
+                : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
+                : { color: "var(--gold)", label: "Needs attention" }
+              // Identity facts — omit any empty value
+              const dateOnly = startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+              const timeVal = calendarEvent.all_day ? "" :
+                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              // Where always shows below Time, sourced from the Edit-event location field
+              // (muted em-dash when unset); Time/What omit when empty.
+              const facts: { k: string; v: string; muted?: boolean }[] = [
+                ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
+                { k: "Where", v: calendarEvent.location?.trim() || "—", muted: !calendarEvent.location?.trim() },
+                ...(calendarEvent.description?.trim() ? [{ k: "What", v: calendarEvent.description.trim() }] : []),
+              ]
+
+              const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
+              const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
+              const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
+              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }
+              const factDateInput: React.CSSProperties = { background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 8, padding: "4px 10px", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }
+              const factLink: React.CSSProperties = { fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)" }
+
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
+                {/* ── LEFT column ── */}
                 <section>
-                  {calendarEvent.description && (
-                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, maxWidth: 540 }}>
-                      {calendarEvent.description}
-                    </p>
-                  )}
-                  <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "120px 1fr", rowGap: 14, columnGap: 24, fontSize: 14 }}>
-                    <span style={{ color: "var(--muted-text)" }}>When</span>
-                    <span style={{ color: "var(--ink)" }}>{dateStr}</span>
-                    {calendarEvent.location && (
-                      <>
-                        <span style={{ color: "var(--muted-text)" }}>Where</span>
-                        <span style={{ color: "var(--ink)" }}>{calendarEvent.location}</span>
-                      </>
+                  {/* Event identity header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
+                    <div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
+                        {facts.map(f => (
+                          <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                            <span style={factKey}>{f.k}</span>
+                            <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                          </div>
+                        ))}
+
+                        {/* Plan start — planning begins; always set, not removable */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Plan</span>
+                          {canEdit && editingPlanStart ? (
+                            <input
+                              type="date"
+                              autoFocus
+                              value={planStartDate}
+                              max={eventYMD}
+                              onChange={(e) => { if (e.target.value) handleSavePlanDates({ plan_start_date: e.target.value }) }}
+                              onBlur={() => setEditingPlanStart(false)}
+                              style={factDateInput}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => { if (canEdit) setEditingPlanStart(true) }}
+                              style={{ fontSize: 15, color: planStartDate ? "var(--ink)" : "var(--faint)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                            >{planStartDate ? fmtMD(planStartDate) : "—"}</span>
+                          )}
+                        </div>
+
+                        {/* Crunch — busy phase begins; optional (removable) */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Crunch</span>
+                          {crunchDate ? (
+                            canEdit && editingCrunch ? (
+                              <input
+                                type="date"
+                                autoFocus
+                                value={crunchDate}
+                                min={planStartDate || undefined}
+                                max={eventYMD}
+                                onChange={(e) => { if (e.target.value) handleSavePlanDates({ crunch_date: e.target.value }) }}
+                                onBlur={() => setEditingCrunch(false)}
+                                style={factDateInput}
+                              />
+                            ) : (
+                              <span style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                                <span
+                                  onClick={() => { if (canEdit) setEditingCrunch(true) }}
+                                  style={{ fontSize: 15, color: "var(--ink)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                                >{fmtMD(crunchDate)}</span>
+                                {canEdit && (
+                                  <button onClick={() => handleSavePlanDates({ crunch_date: null })} style={{ ...factLink, color: "var(--muted-text)" }}>Remove</button>
+                                )}
+                              </span>
+                            )
+                          ) : (
+                            canEdit ? (
+                              <button
+                                onClick={() => handleSavePlanDates({ crunch_date: addDaysYMD(startDate, -7) })}
+                                style={factLink}
+                              >+ Add crunch phase</button>
+                            ) : (
+                              <span style={{ fontSize: 15, color: "var(--faint)", lineHeight: 1.5 }}>—</span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {canEdit && onEditEvent && (
+                      <button
+                        onClick={onEditEvent}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
+                      >
+                        <Pencil style={{ width: 14, height: 14 }} /> Edit event
+                      </button>
                     )}
                   </div>
 
-                  {/* Planning notes */}
-                  <div style={{ marginTop: 28 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Planning Notes</p>
+                  {/* Launchpad */}
+                  <div>
+                    <p style={eyebrow}>Jump into planning</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+                      <LaunchpadRow
+                        icon={ClipboardList}
+                        title="Checklist"
+                        subtitle="Tasks to prepare before the event"
+                        onClick={() => setActiveSectionAndUrl('checklist')}
+                        right={
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 90, height: 5, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+                              <span style={{ display: "block", height: "100%", width: `${taskTotal > 0 ? (taskDone / taskTotal) * 100 : 0}%`, background: "var(--plum)" }} />
+                            </span>
+                            <span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{taskDone} / {taskTotal}</span>
+                          </span>
+                        }
+                      />
+                      <LaunchpadRow
+                        icon={Users}
+                        title="Roles & Leads"
+                        subtitle="Assign who owns each part"
+                        onClick={() => setActiveSectionAndUrl('roles')}
+                        right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesAssigned} / {rolesTotal} assigned</span>}
+                      />
+                      {extraTabs.map(t => (
+                        <LaunchpadRow
+                          key={t}
+                          icon={EXTRA_TAB_META[t].icon}
+                          title={EXTRA_TAB_LABELS[t]}
+                          subtitle={EXTRA_TAB_META[t].subtitle}
+                          onClick={() => setActiveSectionAndUrl(t)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Planning notes (demoted) */}
+                  <div style={{ marginTop: "var(--space-9)" }}>
+                    <p style={eyebrow}>Planning notes</p>
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
                         onChange={e => setOverviewNotes(e.target.value)}
                         onBlur={handleSaveOverview}
                         placeholder="Add context, key decisions, or reminders for this event…"
-                        rows={4}
-                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "15px 17px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                       />
                     ) : overviewNotes ? (
                       <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
                     ) : (
-                      <p style={{ fontSize: 14, color: "#A09A8C", fontStyle: "italic" }}>No planning notes yet.</p>
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>No planning notes yet.</p>
                     )}
                   </div>
                 </section>
 
-                {/* Right: stat cards */}
-                <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
-                  {/* Expected Turnout */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Expected Turnout</p>
-                    {canEdit ? (
+                {/* ── RIGHT column — stat cards ── */}
+                <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
+                  {/* Expected turnout */}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Expected turnout</p>
+                    {canEdit && editingTurnout ? (
                       <input
                         type="number"
+                        autoFocus
                         value={turnout}
                         onChange={(e) => setTurnout(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingTurnout(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingTurnout(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
+                      <p
+                        onClick={() => { if (canEdit) setEditingTurnout(true) }}
+                        style={{ ...bigNumber, color: turnout ? "var(--ink)" : "var(--faint)", cursor: canEdit ? "pointer" : "default" }}
+                      >{turnout || "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>guests</p>
                     {rsvpCount !== null && (
                       <p style={{ fontSize: 12, color: "var(--body)", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                        <span style={{ fontWeight: 600, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
+                        <span style={{ fontWeight: 500, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
                   </div>
+
                   {/* Budget */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
+                  <div style={statCard}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Budget</p>
-                      {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
+                      <p style={monoLabel}>Budget</p>
+                      {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
                     </div>
-                    {canEditBudget ? (
+                    {canEditBudget && editingBudget ? (
                       <input
                         type="number"
+                        autoFocus
                         value={budget}
                         onChange={(e) => setBudget(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingBudget(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingBudget(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
+                      <p
+                        onClick={() => { if (canEditBudget) setEditingBudget(true) }}
+                        style={{ ...bigNumber, color: budget ? "var(--ink)" : "var(--faint)", cursor: canEditBudget ? "pointer" : "default" }}
+                      >{budget ? `$${budget}` : "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>allocated for this event</p>
                     {typeCfg.budgetCategory && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                          Ministry Allocation · {calendarEvent.title}
-                        </p>
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                        <p style={{ ...monoLabel, letterSpacing: "0.08em" }}>Ministry allocation · {calendarEvent.title}</p>
                         {ministryBudget ? (
                           <>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
-                              ${ministryBudget.total.toFixed(2)} total
+                            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
+                              ${ministryBudget.total.toFixed(2)}
                             </p>
                             <p style={{ fontSize: 12, color: "var(--body)", marginTop: 2 }}>
                               {Object.entries(ministryBudget.byFund)
@@ -6787,46 +7009,37 @@ export function EventPlanWorkspace({
                             </p>
                           </>
                         ) : (
-                          <p style={{ fontSize: 12, color: "#A09A8C", fontStyle: "italic", marginTop: 6 }}>
+                          <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", marginTop: 6 }}>
                             No ministry budget set
                           </p>
                         )}
                       </div>
                     )}
                   </div>
+
                   {/* Readiness */}
-                  {(() => {
-                    const total = tasks.length
-                    const done = tasks.filter(t => t.completed).length
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                    const onTrack = total === 0 || pct >= 50
-                    return (
-                      <div style={{ padding: 22, background: "var(--ivory)", borderColor: "var(--line-2)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Readiness</p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 99, background: onTrack ? "#7FA67F" : "#D4855C", flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
-                        </div>
-                        {total > 0 && (
-                          <>
-                            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                              {Array.from({ length: Math.min(total, 4) }).map((_, i) => (
-                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "var(--plum)" : "var(--line-2)" }} />
-                              ))}
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "var(--body)" }}>
-                              <span>{done} of {total} done</span>
-                              <span>{pct}%</span>
-                            </div>
-                          </>
-                        )}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Readiness</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{readiness.label}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: i < filledSegs ? (pct === 100 ? "var(--success)" : "var(--plum)") : "var(--line-2)" }} />
+                      ))}
+                    </div>
+                    {taskTotal > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{taskDone} of {taskTotal} done</span>
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
                       </div>
-                    )
-                  })()}
+                    )}
+                  </div>
                 </aside>
               </div>
-              </>
-            )}
+              )
+            })()}
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
@@ -6840,26 +7053,26 @@ export function EventPlanWorkspace({
                 </div>
 
                 {/* Phase-grouped task list */}
-                {phaseConfig.map((phase) => {
-                  const phaseTasks = tasks.filter(t => t.phase === phase.key)
-                  const phaseIncomplete = phaseTasks.filter(t => !t.completed).length
-                  const isCollapsed = collapsedPhases.has(phase.key)
+                {sectionDefs.map((section) => {
+                  const sectionTasks = tasks.filter(t => sectionOf(t) === section.key)
+                  const sectionIncomplete = sectionTasks.filter(t => !t.completed).length
+                  const isCollapsed = collapsedPhases.has(section.key)
                   return (
-                    <div key={phase.key} style={{ marginBottom: 28 }}>
-                      {/* Phase header */}
+                    <div key={section.key} style={{ marginBottom: 28 }}>
+                      {/* Section header */}
                       <button
                         onClick={() => setCollapsedPhases(prev => {
                           const next = new Set(prev)
-                          if (next.has(phase.key)) next.delete(phase.key)
-                          else next.add(phase.key)
+                          if (next.has(section.key)) next.delete(section.key)
+                          else next.add(section.key)
                           return next
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{phase.label}</span>
-                        {phaseTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "var(--body)" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
-                            {phaseIncomplete > 0 ? `${phaseIncomplete} remaining` : "All done"}
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        {sectionTasks.length > 0 && (
+                          <span style={{ fontSize: 11, color: sectionIncomplete > 0 ? "var(--body)" : "#7FA67F", background: sectionIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
+                            {sectionIncomplete > 0 ? `${sectionIncomplete} remaining` : "All done"}
                           </span>
                         )}
                         <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
@@ -6868,11 +7081,57 @@ export function EventPlanWorkspace({
 
                       {!isCollapsed && (
                         <>
-                          {phaseTasks.length === 0 && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this phase.</p>
+                          {sectionTasks.length === 0 && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
                           )}
-                          {phaseTasks.map((task, i) => (
-                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
+                          {sectionTasks.map((task, i) => (
+                            canEdit && editingTaskId === task.id ? (
+                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === sectionTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
+                                <button
+                                  onClick={() => handleToggleTask(task)}
+                                  style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                                </button>
+                                <input
+                                  autoFocus
+                                  value={editTaskTitle}
+                                  onChange={(e) => setEditTaskTitle(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
+                                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                                />
+                                <select
+                                  value={editTaskAssignee}
+                                  onChange={(e) => setEditTaskAssignee(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                                <input
+                                  type="date"
+                                  value={editTaskDue}
+                                  min={planStartDate || undefined}
+                                  max={eventPlusTwoMonthsYMD}
+                                  onChange={(e) => setEditTaskDue(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                />
+                                <CentralButton
+                                  variant="primary" size="sm"
+                                  onClick={handleUpdateTask}
+                                  disabled={savingTaskEdit || !editTaskTitle.trim()}
+                                >
+                                  Save
+                                </CentralButton>
+                                <button
+                                  onClick={() => setEditingTaskId(null)}
+                                  style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === sectionTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
                               <button
                                 onClick={() => handleToggleTask(task)}
                                 style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
@@ -6905,27 +7164,36 @@ export function EventPlanWorkspace({
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => setConfirmDeleteTaskId(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                                  <>
+                                    <button onClick={() => startEditTask(task)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>
+                                      <Pencil style={{ width: 14, height: 14 }} />
+                                    </button>
+                                    <button onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
                                 )
                               )}
                             </div>
+                            )
                           ))}
 
-                          {/* Inline add row per phase */}
+                          {/* Inline add row per section — prefills due to the section window */}
                           {canEdit && (
                             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
                               <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
                               <input
-                                value={phase.key === newTaskPhase ? newTaskTitle : ""}
-                                onChange={(e) => { setNewTaskPhase(phase.key); setNewTaskTitle(e.target.value) }}
-                                onFocus={() => setNewTaskPhase(phase.key)}
-                                placeholder={`Add to ${phase.label}…`}
+                                value={section.key === newTaskSection ? newTaskTitle : ""}
+                                onChange={(e) => {
+                                  if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) }
+                                  setNewTaskTitle(e.target.value)
+                                }}
+                                onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
+                                placeholder={`Add to ${section.label}…`}
                                 style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskPhase === phase.key) handleAddTask(phase.key) }}
+                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
                               />
-                              {phase.key === newTaskPhase && newTaskTitle.trim() && (
+                              {section.key === newTaskSection && newTaskTitle.trim() && (
                                 <>
                                   <select
                                     value={newTaskAssignee}
@@ -6933,17 +7201,19 @@ export function EventPlanWorkspace({
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                                   >
                                     <option value="">Unassigned</option>
-                                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                    {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                                   </select>
                                   <input
                                     type="date"
                                     value={newTaskDue}
+                                    min={planStartDate || undefined}
+                                    max={eventPlusTwoMonthsYMD}
                                     onChange={(e) => setNewTaskDue(e.target.value)}
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
                                   <CentralButton
                                     variant="primary" size="sm"
-                                    onClick={() => handleAddTask(phase.key)}
+                                    onClick={() => handleAddTask(section)}
                                     disabled={addingTask}
                                   >
                                     Add

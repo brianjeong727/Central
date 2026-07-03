@@ -404,6 +404,27 @@ hr-1px #E8E2D2  ──── DANGER ZONE (mono, color #9F3030) ──── hr-1
 ```
 Each destructive option is a row: serif 22 title + 13px body description + outline-destructive button on the right (border `#9F3030`, text `#9F3030`, transparent bg). Spacing 22–24 between rows.
 
+### 4.21 Events agenda list (team Events section)
+
+The team **Events** section is an **agenda/timeline list** (not a calendar grid — that's the General section). Events are grouped by **month** (mono divider label + `--line` hairline), each rendered as a three-column row: **date block** (serif day number ~38px, mono DOW/month) · **timeline spine** (2px `--line` rail + an 11px node, `--cream` fill / 2px `--dashed` border; the rail trims to the node on the first/last row so it doesn't overhang) · **body card** (standard cream card, hover border → `--dashed`). Each card carries a title (serif ~19/600), a meta row (date-time + optional location with stroked icons, `--faint` dot separators), a **countdown pill** (`--cream-2`/`--line-2`, or the `--ivory`/`--plum` "soon" variant within ~7 days; omitted for past events), and the faint `--faint` "has-a-plan" check. Click opens the event's plan workspace (no modal).
+
+**"Up Next" card (the closest upcoming event)** — the one emphasized entry: a plum date number, a **plum timeline node with a subtle pulse ring** (2.4s, `prefers-reduced-motion` → static faint ring), and a `--cream-3` callout carrying the **authorized §8.7 left-border exception** (`border-left: 3px solid var(--plum)`, `--r-callout`). Inside: a plum mono "Up next · Starts in N days" eyebrow (+ plum dot), a serif ~23 title with date-range/location meta, and a right-aligned **big countdown** (serif ~22 `--plum` number + mono unit). This is the only sanctioned left-border rounded callout in the app.
+
+**Sub-events disclosure** — events with children (`calendar_events.parent_event_id`) show a plum "Sub-events (N)" toggle (rotating chevron + `--ivory` count pill) that expands an inline panel (max-height transition) of child rows: a mini date, a mini sub-spine, and a small cream sub-card (child title ~15/500 + description + right-aligned mono time). The Up Next event's panel defaults open.
+
+**Past events** — events before today are split out below the upcoming list behind a **collapsed** "Past events (N)" toggle divider (centered mono label + rotating chevron + `--ivory` count pill, flanked by `--line` hairlines). Expanded, past events list **reverse-chronologically** (most recent first, not month-grouped) and **de-emphasized**: `--cream-2` card at `opacity .82` (hover → 1), title `--body`/500, meta `--faint`, a muted date block, and a `--line-2` spine node carrying a small cream "done" check. Each shows an "Ended · {relative}" mono `--faint` label instead of a countdown, and no sub-events disclosure. The toggle defaults open only when there are zero upcoming events (so an all-past list isn't hidden).
+
+### 4.22 Event overview (EventPlanWorkspace overview tab)
+
+The **Overview** tab of an event's plan workspace is a **two-column** layout (`1fr 336px`) shared by all standard team events (worship weeks use their own workspace, not this). Under the serif event title + underline tabs:
+
+**Left column** —
+- **Identity header:** the serif event date + a compact facts list (mono key `Time` / `Where` / `What` + value; empty facts omitted), with an **"Edit event"** outline button (edits the calendar-event identity) — bottom hairline.
+- **Launchpad** ("Jump into planning"): a column of link rows into the event's OWN planning tabs, built dynamically per event template — **Checklist** and **Roles & Leads** always first (each with a metric: a mini `--plum` progress bar + "N / M" for checklist, "N / M assigned" for roles), then one row per the event type's `extraTabs` (Sub-events, New Folks, Acts, Teams, Transport, Program). Each row: ivory icon-chip (plum icon) + serif title + subtitle + right-side metric/arrow; hover → `--plum` border + slight translateX. **No left-border on the primary rows** — they're distinguished by position + the progress metric, not a border (the §8.7 exception is NOT extended here).
+- **Planning notes** (demoted): an editable `--cream-2` box for free-form context.
+
+**Right column** — three stat cards (`--cream`, `--r-callout`): **Expected turnout** (serif number or `—`, click-to-edit), **Budget** (allocated number, click-to-edit; divider; ministry-allocation sub-line or "No ministry budget set"), and **Readiness** (a status dot — `--gold` needs-attention → `--success`/`--sage` ready — + a 5-segment bar + "X of N done · P%", derived from checklist completion).
+
 ---
 
 ## 5. Page header recipe
@@ -531,7 +552,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 4. **Headlines are Bricolage Grotesque at weight 600, body/UI text at weight 400.** Do not use weight 600 for body copy, labels, or metadata — reserve it for heading hierarchy (H1, H2, display).
 5. **No emoji-led status pills, no traffic-light colors.** Use the limited semantic palette (success sage, warm-tan social, sage outreach, plum ministry).
 6. **No red filled "Delete" buttons.** Destructive actions are outline-only in `#9F3030`.
-7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13) and the timeline rail (§4.12).
+7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13), the timeline rail (§4.12), and — as a **single authorized exception (July 2026)** — the **Events "Up Next" card** (§4.21): a `cream-3` rounded callout with a `border-left: 3px solid var(--plum)` marking the closest upcoming event in the team Events agenda. This is the one sanctioned left-border rounded callout; do not generalize it to any other card.
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients.
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
 10. **No drop shadows on cards.** The only shadow allowed is on a centered modal panel (§4.17).

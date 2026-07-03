@@ -95,21 +95,16 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
   const loadList = useCallback(async () => {
     setLoadingList(true)
+    // Single query — the embedded aggregate replaces one count query per question (N+1).
     const { data } = await supabase
       .from("congregation_questions")
-      .select("*")
+      .select("*, congregation_responses(count)")
       .eq("ministry_id", ministryId)
       .order("created_at", { ascending: false })
-    const qs = data ?? []
-    const withCounts: QuestionEntry[] = await Promise.all(
-      qs.map(async (q) => {
-        const { count } = await supabase
-          .from("congregation_responses")
-          .select("*", { count: "exact", head: true })
-          .eq("question_id", q.id)
-        return { ...q, response_count: count ?? 0 }
-      })
-    )
+    const withCounts: QuestionEntry[] = (data ?? []).map(({ congregation_responses, ...q }) => ({
+      ...q,
+      response_count: congregation_responses?.[0]?.count ?? 0,
+    }))
     setQuestions(withCounts)
     setLoadingList(false)
   }, [ministryId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,15 +138,18 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
     // Deactivate any existing active question (only one live at a time).
     const active = questions.find(q => q.is_active)
+    const closedAt = new Date().toISOString()
+    let closeErr: unknown = null
     if (active) {
-      await supabase
+      const { error } = await supabase
         .from("congregation_questions")
-        .update({ is_active: false, closed_at: new Date().toISOString() })
+        .update({ is_active: false, closed_at: closedAt })
         .eq("id", active.id)
         .eq("ministry_id", ministryId)
+      closeErr = error
     }
 
-    const { error: insertErr } = await supabase
+    const { data: inserted, error: insertErr } = await supabase
       .from("congregation_questions")
       .insert({
         ministry_id: ministryId,
@@ -161,6 +159,8 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         options: questionType === "poll" ? pollOptions.filter(o => o.trim()) : null,
         is_active: true,
       })
+      .select()
+      .single()
 
     if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
 
@@ -168,20 +168,29 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     setPollOptions(["", ""])
     setQuestionType("poll")
     setSubmitting(false)
-    await loadList()
+    // Patch the list locally instead of refetching everything: prepend the new
+    // question (0 responses) and mark the previously-active one archived.
+    setQuestions(prev => [
+      { ...(inserted as CongregationQuestion), response_count: 0 },
+      ...prev.map(q =>
+        active && !closeErr && q.id === active.id ? { ...q, is_active: false, closed_at: closedAt } : q
+      ),
+    ])
     goTo("list")
   }
 
   // Archive = set is_active:false + closed_at:now() on the live question.
   async function handleArchive(id: string) {
     setArchivingId(id)
-    await supabase
+    const closedAt = new Date().toISOString()
+    const { error: err } = await supabase
       .from("congregation_questions")
-      .update({ is_active: false, closed_at: new Date().toISOString() })
+      .update({ is_active: false, closed_at: closedAt })
       .eq("id", id)
       .eq("ministry_id", ministryId)
     setArchivingId(null)
-    await loadList()
+    // Patch just the archived row locally — no full refetch.
+    if (!err) setQuestions(prev => prev.map(q => (q.id === id ? { ...q, is_active: false, closed_at: closedAt } : q)))
   }
 
   function renderResults(q: CongregationQuestion, resps: Response[]) {

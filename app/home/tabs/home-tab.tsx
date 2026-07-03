@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -10,7 +11,12 @@ import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
-import { HomeSlideManager } from "../components/home-slide-manager"
+// Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
+// so keep it out of the initial home-tab bundle every member/visitor downloads.
+const HomeSlideManager = dynamic(
+  () => import("../components/home-slide-manager").then((m) => m.HomeSlideManager),
+  { ssr: false }
+)
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 
 export { HomeTabProps }
@@ -505,7 +511,7 @@ export function HomeTab({
           aria-label="Your profile"
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={avatarUrl} alt="Profile" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <span style={{ color: "var(--cream)", fontWeight: 700, fontSize: 11, fontFamily: "var(--sans)" }}>
               {getInitials(profile.name)}
