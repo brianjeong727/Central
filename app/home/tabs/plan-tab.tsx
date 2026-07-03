@@ -7437,11 +7437,7 @@ export function EventPlanWorkspace({
           borderRadius: isDragOver ? 8 : 0,
         }}
       >
-        {/* grip */}
-        <span style={{ display: "grid", placeItems: "center", cursor: "grab", color: "var(--dashed)", opacity: canEdit && hovered ? 1 : 0, flexShrink: 0, width: 14 }}>
-          <GripVertical style={{ width: 14, height: 14 }} />
-        </span>
-        {/* disclosure or spacer */}
+        {/* disclosure or spacer (no drag-grip gutter — rows sit flush left; the row itself stays draggable) */}
         {!isChild && hasKids ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); if (n.has(task.id)) n.delete(task.id); else n.add(task.id); return n }) }}
             style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: "var(--faint)", flexShrink: 0, width: 14 }}>
@@ -8580,6 +8576,10 @@ function SubEventsTab({
               <div
                 onMouseEnter={() => setHoveredId(ev.id)}
                 onMouseLeave={() => setHoveredId(null)}
+                onClick={drillable ? () => onOpenChild!(ev) : undefined}
+                role={drillable ? "button" : undefined}
+                tabIndex={drillable ? 0 : undefined}
+                onKeyDown={drillable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenChild!(ev) } } : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -8590,6 +8590,7 @@ function SubEventsTab({
                   background: "var(--cream)",
                   marginBottom: 10,
                   transition: "border-color .15s",
+                  cursor: drillable ? "pointer" : "default",
                 }}
               >
                 {/* emoji badge — derived from event_type via getEventConfig */}
@@ -8631,16 +8632,11 @@ function SubEventsTab({
                   )}
                 </div>
 
-                {/* drill affordance — omitted when nesting-capped (non-drillable) */}
+                {/* drill affordance — decorative; the whole row is the click target. Omitted when nesting-capped. */}
                 {drillable && (
-                  <IconButton
-                    dim={34}
-                    onClick={() => onOpenChild!(ev)}
-                    title="Open planning"
-                    style={{ borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)" }}
-                  >
+                  <span aria-hidden style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)", flexShrink: 0 }}>
                     <ArrowRight style={{ width: 16, height: 16 }} />
-                  </IconButton>
+                  </span>
                 )}
               </div>
             </Fragment>
