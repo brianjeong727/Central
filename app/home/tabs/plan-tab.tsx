@@ -10,7 +10,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
-  UserPlus, Sparkles, Layers, Bus, Clock, Star, CornerUpLeft,
+  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -47,7 +47,7 @@ import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
-  EventType, EventExtraTab, EventNewFolk,
+  EventType, EventExtraTab,
 } from "../types"
 import { teamAccessLevel, type TeamAccess } from "../governance"
 
@@ -5070,7 +5070,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
       { name: "DGL Liaison", notes: "Coordinates with DGL team for dinner cooking rotations" },
       { name: "Praise Team Liaison", notes: "Coordinates Praise Night worship with Praise Team" },
     ],
-    extraTabs: ["sub_events", "new_folks"],
+    extraTabs: ["sub_events"],
   },
   coffeehouse: {
     label: "Coffeehouse", icon: "☕", dot: "#9D7B4F", bg: "#FDF6EC", text: "#6B4C1E",
@@ -6780,7 +6780,7 @@ export function EventPlanWorkspace({
   const incompleteTasks = tasks.filter((t) => !t.completed)
 
   const EXTRA_TAB_LABELS: Record<EventExtraTab, string> = {
-    sub_events: "Sub-events", new_folks: "New Folks", acts: "Acts",
+    sub_events: "Sub-events", acts: "Acts",
     teams: "Teams", transport: "Transport", program: "Program",
   }
 
@@ -6788,7 +6788,6 @@ export function EventPlanWorkspace({
   // a one-line subtitle per planning tab this event actually carries.
   const EXTRA_TAB_META: Record<EventExtraTab, { icon: typeof Users; subtitle: string }> = {
     sub_events: { icon: Calendar, subtitle: "Nights & activities inside the week" },
-    new_folks: { icon: UserPlus, subtitle: "Track first-timers and follow-up" },
     acts: { icon: Sparkles, subtitle: "Performances & skits for the night" },
     teams: { icon: Layers, subtitle: "Split attendees into teams" },
     transport: { icon: Bus, subtitle: "Rides & carpools to the venue" },
@@ -7756,15 +7755,6 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── New Folks (Welcome Week) ── */}
-            {activeSection === 'new_folks' && plan && (
-              <NewFolksTab
-                planId={plan.id}
-                ministryId={ministryId}
-                canEdit={canEdit}
-              />
-            )}
-
             {/* ── Acts Lineup (Coffeehouse) ── */}
             {activeSection === 'acts' && plan && (
               <ActsTab
@@ -7911,135 +7901,6 @@ function SubEventsTab({
   )
 }
 
-// ── NewFolksTab ───────────────────────────────────────────────────────────────
-
-function NewFolksTab({
-  planId,
-  ministryId,
-  canEdit,
-}: {
-  planId: string
-  ministryId: string
-  canEdit: boolean
-}) {
-  const supabase = createClient()
-  const [folks, setFolks] = useState<EventNewFolk[]>([])
-  const [dgls, setDgls] = useState<{ id: string; name: string }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [newName, setNewName] = useState("")
-  const [newContact, setNewContact] = useState("")
-  const [newNotes, setNewNotes] = useState("")
-  const [adding, setAdding] = useState(false)
-
-  useEffect(() => {
-    async function load() {
-      const [{ data: folkData }, { data: dglData }] = await Promise.all([
-        supabase.from("event_new_folks").select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").eq("event_plan_id", planId).order("created_at", { ascending: true }),
-        supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name"),
-      ])
-      setFolks((folkData ?? []).map((f: Record<string, unknown>) => ({
-        id: f.id as string, event_plan_id: f.event_plan_id as string,
-        ministry_id: f.ministry_id as string, name: f.name as string,
-        contact: f.contact as string | null, notes: f.notes as string | null,
-        assigned_dgl_id: f.assigned_dgl_id as string | null,
-        assigned_dgl_name: (f.profiles as { name?: string } | null)?.name,
-        created_at: f.created_at as string,
-      })))
-      setDgls((dglData ?? []) as { id: string; name: string }[])
-      setLoading(false)
-    }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId])
-
-  async function handleAdd() {
-    if (!newName.trim()) return
-    setAdding(true)
-    const { data } = await supabase.from("event_new_folks").insert({
-      event_plan_id: planId, ministry_id: ministryId,
-      name: newName.trim(), contact: newContact.trim() || null, notes: newNotes.trim() || null,
-    }).select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").single()
-    if (data) {
-      const d = data as Record<string, unknown>
-      setFolks(prev => [...prev, {
-        id: d.id as string, event_plan_id: planId, ministry_id: ministryId,
-        name: d.name as string, contact: d.contact as string | null,
-        notes: d.notes as string | null, assigned_dgl_id: null, created_at: d.created_at as string,
-      }])
-    }
-    setNewName(""); setNewContact(""); setNewNotes("")
-    setAdding(false)
-  }
-
-  async function handleAssignDGL(folkId: string, dglId: string) {
-    const dgl = dgls.find(d => d.id === dglId)
-    setFolks(prev => prev.map(f => f.id === folkId ? { ...f, assigned_dgl_id: dglId || null, assigned_dgl_name: dgl?.name } : f))
-    await supabase.from("event_new_folks").update({ assigned_dgl_id: dglId || null }).eq("id", folkId)
-  }
-
-  async function handleDelete(id: string) {
-    setFolks(prev => prev.filter(f => f.id !== id))
-    await supabase.from("event_new_folks").delete().eq("id", id)
-  }
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Follow Up</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>New Folks</h2>
-        </div>
-        <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{folks.length} people tracked</span>
-      </div>
-
-      {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
-
-      {/* Table header */}
-      {folks.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
-          {["Name", "Contact", "Notes", "Assigned DGL", ""].map(h => (
-            <span key={h} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {!loading && folks.length === 0 && (
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "16px 0" }}>No new folks tracked yet. Add people you met during Welcome Week.</p>
-        )}
-        {folks.map(folk => (
-          <div key={folk.id} style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
-            <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{folk.name}</span>
-            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.contact ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
-            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.notes ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
-            <select
-              value={folk.assigned_dgl_id ?? ""}
-              onChange={(e) => canEdit && handleAssignDGL(folk.id, e.target.value)}
-              disabled={!canEdit}
-              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: folk.assigned_dgl_id ? "var(--plum-2)" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
-            >
-              <option value="">Unassigned</option>
-              {dgls.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-            {canEdit ? (
-              <button onClick={() => handleDelete(folk.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
-            ) : <span />}
-          </div>
-        ))}
-      </div>
-
-      {/* Add row */}
-      {canEdit && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }} />
-          <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <CentralButton variant="primary" size="sm" onClick={handleAdd} disabled={adding || !newName.trim()}>Add</CentralButton>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── ActsTab ───────────────────────────────────────────────────────────────────
 
