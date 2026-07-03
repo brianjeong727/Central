@@ -374,6 +374,29 @@ export interface ChatScreenProps {
   inline?: boolean
 }
 
+// Message composer (bottom input area) — extracted from ChatScreen so per-keystroke
+// churn (inputText, @mention autocomplete, GIF search) re-renders only the composer.
+// ChatScreen keeps messages + optimistic send behind the callbacks below.
+export interface ComposerProps {
+  groupArchived: boolean
+  displayName: string
+  // Roster (self already excluded) for @mention autocomplete. Structural type — the
+  // richer roster objects pass fine.
+  mentionMembers: { id: string; name: string }[]
+  replyingTo: Message | null
+  sending: boolean
+  uploading: boolean
+  pollActive: boolean
+  // Send stays in ChatScreen (owns messages + optimistic reconciliation). Composer
+  // clears its own inputText/attachment locally, then hands the payload up.
+  onSend: (payload: { content: string; attachment: File | null; replyTo: Message | null }) => void
+  onSendGif: (fullUrl: string) => void
+  // Throttled typing broadcast — the realtime channel lives in ChatScreen.
+  onTyping: (value: string) => void
+  onClearReply: () => void
+  onSetPollOpen: (open: boolean) => void
+}
+
 export interface ChatsTabProps {
   userId: string
   userProfile: Profile

@@ -3,19 +3,20 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Send, Settings, Trash2, CornerUpLeft, Plus, Users, Pencil, User, Smile, Forward, Paperclip, Pin, FileDown, BarChart2 } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
-import { getInitials, formatRelativeTime } from "../utils"
+import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
-import { MessageRow, LazyEmojiPicker, formatFileSize } from "./message-row"
+import { MessageRow } from "./message-row"
+import { Composer } from "./composer"
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
@@ -822,7 +823,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // reading it). Patches the SAME shared key the sidebar reads, so the row jumps
   // instantly with no round-trip. The home-app realtime refetch later reconciles
   // from get_chat_list (and re-forces this open group to 0).
-  function bumpChatListForOwnSend(previewText: string) {
+  const bumpChatListForOwnSend = useCallback((previewText: string) => {
     mutateGlobal(
       ["chat-list", userId, ministryId],
       (cur: ChatGroup[] | undefined) => {
@@ -840,10 +841,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       },
       { revalidate: false },
     )
-  }
+  }, [mutateGlobal, userId, ministryId, groupId, userName])
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
-  const [inputText, setInputText] = useState("")
   const [sending, setSending] = useState(false)
   const [displayName, setDisplayName] = useState(groupName)
   // Re-seed the header name whenever the groupName prop changes (chat switch through
@@ -865,8 +865,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
   const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
   const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
-  const [showComposerEmojiPicker, setShowComposerEmojiPicker] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [typingUsers, setTypingUsers] = useState<Record<string, { name: string; avatarUrl: string | null }>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
   const profilesCache = useRef<Record<string, string>>({ [userId]: userName })
@@ -888,8 +886,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null } | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl: string } | null>(null)
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   // SWR-cached group roster — the SINGLE source for @mention names, member count,
   // and (small-room) seed read state. Read-only lookup, pure fetcher. Replaces the
   // old @mention-only join AND the standalone loadMemberReadStates fetch.
@@ -916,8 +912,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // per-member read-receipt fan-out (the O(members²) source) for an on-demand
   // "Seen by N" pill; <30 keep today's live per-member receipts exactly.
   const isLargeRoom = memberCount >= 30
-  const [mentionIndex, setMentionIndex] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   // Polls
   const [showPollCreator, setShowPollCreator] = useState(false)
   const [pollQuestion, setPollQuestion] = useState("")
@@ -931,12 +925,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [pollMenuFor, setPollMenuFor] = useState<string | null>(null)
   const [pollVoters, setPollVoters] = useState<Record<string, { option_index: number; user_id: string; name: string; avatar_url: string | null }[]>>({})
   const [votersPollId, setVotersPollId] = useState<string | null>(null)
-  // GIFs
-  const [showGifPicker, setShowGifPicker] = useState(false)
-  const [gifSearch, setGifSearch] = useState("")
-  const [gifResults, setGifResults] = useState<{ id: string; previewUrl: string; fullUrl: string }[]>([])
-  const [gifLoading, setGifLoading] = useState(false)
-  const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevMsgCountRef = useRef(0)
   const suppressScrollRef = useRef(false)
   // Upward (older-message) pagination — keyset cursor is the oldest loaded message.
@@ -986,39 +974,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const filteredMentions = useMemo(() => {
-    if (mentionQuery === null) return []
-    const q = mentionQuery.toLowerCase()
-    return mentionMembers.filter(m => m.name.split(" ")[0].toLowerCase().startsWith(q)).slice(0, 5)
-  }, [mentionQuery, mentionMembers])
-
   const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
   const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
 
-  function replyPreviewLabel(content?: string | null, attachmentType?: string | null, attachmentName?: string | null): string {
-    if (content && content.trim()) return content
-    if (attachmentType?.startsWith("image/")) return "Photo"
-    if (attachmentType) return attachmentName || "File"
-    return ""
-  }
-
-  // @mention member list is loaded via useSWR above (see mentionData/mentionMembers).
-
-  // Load trending GIFs when GIF picker opens
-  useEffect(() => {
-    if (!showGifPicker) return
-    if (gifResults.length > 0) return
-    handleGifSearch("")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showGifPicker])
-
-  // Debounced GIF search
-  useEffect(() => {
-    if (!showGifPicker) return
-    if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current)
-    gifDebounceRef.current = setTimeout(() => handleGifSearch(gifSearch), 400)
-    return () => { if (gifDebounceRef.current) clearTimeout(gifDebounceRef.current) }
-  }, [gifSearch, showGifPicker])
+  // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
+  // The @mention dropdown, GIF picker, and input state now live in <Composer>.
 
   // Fetch link previews for URLs found in messages
   useEffect(() => {
@@ -1200,16 +1160,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setForwardGroups(groups)
   }, [supabase, userId, groupId])
 
-  function stagePendingAttachment(file: File) {
-    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
-    setPendingAttachment({ file, previewUrl: URL.createObjectURL(file) })
-  }
-
-  function clearPendingAttachment() {
-    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl)
-    setPendingAttachment(null)
-  }
-
   const handlePin = useCallback(async (msgId: string) => {
     setContextMenuFor(null)
     // Read messages through the ref (kept in sync below) so this callback stays
@@ -1238,18 +1188,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setVotingPollId(pollId)
   }, [])
 
-  function handleMentionSelect(name: string) {
-    const firstName = name.split(" ")[0]
-    const el = textareaRef.current
-    const pos = el?.selectionStart ?? inputText.length
-    const before = inputText.slice(0, pos)
-    const after = inputText.slice(pos)
-    const atIdx = before.lastIndexOf("@")
-    const newText = before.slice(0, atIdx) + `@${firstName} ` + after
-    setInputText(newText)
-    setMentionQuery(null)
-    requestAnimationFrame(() => el?.focus())
-  }
 
   // ─── Phase 3 handlers ────────────────────────────────────────────────────
 
@@ -1373,27 +1311,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     loadPollsData([pollId])
   }
 
-  async function handleGifSearch(query: string) {
-    setGifLoading(true)
-    try {
-      const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY
-      const endpoint = query.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(query)}&limit=24&rating=g`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=g`
-      const res = await fetch(endpoint)
-      const json = await res.json()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setGifResults((json.data ?? []).map((g: any) => ({
-        id: g.id,
-        previewUrl: g.images?.fixed_height_small?.url ?? g.images?.preview_gif?.url ?? "",
-        fullUrl: g.images?.original?.url ?? "",
-      })))
-    } catch { /* swallow */ }
-    setGifLoading(false)
-  }
-
-  function handleSendGif(fullUrl: string) {
-    setShowGifPicker(false)
+  // GIF send — optimistic insert stays in ChatScreen (owns messages); <Composer>
+  // closes the picker itself after calling this. Stable for the memoized child.
+  const handleSendGif = useCallback((fullUrl: string) => {
     if (!fullUrl) return
     const optimisticId = `optimistic-gif-${Date.now()}`
     const now = new Date().toISOString()
@@ -1406,7 +1326,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setMessages(prev => [...prev, optimisticMsg])
     supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", attachment_url: fullUrl, attachment_type: "image/gif" }).select("id").single()
       .then(({ data }) => { if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m)) })
-  }
+  }, [supabase, groupId, userId, userName])
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1861,23 +1781,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (matchId) messageRefs.current[matchId]?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [searchMatchIndex, searchMatches])
 
-  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const val = e.target.value
-    setInputText(val)
-    // Auto-resize textarea to fit content
-    const el = e.target
-    el.style.height = "auto"
-    el.style.height = el.scrollHeight + "px"
-    // @mention detection
-    const pos = e.target.selectionStart ?? val.length
-    const before = val.slice(0, pos)
-    const atMatch = before.match(/@(\w*)$/)
-    if (atMatch) {
-      setMentionQuery(atMatch[1])
-      setMentionIndex(0)
-    } else if (mentionQuery !== null) {
-      setMentionQuery(null)
-    }
+  // Throttled typing broadcast — the realtime channel lives here in ChatScreen;
+  // <Composer> calls this on every input change. Stable for the memoized child.
+  const onTyping = useCallback((val: string) => {
     if (typingChannelRef.current && val.trim()) {
       // Throttle the isTyping:true SEND to at most ~1/sec while held — every keystroke
       // firing a broadcast is needless fan-out at scale. The 2500ms stop-typing reset
@@ -1891,37 +1797,33 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
       }, 2500)
     }
-  }
+  }, [userId, userName])
 
-  async function handleSend() {
-    const content = inputText.trim()
-    const pa = pendingAttachment
-    if (!content && !pa) return
-    if (sending || groupArchived) return
+  const onClearReply = useCallback(() => setReplyingTo(null), [])
+  const onSetPollOpen = useCallback((open: boolean) => setShowPollCreator(open), [])
+
+  // Optimistic send (Convention #4) stays here — <Composer> clears its own input +
+  // attachment locally, then hands { content, attachment, replyTo } up. Stable for
+  // the memoized child: reads everything from the payload + refs/stable deps.
+  const handleSend = useCallback(async ({ content, attachment, replyTo }: { content: string; attachment: File | null; replyTo: Message | null }) => {
+    if (!content && !attachment) return
 
     // Clear own typing status
     if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
     typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
 
     setSending(true)
-    setInputText("")
-    setMentionQuery(null)
-    setPendingAttachment(null)
-    if (pa) URL.revokeObjectURL(pa.previewUrl)
-    // Reset textarea height after clearing
-    if (textareaRef.current) { textareaRef.current.style.height = "auto" }
-
-    const replyTarget = replyingTo
+    const replyTarget = replyTo
     setReplyingTo(null)
 
     // Attachment message — no caption embedded; caption sent as separate message below
-    if (pa) {
+    if (attachment) {
       setUploading(true)
-      const ext = pa.file.name.split(".").pop() ?? "bin"
+      const ext = attachment.name.split(".").pop() ?? "bin"
       const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: storageData, error } = await supabase.storage
         .from("chat-attachments")
-        .upload(path, pa.file, { cacheControl: "3600", upsert: false })
+        .upload(path, attachment, { cacheControl: "3600", upsert: false })
       if (!error && storageData) {
         const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
         const optimisticId = `optimistic-att-${Date.now()}`
@@ -1931,15 +1833,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
           reply_to_sender: replyTarget?.sender_name ?? null,
           message_type: "user", attachment_url: publicUrl,
-          attachment_type: pa.file.type, attachment_name: pa.file.name, attachment_size: pa.file.size,
+          attachment_type: attachment.type, attachment_name: attachment.name, attachment_size: attachment.size,
         }
         setMessages(prev => [...prev, optimisticMsg])
-        bumpChatListForOwnSend(content || pa.file.name)
+        bumpChatListForOwnSend(content || attachment.name)
         const { data } = await supabase.from("messages").insert({
           group_id: groupId, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
-          attachment_url: publicUrl, attachment_type: pa.file.type,
-          attachment_name: pa.file.name, attachment_size: pa.file.size,
+          attachment_url: publicUrl, attachment_type: attachment.type,
+          attachment_name: attachment.name, attachment_size: attachment.size,
         }).select("id").single()
         if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
 
@@ -1989,36 +1891,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
-  }
-
-  function insertEmojiAtCursor(native: string) {
-    const el = textareaRef.current
-    const start = el?.selectionStart ?? inputText.length
-    const end = el?.selectionEnd ?? inputText.length
-    const newText = inputText.slice(0, start) + native + inputText.slice(end)
-    setInputText(newText)
-    requestAnimationFrame(() => {
-      if (el) {
-        const pos = start + native.length
-        el.selectionStart = pos
-        el.selectionEnd = pos
-        el.focus()
-      }
-    })
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (mentionQuery !== null && filteredMentions.length > 0) {
-      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredMentions.length - 1)); return }
-      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
-      if (e.key === "Escape") { setMentionQuery(null); return }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
+  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend])
 
   // For each own message: which other members have it as their most-recently-read own message.
   // Reuses the PRIOR array reference for any message whose receipts didn't change, so
@@ -2465,206 +2338,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         )}
       </div>
 
-      {/* ── Reply preview bar ── */}
-      {replyingTo && (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
-          <div className="flex-1 border-l-2 border-[var(--plum)] pl-2.5 min-w-0">
-            <p className="text-[11px] font-semibold text-[var(--plum)] flex items-center gap-1 mb-0.5">
-              <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
-              {replyingTo.sender_name}
-            </p>
-            <p className="text-[12px] text-[var(--muted-text)] truncate">{replyPreviewLabel(replyingTo.content, replyingTo.attachment_type, replyingTo.attachment_name).slice(0, 60)}</p>
-          </div>
-          <button onClick={() => setReplyingTo(null)} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <Composer
+        groupArchived={groupArchived}
+        displayName={displayName}
+        mentionMembers={mentionMembers}
+        replyingTo={replyingTo}
+        sending={sending}
+        uploading={uploading}
+        pollActive={showPollCreator}
+        onSend={handleSend}
+        onSendGif={handleSendGif}
+        onTyping={onTyping}
+        onClearReply={onClearReply}
+        onSetPollOpen={onSetPollOpen}
+      />
 
-
-      {/* ── GIF Picker panel ── */}
-      {showGifPicker && !groupArchived && (
-        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
-          <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
-            <input
-              autoFocus
-              value={gifSearch}
-              onChange={e => setGifSearch(e.target.value)}
-              placeholder="Search GIFs…"
-              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[var(--line)] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
-            />
-            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="overflow-y-auto h-[188px]">
-            {gifLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : gifResults.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-[13px] text-[var(--muted-text)]">No GIFs found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-1 p-1">
-                {gifResults.map(gif => (
-                  <button
-                    key={gif.id}
-                    onClick={() => handleSendGif(gif.fullUrl)}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-[#F4F1E8] hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    <img src={gif.previewUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Input bar ── */}
-      {groupArchived ? (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center justify-center">
-          <p className="text-[13px] text-[var(--muted-text)]">This chat is archived</p>
-        </div>
-      ) : (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
-          {/* @mention dropdown */}
-          {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
-              {filteredMentions.map((member, idx) => (
-                <button
-                  key={member.id}
-                  onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => handleMentionSelect(member.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[var(--cream-panel)]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
-                >
-                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
-                  <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf,.doc,.docx,.txt,.xlsx,.pptx"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
-            />
-            {/* Left icons — outside the bubble */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="flex-shrink-0 text-[var(--body)] hover:text-[var(--ink)] transition-colors disabled:opacity-40 mb-2"
-              title="Attach file"
-            >
-              {uploading
-                ? <div className="w-4 h-4 border-2 border-[var(--body)] border-t-transparent rounded-full animate-spin" />
-                : <Paperclip className="w-4 h-4" />
-              }
-            </button>
-            <button
-              onClick={() => { setShowGifPicker(p => !p); setShowPollCreator(false) }}
-              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
-              title="Send a GIF"
-            >
-              GIF
-            </button>
-            <button
-              onClick={() => { setShowPollCreator(p => !p); setShowGifPicker(false) }}
-              className={`flex-shrink-0 transition-colors mb-2 ${showPollCreator ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
-              title="Create a poll"
-            >
-              <BarChart2 className="w-4 h-4" />
-            </button>
-            {/* Textarea bubble — its own bordered component */}
-            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
-              {/* Attachment preview — inside the bubble, above the textarea */}
-              {pendingAttachment && (
-                <div className="mb-2">
-                  {pendingAttachment.file.type.startsWith("image/") ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={pendingAttachment.previewUrl}
-                        alt="Preview"
-                        className="w-16 h-16 rounded-xl object-cover border border-[var(--line)]"
-                      />
-                      <button
-                        onClick={clearPendingAttachment}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--ink)] flex items-center justify-center"
-                      >
-                        <X className="w-2.5 h-2.5 text-white" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-[#EDE9DF] rounded-xl px-2.5 py-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[var(--line)] flex items-center justify-center flex-shrink-0">
-                        <FileDown className="w-3.5 h-3.5 text-[var(--body)]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-medium text-[var(--ink)] truncate">{pendingAttachment.file.name}</p>
-                        <p className="text-[10px] text-[var(--muted-text)]">{formatFileSize(pendingAttachment.file.size)}</p>
-                      </div>
-                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              <textarea
-                ref={textareaRef}
-                value={inputText}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder={`Message ${displayName}`}
-                rows={1}
-                className="w-full resize-none bg-transparent text-[14px] text-[var(--ink)] placeholder:text-[var(--muted-text)] focus:outline-none border-none max-h-36 overflow-y-auto block"
-                style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
-              />
-            </div>
-            {/* Right icons — outside the bubble */}
-            <div className="relative mb-2">
-              <button
-                onClick={() => setShowComposerEmojiPicker(p => !p)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--body)] hover:bg-[var(--line)] transition-colors"
-              >
-                <Smile className="w-4 h-4" />
-              </button>
-              {showComposerEmojiPicker && (
-                <div className="absolute bottom-full right-0 mb-2 z-[160]">
-                  <LazyEmojiPicker
-                    onEmojiSelect={(emoji: { native: string }) => {
-                      insertEmojiAtCursor(emoji.native)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleSend}
-              disabled={(!inputText.trim() && !pendingAttachment) || sending}
-              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)] mb-2"
-              style={{ width: 34, height: 34, borderRadius: 10 }}
-            >
-              <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
-            </button>
-          </div>
-          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[#A09A8C]">
-            <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
-            <span>End-to-end visible to {displayName} members</span>
-          </div>
-        </div>
-      )}
-
-      {/* Overlay to dismiss emoji / context menu / GIF picker */}
-      {(emojiPickerFor || contextMenuFor || showComposerEmojiPicker || fullReactionPickerFor || showGifPicker || pollMenuFor) && (
+      {/* Overlay to dismiss message-row emoji / context menu / poll menu. The
+          composer's own GIF + emoji pickers render their dismiss overlay in <Composer>. */}
+      {(emojiPickerFor || contextMenuFor || fullReactionPickerFor || pollMenuFor) && (
         <div
           className="fixed inset-0 z-[155] md:left-[var(--shell-offset)]"
-          onPointerDown={() => { setEmojiPickerFor(null); setContextMenuFor(null); setShowComposerEmojiPicker(false); setFullReactionPickerFor(null); setShowGifPicker(false); setPollMenuFor(null) }}
+          onPointerDown={() => { setEmojiPickerFor(null); setContextMenuFor(null); setFullReactionPickerFor(null); setPollMenuFor(null) }}
         />
       )}
 
