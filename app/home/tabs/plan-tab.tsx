@@ -905,8 +905,11 @@ function EventsAgendaList({
     const monthKey = `${d.getFullYear()}-${d.getMonth()}`
     if (monthKey !== lastMonthKey) {
       lastMonthKey = monthKey
+      // First month sits flush under the section header — the padded wrapper already
+      // supplies the top gap; only later months get the full separating top margin.
+      const firstMonth = upcomingNodes.length === 0
       upcomingNodes.push(
-        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: "var(--space-9) 0 var(--space-6)" }}>
+        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: `${firstMonth ? "0" : "var(--space-9)"} 0 var(--space-6)` }}>
           <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.16em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
             {d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </span>
