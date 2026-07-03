@@ -1804,6 +1804,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         { event: "INSERT", schema: "public", table: "message_reactions" },
         (payload) => {
           const rx = payload.new as Reaction
+          // The channel receives ALL message_reactions (the table has no group_id
+          // to filter on), so ignore reactions for messages not currently loaded in
+          // THIS chat — otherwise every reaction in every visible chat re-renders us
+          // and grows the map with entries for unloaded messages. Reactions for
+          // messages loaded later (scroll-up) are fetched fresh by mergeReactionsFor.
+          if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => {
             const list = prev[rx.message_id] ?? []
             // Replace optimistic temp entry if present, otherwise append
@@ -1826,6 +1832,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         (payload) => {
           const rx = payload.old as Reaction
           if (!rx.message_id) return
+          // Same scoping as the INSERT handler: skip reactions for messages not
+          // loaded here (avoids re-renders + empty map entries for other chats).
+          if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => ({
             ...prev,
             [rx.message_id]: (prev[rx.message_id] ?? []).filter((r) => r.id !== rx.id),
