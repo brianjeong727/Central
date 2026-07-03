@@ -10,6 +10,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
+  UserPlus, Sparkles, Layers, Bus, Clock,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -6121,6 +6122,58 @@ export function MinistryCalendar({
 
 // ── EventPlanWorkspace ────────────────────────────────────────────────────────
 
+// Date helpers for the plan/crunch checklist windows. Format is "YYYY-MM-DD" in
+// LOCAL time (never UTC) so day-granularity comparisons never off-by-one, and
+// month/day arithmetic uses the Date constructor's own overflow normalization.
+function toLocalYMD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+function addMonthsYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth() + n, d.getDate()))
+}
+function addDaysYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
+}
+
+// A single Launchpad link row on the event Overview — an ivory icon-chip, a
+// serif title + subtitle, and an optional right-side metric before the chevron.
+// Hover lifts the card slightly and warms the border to plum.
+function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
+  icon: typeof Users
+  title: string
+  subtitle: string
+  right?: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--plum)"; e.currentTarget.style.transform = "translateX(2px)" }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)"; e.currentTarget.style.transform = "translateX(0)" }}
+      style={{
+        display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", textAlign: "left",
+        background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-card)",
+        padding: "16px 18px", cursor: "pointer", transition: "border-color .15s ease, transform .15s ease",
+      }}
+    >
+      <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ivory)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+        <Icon style={{ width: 18, height: 18, color: "var(--plum)" }} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--body)", marginTop: 2 }}>{subtitle}</span>
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        {right}
+        <ChevronRight style={{ width: 18, height: 18, color: "var(--faint)" }} />
+      </span>
+    </button>
+  )
+}
+
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -6171,6 +6224,13 @@ export function EventPlanWorkspace({
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
 
+  // Assignee pool = team members ∪ anyone assigned to a role on this event, deduped by id
+  const assigneePool = useMemo(() => {
+    const map = new Map<string, string>(members.map(m => [m.id, m.name]))
+    for (const r of roles) if (r.assigned_to && r.assigned_name) map.set(r.assigned_to, r.assigned_name)
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [members, roles])
+
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
@@ -6193,15 +6253,32 @@ export function EventPlanWorkspace({
   const [budget, setBudget] = useState("")
   const [overviewNotes, setOverviewNotes] = useState("")
   const [savingOverview, setSavingOverview] = useState(false)
+  // Overview click-to-edit toggles for the turnout / budget stat numbers
+  const [editingTurnout, setEditingTurnout] = useState(false)
+  const [editingBudget, setEditingBudget] = useState(false)
 
-  // Task add state
+  // Task add state — newTaskSection is the date-derived checklist section the
+  // inline add-row is currently active in ("" = none focused yet).
   const [newTaskTitle, setNewTaskTitle] = useState("")
   const [newTaskAssignee, setNewTaskAssignee] = useState("")
   const [newTaskDue, setNewTaskDue] = useState("")
-  const [newTaskPhase, setNewTaskPhase] = useState<EventTask["phase"]>("pre_event")
+  const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
+
+  // Plan/crunch date state — drives the checklist section windows.
+  const [planStartDate, setPlanStartDate] = useState("")
+  const [crunchDate, setCrunchDate] = useState("")
+  const [editingPlanStart, setEditingPlanStart] = useState(false)
+  const [editingCrunch, setEditingCrunch] = useState(false)
+
+  // Task inline edit state
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState("")
+  const [editTaskAssignee, setEditTaskAssignee] = useState("")
+  const [editTaskDue, setEditTaskDue] = useState("")
+  const [savingTaskEdit, setSavingTaskEdit] = useState(false)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -6221,11 +6298,6 @@ export function EventPlanWorkspace({
 
   const startDate = new Date(calendarEvent.start_date)
   const endDate = new Date(calendarEvent.end_date)
-  const dateStr = calendarEvent.all_day
-    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 
   useEffect(() => {
     async function init() {
@@ -6249,13 +6321,29 @@ export function EventPlanWorkspace({
 
       if (!planData) { setLoading(false); return }
 
+      const planId = planData.id
+
+      // Plan/crunch dates. First-time init: when plan_start_date is null, seed
+      // plan-start = event − 1 month and crunch = event − 1 week (local YMD),
+      // persist once, and use them. After this one-time write plan_start_date is
+      // always set; a later null crunch_date means the user REMOVED the crunch phase.
+      let psd = planData.plan_start_date as string | null
+      let cd = planData.crunch_date as string | null
+      if (!psd) {
+        const eventDate = new Date(calendarEvent.start_date)
+        psd = addMonthsYMD(eventDate, -1)
+        cd = addDaysYMD(eventDate, -7)
+        await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
+        planData = { ...planData, plan_start_date: psd, crunch_date: cd }
+      }
+      setPlanStartDate(psd ?? "")
+      setCrunchDate(cd ?? "")
+
       setPlan(planData as EventPlan)
       setPlanningGroupId((planData as EventPlan).planning_group_id ?? null)
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
       setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
-
-      const planId = planData.id
 
       // Fetch tasks with assignee name
       const { data: tasksData } = await supabase
@@ -6308,21 +6396,12 @@ export function EventPlanWorkspace({
         created_at: n.created_at as string,
       })))
 
-      // Fetch assignee list: team roster if teamId given, else all ministry members
-      if (teamId) {
-        const { data: rosterData } = await supabase
-          .from("team_members")
-          .select("user_id, profiles(id, name)")
-          .eq("team_id", teamId)
-        setMembers((rosterData ?? []).map((r: Record<string, unknown>) => {
-          const p = r.profiles as { id?: string; name?: string } | null
-          return { id: p?.id ?? r.user_id as string, name: p?.name ?? "Unknown" }
-        }).filter(m => m.name !== "Unknown"))
-      } else {
-        const { data: membersData } = await supabase
-          .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
-        setMembers(membersData ?? [])
-      }
+      // Assignee list = the entire ministry (student org) member list — the team
+      // roster is often unpopulated, and tasks should be assignable to anyone in
+      // the org. assigneePool (memo) additionally unions in this event's role-assignees.
+      const { data: membersData } = await supabase
+        .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+      setMembers(membersData ?? [])
 
       // Fetch RSVP count if linked to an announcement
       if ((calendarEvent as { linked_announcement_id?: string | null }).linked_announcement_id) {
@@ -6363,6 +6442,13 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
+  async function handleSavePlanDates(patch: { plan_start_date?: string | null; crunch_date?: string | null }) {
+    if (!plan || !canEdit) return
+    await supabase.from("event_plans").update(patch).eq("id", plan.id).eq("ministry_id", ministryId)
+    if (patch.plan_start_date !== undefined) setPlanStartDate(patch.plan_start_date ?? "")
+    if (patch.crunch_date !== undefined) setCrunchDate(patch.crunch_date ?? "")
+  }
+
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
@@ -6372,10 +6458,11 @@ export function EventPlanWorkspace({
       .eq("id", task.id)
   }
 
-  async function handleAddTask(phaseOverride?: EventTask["phase"]) {
+  async function handleAddTask(section: { defaultDue: string; phase: EventTask["phase"] }) {
     if (!plan || !newTaskTitle.trim()) return
-    const phase = phaseOverride ?? newTaskPhase
-    const maxSort = tasks.filter(t => t.phase === phase).reduce((m, t) => Math.max(m, t.sort_order), -1)
+    const phase = section.phase
+    const due = newTaskDue || section.defaultDue || null
+    const maxSort = tasks.reduce((m, t) => Math.max(m, t.sort_order), -1)
     setAddingTask(true)
     const { data } = await supabase
       .from("event_tasks")
@@ -6383,7 +6470,7 @@ export function EventPlanWorkspace({
         event_plan_id: plan.id,
         title: newTaskTitle.trim(),
         assigned_to: newTaskAssignee || null,
-        due_date: newTaskDue || null,
+        due_date: due,
         completed: false,
         phase,
         sort_order: maxSort + 1,
@@ -6408,12 +6495,38 @@ export function EventPlanWorkspace({
     setNewTaskTitle("")
     setNewTaskAssignee("")
     setNewTaskDue("")
+    setNewTaskSection("")
     setAddingTask(false)
   }
 
   async function handleDeleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     await supabase.from("event_tasks").delete().eq("id", id)
+  }
+
+  function startEditTask(task: EventTask) {
+    setConfirmDeleteTaskId(null)
+    setEditingTaskId(task.id)
+    setEditTaskTitle(task.title)
+    setEditTaskAssignee(task.assigned_to ?? "")
+    setEditTaskDue(task.due_date ?? "")
+  }
+
+  async function handleUpdateTask() {
+    if (!editingTaskId || !editTaskTitle.trim()) return
+    setSavingTaskEdit(true)
+    const id = editingTaskId
+    const newTitle = editTaskTitle.trim()
+    const newAssignee = editTaskAssignee || null
+    const newDue = editTaskDue || null
+    await supabase
+      .from("event_tasks")
+      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue })
+      .eq("id", id)
+    const assignedName = newAssignee ? assigneePool.find(a => a.id === newAssignee)?.name : undefined
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, assigned_name: assignedName } : t))
+    setEditingTaskId(null)
+    setSavingTaskEdit(false)
   }
 
   async function handleAddRole() {
@@ -6515,6 +6628,17 @@ export function EventPlanWorkspace({
     teams: "Teams", transport: "Transport", program: "Program",
   }
 
+  // Launchpad metadata for the dynamic extra-tab rows on Overview: an icon +
+  // a one-line subtitle per planning tab this event actually carries.
+  const EXTRA_TAB_META: Record<EventExtraTab, { icon: typeof Users; subtitle: string }> = {
+    sub_events: { icon: Calendar, subtitle: "Nights & activities inside the week" },
+    new_folks: { icon: UserPlus, subtitle: "Track first-timers and follow-up" },
+    acts: { icon: Sparkles, subtitle: "Performances & skits for the night" },
+    teams: { icon: Layers, subtitle: "Split attendees into teams" },
+    transport: { icon: Bus, subtitle: "Rides & carpools to the venue" },
+    program: { icon: Clock, subtitle: "Run-of-show & schedule" },
+  }
+
   const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
@@ -6523,15 +6647,41 @@ export function EventPlanWorkspace({
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
-  // Phase config: use typeCfg phases if available, else defaults
-  const phaseConfig: { key: EventTask["phase"]; label: string }[] = typeCfg.defaultPhases.length > 0
-    ? typeCfg.defaultPhases.map(p => ({ key: p.key as EventTask["phase"], label: p.label }))
-    : [
-        { key: "pre_event", label: "Pre-Event" },
-        { key: "day_of", label: "Day-of" },
-        { key: "post_event", label: "Post-Event" },
-        { key: "followup", label: "Follow-up" },
-      ]
+  // ── Date-driven checklist sections ──────────────────────────────────────────
+  // Window anchors (local YMD): plan-start … [crunch] … event day … event+2mo cap.
+  const eventYMD = toLocalYMD(startDate)
+  const eventPlusOneYMD = addDaysYMD(startDate, 1)
+  const eventPlusTwoMonthsYMD = addMonthsYMD(startDate, 2)
+  const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+
+  // Map a task to its section. If dated, compare day-granularity YMD strings to
+  // the plan-start / crunch / event anchors; otherwise fall back to the stored
+  // phase (dateless tasks never land in "crunch").
+  type ChecklistSection = "planning" | "crunch" | "day_of" | "post"
+  function sectionOf(task: EventTask): ChecklistSection {
+    const due = task.due_date
+    if (due) {
+      if (due >= eventPlusOneYMD) return "post"
+      if (due === eventYMD) return "day_of"
+      if (crunchDate && due >= crunchDate && due < eventYMD) return "crunch"
+      return "planning"
+    }
+    switch (task.phase) {
+      case "day_of": return "day_of"
+      case "post_event":
+      case "followup": return "post"
+      default: return "planning" // pre_event
+    }
+  }
+
+  // Rendered sections in order — Crunch only appears when a crunch date is set.
+  // defaultDue/phase seed the section's inline add-row so a new task lands here.
+  const sectionDefs: { key: ChecklistSection; label: string; defaultDue: string; phase: EventTask["phase"] }[] = [
+    { key: "planning", label: "Planning phase", defaultDue: planStartDate, phase: "pre_event" },
+    ...(crunchDate ? [{ key: "crunch" as ChecklistSection, label: "Crunch phase", defaultDue: crunchDate, phase: "day_of" as EventTask["phase"] }] : []),
+    { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
+    { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
+  ]
 
   const inputStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
@@ -6610,105 +6760,247 @@ export function EventPlanWorkspace({
         ) : (
           <>
             {/* ── Overview ── */}
-            {activeSection === 'overview' && (
-              <>
-              <ContentHeader
-                label="Overview"
-                action={canEdit && onEditEvent ? (
-                  <ContentActionButton variant="ghost" icon={<Pencil style={{ width: 14, height: 14 }} />} label="Edit event" onClick={onEditEvent} />
-                ) : undefined}
-              />
-              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 28, alignItems: "start", marginTop: 24 }} className="max-md:!block">
-                {/* Left: planning details (section header is the ContentHeader above) */}
+            {activeSection === 'overview' && (() => {
+              // ── Derived overview metrics ──────────────────────────────────
+              const taskTotal = tasks.length
+              const taskDone = tasks.filter(t => t.completed).length
+              const rolesTotal = roles.length
+              const rolesAssigned = roles.filter(r => r.assigned_to).length
+              const pct = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0
+              const filledSegs = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 5) : 0
+              // Readiness status from checklist progress
+              const readiness = taskTotal === 0
+                ? { color: "var(--faint)", label: "No checklist yet" }
+                : pct === 100 ? { color: "var(--success)", label: "Ready" }
+                : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
+                : { color: "var(--gold)", label: "Needs attention" }
+              // Identity facts — omit any empty value
+              const dateOnly = startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+              const timeVal = calendarEvent.all_day ? "" :
+                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              // Where always shows below Time, sourced from the Edit-event location field
+              // (muted em-dash when unset); Time/What omit when empty.
+              const facts: { k: string; v: string; muted?: boolean }[] = [
+                ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
+                { k: "Where", v: calendarEvent.location?.trim() || "—", muted: !calendarEvent.location?.trim() },
+                ...(calendarEvent.description?.trim() ? [{ k: "What", v: calendarEvent.description.trim() }] : []),
+              ]
+
+              const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
+              const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
+              const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
+              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }
+              const factDateInput: React.CSSProperties = { background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 8, padding: "4px 10px", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }
+              const factLink: React.CSSProperties = { fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)" }
+
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
+                {/* ── LEFT column ── */}
                 <section>
-                  {calendarEvent.description && (
-                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.7, maxWidth: 540 }}>
-                      {calendarEvent.description}
-                    </p>
-                  )}
-                  <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "120px 1fr", rowGap: 14, columnGap: 24, fontSize: 14 }}>
-                    <span style={{ color: "var(--muted-text)" }}>When</span>
-                    <span style={{ color: "var(--ink)" }}>{dateStr}</span>
-                    {calendarEvent.location && (
-                      <>
-                        <span style={{ color: "var(--muted-text)" }}>Where</span>
-                        <span style={{ color: "var(--ink)" }}>{calendarEvent.location}</span>
-                      </>
+                  {/* Event identity header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
+                    <div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
+                        {facts.map(f => (
+                          <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                            <span style={factKey}>{f.k}</span>
+                            <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                          </div>
+                        ))}
+
+                        {/* Plan start — planning begins; always set, not removable */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Plan</span>
+                          {canEdit && editingPlanStart ? (
+                            <input
+                              type="date"
+                              autoFocus
+                              value={planStartDate}
+                              max={eventYMD}
+                              onChange={(e) => { if (e.target.value) handleSavePlanDates({ plan_start_date: e.target.value }) }}
+                              onBlur={() => setEditingPlanStart(false)}
+                              style={factDateInput}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => { if (canEdit) setEditingPlanStart(true) }}
+                              style={{ fontSize: 15, color: planStartDate ? "var(--ink)" : "var(--faint)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                            >{planStartDate ? fmtMD(planStartDate) : "—"}</span>
+                          )}
+                        </div>
+
+                        {/* Crunch — busy phase begins; optional (removable) */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Crunch</span>
+                          {crunchDate ? (
+                            canEdit && editingCrunch ? (
+                              <input
+                                type="date"
+                                autoFocus
+                                value={crunchDate}
+                                min={planStartDate || undefined}
+                                max={eventYMD}
+                                onChange={(e) => { if (e.target.value) handleSavePlanDates({ crunch_date: e.target.value }) }}
+                                onBlur={() => setEditingCrunch(false)}
+                                style={factDateInput}
+                              />
+                            ) : (
+                              <span style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                                <span
+                                  onClick={() => { if (canEdit) setEditingCrunch(true) }}
+                                  style={{ fontSize: 15, color: "var(--ink)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                                >{fmtMD(crunchDate)}</span>
+                                {canEdit && (
+                                  <button onClick={() => handleSavePlanDates({ crunch_date: null })} style={{ ...factLink, color: "var(--muted-text)" }}>Remove</button>
+                                )}
+                              </span>
+                            )
+                          ) : (
+                            canEdit ? (
+                              <button
+                                onClick={() => handleSavePlanDates({ crunch_date: addDaysYMD(startDate, -7) })}
+                                style={factLink}
+                              >+ Add crunch phase</button>
+                            ) : (
+                              <span style={{ fontSize: 15, color: "var(--faint)", lineHeight: 1.5 }}>—</span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {canEdit && onEditEvent && (
+                      <button
+                        onClick={onEditEvent}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
+                      >
+                        <Pencil style={{ width: 14, height: 14 }} /> Edit event
+                      </button>
                     )}
                   </div>
 
-                  {/* Planning notes */}
-                  <div style={{ marginTop: 28 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 10 }}>Planning Notes</p>
+                  {/* Launchpad */}
+                  <div>
+                    <p style={eyebrow}>Jump into planning</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+                      <LaunchpadRow
+                        icon={ClipboardList}
+                        title="Checklist"
+                        subtitle="Tasks to prepare before the event"
+                        onClick={() => setActiveSectionAndUrl('checklist')}
+                        right={
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 90, height: 5, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+                              <span style={{ display: "block", height: "100%", width: `${taskTotal > 0 ? (taskDone / taskTotal) * 100 : 0}%`, background: "var(--plum)" }} />
+                            </span>
+                            <span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{taskDone} / {taskTotal}</span>
+                          </span>
+                        }
+                      />
+                      <LaunchpadRow
+                        icon={Users}
+                        title="Roles & Leads"
+                        subtitle="Assign who owns each part"
+                        onClick={() => setActiveSectionAndUrl('roles')}
+                        right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesAssigned} / {rolesTotal} assigned</span>}
+                      />
+                      {extraTabs.map(t => (
+                        <LaunchpadRow
+                          key={t}
+                          icon={EXTRA_TAB_META[t].icon}
+                          title={EXTRA_TAB_LABELS[t]}
+                          subtitle={EXTRA_TAB_META[t].subtitle}
+                          onClick={() => setActiveSectionAndUrl(t)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Planning notes (demoted) */}
+                  <div style={{ marginTop: "var(--space-9)" }}>
+                    <p style={eyebrow}>Planning notes</p>
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
                         onChange={e => setOverviewNotes(e.target.value)}
                         onBlur={handleSaveOverview}
                         placeholder="Add context, key decisions, or reminders for this event…"
-                        rows={4}
-                        style={{ width: "100%", background: "#F4F1E8", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "15px 17px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                       />
                     ) : overviewNotes ? (
                       <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
                     ) : (
-                      <p style={{ fontSize: 14, color: "#A09A8C", fontStyle: "italic" }}>No planning notes yet.</p>
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>No planning notes yet.</p>
                     )}
                   </div>
                 </section>
 
-                {/* Right: stat cards */}
-                <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="max-md:mt-6">
-                  {/* Expected Turnout */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Expected Turnout</p>
-                    {canEdit ? (
+                {/* ── RIGHT column — stat cards ── */}
+                <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
+                  {/* Expected turnout */}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Expected turnout</p>
+                    {canEdit && editingTurnout ? (
                       <input
                         type="number"
+                        autoFocus
                         value={turnout}
                         onChange={(e) => setTurnout(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingTurnout(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingTurnout(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{turnout || "—"}</p>
+                      <p
+                        onClick={() => { if (canEdit) setEditingTurnout(true) }}
+                        style={{ ...bigNumber, color: turnout ? "var(--ink)" : "var(--faint)", cursor: canEdit ? "pointer" : "default" }}
+                      >{turnout || "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>guests</p>
                     {rsvpCount !== null && (
                       <p style={{ fontSize: 12, color: "var(--body)", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                        <span style={{ fontWeight: 600, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
+                        <span style={{ fontWeight: 500, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
                   </div>
+
                   {/* Budget */}
-                  <div style={{ padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--ivory)" }}>
+                  <div style={statCard}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Budget</p>
-                      {!canEditBudget && <span style={{ fontSize: 11, color: "#A09A8C", fontStyle: "italic" }}>Treasurer only</span>}
+                      <p style={monoLabel}>Budget</p>
+                      {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
                     </div>
-                    {canEditBudget ? (
+                    {canEditBudget && editingBudget ? (
                       <input
                         type="number"
+                        autoFocus
                         value={budget}
                         onChange={(e) => setBudget(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={() => { handleSaveOverview(); setEditingBudget(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingBudget(false) } }}
                         placeholder="—"
-                        style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, background: "transparent", border: "none", outline: "none", padding: 0, marginTop: 10, width: "100%" }}
+                        style={bigInput}
                       />
                     ) : (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, color: "var(--ink)", letterSpacing: -0.6, marginTop: 10 }}>{budget ? `$${budget}` : "—"}</p>
+                      <p
+                        onClick={() => { if (canEditBudget) setEditingBudget(true) }}
+                        style={{ ...bigNumber, color: budget ? "var(--ink)" : "var(--faint)", cursor: canEditBudget ? "pointer" : "default" }}
+                      >{budget ? `$${budget}` : "—"}</p>
                     )}
                     <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>allocated for this event</p>
                     {typeCfg.budgetCategory && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                          Ministry Allocation · {calendarEvent.title}
-                        </p>
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                        <p style={{ ...monoLabel, letterSpacing: "0.08em" }}>Ministry allocation · {calendarEvent.title}</p>
                         {ministryBudget ? (
                           <>
-                            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
-                              ${ministryBudget.total.toFixed(2)} total
+                            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
+                              ${ministryBudget.total.toFixed(2)}
                             </p>
                             <p style={{ fontSize: 12, color: "var(--body)", marginTop: 2 }}>
                               {Object.entries(ministryBudget.byFund)
@@ -6717,46 +7009,37 @@ export function EventPlanWorkspace({
                             </p>
                           </>
                         ) : (
-                          <p style={{ fontSize: 12, color: "#A09A8C", fontStyle: "italic", marginTop: 6 }}>
+                          <p style={{ fontSize: 12, color: "var(--faint)", fontStyle: "italic", marginTop: 6 }}>
                             No ministry budget set
                           </p>
                         )}
                       </div>
                     )}
                   </div>
+
                   {/* Readiness */}
-                  {(() => {
-                    const total = tasks.length
-                    const done = tasks.filter(t => t.completed).length
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                    const onTrack = total === 0 || pct >= 50
-                    return (
-                      <div style={{ padding: 22, background: "var(--ivory)", borderColor: "var(--line-2)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
-                        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Readiness</p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 99, background: onTrack ? "#7FA67F" : "#D4855C", flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{total === 0 ? "No tasks yet" : onTrack ? "On track" : "Needs attention"}</span>
-                        </div>
-                        {total > 0 && (
-                          <>
-                            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                              {Array.from({ length: Math.min(total, 4) }).map((_, i) => (
-                                <span key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i < done ? "var(--plum)" : "var(--line-2)" }} />
-                              ))}
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "var(--body)" }}>
-                              <span>{done} of {total} done</span>
-                              <span>{pct}%</span>
-                            </div>
-                          </>
-                        )}
+                  <div style={statCard}>
+                    <p style={monoLabel}>Readiness</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{readiness.label}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: i < filledSegs ? (pct === 100 ? "var(--success)" : "var(--plum)") : "var(--line-2)" }} />
+                      ))}
+                    </div>
+                    {taskTotal > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{taskDone} of {taskTotal} done</span>
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
                       </div>
-                    )
-                  })()}
+                    )}
+                  </div>
                 </aside>
               </div>
-              </>
-            )}
+              )
+            })()}
 
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
@@ -6770,26 +7053,26 @@ export function EventPlanWorkspace({
                 </div>
 
                 {/* Phase-grouped task list */}
-                {phaseConfig.map((phase) => {
-                  const phaseTasks = tasks.filter(t => t.phase === phase.key)
-                  const phaseIncomplete = phaseTasks.filter(t => !t.completed).length
-                  const isCollapsed = collapsedPhases.has(phase.key)
+                {sectionDefs.map((section) => {
+                  const sectionTasks = tasks.filter(t => sectionOf(t) === section.key)
+                  const sectionIncomplete = sectionTasks.filter(t => !t.completed).length
+                  const isCollapsed = collapsedPhases.has(section.key)
                   return (
-                    <div key={phase.key} style={{ marginBottom: 28 }}>
-                      {/* Phase header */}
+                    <div key={section.key} style={{ marginBottom: 28 }}>
+                      {/* Section header */}
                       <button
                         onClick={() => setCollapsedPhases(prev => {
                           const next = new Set(prev)
-                          if (next.has(phase.key)) next.delete(phase.key)
-                          else next.add(phase.key)
+                          if (next.has(section.key)) next.delete(section.key)
+                          else next.add(section.key)
                           return next
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{phase.label}</span>
-                        {phaseTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "var(--body)" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
-                            {phaseIncomplete > 0 ? `${phaseIncomplete} remaining` : "All done"}
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        {sectionTasks.length > 0 && (
+                          <span style={{ fontSize: 11, color: sectionIncomplete > 0 ? "var(--body)" : "#7FA67F", background: sectionIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
+                            {sectionIncomplete > 0 ? `${sectionIncomplete} remaining` : "All done"}
                           </span>
                         )}
                         <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
@@ -6798,11 +7081,57 @@ export function EventPlanWorkspace({
 
                       {!isCollapsed && (
                         <>
-                          {phaseTasks.length === 0 && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this phase.</p>
+                          {sectionTasks.length === 0 && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
                           )}
-                          {phaseTasks.map((task, i) => (
-                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
+                          {sectionTasks.map((task, i) => (
+                            canEdit && editingTaskId === task.id ? (
+                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === sectionTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
+                                <button
+                                  onClick={() => handleToggleTask(task)}
+                                  style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                                </button>
+                                <input
+                                  autoFocus
+                                  value={editTaskTitle}
+                                  onChange={(e) => setEditTaskTitle(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
+                                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                                />
+                                <select
+                                  value={editTaskAssignee}
+                                  onChange={(e) => setEditTaskAssignee(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                                <input
+                                  type="date"
+                                  value={editTaskDue}
+                                  min={planStartDate || undefined}
+                                  max={eventPlusTwoMonthsYMD}
+                                  onChange={(e) => setEditTaskDue(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                />
+                                <CentralButton
+                                  variant="primary" size="sm"
+                                  onClick={handleUpdateTask}
+                                  disabled={savingTaskEdit || !editTaskTitle.trim()}
+                                >
+                                  Save
+                                </CentralButton>
+                                <button
+                                  onClick={() => setEditingTaskId(null)}
+                                  style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === sectionTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
                               <button
                                 onClick={() => handleToggleTask(task)}
                                 style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
@@ -6835,27 +7164,36 @@ export function EventPlanWorkspace({
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => setConfirmDeleteTaskId(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                                  <>
+                                    <button onClick={() => startEditTask(task)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>
+                                      <Pencil style={{ width: 14, height: 14 }} />
+                                    </button>
+                                    <button onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
                                 )
                               )}
                             </div>
+                            )
                           ))}
 
-                          {/* Inline add row per phase */}
+                          {/* Inline add row per section — prefills due to the section window */}
                           {canEdit && (
                             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
                               <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
                               <input
-                                value={phase.key === newTaskPhase ? newTaskTitle : ""}
-                                onChange={(e) => { setNewTaskPhase(phase.key); setNewTaskTitle(e.target.value) }}
-                                onFocus={() => setNewTaskPhase(phase.key)}
-                                placeholder={`Add to ${phase.label}…`}
+                                value={section.key === newTaskSection ? newTaskTitle : ""}
+                                onChange={(e) => {
+                                  if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) }
+                                  setNewTaskTitle(e.target.value)
+                                }}
+                                onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
+                                placeholder={`Add to ${section.label}…`}
                                 style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskPhase === phase.key) handleAddTask(phase.key) }}
+                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
                               />
-                              {phase.key === newTaskPhase && newTaskTitle.trim() && (
+                              {section.key === newTaskSection && newTaskTitle.trim() && (
                                 <>
                                   <select
                                     value={newTaskAssignee}
@@ -6863,17 +7201,19 @@ export function EventPlanWorkspace({
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                                   >
                                     <option value="">Unassigned</option>
-                                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                    {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                                   </select>
                                   <input
                                     type="date"
                                     value={newTaskDue}
+                                    min={planStartDate || undefined}
+                                    max={eventPlusTwoMonthsYMD}
                                     onChange={(e) => setNewTaskDue(e.target.value)}
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
                                   <CentralButton
                                     variant="primary" size="sm"
-                                    onClick={() => handleAddTask(phase.key)}
+                                    onClick={() => handleAddTask(section)}
                                     disabled={addingTask}
                                   >
                                     Add
