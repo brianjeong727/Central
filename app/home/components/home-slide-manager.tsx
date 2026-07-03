@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone, Image as ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "./shared"
 
 // Curation overlay for the home hero carousel. Reference slides (upcoming events
-// / announcements) plus uploaded photo slides; add, reorder, remove. Writes go
-// straight to home_slides (ministry_id on every write; RLS mirrors canCurateHome).
+// / announcements); add, reorder, remove. Writes go straight to home_slides
+// (ministry_id on every write; RLS mirrors canCurateHome).
+// Photo slides are shelved (coming soon): existing rows are soft-hidden here and
+// on the home tab, and upload UI is replaced by a placeholder — no data deleted.
 
 interface SlideRow {
   id: string
@@ -16,86 +18,6 @@ interface SlideRow {
   calendar_event_id: string | null
   order_index: number
   title: string
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  // h in [0,360), s & l in [0,1]
-  const c = (1 - Math.abs(2 * l - 1)) * s
-  const hp = h / 60
-  const x = c * (1 - Math.abs((hp % 2) - 1))
-  let r = 0, g = 0, b = 0
-  if (hp < 1) { r = c; g = x }
-  else if (hp < 2) { r = x; g = c }
-  else if (hp < 3) { g = c; b = x }
-  else if (hp < 4) { g = x; b = c }
-  else if (hp < 5) { r = x; b = c }
-  else { r = c; b = x }
-  const m = l - c / 2
-  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0")
-  return `#${to(r)}${to(g)}${to(b)}`
-}
-
-// Compute a dark, contrast-safe panel color from the chosen photo, ONCE at
-// upload (from the local file blob — no CORS). Stored in home_slides.panel_color
-// and used as the slide's adaptive panel fill (replaces any per-render blur).
-//
-// Hue-preserving: a chroma-weighted circular mean recovers the photo's dominant
-// hue (ignoring near-white/near-black/neutral pixels that would otherwise wash a
-// bright, diverse image toward grey), then the color is rebuilt at a fixed dark
-// lightness with saturation clamped to a floor/cap so the hue stays visible but
-// on-brand. Falls back to --plum-deep only when the image has no usable color.
-function clampDark(file: File): Promise<string> {
-  const FALLBACK = "#1B0A1E" // --plum-deep
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file)
-    const img = new window.Image()
-    img.onload = () => {
-      try {
-        const c = document.createElement("canvas")
-        const w = (c.width = 32)
-        const h = (c.height = 32)
-        const ctx = c.getContext("2d")
-        if (!ctx) { resolve(FALLBACK); return }
-        ctx.drawImage(img, 0, 0, w, h)
-        const { data } = ctx.getImageData(0, 0, w, h)
-
-        let sx = 0, sy = 0, satSum = 0, wsum = 0
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
-          const max = Math.max(r, g, b), min = Math.min(r, g, b)
-          const l = (max + min) / 2
-          if (l > 0.92 || l < 0.08) continue // skip near-white / near-black
-          const chroma = max - min
-          if (chroma < 0.01) continue // skip neutral pixels (no usable hue)
-          const s = chroma / (1 - Math.abs(2 * l - 1)) // HSL saturation
-          let hue: number // degrees
-          if (max === r) hue = (((g - b) / chroma) % 6) * 60
-          else if (max === g) hue = ((b - r) / chroma + 2) * 60
-          else hue = ((r - g) / chroma + 4) * 60
-          const rad = (hue * Math.PI) / 180
-          const wgt = chroma // weight by colorfulness so washed pixels don't dilute hue
-          sx += Math.cos(rad) * wgt
-          sy += Math.sin(rad) * wgt
-          satSum += s * wgt
-          wsum += wgt
-        }
-
-        if (wsum < 1e-4) { resolve(FALLBACK); return } // genuinely colorless image
-
-        let H = (Math.atan2(sy, sx) * 180) / Math.PI
-        if (H < 0) H += 360
-        const S = Math.min(0.5, Math.max(0.28, satSum / wsum)) // floor so hue shows, cap so on-brand
-        const L = 0.13 // fixed dark lightness (≈ --plum-deep range)
-        resolve(hslToHex(H, S, L))
-      } catch {
-        resolve(FALLBACK)
-      } finally {
-        URL.revokeObjectURL(url)
-      }
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(FALLBACK) }
-    img.src = url
-  })
 }
 
 interface EventOpt {
@@ -132,11 +54,6 @@ export function HomeSlideManager({
   const [events, setEvents] = useState<EventOpt[]>([])
   const [anns, setAnns] = useState<AnnOpt[]>([])
   const [userId, setUserId] = useState<string | null>(null)
-  const [caption, setCaption] = useState("")
-  const [eyebrow, setEyebrow] = useState("")
-  const [uploading, setUploading] = useState(false)
-  const [photoError, setPhotoError] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
     const nowIso = new Date().toISOString()
@@ -178,7 +95,8 @@ export function HomeSlideManager({
             : annMap.get(r.announcement_id ?? "")?.title ?? "Announcement",
     }))
 
-    setSlides(resolved)
+    // Photo slides are shelved — soft-hide them from the manager list (rows kept in DB).
+    setSlides(resolved.filter((s) => s.slide_type !== "photo"))
     setEvents(evRows ?? [])
     setAnns(annRows ?? [])
     setLoading(false)
@@ -207,49 +125,6 @@ export function HomeSlideManager({
     })
     await refresh()
     setBusy(false)
-  }
-
-  async function addPhotoSlide(file: File) {
-    setBusy(true)
-    setUploading(true)
-    setPhotoError(null)
-    try {
-      // compute clamped panel color from the local file (no CORS), then upload
-      const panel = await clampDark(file)
-      const ext = file.name.split(".").pop() || "jpg"
-      // reuse the announcement-images bucket via a home-slides/ path prefix
-      const path = `home-slides/${ministryId}/${Date.now()}.${ext}`
-      const { data: up, error } = await supabase.storage.from("announcement-images").upload(path, file, { upsert: false })
-      if (error || !up) {
-        setPhotoError(error?.message || "Upload failed. Please try again.")
-        return
-      }
-      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(up.path)
-      const nextOrder = slides.length ? Math.max(...slides.map((s) => s.order_index)) + 1 : 0
-      const { error: insErr } = await supabase.from("home_slides").insert({
-        ministry_id: ministryId,
-        slide_type: "photo",
-        image_url: publicUrl,
-        caption: caption.trim() || null,
-        eyebrow: eyebrow.trim() || null,
-        panel_color: panel,
-        order_index: nextOrder,
-        created_by: userId,
-      })
-      if (insErr) {
-        setPhotoError(insErr.message || "Could not save the slide.")
-        return
-      }
-      setCaption("")
-      setEyebrow("")
-      if (fileRef.current) fileRef.current.value = ""
-      await refresh()
-    } catch (e) {
-      setPhotoError(e instanceof Error ? e.message : "Something went wrong uploading the photo.")
-    } finally {
-      setUploading(false)
-      setBusy(false)
-    }
   }
 
   async function removeSlide(id: string) {
@@ -361,7 +236,7 @@ export function HomeSlideManager({
               <div style={{ ...MONO, marginBottom: 12 }}>Current slides · {slides.length}</div>
               {slides.length === 0 ? (
                 <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>
-                  No slides yet — add a photo, event, or announcement below. The home hero falls back to the latest
+                  No slides yet — add an event or announcement below. The home hero falls back to the latest
                   pinned announcement until you add one.
                 </p>
               ) : (
@@ -432,72 +307,27 @@ export function HomeSlideManager({
               )}
             </section>
 
-            {/* Add a photo */}
+            {/* Photo slides — shelved (coming soon placeholder, nothing interactive) */}
             <section>
-              <div style={{ ...MONO, marginBottom: 12 }}>Add a photo</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <input
-                  value={eyebrow}
-                  onChange={(e) => setEyebrow(e.target.value)}
-                  placeholder="Eyebrow (e.g. Fellowship night)"
-                  maxLength={48}
-                  style={fieldStyle}
-                />
-                <input
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Caption (e.g. Sixty of us packed the hall)"
-                  maxLength={120}
-                  style={fieldStyle}
-                />
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) addPhotoSlide(f)
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={busy}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    padding: "12px 14px",
-                    borderRadius: "var(--r-card)",
-                    border: "1px solid var(--plum)",
-                    background: "transparent",
-                    color: "var(--plum)",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: busy ? "default" : "pointer",
-                    opacity: busy ? 0.5 : 1,
-                    fontFamily: "var(--sans)",
-                  }}
-                >
-                  <ImageIcon style={{ width: 16, height: 16 }} />
-                  {uploading ? "Uploading…" : "Choose photo & add slide"}
-                </button>
-                {photoError && (
-                  <div
-                    style={{
-                      borderRadius: "var(--r-input)",
-                      background: "rgba(159,48,48,0.08)",
-                      border: "1px solid rgba(159,48,48,0.18)",
-                      padding: "8px 12px",
-                      fontSize: 12,
-                      color: "var(--danger)",
-                    }}
-                  >
-                    {photoError}
-                  </div>
-                )}
+              <div style={{ ...MONO, marginBottom: 12 }}>Photo slides</div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "28px 22px",
+                  border: "1px dashed var(--dashed)",
+                  borderRadius: "var(--r-card)",
+                  background: "transparent",
+                  textAlign: "center",
+                }}
+              >
+                <ImageIcon style={{ width: 18, height: 18, color: "var(--muted-text)" }} />
+                <span style={MONO}>Coming soon</span>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: 0, fontFamily: "var(--sans)" }}>
+                  Photo slides are coming soon. For now, feature upcoming events and announcements below.
+                </p>
               </div>
             </section>
 
@@ -547,19 +377,6 @@ export function HomeSlideManager({
       </div>
     </div>
   )
-}
-
-const fieldStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: "var(--r-input)",
-  border: "1px solid var(--line-2)",
-  background: "var(--cream)",
-  color: "var(--ink)",
-  fontSize: 14,
-  fontFamily: "var(--sans)",
-  outline: "none",
-  boxSizing: "border-box",
 }
 
 function iconBtn(disabled: boolean): React.CSSProperties {
