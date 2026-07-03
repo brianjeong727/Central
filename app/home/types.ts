@@ -523,6 +523,9 @@ export interface EventTask {
   completed: boolean
   phase: 'pre_event' | 'day_of' | 'post_event' | 'followup'
   sort_order: number
+  parent_id: string | null
+  pinned: boolean
+  priority: 'none' | 'med' | 'high'
 }
 
 export interface EventNewFolk {

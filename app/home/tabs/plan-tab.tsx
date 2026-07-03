@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { createPortal } from "react-dom"
 import useSWR from "swr"
@@ -10,7 +10,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
-  UserPlus, Sparkles, Layers, Bus, Clock,
+  UserPlus, Sparkles, Layers, Bus, Clock, Star, CornerUpLeft,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -6174,6 +6174,32 @@ function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
   )
 }
 
+// Small hover-aware icon button for the checklist row actions (grip, pin, add
+// subtask, promote, edit, delete). Inline styles across this file preclude CSS
+// :hover, so hover is tracked in local state.
+function ChecklistIconBtn({ onClick, title, baseColor = "var(--faint)", hoverColor = "var(--body)", children, style }: {
+  onClick: () => void
+  title: string
+  baseColor?: string
+  hoverColor?: string
+  children: ReactNode
+  style?: React.CSSProperties
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: hov ? hoverColor : baseColor, transition: "color .12s ease", ...style }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -6231,6 +6257,26 @@ export function EventPlanWorkspace({
     return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [members, roles])
 
+  // Map a raw event_tasks row (with joined assignee profile) to an EventTask.
+  // Shared by the initial load, task add, and subtask add so the hierarchy /
+  // pin / priority columns are mapped consistently in one place.
+  function mapTask(t: Record<string, unknown>): EventTask {
+    return {
+      id: t.id as string,
+      event_plan_id: t.event_plan_id as string,
+      title: t.title as string,
+      assigned_to: t.assigned_to as string | null,
+      assigned_name: (t.profiles as { name?: string } | null)?.name,
+      due_date: t.due_date as string | null,
+      completed: t.completed as boolean,
+      phase: (t.phase as string ?? "pre_event") as EventTask["phase"],
+      sort_order: (t.sort_order as number) ?? 0,
+      parent_id: (t.parent_id as string | null) ?? null,
+      pinned: (t.pinned as boolean) ?? false,
+      priority: (t.priority as EventTask["priority"]) ?? "none",
+    }
+  }
+
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
@@ -6265,7 +6311,6 @@ export function EventPlanWorkspace({
   const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
-  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
 
   // Plan/crunch date state — drives the checklist section windows.
   const [planStartDate, setPlanStartDate] = useState("")
@@ -6278,7 +6323,24 @@ export function EventPlanWorkspace({
   const [editTaskTitle, setEditTaskTitle] = useState("")
   const [editTaskAssignee, setEditTaskAssignee] = useState("")
   const [editTaskDue, setEditTaskDue] = useState("")
+  const [editTaskPriority, setEditTaskPriority] = useState<EventTask["priority"]>("none")
+  const [editTaskPinned, setEditTaskPinned] = useState(false)
   const [savingTaskEdit, setSavingTaskEdit] = useState(false)
+
+  // Checklist hierarchy / interaction state
+  const [childTitle, setChildTitle] = useState("")               // inline subtask input text
+  const [addingChildFor, setAddingChildFor] = useState<string | null>(null) // parent id whose subtask input is open
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set()) // parents whose children are collapsed
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const [dragOverSection, setDragOverSection] = useState<string | null>(null)
+  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null) // row in two-step delete confirm
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)           // delete in flight
+  // A dated task dropped onto a different date-window section — pending until the
+  // user confirms the date change (see §14 / date-reseed warning).
+  const [pendingSectionMove, setPendingSectionMove] = useState<{ taskId: string; sectionKey: string } | null>(null)
+  const [sectionMoveBusy, setSectionMoveBusy] = useState(false)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -6352,17 +6414,7 @@ export function EventPlanWorkspace({
         .eq("event_plan_id", planId)
         .order("sort_order", { ascending: true })
 
-      setTasks((tasksData ?? []).map((t: Record<string, unknown>) => ({
-        id: t.id as string,
-        event_plan_id: t.event_plan_id as string,
-        title: t.title as string,
-        assigned_to: t.assigned_to as string | null,
-        assigned_name: (t.profiles as { name?: string } | null)?.name,
-        due_date: t.due_date as string | null,
-        completed: t.completed as boolean,
-        phase: (t.phase as string ?? "pre_event") as EventTask["phase"],
-        sort_order: (t.sort_order as number) ?? 0,
-      })))
+      setTasks((tasksData ?? []).map(mapTask))
 
       // Fetch roles with assignee name
       const { data: rolesData } = await supabase
@@ -6478,20 +6530,7 @@ export function EventPlanWorkspace({
       })
       .select("*, profiles!event_tasks_assigned_to_fkey(name)")
       .single()
-    if (data) {
-      const d = data as Record<string, unknown>
-      setTasks((prev) => [...prev, {
-        id: d.id as string,
-        event_plan_id: d.event_plan_id as string,
-        title: d.title as string,
-        assigned_to: d.assigned_to as string | null,
-        assigned_name: (d.profiles as { name?: string } | null)?.name,
-        due_date: d.due_date as string | null,
-        completed: d.completed as boolean,
-        phase: (d.phase as string ?? phase) as EventTask["phase"],
-        sort_order: (d.sort_order as number) ?? 0,
-      }])
-    }
+    if (data) setTasks((prev) => [...prev, mapTask(data as Record<string, unknown>)])
     setNewTaskTitle("")
     setNewTaskAssignee("")
     setNewTaskDue("")
@@ -6500,33 +6539,147 @@ export function EventPlanWorkspace({
   }
 
   async function handleDeleteTask(id: string) {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    // Children cascade in the DB (parent_id ON DELETE CASCADE); drop them from
+    // local state too so the UI doesn't strand orphaned child rows.
+    setDeletingTaskId(id)
     await supabase.from("event_tasks").delete().eq("id", id)
+    setTasks((prev) => prev.filter((t) => t.id !== id && t.parent_id !== id))
+    setDeletingTaskId(null)
+    setConfirmDeleteTaskId(null)
   }
 
   function startEditTask(task: EventTask) {
-    setConfirmDeleteTaskId(null)
     setEditingTaskId(task.id)
     setEditTaskTitle(task.title)
     setEditTaskAssignee(task.assigned_to ?? "")
     setEditTaskDue(task.due_date ?? "")
+    setEditTaskPriority(task.priority)
+    setEditTaskPinned(task.pinned)
   }
 
   async function handleUpdateTask() {
     if (!editingTaskId || !editTaskTitle.trim()) return
     setSavingTaskEdit(true)
     const id = editingTaskId
+    const editing = tasks.find((t) => t.id === id)
     const newTitle = editTaskTitle.trim()
     const newAssignee = editTaskAssignee || null
     const newDue = editTaskDue || null
+    // Pin is top-level only — never persist pinned=true for a child.
+    const newPinned = editing && editing.parent_id === null ? editTaskPinned : false
     await supabase
       .from("event_tasks")
-      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue })
+      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue, priority: editTaskPriority, pinned: newPinned })
       .eq("id", id)
     const assignedName = newAssignee ? assigneePool.find(a => a.id === newAssignee)?.name : undefined
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, assigned_name: assignedName } : t))
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, priority: editTaskPriority, pinned: newPinned, assigned_name: assignedName } : t))
     setEditingTaskId(null)
     setSavingTaskEdit(false)
+  }
+
+  // ── Hierarchy / pin / priority / drag handlers ─────────────────────────────
+  async function togglePin(task: EventTask) {
+    if (!canEdit || task.parent_id !== null) return
+    const np = !task.pinned
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, pinned: np } : t))
+    await supabase.from("event_tasks").update({ pinned: np }).eq("id", task.id)
+  }
+
+  async function addChild(parent: EventTask) {
+    if (!plan || !canEdit || !childTitle.trim()) return
+    const maxSort = tasks.reduce((m, t) => Math.max(m, t.sort_order), -1)
+    const { data } = await supabase
+      .from("event_tasks")
+      .insert({
+        event_plan_id: plan.id,
+        title: childTitle.trim(),
+        assigned_to: null,
+        due_date: null,
+        completed: false,
+        phase: parent.phase,
+        sort_order: maxSort + 1,
+        created_by: userId,
+        parent_id: parent.id,
+        priority: "none",
+        pinned: false,
+      })
+      .select("*, profiles!event_tasks_assigned_to_fkey(name)")
+      .single()
+    if (data) setTasks((prev) => [...prev, mapTask(data as Record<string, unknown>)])
+    setChildTitle("") // keep the input open so several subtasks can be added in a row
+  }
+
+  async function promoteTask(task: EventTask) {
+    if (!canEdit || task.parent_id === null) return
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, parent_id: null } : t))
+    await supabase.from("event_tasks").update({ parent_id: null }).eq("id", task.id)
+  }
+
+  // Make dragId a child of targetId's parent (or targetId itself). One level
+  // deep: a task that already HAS children can't be nested. Inherits the new
+  // parent's phase and clears pinned.
+  async function nest(dragId: string, targetId: string) {
+    if (!canEdit || dragId === targetId) return
+    const drag = tasks.find((t) => t.id === dragId)
+    const target = tasks.find((t) => t.id === targetId)
+    if (!drag || !target) return
+    if (tasks.some((t) => t.parent_id === dragId)) return // dragId is a parent → refuse
+    const newParent = target.parent_id ?? target.id
+    if (newParent === dragId) return
+    const parentTask = tasks.find((t) => t.id === newParent)
+    const phase = parentTask?.phase ?? drag.phase
+    setTasks((prev) => prev.map((t) => t.id === dragId ? { ...t, parent_id: newParent, phase, pinned: false } : t))
+    await supabase.from("event_tasks").update({ parent_id: newParent, phase, pinned: false }).eq("id", dragId)
+  }
+
+  // Drop onto a section → promote to a standalone (top-level) task in that
+  // section, reseeding its due_date to the section's default so it actually
+  // lands in that date window (sections are date-driven). Children inherit the
+  // new phase. Callers gate the date-change warning via requestMoveToSection.
+  async function moveToSection(dragId: string, sectionKey: ChecklistSection) {
+    if (!canEdit) return
+    const def = sectionDefs.find((s) => s.key === sectionKey)
+    const drag = tasks.find((t) => t.id === dragId)
+    if (!def || !drag) return
+    const phase = def.phase
+    const newDue = def.defaultDue || null
+    const kidIds = tasks.filter((t) => t.parent_id === dragId).map((t) => t.id)
+    setTasks((prev) => prev.map((t) => {
+      if (t.id === dragId) return { ...t, parent_id: null, phase, due_date: newDue }
+      if (kidIds.includes(t.id)) return { ...t, phase }
+      return t
+    }))
+    await supabase.from("event_tasks").update({ parent_id: null, phase, due_date: newDue }).eq("id", dragId)
+    if (kidIds.length) await supabase.from("event_tasks").update({ phase }).in("id", kidIds)
+  }
+
+  // Section-drop entry point. A DATED task moving to a DIFFERENT date-window
+  // section would have its due_date overwritten — warn first (pending state). A
+  // dateless task (e.g. a promoted subtask) has nothing to overwrite, so move
+  // immediately.
+  function requestMoveToSection(dragId: string, sectionKey: ChecklistSection) {
+    if (!canEdit) return
+    const drag = tasks.find((t) => t.id === dragId)
+    if (!drag) return
+    if (drag.due_date && sectionOf(drag) !== sectionKey) {
+      setPendingSectionMove({ taskId: dragId, sectionKey })
+    } else {
+      moveToSection(dragId, sectionKey)
+    }
+  }
+
+  async function confirmSectionMove() {
+    if (!pendingSectionMove) return
+    setSectionMoveBusy(true)
+    await moveToSection(pendingSectionMove.taskId, pendingSectionMove.sectionKey as ChecklistSection)
+    setSectionMoveBusy(false)
+    setPendingSectionMove(null)
+  }
+
+  function clearDrag() {
+    setDragTaskId(null)
+    setDragOverTaskId(null)
+    setDragOverSection(null)
   }
 
   async function handleAddRole() {
@@ -6682,6 +6835,217 @@ export function EventPlanWorkspace({
     { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
     { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
   ]
+
+  // ── Checklist hierarchy helpers ────────────────────────────────────────────
+  const childrenOf = (id: string) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_order - b.sort_order)
+  const pinnedTop = tasks.filter((t) => t.parent_id === null && t.pinned)
+  const pinnedIds = new Set(pinnedTop.map((t) => t.id))
+  // A task lives in the top Pinned band if it's a pinned top-level task or a
+  // child of one — those never appear in the date-driven sections below.
+  const inBand = (t: EventTask) => (t.parent_id === null ? t.pinned : pinnedIds.has(t.parent_id ?? ""))
+
+  // The roomy inline editor card that replaces a row while it's being edited.
+  function renderTaskEditor(task: EventTask) {
+    const isTop = task.parent_id === null
+    const isHighPriority = editTaskPriority === "high"
+    return (
+      <div key={task.id} style={{ border: "1px solid var(--plum)", borderRadius: 14, padding: "16px 18px", background: "var(--cream)", marginBottom: 2 }}>
+        <input
+          autoFocus
+          value={editTaskTitle}
+          onChange={(e) => setEditTaskTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
+          placeholder="Task title"
+          style={{ width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--line)", outline: "none", fontSize: 16, fontFamily: "var(--font-inter)", color: "var(--ink)", padding: "2px 0 8px" }}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Assignee</span>
+            <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+              <option value="">Unassigned</option>
+              {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </label>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Due date</span>
+            <input type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} />
+          </label>
+          <div>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Priority</span>
+            <button type="button" onClick={() => setEditTaskPriority((p) => (p === "high" ? "none" : "high"))}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                background: isHighPriority ? "var(--cream-3)" : "var(--cream-2)", border: "1px solid " + (isHighPriority ? "var(--plum)" : "var(--line-2)"), color: isHighPriority ? "var(--plum)" : "var(--body)", fontFamily: "var(--font-inter)" }}>
+              <AlertCircle style={{ width: 12, height: 12 }} />
+              High priority
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <CentralButton variant="primary" size="sm" onClick={handleUpdateTask} disabled={savingTaskEdit || !editTaskTitle.trim()}>Save</CentralButton>
+            <button onClick={() => setEditingTaskId(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>Cancel</button>
+          </div>
+          {isTop && (
+            <button type="button" onClick={() => setEditTaskPinned((p) => !p)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                background: editTaskPinned ? "var(--plum)" : "var(--cream-2)", border: "1px solid " + (editTaskPinned ? "var(--plum)" : "var(--line-2)"), color: editTaskPinned ? "var(--cream-3)" : "var(--body)" }}>
+              <Star style={{ width: 12, height: 12, fill: editTaskPinned ? "currentColor" : "none" }} />
+              {editTaskPinned ? "Pinned" : "Pin to top"}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // A single checklist row (top-level or child). isChild → tighter, promote
+  // action instead of pin/add-subtask, no disclosure/subcount.
+  function renderTaskRow(task: EventTask, isChild: boolean) {
+    if (canEdit && editingTaskId === task.id) return renderTaskEditor(task)
+    const kids = childrenOf(task.id)
+    const hasKids = kids.length > 0
+    const doneKids = kids.filter((k) => k.completed).length
+    const collapsed = collapsedTasks.has(task.id)
+    const isHigh = task.priority === "high"
+    const hovered = hoveredTaskId === task.id
+    const isDragOver = dragOverTaskId === task.id
+    const inDeleteConfirm = confirmDeleteTaskId === task.id
+    const isDeleting = deletingTaskId === task.id
+    const kidCount = kids.length
+    return (
+      <div
+        key={task.id}
+        draggable={canEdit}
+        onDragStart={canEdit ? (e) => { setDragTaskId(task.id); e.dataTransfer.effectAllowed = "move" } : undefined}
+        onDragOver={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverSection(null) } : undefined}
+        onDrop={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); if (dragTaskId) nest(dragTaskId, task.id); clearDrag() } : undefined}
+        onDragEnd={canEdit ? clearDrag : undefined}
+        onMouseEnter={() => setHoveredTaskId(task.id)}
+        onMouseLeave={() => setHoveredTaskId((cur) => (cur === task.id ? null : cur))}
+        style={{
+          position: "relative",
+          display: "flex", alignItems: "center", gap: "var(--space-4)",
+          padding: isChild ? "11px 12px" : "13px 12px",
+          borderBottom: "1px solid var(--line-3)",
+          background: isDragOver ? "var(--cream-3)" : hovered ? "var(--cream-2)" : isHigh ? "color-mix(in srgb, var(--plum) 7%, transparent)" : "transparent",
+          boxShadow: isDragOver ? "inset 0 0 0 2px var(--plum)" : "none",
+          borderRadius: isDragOver ? 8 : 0,
+        }}
+      >
+        {/* grip */}
+        <span style={{ display: "grid", placeItems: "center", cursor: "grab", color: "var(--dashed)", opacity: canEdit && hovered ? 1 : 0, flexShrink: 0, width: 14 }}>
+          <GripVertical style={{ width: 14, height: 14 }} />
+        </span>
+        {/* disclosure or spacer */}
+        {!isChild && hasKids ? (
+          <button type="button" onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); if (n.has(task.id)) n.delete(task.id); else n.add(task.id); return n }) }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: "var(--faint)", flexShrink: 0, width: 14 }}>
+            <ChevronRight style={{ width: 14, height: 14, transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
+          </button>
+        ) : (
+          <span style={{ width: 14, flexShrink: 0 }} />
+        )}
+        {/* checkbox */}
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canEdit) handleToggleTask(task) }}
+          disabled={!canEdit}
+          style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (task.completed ? "var(--plum-2)" : "var(--dashed)"), background: task.completed ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: canEdit ? "pointer" : "default", flexShrink: 0 }}
+        >
+          {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+        </button>
+        {/* title */}
+        <span style={{ flex: 1, minWidth: 0, fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+        {/* subcount */}
+        {!isChild && hasKids && (
+          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
+        )}
+        {/* assignee */}
+        {task.assigned_name && (
+          <span style={{ padding: "3px 10px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap", flexShrink: 0 }}>{task.assigned_name}</span>
+        )}
+        {/* due */}
+        {task.due_date && (
+          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
+        )}
+        {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
+        {canEdit && (
+          inDeleteConfirm ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 1, flexShrink: 0 }} onMouseDown={(e) => e.stopPropagation()}>
+              {kidCount > 0 && (
+                <span style={{ fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>and {kidCount} subtask{kidCount > 1 ? "s" : ""}</span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                disabled={isDeleting}
+                style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", borderRadius: 6, padding: "3px 10px", cursor: isDeleting ? "default" : "pointer", whiteSpace: "nowrap" }}
+              >
+                {isDeleting ? "Deleting…" : kidCount > 0 ? `Delete +${kidCount}` : "Delete"}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDeleteTaskId(null) }}
+                disabled={isDeleting}
+                style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: isDeleting ? "default" : "pointer", padding: "2px 4px" }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: hovered ? 1 : 0, transition: "opacity .12s ease", flexShrink: 0 }}>
+              {isChild ? (
+                <ChecklistIconBtn onClick={() => promoteTask(task)} title="Promote to standalone task"><CornerUpLeft style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+              ) : (
+                <>
+                  <ChecklistIconBtn onClick={() => togglePin(task)} title={task.pinned ? "Unpin" : "Pin to top"} baseColor={task.pinned ? "var(--plum)" : "var(--faint)"} hoverColor={task.pinned ? "var(--plum)" : "var(--body)"}>
+                    <Star style={{ width: 14, height: 14, fill: task.pinned ? "currentColor" : "none" }} />
+                  </ChecklistIconBtn>
+                  <ChecklistIconBtn onClick={() => { setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) }} title="Add subtask"><Plus style={{ width: 15, height: 15 }} /></ChecklistIconBtn>
+                </>
+              )}
+              <ChecklistIconBtn onClick={() => startEditTask(task)} title="Edit"><Pencil style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+              <ChecklistIconBtn onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} title="Delete"><X style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+            </div>
+          )
+        )}
+      </div>
+    )
+  }
+
+  // A top-level task plus (when expanded) its indented children block and the
+  // "Add subtask" affordance / inline input.
+  function renderTaskTree(task: EventTask) {
+    const kids = childrenOf(task.id)
+    const hasKids = kids.length > 0
+    const collapsed = collapsedTasks.has(task.id)
+    const showChildren = hasKids && !collapsed
+    const inputOpen = addingChildFor === task.id
+    return (
+      <Fragment key={task.id}>
+        {renderTaskRow(task, false)}
+        {(showChildren || inputOpen) && (
+          <div style={{ marginLeft: 30, paddingLeft: 16, borderLeft: "1px solid var(--line-2)" }}>
+            {showChildren && kids.map((k) => renderTaskRow(k, true))}
+            {canEdit && inputOpen && (
+              <input
+                autoFocus
+                value={childTitle}
+                onChange={(e) => setChildTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { if (childTitle.trim()) addChild(task); else setAddingChildFor(null) } if (e.key === "Escape") { setChildTitle(""); setAddingChildFor(null) } }}
+                onBlur={() => { if (!childTitle.trim()) setAddingChildFor(null) }}
+                placeholder="New subtask, press Enter…"
+                style={{ width: "100%", boxSizing: "border-box", background: "var(--cream)", border: "1px solid var(--plum)", borderRadius: 8, outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", padding: "9px 12px", margin: "8px 0" }}
+              />
+            )}
+            {canEdit && showChildren && !inputOpen && (
+              <button type="button" onClick={() => { setChildTitle(""); setAddingChildFor(task.id) }} onMouseEnter={(e) => { e.currentTarget.style.color = "var(--plum)" }} onMouseLeave={(e) => { e.currentTarget.style.color = "var(--muted-text)" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--muted-text)", fontSize: 13, fontFamily: "var(--font-inter)", padding: "8px 0" }}>
+                <Plus style={{ width: 14, height: 14 }} /> Add subtask
+              </button>
+            )}
+          </div>
+        )}
+      </Fragment>
+    )
+  }
 
   const inputStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
@@ -7052,13 +7416,32 @@ export function EventPlanWorkspace({
                   <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
                 </div>
 
-                {/* Phase-grouped task list */}
+                {/* Pinned band — top-level pinned tasks (+ their children) */}
+                {pinnedTop.length > 0 && (
+                  <div style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "6px 14px 8px", marginBottom: 24 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
+                      <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
+                      <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
+                    </div>
+                    {pinnedTop.map((task) => renderTaskTree(task))}
+                  </div>
+                )}
+
+                {/* Date-driven sections — top-level, non-pinned tasks grouped by window */}
                 {sectionDefs.map((section) => {
-                  const sectionTasks = tasks.filter(t => sectionOf(t) === section.key)
-                  const sectionIncomplete = sectionTasks.filter(t => !t.completed).length
+                  const sectionTop = tasks
+                    .filter((t) => t.parent_id === null && !t.pinned && sectionOf(t) === section.key)
+                    .sort((a, b) => (Number(b.priority === "high") - Number(a.priority === "high")) || (a.sort_order - b.sort_order))
+                  const remaining = tasks.filter((t) => !inBand(t) && sectionOf(t) === section.key && !t.completed).length
                   const isCollapsed = collapsedPhases.has(section.key)
+                  const isDropZone = dragOverSection === section.key
                   return (
-                    <div key={section.key} style={{ marginBottom: 28 }}>
+                    <div
+                      key={section.key}
+                      style={{ marginBottom: 28 }}
+                      onDragOver={canEdit ? (e) => { e.preventDefault(); setDragOverSection(section.key); setDragOverTaskId(null) } : undefined}
+                      onDrop={canEdit ? (e) => { e.preventDefault(); if (dragTaskId) requestMoveToSection(dragTaskId, section.key); clearDrag() } : undefined}
+                    >
                       {/* Section header */}
                       <button
                         onClick={() => setCollapsedPhases(prev => {
@@ -7070,118 +7453,28 @@ export function EventPlanWorkspace({
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
                         <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
-                        {sectionTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: sectionIncomplete > 0 ? "var(--body)" : "#7FA67F", background: sectionIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
-                            {sectionIncomplete > 0 ? `${sectionIncomplete} remaining` : "All done"}
-                          </span>
-                        )}
-                        <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
+                        <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
                       </button>
                       <div style={{ borderTop: "1px solid var(--line)" }} />
 
+                      {isDropZone && (
+                        <div style={{ margin: "10px 0", padding: "12px", border: "1.5px dashed var(--plum)", borderRadius: 10, textAlign: "center" }}>
+                          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
+                        </div>
+                      )}
+
                       {!isCollapsed && (
                         <>
-                          {sectionTasks.length === 0 && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
+                          {sectionTop.length === 0 && !isDropZone && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
                           )}
-                          {sectionTasks.map((task, i) => (
-                            canEdit && editingTaskId === task.id ? (
-                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === sectionTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
-                                <button
-                                  onClick={() => handleToggleTask(task)}
-                                  style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
-                                >
-                                  {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
-                                </button>
-                                <input
-                                  autoFocus
-                                  value={editTaskTitle}
-                                  onChange={(e) => setEditTaskTitle(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
-                                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                />
-                                <select
-                                  value={editTaskAssignee}
-                                  onChange={(e) => setEditTaskAssignee(e.target.value)}
-                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                                >
-                                  <option value="">Unassigned</option>
-                                  {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                </select>
-                                <input
-                                  type="date"
-                                  value={editTaskDue}
-                                  min={planStartDate || undefined}
-                                  max={eventPlusTwoMonthsYMD}
-                                  onChange={(e) => setEditTaskDue(e.target.value)}
-                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                                />
-                                <CentralButton
-                                  variant="primary" size="sm"
-                                  onClick={handleUpdateTask}
-                                  disabled={savingTaskEdit || !editTaskTitle.trim()}
-                                >
-                                  Save
-                                </CentralButton>
-                                <button
-                                  onClick={() => setEditingTaskId(null)}
-                                  style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === sectionTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
-                              <button
-                                onClick={() => handleToggleTask(task)}
-                                style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
-                              >
-                                {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
-                              </button>
-                              <span style={{ flex: 1, fontSize: 14, color: task.completed ? "#A09A8C" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
-                              {task.assigned_name && (
-                                <span style={{ padding: "4px 10px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
-                              )}
-                              {task.due_date && (
-                                <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                                  {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                                </span>
-                              )}
-                              {canEdit && (
-                                confirmDeleteTaskId === task.id ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <button
-                                      onClick={() => { handleDeleteTask(task.id); setConfirmDeleteTaskId(null) }}
-                                      style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
-                                    >
-                                      Delete
-                                    </button>
-                                    <button
-                                      onClick={() => setConfirmDeleteTaskId(null)}
-                                      style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <button onClick={() => startEditTask(task)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>
-                                      <Pencil style={{ width: 14, height: 14 }} />
-                                    </button>
-                                    <button onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )
-                              )}
-                            </div>
-                            )
-                          ))}
+                          {sectionTop.map((task) => renderTaskTree(task))}
 
                           {/* Inline add row per section — prefills due to the section window */}
                           {canEdit && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
-                              <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px", borderBottom: "1px dashed var(--dashed)" }}>
+                              <Plus style={{ width: 14, height: 14, color: "var(--faint)", flexShrink: 0 }} />
                               <input
                                 value={section.key === newTaskSection ? newTaskTitle : ""}
                                 onChange={(e) => {
@@ -7190,7 +7483,7 @@ export function EventPlanWorkspace({
                                 }}
                                 onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
                                 placeholder={`Add to ${section.label}…`}
-                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
                                 onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
                               />
                               {section.key === newTaskSection && newTaskTitle.trim() && (
@@ -7227,6 +7520,39 @@ export function EventPlanWorkspace({
                     </div>
                   )
                 })}
+
+                {/* Section-move date-change confirmation (dated task → different window) */}
+                {pendingSectionMove && (
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 210, background: "color-mix(in srgb, var(--ink) 35%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+                    onClick={() => { if (!sectionMoveBusy) setPendingSectionMove(null) }}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "22px 24px", maxWidth: 380, width: "100%", boxShadow: "0 8px 40px color-mix(in srgb, var(--ink) 16%, transparent)" }}
+                    >
+                      <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
+                        This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+                        <button
+                          onClick={() => setPendingSectionMove(null)}
+                          disabled={sectionMoveBusy}
+                          style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: sectionMoveBusy ? "default" : "pointer", padding: "6px 8px" }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={confirmSectionMove}
+                          disabled={sectionMoveBusy}
+                          style={{ fontSize: 13, fontWeight: 600, color: "var(--cream)", background: "var(--plum-2)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
+                        >
+                          {sectionMoveBusy ? "Moving…" : "Continue"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
