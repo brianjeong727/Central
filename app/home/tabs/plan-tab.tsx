@@ -6292,6 +6292,10 @@ export function EventPlanWorkspace({
   const [editRoleAssignee, setEditRoleAssignee] = useState("")
   const [editRoleNotes, setEditRoleNotes] = useState("")
 
+  // Role presentation state (inline add-role form + inline assignee select)
+  const [showAddRole, setShowAddRole] = useState(false)
+  const [assigningRoleId, setAssigningRoleId] = useState<string | null>(null)
+
   // Note add state
   const [newNote, setNewNote] = useState("")
   const [addingNote, setAddingNote] = useState(false)
@@ -6558,11 +6562,24 @@ export function EventPlanWorkspace({
     setNewRoleAssignee("")
     setNewRoleNotes("")
     setAddingRole(false)
+    setShowAddRole(false)
   }
 
   async function handleDeleteRole(id: string) {
     setRoles((prev) => prev.filter((r) => r.id !== id))
     await supabase.from("event_roles").delete().eq("id", id)
+  }
+
+  async function handleAssignRole(roleId: string, userId: string) {
+    const name = members.find((m) => m.id === userId)?.name
+    setRoles((prev) => prev.map((r) => r.id === roleId ? { ...r, assigned_to: userId || null, assigned_name: name } : r))
+    setAssigningRoleId(null)
+    await supabase.from("event_roles").update({ assigned_to: userId || null }).eq("id", roleId)
+  }
+
+  async function handleUnassignRole(roleId: string) {
+    setRoles((prev) => prev.map((r) => r.id === roleId ? { ...r, assigned_to: null, assigned_name: undefined } : r))
+    await supabase.from("event_roles").update({ assigned_to: null }).eq("id", roleId)
   }
 
   async function handleSaveRoleEdit(roleId: string) {
@@ -7231,135 +7248,197 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Roles & Leads ── */}
-            {activeSection === 'roles' && (
-              <div>
+            {activeSection === 'roles' && (() => {
+              const needs = roles.filter(r => !r.assigned_to)
+              const covered = roles.filter(r => r.assigned_to)
+              const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
+              const editInput: React.CSSProperties = { ...inputStyle, borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
+              const editSelect: React.CSSProperties = { ...selectStyle, width: "100%", borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
+
+              const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
+                  {allSet ? (
+                    <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--faint)", fontFamily: "var(--font-inter)" }}>All roles covered</span>
+                  ) : (
+                    <span style={{ background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", fontSize: 11, color: "var(--body)", fontFamily: "var(--font-inter)" }}>{count}</span>
+                  )}
+                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                </div>
+              )
+
+              const renderRow = (role: EventRole, isLast: boolean) => {
+                if (editingRoleId === role.id) {
+                  return (
+                    <div key={role.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                      <div style={{ padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" style={editInput} />
+                          <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput" style={editSelect}>
+                            <option value="">Unassigned</option>
+                            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                        </div>
+                        <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" style={editInput} />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
+                          <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                const isCovered = !!role.assigned_to
+                const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
+                return (
+                  <div key={role.id} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px", borderRadius: 8, borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                    {isCovered ? (
+                      <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 600 }} />
+                    ) : (
+                      <div style={{ width: 38, height: 38, border: "1px dashed var(--dashed)", borderRadius: 999, display: "grid", placeItems: "center" }}>
+                        <Plus style={{ width: 16, height: 16, color: "var(--dashed)" }} />
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "var(--font-inter)", fontSize: 15, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em" }}>{role.role_name}</div>
+                      {role.notes ? (
+                        <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.4, marginTop: 3 }}>{role.notes}</div>
+                      ) : canEdit ? (
+                        <div style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", lineHeight: 1.4, marginTop: 3, fontFamily: "var(--font-inter)" }}>Add a note for whoever takes this on</div>
+                      ) : null}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {isCovered ? (
+                        <>
+                          <span style={{ fontSize: 14, color: "var(--ink)", whiteSpace: "nowrap", fontFamily: "var(--font-inter)" }}>{role.assigned_name}</span>
+                          {canEdit && (
+                            <button className="role-icon danger" title="Unassign" onClick={() => handleUnassignRole(role.id)} style={iconBtnBase}>
+                              <X style={{ width: 16, height: 16 }} />
+                            </button>
+                          )}
+                        </>
+                      ) : canEdit ? (
+                        assigningRoleId === role.id ? (
+                          <select autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)} style={{ border: "1px solid var(--plum)", borderRadius: 10, padding: "8px 11px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none" }}>
+                            <option value="">Choose someone…</option>
+                            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                        ) : (
+                          <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1px dashed var(--dashed)", borderRadius: 10, padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
+                        )
+                      ) : null}
+                      {canEdit && (
+                        <>
+                          <button className="role-icon" title="Edit role" onClick={() => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={iconBtnBase}>
+                            <Pencil style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button className="role-icon danger" title="Delete role" onClick={() => handleDeleteRole(role.id)} style={iconBtnBase}>
+                            <Trash2 style={{ width: 16, height: 16 }} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+              <div className="rolesui">
+                <style>{`
+                  .rolesui .rrow{transition:background .12s}
+                  .rolesui .rrow:hover{background:var(--cream-2)}
+                  .rolesui .rrow:hover .role-icon{opacity:1}
+                  .rolesui .role-icon{opacity:0;transition:opacity .12s}
+                  .rolesui .role-icon:hover{color:var(--body)}
+                  .rolesui .role-icon.danger:hover{color:var(--danger)}
+                  .rolesui .assignbtn:hover{border-color:var(--plum)}
+                  .rolesui .roleinput:focus{border-color:var(--plum)}
+                `}</style>
                 <ContentHeader
                   eyebrow="Who's Responsible"
                   label="Roles"
                   action={canEdit ? (
                     <>
                       {planningGroupId ? (
-                        <CentralButton
-                          variant="primary" size="sm"
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
+                          label="Open planning chat"
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                        >
-                          <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
-                        </CentralButton>
+                        />
                       ) : (
-                        <button
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
+                          label={creatingPlanChat ? "Creating…" : "Create planning chat"}
                           onClick={handleCreatePlanningChat}
-                          disabled={creatingPlanChat || roles.filter(r => r.assigned_to).length === 0}
-                          title={roles.filter(r => r.assigned_to).length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: creatingPlanChat ? "not-allowed" : "pointer", fontWeight: 500, opacity: roles.filter(r => r.assigned_to).length === 0 ? 0.4 : 1 }}
-                        >
-                          <MessageCircle style={{ width: 13, height: 13 }} />
-                          {creatingPlanChat ? "Creating…" : "Create planning chat"}
-                        </button>
+                          disabled={creatingPlanChat || covered.length === 0}
+                          title={covered.length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
+                        />
                       )}
-                      <ContentActionButton
-                        variant="primary"
-                        icon={<Plus style={{ width: 13, height: 13 }} />}
-                        label="Add role"
-                        onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
-                      />
+                      {!showAddRole && !editingRoleId && (
+                        <ContentActionButton
+                          variant="primary"
+                          icon={<Plus style={{ width: 14, height: 14 }} />}
+                          label="Add role"
+                          onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
+                        />
+                      )}
                     </>
                   ) : undefined}
                 />
-                {planChatError && <p style={{ fontSize: 12, color: "#C44B4B", marginTop: 8 }}>{planChatError}</p>}
+                {planChatError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{planChatError}</p>}
 
-                {/* Roles rows */}
-                <div style={{ marginTop: 28 }}>
-                  {roles.length === 0 && !canEdit && (
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "8px 0" }}>No roles defined yet.</p>
-                  )}
-                  {roles.map((role, i) => (
-                    <div key={role.id} style={{ borderBottom: i === roles.length - 1 ? "none" : "1px solid var(--line)" }}>
-                      {editingRoleId === role.id ? (
-                        <div style={{ padding: "18px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                            <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" style={inputStyle} />
-                            <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-                              <option value="">Unassigned</option>
-                              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                          </div>
-                          <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
-                            <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 220px", alignItems: "center", gap: 18, padding: "18px 4px" }}>
-                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{role.role_name}</div>
-                          <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
-                            {role.notes || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>Add a note for whoever takes this on</span>}
-                          </div>
-                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                            {role.assigned_name ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)" }}>
-                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "var(--plum)", color: "var(--cream-panel)", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
-                                  {role.assigned_name.split(" ").map((s: string) => s[0]).join("")}
-                                </span>
-                                <span style={{ fontSize: 13 }}>{role.assigned_name}</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => canEdit ? (setEditingRoleId(role.id), setEditRoleName(role.role_name), setEditRoleAssignee(""), setEditRoleNotes(role.notes ?? "")) : undefined}
-                                style={{ padding: "8px 14px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "transparent", color: "var(--muted-text)", fontSize: 13, fontFamily: "var(--font-inter)", cursor: canEdit ? "pointer" : "default" }}
-                              >+ Assign someone</button>
-                            )}
-                            {canEdit && role.assigned_name && (
-                              <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--muted-text)" }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                              </button>
-                            )}
-                            {canEdit && (
-                              <button onClick={() => handleDeleteRole(role.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#C4C4C4" }}>
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                {/* Inline add-role form */}
+                {canEdit && showAddRole && (
+                  <div style={{ display: "grid", gridTemplateColumns: "230px 1fr 180px auto auto", gap: 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
+                    <input
+                      value={newRoleName}
+                      onChange={(e) => setNewRoleName(e.target.value)}
+                      placeholder="Role name…"
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", fontWeight: 600, color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                    />
+                    <input
+                      value={newRoleNotes}
+                      onChange={(e) => setNewRoleNotes(e.target.value)}
+                      placeholder="What they're responsible for…"
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                    />
+                    <select
+                      value={newRoleAssignee}
+                      onChange={(e) => setNewRoleAssignee(e.target.value)}
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer" }}
+                    >
+                      <option value="">Unassigned</option>
+                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
+                    <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                  </div>
+                )}
 
-                  {/* Inline add role row */}
-                  {canEdit && (
-                    <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "14px 16px", marginTop: 16, display: "flex", gap: 12, alignItems: "center", background: "#F8F4EA" }}>
-                      <input
-                        value={newRoleName}
-                        onChange={(e) => setNewRoleName(e.target.value)}
-                        placeholder="Role name…"
-                        style={{ flex: "0 0 160px", background: "none", border: "none", outline: "none", fontSize: 15, color: "var(--ink)", fontFamily: "var(--font-inter)", fontWeight: 500 }}
-                      />
-                      <input
-                        value={newRoleNotes}
-                        onChange={(e) => setNewRoleNotes(e.target.value)}
-                        placeholder="Add a note…"
-                        style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--body)", fontFamily: "var(--font-inter)" }}
-                      />
-                      <select
-                        value={newRoleAssignee}
-                        onChange={(e) => setNewRoleAssignee(e.target.value)}
-                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                      <CentralButton
-                        variant="primary" size="sm"
-                        onClick={handleAddRole}
-                        disabled={addingRole || !newRoleName.trim()}
-                      >
-                        Add
-                      </CentralButton>
-                    </div>
-                  )}
-                </div>
+                {roles.length === 0 ? (
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", padding: "24px 0 8px" }}>
+                    {canEdit ? "No roles yet — add the first one." : "No roles defined yet."}
+                  </p>
+                ) : (
+                  <>
+                    <GroupHeader label="Needs someone" count={needs.length} allSet={needs.length === 0} />
+                    {needs.map((role, i) => renderRow(role, i === needs.length - 1))}
+                    {covered.length > 0 && (
+                      <>
+                        <GroupHeader label="Covered" count={covered.length} />
+                        {covered.map((role, i) => renderRow(role, i === covered.length - 1))}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+              )
+            })()}
 
             {/* ── Transition Notes ── */}
             {activeSection === 'notes' && (
