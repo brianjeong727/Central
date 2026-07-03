@@ -402,6 +402,8 @@ export interface EventPlan {
   budget_allocated: number | null
   type_data: Record<string, unknown>
   planning_group_id: string | null
+  plan_start_date: string | null
+  crunch_date: string | null
 }
 
 export interface EventTask {

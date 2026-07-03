@@ -6511,6 +6511,22 @@ export function MinistryCalendar({
 
 // ── EventPlanWorkspace ────────────────────────────────────────────────────────
 
+// Date helpers for the plan/crunch checklist windows. Format is "YYYY-MM-DD" in
+// LOCAL time (never UTC) so day-granularity comparisons never off-by-one, and
+// month/day arithmetic uses the Date constructor's own overflow normalization.
+function toLocalYMD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+function addMonthsYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth() + n, d.getDate()))
+}
+function addDaysYMD(d: Date, n: number): string {
+  return toLocalYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
+}
+
 // A single Launchpad link row on the event Overview — an ivory icon-chip, a
 // serif title + subtitle, and an optional right-side metric before the chevron.
 // Hover lifts the card slightly and warms the border to plum.
@@ -6630,14 +6646,21 @@ export function EventPlanWorkspace({
   const [editingTurnout, setEditingTurnout] = useState(false)
   const [editingBudget, setEditingBudget] = useState(false)
 
-  // Task add state
+  // Task add state — newTaskSection is the date-derived checklist section the
+  // inline add-row is currently active in ("" = none focused yet).
   const [newTaskTitle, setNewTaskTitle] = useState("")
   const [newTaskAssignee, setNewTaskAssignee] = useState("")
   const [newTaskDue, setNewTaskDue] = useState("")
-  const [newTaskPhase, setNewTaskPhase] = useState<EventTask["phase"]>("pre_event")
+  const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
+
+  // Plan/crunch date state — drives the checklist section windows.
+  const [planStartDate, setPlanStartDate] = useState("")
+  const [crunchDate, setCrunchDate] = useState("")
+  const [editingPlanStart, setEditingPlanStart] = useState(false)
+  const [editingCrunch, setEditingCrunch] = useState(false)
 
   // Task inline edit state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -6687,13 +6710,29 @@ export function EventPlanWorkspace({
 
       if (!planData) { setLoading(false); return }
 
+      const planId = planData.id
+
+      // Plan/crunch dates. First-time init: when plan_start_date is null, seed
+      // plan-start = event − 1 month and crunch = event − 1 week (local YMD),
+      // persist once, and use them. After this one-time write plan_start_date is
+      // always set; a later null crunch_date means the user REMOVED the crunch phase.
+      let psd = planData.plan_start_date as string | null
+      let cd = planData.crunch_date as string | null
+      if (!psd) {
+        const eventDate = new Date(calendarEvent.start_date)
+        psd = addMonthsYMD(eventDate, -1)
+        cd = addDaysYMD(eventDate, -7)
+        await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
+        planData = { ...planData, plan_start_date: psd, crunch_date: cd }
+      }
+      setPlanStartDate(psd ?? "")
+      setCrunchDate(cd ?? "")
+
       setPlan(planData as EventPlan)
       setPlanningGroupId((planData as EventPlan).planning_group_id ?? null)
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
       setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
-
-      const planId = planData.id
 
       // Fetch tasks with assignee name
       const { data: tasksData } = await supabase
@@ -6792,6 +6831,13 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
+  async function handleSavePlanDates(patch: { plan_start_date?: string | null; crunch_date?: string | null }) {
+    if (!plan || !canEdit) return
+    await supabase.from("event_plans").update(patch).eq("id", plan.id).eq("ministry_id", ministryId)
+    if (patch.plan_start_date !== undefined) setPlanStartDate(patch.plan_start_date ?? "")
+    if (patch.crunch_date !== undefined) setCrunchDate(patch.crunch_date ?? "")
+  }
+
   async function handleToggleTask(task: EventTask) {
     const newCompleted = !task.completed
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, completed: newCompleted, } : t))
@@ -6801,10 +6847,11 @@ export function EventPlanWorkspace({
       .eq("id", task.id)
   }
 
-  async function handleAddTask(phaseOverride?: EventTask["phase"]) {
+  async function handleAddTask(section: { defaultDue: string; phase: EventTask["phase"] }) {
     if (!plan || !newTaskTitle.trim()) return
-    const phase = phaseOverride ?? newTaskPhase
-    const maxSort = tasks.filter(t => t.phase === phase).reduce((m, t) => Math.max(m, t.sort_order), -1)
+    const phase = section.phase
+    const due = newTaskDue || section.defaultDue || null
+    const maxSort = tasks.reduce((m, t) => Math.max(m, t.sort_order), -1)
     setAddingTask(true)
     const { data } = await supabase
       .from("event_tasks")
@@ -6812,7 +6859,7 @@ export function EventPlanWorkspace({
         event_plan_id: plan.id,
         title: newTaskTitle.trim(),
         assigned_to: newTaskAssignee || null,
-        due_date: newTaskDue || null,
+        due_date: due,
         completed: false,
         phase,
         sort_order: maxSort + 1,
@@ -6837,6 +6884,7 @@ export function EventPlanWorkspace({
     setNewTaskTitle("")
     setNewTaskAssignee("")
     setNewTaskDue("")
+    setNewTaskSection("")
     setAddingTask(false)
   }
 
@@ -6988,15 +7036,41 @@ export function EventPlanWorkspace({
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
-  // Phase config: use typeCfg phases if available, else defaults
-  const phaseConfig: { key: EventTask["phase"]; label: string }[] = typeCfg.defaultPhases.length > 0
-    ? typeCfg.defaultPhases.map(p => ({ key: p.key as EventTask["phase"], label: p.label }))
-    : [
-        { key: "pre_event", label: "Pre-Event" },
-        { key: "day_of", label: "Day-of" },
-        { key: "post_event", label: "Post-Event" },
-        { key: "followup", label: "Follow-up" },
-      ]
+  // ── Date-driven checklist sections ──────────────────────────────────────────
+  // Window anchors (local YMD): plan-start … [crunch] … event day … event+2mo cap.
+  const eventYMD = toLocalYMD(startDate)
+  const eventPlusOneYMD = addDaysYMD(startDate, 1)
+  const eventPlusTwoMonthsYMD = addMonthsYMD(startDate, 2)
+  const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+
+  // Map a task to its section. If dated, compare day-granularity YMD strings to
+  // the plan-start / crunch / event anchors; otherwise fall back to the stored
+  // phase (dateless tasks never land in "crunch").
+  type ChecklistSection = "planning" | "crunch" | "day_of" | "post"
+  function sectionOf(task: EventTask): ChecklistSection {
+    const due = task.due_date
+    if (due) {
+      if (due >= eventPlusOneYMD) return "post"
+      if (due === eventYMD) return "day_of"
+      if (crunchDate && due >= crunchDate && due < eventYMD) return "crunch"
+      return "planning"
+    }
+    switch (task.phase) {
+      case "day_of": return "day_of"
+      case "post_event":
+      case "followup": return "post"
+      default: return "planning" // pre_event
+    }
+  }
+
+  // Rendered sections in order — Crunch only appears when a crunch date is set.
+  // defaultDue/phase seed the section's inline add-row so a new task lands here.
+  const sectionDefs: { key: ChecklistSection; label: string; defaultDue: string; phase: EventTask["phase"] }[] = [
+    { key: "planning", label: "Planning phase", defaultDue: planStartDate, phase: "pre_event" },
+    ...(crunchDate ? [{ key: "crunch" as ChecklistSection, label: "Crunch phase", defaultDue: crunchDate, phase: "day_of" as EventTask["phase"] }] : []),
+    { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
+    { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
+  ]
 
   const inputStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
@@ -7107,6 +7181,9 @@ export function EventPlanWorkspace({
               const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
               const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
+              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }
+              const factDateInput: React.CSSProperties = { background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 8, padding: "4px 10px", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)", outline: "none", cursor: "pointer" }
+              const factLink: React.CSSProperties = { fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-inter)" }
 
               return (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
@@ -7116,16 +7193,73 @@ export function EventPlanWorkspace({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
                     <div>
                       <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
-                      {facts.length > 0 && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
-                          {facts.map(f => (
-                            <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", width: 52, flexShrink: 0 }}>{f.k}</span>
-                              <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
-                            </div>
-                          ))}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
+                        {facts.map(f => (
+                          <div key={f.k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                            <span style={factKey}>{f.k}</span>
+                            <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                          </div>
+                        ))}
+
+                        {/* Plan start — planning begins; always set, not removable */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Plan</span>
+                          {canEdit && editingPlanStart ? (
+                            <input
+                              type="date"
+                              autoFocus
+                              value={planStartDate}
+                              max={eventYMD}
+                              onChange={(e) => { if (e.target.value) handleSavePlanDates({ plan_start_date: e.target.value }) }}
+                              onBlur={() => setEditingPlanStart(false)}
+                              style={factDateInput}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => { if (canEdit) setEditingPlanStart(true) }}
+                              style={{ fontSize: 15, color: planStartDate ? "var(--ink)" : "var(--faint)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                            >{planStartDate ? fmtMD(planStartDate) : "—"}</span>
+                          )}
                         </div>
-                      )}
+
+                        {/* Crunch — busy phase begins; optional (removable) */}
+                        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                          <span style={factKey}>Crunch</span>
+                          {crunchDate ? (
+                            canEdit && editingCrunch ? (
+                              <input
+                                type="date"
+                                autoFocus
+                                value={crunchDate}
+                                min={planStartDate || undefined}
+                                max={eventYMD}
+                                onChange={(e) => { if (e.target.value) handleSavePlanDates({ crunch_date: e.target.value }) }}
+                                onBlur={() => setEditingCrunch(false)}
+                                style={factDateInput}
+                              />
+                            ) : (
+                              <span style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                                <span
+                                  onClick={() => { if (canEdit) setEditingCrunch(true) }}
+                                  style={{ fontSize: 15, color: "var(--ink)", lineHeight: 1.5, cursor: canEdit ? "pointer" : "default" }}
+                                >{fmtMD(crunchDate)}</span>
+                                {canEdit && (
+                                  <button onClick={() => handleSavePlanDates({ crunch_date: null })} style={{ ...factLink, color: "var(--muted-text)" }}>Remove</button>
+                                )}
+                              </span>
+                            )
+                          ) : (
+                            canEdit ? (
+                              <button
+                                onClick={() => handleSavePlanDates({ crunch_date: addDaysYMD(startDate, -7) })}
+                                style={factLink}
+                              >+ Add crunch phase</button>
+                            ) : (
+                              <span style={{ fontSize: 15, color: "var(--faint)", lineHeight: 1.5 }}>—</span>
+                            )
+                          )}
+                        </div>
+                      </div>
                     </div>
                     {canEdit && onEditEvent && (
                       <button
@@ -7308,26 +7442,26 @@ export function EventPlanWorkspace({
                 </div>
 
                 {/* Phase-grouped task list */}
-                {phaseConfig.map((phase) => {
-                  const phaseTasks = tasks.filter(t => t.phase === phase.key)
-                  const phaseIncomplete = phaseTasks.filter(t => !t.completed).length
-                  const isCollapsed = collapsedPhases.has(phase.key)
+                {sectionDefs.map((section) => {
+                  const sectionTasks = tasks.filter(t => sectionOf(t) === section.key)
+                  const sectionIncomplete = sectionTasks.filter(t => !t.completed).length
+                  const isCollapsed = collapsedPhases.has(section.key)
                   return (
-                    <div key={phase.key} style={{ marginBottom: 28 }}>
-                      {/* Phase header */}
+                    <div key={section.key} style={{ marginBottom: 28 }}>
+                      {/* Section header */}
                       <button
                         onClick={() => setCollapsedPhases(prev => {
                           const next = new Set(prev)
-                          if (next.has(phase.key)) next.delete(phase.key)
-                          else next.add(phase.key)
+                          if (next.has(section.key)) next.delete(section.key)
+                          else next.add(section.key)
                           return next
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{phase.label}</span>
-                        {phaseTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: phaseIncomplete > 0 ? "var(--body)" : "#7FA67F", background: phaseIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
-                            {phaseIncomplete > 0 ? `${phaseIncomplete} remaining` : "All done"}
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        {sectionTasks.length > 0 && (
+                          <span style={{ fontSize: 11, color: sectionIncomplete > 0 ? "var(--body)" : "#7FA67F", background: sectionIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
+                            {sectionIncomplete > 0 ? `${sectionIncomplete} remaining` : "All done"}
                           </span>
                         )}
                         <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
@@ -7336,12 +7470,12 @@ export function EventPlanWorkspace({
 
                       {!isCollapsed && (
                         <>
-                          {phaseTasks.length === 0 && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this phase.</p>
+                          {sectionTasks.length === 0 && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
                           )}
-                          {phaseTasks.map((task, i) => (
+                          {sectionTasks.map((task, i) => (
                             canEdit && editingTaskId === task.id ? (
-                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === phaseTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
+                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === sectionTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
                                 <button
                                   onClick={() => handleToggleTask(task)}
                                   style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
@@ -7366,6 +7500,8 @@ export function EventPlanWorkspace({
                                 <input
                                   type="date"
                                   value={editTaskDue}
+                                  min={planStartDate || undefined}
+                                  max={eventPlusTwoMonthsYMD}
                                   onChange={(e) => setEditTaskDue(e.target.value)}
                                   style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                 />
@@ -7384,7 +7520,7 @@ export function EventPlanWorkspace({
                                 </button>
                               </div>
                             ) : (
-                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
+                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === sectionTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
                               <button
                                 onClick={() => handleToggleTask(task)}
                                 style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
@@ -7431,19 +7567,22 @@ export function EventPlanWorkspace({
                             )
                           ))}
 
-                          {/* Inline add row per phase */}
+                          {/* Inline add row per section — prefills due to the section window */}
                           {canEdit && (
                             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
                               <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
                               <input
-                                value={phase.key === newTaskPhase ? newTaskTitle : ""}
-                                onChange={(e) => { setNewTaskPhase(phase.key); setNewTaskTitle(e.target.value) }}
-                                onFocus={() => setNewTaskPhase(phase.key)}
-                                placeholder={`Add to ${phase.label}…`}
+                                value={section.key === newTaskSection ? newTaskTitle : ""}
+                                onChange={(e) => {
+                                  if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) }
+                                  setNewTaskTitle(e.target.value)
+                                }}
+                                onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
+                                placeholder={`Add to ${section.label}…`}
                                 style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskPhase === phase.key) handleAddTask(phase.key) }}
+                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
                               />
-                              {phase.key === newTaskPhase && newTaskTitle.trim() && (
+                              {section.key === newTaskSection && newTaskTitle.trim() && (
                                 <>
                                   <select
                                     value={newTaskAssignee}
@@ -7456,12 +7595,14 @@ export function EventPlanWorkspace({
                                   <input
                                     type="date"
                                     value={newTaskDue}
+                                    min={planStartDate || undefined}
+                                    max={eventPlusTwoMonthsYMD}
                                     onChange={(e) => setNewTaskDue(e.target.value)}
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
                                   />
                                   <CentralButton
                                     variant="primary" size="sm"
-                                    onClick={() => handleAddTask(phase.key)}
+                                    onClick={() => handleAddTask(section)}
                                     disabled={addingTask}
                                   >
                                     Add
