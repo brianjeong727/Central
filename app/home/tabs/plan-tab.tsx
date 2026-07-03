@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -136,17 +136,6 @@ export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: stri
 }
 
 // Shared field styling for the Resources edit forms (§4.4 inputs).
-const RESOURCE_INPUT_STYLE: React.CSSProperties = {
-  width: "100%",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--r-input)",
-  padding: "9px 12px",
-  fontSize: 14,
-  fontFamily: "var(--sans)",
-  color: "var(--ink)",
-  background: "var(--cream)",
-  outline: "none",
-}
 const RESOURCE_LABEL_STYLE: React.CSSProperties = {
   ...EYEBROW_STYLE,
   fontSize: 10,
@@ -154,13 +143,6 @@ const RESOURCE_LABEL_STYLE: React.CSSProperties = {
   display: "block",
   marginBottom: 6,
 }
-function resourceFocusPlum(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  e.currentTarget.style.borderColor = "var(--plum)"
-}
-function resourceBlurLine(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  e.currentTarget.style.borderColor = "var(--line-2)"
-}
-
 // Inline add/edit form for a relevant link. Rendered inside a plum-bordered card
 // by the parent. Label + URL sit in a 2-col grid; Description spans below.
 export function LinkForm({
@@ -183,37 +165,28 @@ export function LinkForm({
       <div className="grid grid-cols-2 gap-3.5">
         <div>
           <label style={RESOURCE_LABEL_STYLE}>Label</label>
-          <input
+          <Input
             value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}
-            onFocus={resourceFocusPlum}
-            onBlur={resourceBlurLine}
             placeholder="e.g. Room booking"
-            style={RESOURCE_INPUT_STYLE}
           />
         </div>
         <div>
           <label style={RESOURCE_LABEL_STYLE}>URL</label>
-          <input
+          <Input
             value={form.url}
             onChange={e => setForm({ ...form, url: e.target.value })}
-            onFocus={resourceFocusPlum}
-            onBlur={resourceBlurLine}
             placeholder="https://…"
             type="url"
-            style={RESOURCE_INPUT_STYLE}
           />
         </div>
       </div>
       <div style={{ marginTop: 12 }}>
         <label style={RESOURCE_LABEL_STYLE}>Description (optional)</label>
-        <input
+        <Input
           value={form.description}
           onChange={e => setForm({ ...form, description: e.target.value })}
-          onFocus={resourceFocusPlum}
-          onBlur={resourceBlurLine}
           placeholder="What it's for"
-          style={RESOURCE_INPUT_STYLE}
         />
       </div>
       <div className="flex gap-3 items-center" style={{ marginTop: 16 }}>
@@ -380,13 +353,11 @@ export function StudentOrgRoleTabContent({
         {editingDesc ? (
           <div style={{ border: "1px solid var(--plum)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
             <label style={RESOURCE_LABEL_STYLE}>Summary</label>
-            <textarea
+            <Textarea
               value={summaryDraft}
               onChange={e => setSummaryDraft(e.target.value)}
-              onFocus={resourceFocusPlum}
-              onBlur={resourceBlurLine}
               placeholder={`Describe the ${roleName} role…`}
-              style={{ ...RESOURCE_INPUT_STYLE, fontSize: 15, padding: "12px 13px", minHeight: 70, resize: "vertical", lineHeight: 1.5 }}
+              style={{ minHeight: 70 }}
             />
 
             <div style={respEyebrow}>Responsibilities</div>
@@ -396,13 +367,11 @@ export function StudentOrgRoleTabContent({
                   <span style={{ color: "var(--dashed)", flexShrink: 0, display: "grid", placeItems: "center", cursor: "grab" }} aria-hidden>
                     <GripVertical className="w-3.5 h-3.5" />
                   </span>
-                  <input
+                  <Input
                     value={r}
                     onChange={e => setRespDraft(d => d.map((v, idx) => idx === i ? e.target.value : v))}
-                    onFocus={resourceFocusPlum}
-                    onBlur={resourceBlurLine}
                     placeholder="A responsibility…"
-                    style={{ ...RESOURCE_INPUT_STYLE, flex: 1 }}
+                    style={{ flex: 1 }}
                   />
                   <IconButton dim={26} onClick={() => setRespDraft(d => d.filter((_, idx) => idx !== i))} title="Remove" className="resource-remove-btn">
                     <X className="w-3.5 h-3.5" />
@@ -627,7 +596,9 @@ export function MeetingNoteDetail({
 
         {/* Document body */}
         <div style={{ padding: "28px 32px 0" }}>
-          <input
+          <SerifInput
+            fontSize={26}
+            underline={false}
             value={localTitle}
             readOnly={!canWrite}
             onChange={e => {
@@ -641,16 +612,9 @@ export function MeetingNoteDetail({
             }}
             placeholder="Untitled"
             style={{
-              fontFamily: "var(--font-instrument-serif)",
-              fontSize: 26,
               fontWeight: 400,
-              color: "var(--ink)",
               letterSpacing: "-0.02em",
               lineHeight: 1.2,
-              width: "100%",
-              border: "none",
-              background: "transparent",
-              outline: "none",
               padding: 0,
               display: "block",
             }}
@@ -2138,7 +2102,6 @@ function NewSemesterModal({ onClose, onCreate }: {
   }
 
   const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
-  const inputStyle: React.CSSProperties = { marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--sans)" }
 
   return (
     <div
@@ -2161,20 +2124,17 @@ function NewSemesterModal({ onClose, onCreate }: {
         </div>
 
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
-          <label style={{ display: "block" }}>
-            <span style={labelStyle}>Semester name</span>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" style={inputStyle} />
-          </label>
+          <FormField label="Semester name">
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" />
+          </FormField>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
-            <label style={{ display: "block" }}>
-              <span style={labelStyle}>Starts</span>
-              <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
-            </label>
-            <label style={{ display: "block" }}>
-              <span style={labelStyle}>Ends</span>
-              <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
-            </label>
+            <FormField label="Starts">
+              <Input type="date" value={start} onChange={e => setStart(e.target.value)} />
+            </FormField>
+            <FormField label="Ends">
+              <Input type="date" value={end} onChange={e => setEnd(e.target.value)} />
+            </FormField>
           </div>
           {!validDates && start !== "" && end !== "" && (
             <p style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--danger)", margin: 0 }}>End date must be on or after the start date.</p>
@@ -6250,11 +6210,6 @@ export function AddEventModal({
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", background: "var(--cream-panel)", border: "1px solid #E5E0D2", borderRadius: 8,
-    padding: "8px 12px", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box",
-  }
-
   const labelStyle: React.CSSProperties = {
     fontSize: 11, fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
     letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4, display: "block",
@@ -6313,22 +6268,19 @@ export function AddEventModal({
           )}
 
           {/* Title */}
-          <div>
-            <label style={labelStyle}>Title *</label>
-            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
-          </div>
+          <FormField label="Title *">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+          </FormField>
 
           {/* Description */}
-          <div>
-            <label style={labelStyle}>Description</label>
-            <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
-          </div>
+          <FormField label="Description">
+            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
+          </FormField>
 
           {/* Location */}
-          <div>
-            <label style={labelStyle}>Location</label>
-            <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
-          </div>
+          <FormField label="Location">
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
+          </FormField>
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -6338,47 +6290,38 @@ export function AddEventModal({
 
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={labelStyle}>Start date *</label>
-              <input type="date" style={inputStyle} value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>Start time</label>
-              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
-            </div>
-            <div>
-              <label style={labelStyle}>End date *</label>
-              <input type="date" style={inputStyle} value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>End time</label>
-              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
-            </div>
+            <FormField label="Start date *">
+              <Input type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+            </FormField>
+            <FormField label="Start time">
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
+            </FormField>
+            <FormField label="End date *">
+              <Input type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+            </FormField>
+            <FormField label="End time">
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
+            </FormField>
           </div>
 
           {/* Planning window — edit mode only; persisted to the event's plan row */}
           {isEditing && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Plan start date</label>
-                <input type="date" style={inputStyle} value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ ...labelStyle, display: "flex", alignItems: "baseline", gap: 6 }}>
-                  Crunch date
-                  <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span>
-                </label>
-                <input type="date" style={inputStyle} value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
+              <FormField label="Plan start date">
+                <Input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
+              </FormField>
+              <FormField label={<>Crunch date <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span></>}>
+                <Input type="date" value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
                 {crunchDate && (
                   <button
                     type="button"
                     onClick={() => setCrunchDate("")}
-                    style={{ marginTop: 6, background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
+                    style={{ background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
                   >
                     Clear crunch date
                   </button>
                 )}
-              </div>
+              </FormField>
             </div>
           )}
 
@@ -7448,14 +7391,14 @@ export function EventPlanWorkspace({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
           <label style={{ display: "block" }}>
             <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Assignee</span>
-            <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            <Select size="sm" value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)}>
               <option value="">Unassigned</option>
               {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label style={{ display: "block" }}>
             <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Due date</span>
-            <input type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} />
+            <Input size="sm" type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ cursor: "pointer" }} />
           </label>
           <div>
             <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Priority</span>
@@ -7632,29 +7575,6 @@ export function EventPlanWorkspace({
         )}
       </Fragment>
     )
-  }
-
-  const inputStyle: React.CSSProperties = {
-    background: "var(--cream-panel)",
-    border: "1px solid #E5E0D2",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 13,
-    color: "var(--ink)",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-  }
-
-  const selectStyle: React.CSSProperties = {
-    background: "var(--cream-panel)",
-    border: "1px solid #E5E0D2",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 13,
-    color: "var(--ink)",
-    outline: "none",
-    cursor: "pointer",
   }
 
   const cardStyle: React.CSSProperties = {
@@ -8096,8 +8016,6 @@ export function EventPlanWorkspace({
               const needs = roles.filter(r => !r.assigned_to)
               const covered = roles.filter(r => r.assigned_to)
               const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
-              const editInput: React.CSSProperties = { ...inputStyle, borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
-              const editSelect: React.CSSProperties = { ...selectStyle, width: "100%", borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
 
               const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
@@ -8117,13 +8035,13 @@ export function EventPlanWorkspace({
                     <div key={role.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
                       <div style={{ padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" style={editInput} />
-                          <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput" style={editSelect}>
+                          <Input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" />
+                          <Select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput">
                             <option value="">Unassigned</option>
                             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
+                          </Select>
                         </div>
-                        <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" style={editInput} />
+                        <Input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" />
                         <div style={{ display: "flex", gap: 8 }}>
                           <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
                           <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
@@ -8196,7 +8114,6 @@ export function EventPlanWorkspace({
                   .rolesui .role-icon:hover{color:var(--body)}
                   .rolesui .role-icon.danger:hover{color:var(--danger)}
                   .rolesui .assignbtn:hover{border-color:var(--plum)}
-                  .rolesui .roleinput:focus{border-color:var(--plum)}
                 `}</style>
                 <EventSectionHeader
                   title="Roles"
@@ -8235,29 +8152,27 @@ export function EventPlanWorkspace({
                 {/* Inline add-role form */}
                 {canEdit && showAddRole && (
                   <div style={{ display: "grid", gridTemplateColumns: "230px 1fr 180px auto auto", gap: 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
-                    <input
+                    <Input
                       value={newRoleName}
                       onChange={(e) => setNewRoleName(e.target.value)}
                       placeholder="Role name…"
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", fontWeight: 600, color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                      style={{ fontWeight: 500 }}
                     />
-                    <input
+                    <Input
                       value={newRoleNotes}
                       onChange={(e) => setNewRoleNotes(e.target.value)}
                       placeholder="What they're responsible for…"
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
                     />
-                    <select
+                    <Select
                       value={newRoleAssignee}
                       onChange={(e) => setNewRoleAssignee(e.target.value)}
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer" }}
                     >
                       <option value="">Unassigned</option>
                       {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
+                    </Select>
                     <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
                     <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                   </div>
@@ -8434,63 +8349,57 @@ export function EventPlanWorkspace({
 
                   <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
                     {/* Pain point (title) */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Pain point</span>
-                      <input
+                    <FormField label="Pain point">
+                      <Input
                         value={ppTitle}
                         onChange={e => setPpTitle(e.target.value)}
                         placeholder="What went wrong?"
-                        style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)" }}
                       />
-                    </label>
+                    </FormField>
 
                     {/* Category + Class */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
-                      <label style={{ display: "block" }}>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Category</span>
-                        <select
+                      <FormField label="Category">
+                        <Select
                           value={ppCategory}
                           onChange={e => setPpCategory(e.target.value)}
-                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none" }}
+                          style={{ appearance: "none" }}
                         >
                           {PP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </label>
-                      <label style={{ display: "block" }}>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Class</span>
-                        <select
+                        </Select>
+                      </FormField>
+                      <FormField label="Class">
+                        <Select
                           value={CURRENT_CLASS_YEAR}
                           disabled
-                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--ivory)", fontSize: 14, color: "var(--muted-text)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none", cursor: "not-allowed" }}
+                          style={{ appearance: "none", background: "var(--ivory)", color: "var(--muted-text)", cursor: "not-allowed" }}
                         >
                           <option value={CURRENT_CLASS_YEAR}>{CURRENT_CLASS_YEAR.replace("-", "–")}</option>
-                        </select>
-                      </label>
+                        </Select>
+                      </FormField>
                     </div>
 
                     {/* Watch */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>What to look out for</span>
-                      <textarea
+                    <FormField label="What to look out for">
+                      <Textarea
                         value={ppWatch}
                         onChange={e => setPpWatch(e.target.value)}
                         rows={3}
                         placeholder="The trap the next class should see coming…"
-                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                        style={{ minHeight: 76 }}
                       />
-                    </label>
+                    </FormField>
 
                     {/* Solved */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>How you solved it</span>
-                      <textarea
+                    <FormField label="How you solved it">
+                      <Textarea
                         value={ppSolved}
                         onChange={e => setPpSolved(e.target.value)}
                         rows={3}
                         placeholder="What actually worked…"
-                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                        style={{ minHeight: 76 }}
                       />
-                    </label>
+                    </FormField>
                   </div>
 
                   <div style={{ marginTop: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
@@ -8930,10 +8839,10 @@ function TeamsTab({
           )
         })}
         {canEdit && (
-          <select onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", marginTop: 4 }}>
+          <AddInlineSelect onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: "6px 10px", borderRadius: 8, color: "var(--muted-text)", fontSize: 12, marginTop: 4 }}>
             <option value="">+ Add member…</option>
             {members.filter(m => !teamsData.teamA.members.includes(m.id) && !teamsData.teamB.members.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          </AddInlineSelect>
         )}
       </div>
     </div>
@@ -9077,10 +8986,10 @@ function TransportTab({
                   )
                 })}
                 {canEdit && car.rider_ids.length < car.seats && (
-                  <select onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ padding: "4px 10px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer" }}>
+                  <AddInlineSelect onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: "4px 10px", borderRadius: 999, color: "var(--muted-text)", fontSize: 12 }}>
                     <option value="">+ Add rider…</option>
                     {availableRiders.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </AddInlineSelect>
                 )}
               </div>
             </div>
