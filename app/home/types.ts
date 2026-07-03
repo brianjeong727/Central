@@ -555,6 +555,24 @@ export interface EventNote {
   created_at: string
 }
 
+// Cross-year institutional memory of event pain points. Keyed on team_id +
+// event_type so a recurring event's notes accumulate across class years.
+// Append-only (RLS: ministry members SELECT + INSERT; no update/delete).
+export interface TransitionNote {
+  id: string
+  ministry_id: string
+  team_id: string | null
+  event_type: string
+  class_year: string
+  title: string
+  category: string | null
+  watch_text: string | null
+  solved_text: string | null
+  created_by: string
+  created_by_name: string | null
+  created_at: string
+}
+
 export interface TeamRole {
   id: string
   team_id: string

@@ -10,7 +10,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
-  UserPlus, Sparkles, Layers, Bus, Clock,
+  UserPlus, Sparkles, Layers, Bus, Clock, AlertTriangle,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -44,10 +44,10 @@ import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import type {
-  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventNote,
+  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
-  EventType, EventExtraTab, EventNewFolk,
+  EventType, EventExtraTab, EventNewFolk, TransitionNote,
 } from "../types"
 import { teamAccessLevel, type TeamAccess } from "../governance"
 
@@ -6221,7 +6221,6 @@ export function EventPlanWorkspace({
   const [plan, setPlan] = useState<EventPlan | null>(null)
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [roles, setRoles] = useState<EventRole[]>([])
-  const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
 
   // Assignee pool = team members ∪ anyone assigned to a role on this event, deduped by id
@@ -6292,9 +6291,47 @@ export function EventPlanWorkspace({
   const [editRoleAssignee, setEditRoleAssignee] = useState("")
   const [editRoleNotes, setEditRoleNotes] = useState("")
 
-  // Note add state
-  const [newNote, setNewNote] = useState("")
-  const [addingNote, setAddingNote] = useState(false)
+  // Transition Notes (cross-year institutional memory of pain points)
+  const CURRENT_CLASS_YEAR = currentFiscalYear()
+  const [transitionNotes, setTransitionNotes] = useState<TransitionNote[]>([])
+  const [ppCategoryFilter, setPpCategoryFilter] = useState<string>("All")
+  const [ppModalOpen, setPpModalOpen] = useState(false)
+  const [ppTitle, setPpTitle] = useState("")
+  const [ppCategory, setPpCategory] = useState("Venue")
+  const [ppWatch, setPpWatch] = useState("")
+  const [ppSolved, setPpSolved] = useState("")
+  const [addingPp, setAddingPp] = useState(false)
+
+  const PP_CATEGORIES = ["Venue", "Food", "Budget", "Promo", "People", "Logistics"] as const
+  const PP_FILTERS = ["All", ...PP_CATEGORIES] as const
+
+  // Group transition notes by class_year: current year first (always present,
+  // even when empty), then past years descending. Cards are pre-filtered by the
+  // active category chip, so counts + emptiness reflect the current filter.
+  const transitionGroups = useMemo(() => {
+    const filtered = ppCategoryFilter === "All"
+      ? transitionNotes
+      : transitionNotes.filter(n => (n.category ?? "") === ppCategoryFilter)
+    const map = new Map<string, TransitionNote[]>()
+    for (const n of filtered) {
+      const arr = map.get(n.class_year) ?? []
+      arr.push(n)
+      map.set(n.class_year, arr)
+    }
+    map.set(CURRENT_CLASS_YEAR, map.get(CURRENT_CLASS_YEAR) ?? [])
+    const years = [...map.keys()].sort((a, b) =>
+      a === CURRENT_CLASS_YEAR ? -1 : b === CURRENT_CLASS_YEAR ? 1 : b.localeCompare(a)
+    )
+    return years.map(y => ({ year: y, notes: map.get(y) ?? [] }))
+  }, [transitionNotes, ppCategoryFilter, CURRENT_CLASS_YEAR])
+
+  // Escape closes the "Log a pain point" modal.
+  useEffect(() => {
+    if (!ppModalOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPpModalOpen(false) }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [ppModalOpen])
 
   const startDate = new Date(calendarEvent.start_date)
   const endDate = new Date(calendarEvent.end_date)
@@ -6380,21 +6417,18 @@ export function EventPlanWorkspace({
         notes: r.notes as string | null,
       })))
 
-      // Fetch notes with created_by name
-      const { data: notesData } = await supabase
-        .from("event_notes")
-        .select("*, profiles!event_notes_created_by_fkey(name)")
-        .eq("event_plan_id", planId)
-        .order("created_at", { ascending: false })
-
-      setNotes((notesData ?? []).map((n: Record<string, unknown>) => ({
-        id: n.id as string,
-        event_plan_id: n.event_plan_id as string,
-        content: n.content as string,
-        created_by: n.created_by as string,
-        created_by_name: (n.profiles as { name?: string } | null)?.name,
-        created_at: n.created_at as string,
-      })))
+      // Fetch Transition Notes — cross-year pain points keyed on team_id +
+      // event_type so a recurring event's record accumulates across class years.
+      let transitionQuery = supabase
+        .from("transition_notes")
+        .select("*")
+        .eq("ministry_id", ministryId)
+        .eq("event_type", calendarEvent.event_type)
+      transitionQuery = teamId
+        ? transitionQuery.eq("team_id", teamId)
+        : transitionQuery.is("team_id", null)
+      const { data: transitionData } = await transitionQuery.order("created_at", { ascending: false })
+      setTransitionNotes((transitionData ?? []) as TransitionNote[])
 
       // Assignee list = the entire ministry (student org) member list — the team
       // roster is often unpopulated, and tasks should be assignable to anyone in
@@ -6594,31 +6628,37 @@ export function EventPlanWorkspace({
     onOpenChat?.(result.groupId, `${calendarEvent.title} Planning`)
   }
 
-  async function handleAddNote() {
-    if (!plan || !newNote.trim()) return
-    setAddingNote(true)
+  async function handleAddPainPoint() {
+    if (!canEdit || !ppTitle.trim()) return
+    setAddingPp(true)
+    const authorName = members.find(m => m.id === userId)?.name ?? null
     const { data } = await supabase
-      .from("event_notes")
+      .from("transition_notes")
       .insert({
-        event_plan_id: plan.id,
-        content: newNote.trim(),
+        ministry_id: ministryId,
+        team_id: teamId ?? null,
+        event_type: calendarEvent.event_type,
+        class_year: CURRENT_CLASS_YEAR,
+        title: ppTitle.trim(),
+        category: ppCategory || null,
+        watch_text: ppWatch.trim() || null,
+        solved_text: ppSolved.trim() || null,
         created_by: userId,
+        created_by_name: authorName,
       })
-      .select("*, profiles!event_notes_created_by_fkey(name)")
+      .eq("ministry_id", ministryId)
+      .select("*")
       .single()
     if (data) {
-      const d = data as Record<string, unknown>
-      setNotes((prev) => [{
-        id: d.id as string,
-        event_plan_id: d.event_plan_id as string,
-        content: d.content as string,
-        created_by: d.created_by as string,
-        created_by_name: (d.profiles as { name?: string } | null)?.name,
-        created_at: d.created_at as string,
-      }, ...prev])
+      setTransitionNotes(prev => [data as TransitionNote, ...prev])
     }
-    setNewNote("")
-    setAddingNote(false)
+    setPpTitle("")
+    setPpCategory("Venue")
+    setPpWatch("")
+    setPpSolved("")
+    setPpCategoryFilter("All")
+    setPpModalOpen(false)
+    setAddingPp(false)
   }
 
   const incompleteTasks = tasks.filter((t) => !t.completed)
@@ -7361,58 +7401,237 @@ export function EventPlanWorkspace({
               </div>
             )}
 
-            {/* ── Transition Notes ── */}
+            {/* ── Transition Notes (cross-year institutional memory) ── */}
             {activeSection === 'notes' && (
-              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 36, alignItems: "start" }} className="max-md:!block">
-                {/* Left: institutional memory notes */}
-                <section>
-                  <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>
-                    Institutional Memory — Never Deleted
-                  </p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transition Notes</h2>
-                  <p style={{ fontSize: 14, color: "var(--body)", marginTop: 12, maxWidth: 480, lineHeight: 1.6 }}>
-                    Wisdom from past leaders. Add what you learned so the next class doesn&apos;t have to find it the hard way.
-                  </p>
-
-                  <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 18 }}>
-                    {notes.length === 0 && (
-                      <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No notes yet. Be the first to leave wisdom for future leaders.</p>
-                    )}
-                    {notes.map((note) => (
-                      <article key={note.id} style={{ position: "relative", paddingLeft: 22, borderLeft: "2px solid var(--plum)" }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 19, lineHeight: 1.45, color: "var(--ink)" }}>&ldquo;{note.content}&rdquo;</p>
-                        <p style={{ marginTop: 10, fontSize: 13, color: "var(--muted-text)" }}>
-                          <span style={{ color: "var(--plum-2)", fontWeight: 500 }}>{note.created_by_name ?? "Someone"}</span>
-                          {" · "}{new Date(note.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                        </p>
-                      </article>
-                    ))}
+              <section>
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+                      Institutional memory — never deleted
+                    </p>
+                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transition Notes</h2>
                   </div>
-                </section>
+                  {canEdit && (
+                    <button
+                      onClick={() => setPpModalOpen(true)}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9999, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                    >
+                      <Plus className="w-4 h-4" /> Log a pain point
+                    </button>
+                  )}
+                </div>
 
-                {/* Right: leave a note */}
-                <aside className="max-md:mt-6">
-                  <div style={{ padding: 22, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 14 }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Leave a Note</p>
-                    <textarea
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="What should the next leader know before this event?"
-                      rows={5}
-                      style={{ marginTop: 12, width: "100%", minHeight: 140, padding: 14, border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box" }}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-                      <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Signed as {members.find(m => m.id === userId)?.name ?? "you"}</span>
+                {/* Category filter chips */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
+                  {PP_FILTERS.map(cat => {
+                    const active = ppCategoryFilter === cat
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setPpCategoryFilter(cat)}
+                        style={{
+                          padding: "6px 14px", borderRadius: 9999, fontSize: 12.5, fontWeight: 500, cursor: "pointer",
+                          fontFamily: "var(--font-inter)",
+                          background: active ? "var(--plum)" : "var(--cream)",
+                          color: active ? "var(--cream-on-dark)" : "var(--body)",
+                          border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Year groups */}
+                <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 36 }}>
+                  {ppCategoryFilter !== "All" && transitionGroups.every(g => g.notes.length === 0) ? (
+                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)" }}>
+                      Nothing tagged &ldquo;{ppCategoryFilter}&rdquo; yet.
+                    </p>
+                  ) : transitionGroups.map(({ year, notes: yearNotes }) => {
+                    const isCurrent = year === CURRENT_CLASS_YEAR
+                    const showEmpty = isCurrent && ppCategoryFilter === "All" && yearNotes.length === 0
+                    // Hide non-current empty groups, and current empty groups under a category filter.
+                    if (yearNotes.length === 0 && !showEmpty) return null
+                    return (
+                      <div key={year}>
+                        {/* Year header */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", letterSpacing: -0.2, whiteSpace: "nowrap" }}>
+                            {year.replace("-", "–")}
+                          </span>
+                          {isCurrent && (
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", background: "var(--plum)", color: "var(--cream-on-dark)", padding: "3px 9px", borderRadius: 9999, whiteSpace: "nowrap" }}>
+                              Current
+                            </span>
+                          )}
+                          <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+                            {yearNotes.length} {yearNotes.length === 1 ? "note" : "notes"}
+                          </span>
+                          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                        </div>
+
+                        {showEmpty ? (
+                          <p style={{ marginTop: 16, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
+                            No pain points logged yet — add the first one for this class.
+                          </p>
+                        ) : (
+                          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+                            {yearNotes.map(pp => (
+                              <article
+                                key={pp.id}
+                                style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "20px 22px" }}
+                              >
+                                {/* Title + category */}
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                                  <h3 style={{ fontSize: 16.5, fontWeight: 500, color: "var(--ink)", margin: 0, lineHeight: 1.35, fontFamily: "var(--font-inter)" }}>{pp.title}</h3>
+                                  {pp.category && (
+                                    <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.05em", textTransform: "uppercase", background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--body)", padding: "3px 9px", borderRadius: 9999, whiteSpace: "nowrap", flexShrink: 0 }}>
+                                      {pp.category}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Watch / Solved columns */}
+                                {(pp.watch_text || pp.solved_text) && (
+                                  <div style={{ display: "grid", gridTemplateColumns: pp.watch_text && pp.solved_text ? "1fr 1fr" : "1fr", gap: 20, marginTop: 16 }} className="max-md:!grid-cols-1">
+                                    {pp.watch_text && (
+                                      <div>
+                                        <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+                                          <AlertTriangle className="w-3.5 h-3.5" /> Watch out for
+                                        </p>
+                                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "8px 0 0" }}>{pp.watch_text}</p>
+                                      </div>
+                                    )}
+                                    {pp.solved_text && (
+                                      <div style={{ borderLeft: "2px solid var(--plum)", paddingLeft: 15 }}>
+                                        <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+                                          <Check className="w-3.5 h-3.5" style={{ color: "var(--plum)" }} /> How they solved it
+                                        </p>
+                                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "8px 0 0" }}>{pp.solved_text}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Footer */}
+                                <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--muted-text)" }}>
+                                  <span style={{ color: "var(--body)", fontWeight: 500 }}>{pp.created_by_name ?? "Someone"}</span>
+                                  {" · "}{new Date(pp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </p>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* ── Log a pain point modal (§4.17 creation modal) ── */}
+            {ppModalOpen && canEdit && (
+              <div
+                onClick={() => setPpModalOpen(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 32%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+              >
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{ width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "26px 28px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Log a pain point</p>
+                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", letterSpacing: -0.3, margin: "5px 0 0" }}>Add to the record</h3>
+                      <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0", maxWidth: 420 }}>
+                        Capture what tripped this class up so the next one doesn&apos;t hit the same wall.
+                      </p>
+                    </div>
+                    <button onClick={() => setPpModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--muted-text)", flexShrink: 0 }}>
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Pain point (title) */}
+                    <label style={{ display: "block" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Pain point</span>
+                      <input
+                        value={ppTitle}
+                        onChange={e => setPpTitle(e.target.value)}
+                        placeholder="What went wrong?"
+                        style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)" }}
+                      />
+                    </label>
+
+                    {/* Category + Class */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
+                      <label style={{ display: "block" }}>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Category</span>
+                        <select
+                          value={ppCategory}
+                          onChange={e => setPpCategory(e.target.value)}
+                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none" }}
+                        >
+                          {PP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </label>
+                      <label style={{ display: "block" }}>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Class</span>
+                        <select
+                          value={CURRENT_CLASS_YEAR}
+                          disabled
+                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--ivory)", fontSize: 14, color: "var(--muted-text)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none", cursor: "not-allowed" }}
+                        >
+                          <option value={CURRENT_CLASS_YEAR}>{CURRENT_CLASS_YEAR.replace("-", "–")}</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    {/* Watch */}
+                    <label style={{ display: "block" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>What to look out for</span>
+                      <textarea
+                        value={ppWatch}
+                        onChange={e => setPpWatch(e.target.value)}
+                        rows={3}
+                        placeholder="The trap the next class should see coming…"
+                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                      />
+                    </label>
+
+                    {/* Solved */}
+                    <label style={{ display: "block" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>How you solved it</span>
+                      <textarea
+                        value={ppSolved}
+                        onChange={e => setPpSolved(e.target.value)}
+                        rows={3}
+                        placeholder="What actually worked…"
+                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ marginTop: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                      Adding to {CURRENT_CLASS_YEAR.replace("-", "–")} · signed as {members.find(m => m.id === userId)?.name ?? "you"}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <CentralButton variant="secondary" size="sm" onClick={() => setPpModalOpen(false)}>Cancel</CentralButton>
                       <CentralButton
                         variant="primary" size="sm"
-                        onClick={handleAddNote}
-                        disabled={addingNote || !newNote.trim()}
+                        onClick={handleAddPainPoint}
+                        disabled={addingPp || !ppTitle.trim()}
                       >
-                        {addingNote ? "Adding…" : "Add to record"}
+                        {addingPp ? "Adding…" : "Add to record"}
                       </CentralButton>
                     </div>
                   </div>
-                </aside>
+                </div>
               </div>
             )}
 
