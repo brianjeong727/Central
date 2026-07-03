@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, IconButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -7467,13 +7467,7 @@ export function EventPlanWorkspace({
             {/* ── Checklist ── */}
             {activeSection === 'checklist' && (
               <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-                  <div>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>To Prepare</p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Checklist</h2>
-                  </div>
-                  <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
-                </div>
+                <EventSectionHeader title="Checklist" action={<span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>} />
 
                 {/* Pinned band — top-level pinned tasks (+ their children) */}
                 {pinnedTop.length > 0 && (
@@ -7722,9 +7716,8 @@ export function EventPlanWorkspace({
                   .rolesui .assignbtn:hover{border-color:var(--plum)}
                   .rolesui .roleinput:focus{border-color:var(--plum)}
                 `}</style>
-                <ContentHeader
-                  eyebrow="Who's Responsible"
-                  label="Roles"
+                <EventSectionHeader
+                  title="Roles"
                   action={canEdit ? (
                     <>
                       {planningGroupId ? (
@@ -7812,22 +7805,17 @@ export function EventPlanWorkspace({
             {activeSection === 'notes' && (
               <section>
                 {/* Header row */}
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                  <div>
-                    <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                      Institutional memory — never deleted
-                    </p>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transition Notes</h2>
-                  </div>
-                  {canEdit && (
+                <EventSectionHeader
+                  title="Transition Notes"
+                  action={canEdit ? (
                     <button
                       onClick={() => setPpModalOpen(true)}
                       style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9999, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                     >
                       <Plus className="w-4 h-4" /> Log a pain point
                     </button>
-                  )}
-                </div>
+                  ) : undefined}
+                />
 
                 {/* Category filter chips */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
@@ -8190,15 +8178,12 @@ function SubEventsTab({
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <ContentHeader
-          eyebrow={parentEvent.title}
-          label="Sub-events"
-          action={canEdit ? (
-            <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
-          ) : undefined}
-        />
-      </div>
+      <EventSectionHeader
+        title="Sub-events"
+        action={canEdit ? (
+          <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
+        ) : undefined}
+      />
 
       {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
       {!loading && subEvents.length === 0 && (
@@ -8356,15 +8341,12 @@ function ActsTab({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Performance Order</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Acts Lineup</h2>
-        </div>
-        {canEdit && (
+      <EventSectionHeader
+        title="Acts Lineup"
+        action={canEdit ? (
           <button onClick={addAct} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add act</button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {acts.length === 0 && (
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No acts yet. Add performers to build your lineup.</p>
@@ -8558,13 +8540,12 @@ function TransportTab({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Retreat Logistics</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Transport</h2>
-        </div>
-        {canEdit && <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>}
-      </div>
+      <EventSectionHeader
+        title="Transport"
+        action={canEdit ? (
+          <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>
+        ) : undefined}
+      />
 
       <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
         <div style={{ padding: "10px 18px", background: "var(--ivory)", borderRadius: 10 }}>
@@ -8676,10 +8657,7 @@ function ProgramTab({
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Retreat Schedule</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Program</h2>
-      </div>
+      <EventSectionHeader title="Program" />
 
       {days.map((day, dayIdx) => {
         const daySessions = sessions.filter(s => s.day_index === dayIdx).sort((a, b) => a.time.localeCompare(b.time))
