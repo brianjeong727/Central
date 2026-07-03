@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1881,21 +1881,20 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             {semesters.map(sem => {
               const active = sem.id === activeSemesterId
               return (
-                <button
+                <FilterChip
                   key={sem.id}
+                  selected={active}
                   onClick={() => setActiveSemesterId(sem.id)}
+                  tone="ivory"
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
-                    padding: "7px 14px", borderRadius: 11, cursor: "pointer",
-                    background: active ? "var(--ivory)" : "transparent",
-                    border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                    fontFamily: "var(--sans)", textAlign: "left",
-                    transition: "border-color 150ms, background-color 150ms",
+                    padding: "8px 14px", borderRadius: 12, whiteSpace: "normal", textAlign: "left",
+                    ...(active ? {} : { background: "transparent" }),
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
                   <span style={{ fontSize: 10.5, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
-                </button>
+                </FilterChip>
               )
             })}
           </div>
@@ -8218,19 +8217,15 @@ export function EventPlanWorkspace({
                   {PP_FILTERS.map(cat => {
                     const active = ppCategoryFilter === cat
                     return (
-                      <button
+                      <FilterChip
                         key={cat}
+                        selected={active}
                         onClick={() => setPpCategoryFilter(cat)}
-                        style={{
-                          padding: "6px 14px", borderRadius: 9999, fontSize: 12.5, fontWeight: 500, cursor: "pointer",
-                          fontFamily: "var(--font-inter)",
-                          background: active ? "var(--plum)" : "var(--cream)",
-                          color: active ? "var(--cream-on-dark)" : "var(--body)",
-                          border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                        }}
+                        tone="plum"
+                        style={{ fontWeight: 500 }}
                       >
                         {cat}
-                      </button>
+                      </FilterChip>
                     )
                   })}
                 </div>

@@ -19,6 +19,7 @@ export { ContentActionButton } from "./content-action-button"
 export { MonogramChip } from "./MonogramChip"
 export { PlanSubTabStrip } from "./plan-sub-tab-strip"
 export { FilterDropdown } from "./filter-dropdown"
+export { FilterChip } from "./filter-chip"
 export { Input, Select, Textarea, SerifInput, AddInlineSelect, FormField } from "./field"
 export {
   SkeletonBlock,
