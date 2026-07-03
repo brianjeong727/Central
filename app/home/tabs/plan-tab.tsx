@@ -1859,19 +1859,29 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   useEffect(() => { loadSlots(activeSemesterId) }, [activeSemesterId, loadSlots])
 
   // Claim an open slot or drop your own — mutates only assigned_to.
+  // RLS only permits writing an OPEN or your-own slot; if the write hit 0 rows
+  // (someone raced us / stale state) `.select()` returns nothing → resync from DB
+  // instead of keeping a phantom optimistic change.
   async function confirmClaimOrDrop() {
     if (!confirmSlot) return
     const slot = confirmSlot
     const isMine = slot.assigned_to === userId
     setConfirmBusy(true)
     const nextAssigned = isMine ? null : userId
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("ccsf_rotations")
       .update({ assigned_to: nextAssigned })
       .eq("id", slot.id)
       .eq("ministry_id", ministryId)
+      .select()
     setConfirmBusy(false)
     if (error) return
+    if (!data || data.length === 0) {
+      // rejected / no-op — reconcile with the DB and close.
+      await loadSlots(activeSemesterId)
+      setConfirmSlot(null)
+      return
+    }
     setSlots(prev => prev.map(s => s.id === slot.id
       ? { ...s, assigned_to: nextAssigned, assigned_name: nextAssigned ? s.assigned_name : undefined }
       : s))
@@ -1903,8 +1913,6 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
     .map(rt => ({ ...rt, slots: slots.filter(s => s.rotation_type === rt.type) }))
     .filter(g => g.slots.length > 0)
 
-  const activeSemester = semesters.find(s => s.id === activeSemesterId) ?? null
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
       {/* ── Semester bar ── */}
@@ -1935,7 +1943,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
           {canEdit && (
             <button
               onClick={() => setShowNewSemester(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, flexShrink: 0 }}
             >
               <Plus className="w-4 h-4" /> New semester
             </button>
@@ -1954,7 +1962,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
           {canEdit && (
             <button
               onClick={() => setShowNewSemester(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 600 }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500 }}
             >
               <Plus className="w-4 h-4" /> New semester
             </button>
@@ -2041,7 +2049,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
                   <button
                     onClick={confirmClaimOrDrop}
                     disabled={confirmBusy}
-                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 600, color: "var(--danger)", background: "transparent", border: "1px solid var(--danger)", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
+                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--danger)", background: "transparent", border: "1px solid var(--danger)", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
                   >
                     {confirmBusy ? "Dropping…" : "Drop it"}
                   </button>
@@ -2049,7 +2057,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
                   <button
                     onClick={confirmClaimOrDrop}
                     disabled={confirmBusy}
-                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 600, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
+                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
                   >
                     {confirmBusy ? "Signing up…" : "Yes, sign me up"}
                   </button>
@@ -2109,13 +2117,13 @@ function RotationSlotCell({ slot, userId, onClick }: {
       {/* status */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
         {isOpen ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 600, color: "var(--plum)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>
             <PlusCircle className="w-4 h-4" /> Open
           </span>
         ) : isMine ? (
           <>
             <RotationAvatar name="You" mine />
-            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 600, color: "var(--plum)" }}>You</span>
+            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>You</span>
           </>
         ) : (
           <>
@@ -2227,7 +2235,7 @@ function NewSemesterModal({ onClose, onCreate }: {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
           <button onClick={() => { if (!busy) onClose() }} disabled={busy} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: busy ? "default" : "pointer", padding: "9px 12px" }}>Cancel</button>
-          <button onClick={submit} disabled={!canCreate} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 600, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "9px 18px", cursor: canCreate ? "pointer" : "default", opacity: canCreate ? 1 : 0.5 }}>
+          <button onClick={submit} disabled={!canCreate} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "9px 18px", cursor: canCreate ? "pointer" : "default", opacity: canCreate ? 1 : 0.5 }}>
             {busy ? "Creating…" : "Create"}
           </button>
         </div>
