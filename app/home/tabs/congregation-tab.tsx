@@ -23,14 +23,14 @@ type View = "list" | "create" | "detail"
 
 const TYPE_LABELS: Record<string, string> = {
   poll: "Poll",
-  scale: "1–5 Scale",
+  scale: "1–10 Scale",
   open: "Open-ended",
   prayer: "Prayer request",
 }
 
 const TYPE_DESCRIPTIONS: Record<string, string> = {
   poll: "Members choose from options you define",
-  scale: "Members rate on a scale of 1 to 5",
+  scale: "Members rate on a scale of 1 to 10",
   open: "Members share a short written response",
   prayer: "Members share anonymous prayer requests",
 }
@@ -220,11 +220,11 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     if (q.question_type === "scale") {
       const scores = resps.map(r => r.response_scale).filter(Boolean) as number[]
       const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "—"
-      const dist = [1, 2, 3, 4, 5].map(n => ({ n, count: scores.filter(s => s === n).length }))
+      const dist = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => ({ n, count: scores.filter(s => s === n).length }))
       return (
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 40, fontWeight: 400, color: "var(--plum-2)", fontFamily: "var(--serif)", letterSpacing: "-0.5px", lineHeight: 1 }}>{avg}</div>
-          <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 12 }}>average out of 5</div>
+          <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 12 }}>average out of 10</div>
           <div style={{ display: "flex", gap: 6 }}>
             {dist.map(({ n, count }) => (
               <div key={n} style={{ flex: 1, textAlign: "center" }}>

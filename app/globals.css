@@ -365,6 +365,13 @@
   .greeting-dot-breathe { animation: none; }
 }
 
+/* ── Pastor Pulse hero slide (PulseSlideCard) ────────────────────────────────
+   The translucent textarea on the flat-plum card — placeholder can't be styled
+   inline, so this one rule carries the cream-50 placeholder tint. */
+.pulse-slide-textarea::placeholder {
+  color: color-mix(in srgb, var(--cream) 50%, transparent);
+}
+
 /* ── Events agenda "up next" spine node — subtle plum pulse ring ─────────────
    The up-next event's timeline node emits a soft ring that scales out and fades,
    marking "this is the next thing" without shouting. Reduced-motion users get a

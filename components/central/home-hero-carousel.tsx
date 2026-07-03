@@ -46,8 +46,6 @@ export type HeroSlide =
 const PANEL_FALLBACK = "var(--plum-deep)"
 // --plum-deep components, for the gradient when no stored clamped color exists.
 const PANEL_FALLBACK_RGB = "27, 10, 30"
-// Tall side-pill arrow width — component constant (no spacing token for chrome width).
-const ARROW_W = 54
 
 // ── Option A photo-slide treatment (desktop) ──────────────────────────────────
 // "Light ramp + soft broad scrim, no solid panel." The clamped panel_color makes a
@@ -98,7 +96,9 @@ export function HeroFrame({ children, style, bare = false }: { children: ReactNo
 }
 
 // ── Constant section eyebrow above the hero ("Featured" + plum dot) ───────────
-export function HeroSectionLabel({ offsetForArrows = false, breathe = false }: { offsetForArrows?: boolean; breathe?: boolean }) {
+// (No arrow offset anymore — carousel nav lives BELOW the frame, so the label
+// always sits flush with the frame's left edge.)
+export function HeroSectionLabel({ breathe = false }: { breathe?: boolean }) {
   return (
     <div
       style={{
@@ -106,7 +106,6 @@ export function HeroSectionLabel({ offsetForArrows = false, breathe = false }: {
         alignItems: "center",
         gap: 9,
         marginBottom: "var(--space-6)",
-        paddingLeft: offsetForArrows ? `calc(${ARROW_W}px + var(--space-6))` : 0,
       }}
     >
       <span className={breathe ? "greeting-dot-breathe" : undefined} style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)" }} />
@@ -372,42 +371,9 @@ function Eyebrow({ text }: { text: string }) {
   )
 }
 
-// Tall flanking nav pill (desktop) — cream/line tokens, hover → ivory/plum-2.
-// `onPhoto` keeps the darker cream-2 against image slides; ivory reference slides
-// pass false so the resting fill matches the lighter --cream page background.
-function TallArrow({ dir, disabled, onClick, onPhoto }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void; onPhoto: boolean }) {
-  const [hover, setHover] = useState(false)
-  const Icon = dir === "prev" ? ChevronLeft : ChevronRight
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={dir === "prev" ? "Previous slide" : "Next slide"}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        flexShrink: 0,
-        width: ARROW_W,
-        alignSelf: "stretch",
-        border: "1px solid var(--line-2)",
-        background: !disabled && hover ? "var(--ivory)" : onPhoto ? "var(--cream-2)" : "var(--cream)",
-        color: !disabled && hover ? "var(--plum-2)" : "var(--body)",
-        borderRadius: "var(--r-pill-lg)",
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        display: "grid",
-        placeItems: "center",
-        transition: "background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)",
-      }}
-    >
-      <Icon style={{ width: 22, height: 22 }} />
-    </button>
-  )
-}
-
-// Small round nav pill (mobile).
-function RoundArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void }) {
+// Quiet nav chevron in the bottom controls row (desktop + mobile) — replaces
+// the old flanking TallArrow / RoundArrow pills.
+function NavChevron({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled: boolean; onClick: () => void }) {
   const Icon = dir === "prev" ? ChevronLeft : ChevronRight
   return (
     <button
@@ -416,20 +382,18 @@ function RoundArrow({ dir, disabled, onClick }: { dir: "prev" | "next"; disabled
       disabled={disabled}
       aria-label={dir === "prev" ? "Previous slide" : "Next slide"}
       style={{
-        width: 44,
-        height: 44,
-        borderRadius: 999,
-        border: "1px solid var(--line-2)",
-        background: "var(--cream-2)",
-        color: "var(--body)",
+        background: "none",
+        border: "none",
+        padding: "var(--space-1)",
+        color: "var(--muted-text)",
         display: "grid",
         placeItems: "center",
         cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
+        opacity: disabled ? 0.35 : 1,
         flexShrink: 0,
       }}
     >
-      <Icon style={{ width: 18, height: 18 }} />
+      <Icon style={{ width: 24, height: 24 }} />
     </button>
   )
 }
@@ -464,17 +428,15 @@ const AUTOPLAY_MS = 7000
 const SLIDE_MS = 600
 const SLIDE_EASE = "var(--ease-out)"
 
-// A photo slide (standalone photo, or an event whose linked entity carries a photo).
-function slideUsesPhoto(s: HeroSlide): boolean {
-  return s.kind === "photo" || (s.kind === "event" && !!s.imageUrl)
-}
-
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
 }
 
 interface HomeHeroCarouselProps {
   slides: HeroSlide[]
+  // Optional Pastor Pulse lead slide — rides as slide index 0 when present (NOT a
+  // HeroSlide; the interactive card is built by HomeTab and passed in whole).
+  pulseNode?: ReactNode
   mobile?: boolean
   // RSVP state keyed by announcement_id — reuses the existing announcement RSVP wiring.
   rsvpedIds: Set<string>
@@ -490,6 +452,7 @@ interface HomeHeroCarouselProps {
 
 export function HomeHeroCarousel({
   slides,
+  pulseNode,
   mobile = false,
   rsvpedIds,
   rsvpCounts,
@@ -519,13 +482,17 @@ export function HomeHeroCarousel({
   const trackRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
 
-  const safeIdx = Math.min(idx, Math.max(0, slides.length - 1))
+  // Pulse lead slide: index 0 when present; data slides fill indices lead..total-1.
+  const lead = pulseNode ? 1 : 0
+  const total = lead + slides.length
+
+  const safeIdx = Math.min(idx, Math.max(0, total - 1))
 
   // Start (or instantly perform, under reduced motion) a move to `to` in `dir`.
   // Bounded + guarded: ignores no-ops, out-of-range targets, and triggers fired
   // mid-transition (no queue — matches the "ignore" guard in the spec).
   const go = (to: number, dir: "fwd" | "back") => {
-    if (to === safeIdx || to < 0 || to >= slides.length) return
+    if (to === safeIdx || to < 0 || to >= total) return
     if (anim) return
     if (prefersReducedMotion()) {
       setIdx(to)
@@ -540,12 +507,15 @@ export function HomeHeroCarousel({
   // resting index AND `anim`, so it never fires mid-transition and resets after every
   // change (auto OR manual). Pauses on hover/focus, skipped under reduced motion. The
   // wrap (last → first) is a normal forward move, so it slides forward — never rewinds.
+  // NEVER auto-advances off the pulse lead slide — the user may be mid-drag on the
+  // scale slider or typing an answer (manual prev/next still work: "can peek past").
   useEffect(() => {
-    if (slides.length <= 1 || paused || anim) return
+    if (total <= 1 || paused || anim) return
+    if (lead && safeIdx === 0) return
     if (prefersReducedMotion()) return
-    const t = setTimeout(() => go((safeIdx + 1) % slides.length, "fwd"), AUTOPLAY_MS)
+    const t = setTimeout(() => go((safeIdx + 1) % total, "fwd"), AUTOPLAY_MS)
     return () => clearTimeout(t)
-  }, [safeIdx, paused, slides.length, anim])
+  }, [safeIdx, paused, total, lead, anim])
 
   // Drive the start→end transform: render at the start position (no transition),
   // then flip `started` on the next frame so the transition runs. Safety timeout
@@ -564,9 +534,9 @@ export function HomeHeroCarousel({
     }
   }, [anim])
 
-  if (slides.length === 0) return null
+  if (total === 0) return null
 
-  const multi = slides.length > 1
+  const multi = total > 1
   // The dots / arrow bounds track the TARGET of an in-flight move (resting index otherwise).
   const displayIdx = anim ? anim.to : safeIdx
 
@@ -646,11 +616,18 @@ export function HomeHeroCarousel({
     return { interior, usePhoto }
   }
 
-  // One slide cell. Desktop wraps the interior in its own HeroFrame (border/radius/clip
-  // are per-slide — bare for photos); mobile renders the interior directly (it carries
+  // One slide cell by carousel index. Index 0 is the pulse lead slide when present
+  // — rendered full-bleed (bare frame on desktop: the plum card owns its own
+  // border/radius, no UpNextCard wrapper). Data slides shift up by `lead`.
+  // Desktop wraps interiors in their own HeroFrame (border/radius/clip are
+  // per-slide — bare for photos); mobile renders the interior directly (it carries
   // its own chrome), matching the previous mobile render.
-  const cellContent = (s: HeroSlide): ReactNode => {
-    const { interior, usePhoto } = renderSlide(s)
+  const keyAt = (i: number): string => (lead && i === 0 ? "__pulse__" : slides[i - lead].key)
+  const cellContentAt = (i: number): ReactNode => {
+    if (lead && i === 0) {
+      return mobile ? pulseNode : <HeroFrame bare style={{ height: "100%" }}>{pulseNode}</HeroFrame>
+    }
+    const { interior, usePhoto } = renderSlide(slides[i - lead])
     return mobile ? interior : (
       <HeroFrame bare={usePhoto} style={{ height: "100%" }}>{interior}</HeroFrame>
     )
@@ -694,10 +671,10 @@ export function HomeHeroCarousel({
     >
       {cellIdxs.map((ci) => (
         <div
-          key={slides[ci].key}
+          key={keyAt(ci)}
           style={{ flex: "0 0 100%", width: "100%", minWidth: 0, ...(mobile ? {} : { height: "100%" }) }}
         >
-          {cellContent(slides[ci])}
+          {cellContentAt(ci)}
         </div>
       ))}
     </div>
@@ -709,37 +686,31 @@ export function HomeHeroCarousel({
       style={
         mobile
           ? { position: "relative", overflow: "hidden", width: "100%", height: anim ? frozenH : "auto" }
-          : { position: "relative", overflow: "hidden", flex: 1, minWidth: 0, height: "var(--hero-h)" }
+          : { position: "relative", overflow: "hidden", width: "100%", minWidth: 0, height: "var(--hero-h)" }
       }
     >
       {track}
     </div>
   )
 
-  // ── Mobile: viewport + round arrows + dots below ──
-  if (mobile) {
-    return (
-      <div
-        style={style}
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onFocusCapture={() => setPaused(true)}
-        onBlurCapture={() => setPaused(false)}
-      >
-        {viewport}
-        {multi && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: "var(--space-6)" }}>
-            <RoundArrow dir="prev" disabled={displayIdx === 0} onClick={() => go(safeIdx - 1, "back")} />
-            <Dots count={slides.length} active={displayIdx} onPick={(i) => go(i, i > safeIdx ? "fwd" : "back")} />
-            <RoundArrow dir="next" disabled={displayIdx === slides.length - 1} onClick={() => go(safeIdx + 1, "fwd")} />
-          </div>
-        )}
-      </div>
-    )
-  }
+  // ── Bottom controls row (desktop + mobile): prev chevron · dots · next chevron ──
+  const controls = multi && (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "var(--space-6)",
+        marginTop: mobile ? "var(--space-6)" : "var(--space-7)",
+      }}
+    >
+      <NavChevron dir="prev" disabled={displayIdx === 0} onClick={() => go(safeIdx - 1, "back")} />
+      <Dots count={total} active={displayIdx} onPick={(i) => go(i, i > safeIdx ? "fwd" : "back")} />
+      <NavChevron dir="next" disabled={displayIdx === total - 1} onClick={() => go(safeIdx + 1, "fwd")} />
+    </div>
+  )
 
-  // ── Desktop: tall flanking arrows + framed viewport + dots below ──
-  const displayUsePhoto = slideUsesPhoto(slides[displayIdx])
+  // Full-width viewport, nav below the frame (both breakpoints).
   return (
     <div
       style={style}
@@ -748,16 +719,8 @@ export function HomeHeroCarousel({
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div style={{ display: "flex", alignItems: "stretch", gap: "var(--space-6)" }}>
-        {multi && <TallArrow dir="prev" disabled={displayIdx === 0} onClick={() => go(safeIdx - 1, "back")} onPhoto={displayUsePhoto} />}
-        {viewport}
-        {multi && <TallArrow dir="next" disabled={displayIdx === slides.length - 1} onClick={() => go(safeIdx + 1, "fwd")} onPhoto={displayUsePhoto} />}
-      </div>
-      {multi && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: "var(--space-7)" }}>
-          <Dots count={slides.length} active={displayIdx} onPick={(i) => go(i, i > safeIdx ? "fwd" : "back")} />
-        </div>
-      )}
+      {viewport}
+      {controls}
     </div>
   )
 }
