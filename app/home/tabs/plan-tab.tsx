@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
   Edit3, ArrowLeft, ArrowRight, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   ClipboardList, Pencil,
-  Shuffle, Download, GripVertical, Loader2, MessageCircle,
+  Shuffle, Download, GripVertical, Loader2, MessageCircle, ArrowUpRight,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
   Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle,
 } from "lucide-react"
@@ -55,10 +55,6 @@ import { teamAccessLevel, type TeamAccess } from "../governance"
 // and yjs runtime deps stay OUT of plan-tab's static module graph. They sit behind
 // user interaction (opening a meeting note, editing a role description), so ssr:false
 // with a light fallback is safe. See ./note-editors.
-const RoleDescriptionEditor = dynamic(
-  () => import("./note-editors").then(m => m.RoleDescriptionEditor),
-  { ssr: false, loading: () => <div style={{ minHeight: 44 }} /> },
-)
 const TiptapToolbar = dynamic(
   () => import("./note-editors").then(m => m.TiptapToolbar),
   { ssr: false, loading: () => null },
@@ -139,6 +135,34 @@ export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: stri
   )
 }
 
+// Shared field styling for the Resources edit forms (§4.4 inputs).
+const RESOURCE_INPUT_STYLE: React.CSSProperties = {
+  width: "100%",
+  border: "1px solid var(--line-2)",
+  borderRadius: "var(--r-input)",
+  padding: "9px 12px",
+  fontSize: 14,
+  fontFamily: "var(--sans)",
+  color: "var(--ink)",
+  background: "var(--cream)",
+  outline: "none",
+}
+const RESOURCE_LABEL_STYLE: React.CSSProperties = {
+  ...EYEBROW_STYLE,
+  fontSize: 10,
+  letterSpacing: "0.09em",
+  display: "block",
+  marginBottom: 6,
+}
+function resourceFocusPlum(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  e.currentTarget.style.borderColor = "var(--plum)"
+}
+function resourceBlurLine(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  e.currentTarget.style.borderColor = "var(--line-2)"
+}
+
+// Inline add/edit form for a relevant link. Rendered inside a plum-bordered card
+// by the parent. Label + URL sit in a 2-col grid; Description spans below.
 export function LinkForm({
   form,
   setForm,
@@ -155,54 +179,71 @@ export function LinkForm({
   isNew: boolean
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[var(--muted-text)]">Title</label>
-        <input
-          value={form.title}
-          onChange={e => setForm({ ...form, title: e.target.value })}
-          placeholder="e.g. Officer Handbook"
-          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
-        />
+    <div>
+      <div className="grid grid-cols-2 gap-3.5">
+        <div>
+          <label style={RESOURCE_LABEL_STYLE}>Label</label>
+          <input
+            value={form.title}
+            onChange={e => setForm({ ...form, title: e.target.value })}
+            onFocus={resourceFocusPlum}
+            onBlur={resourceBlurLine}
+            placeholder="e.g. Room booking"
+            style={RESOURCE_INPUT_STYLE}
+          />
+        </div>
+        <div>
+          <label style={RESOURCE_LABEL_STYLE}>URL</label>
+          <input
+            value={form.url}
+            onChange={e => setForm({ ...form, url: e.target.value })}
+            onFocus={resourceFocusPlum}
+            onBlur={resourceBlurLine}
+            placeholder="https://…"
+            type="url"
+            style={RESOURCE_INPUT_STYLE}
+          />
+        </div>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[var(--muted-text)]">Description</label>
+      <div style={{ marginTop: 12 }}>
+        <label style={RESOURCE_LABEL_STYLE}>Description (optional)</label>
         <input
           value={form.description}
           onChange={e => setForm({ ...form, description: e.target.value })}
-          placeholder="Optional short description"
-          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
+          onFocus={resourceFocusPlum}
+          onBlur={resourceBlurLine}
+          placeholder="What it's for"
+          style={RESOURCE_INPUT_STYLE}
         />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[12px] font-medium text-[var(--muted-text)]">URL</label>
-        <input
-          value={form.url}
-          onChange={e => setForm({ ...form, url: e.target.value })}
-          placeholder="https://…"
-          type="url"
-          className="w-full px-3 py-2.5 rounded-xl border border-[var(--line)] bg-white text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/40 transition-all"
-        />
-      </div>
-      <div className="flex gap-2">
-        <button
+      <div className="flex gap-3 items-center" style={{ marginTop: 16 }}>
+        <CentralButton
+          variant="primary"
+          size="sm"
           onClick={onSave}
           disabled={saving || !form.title.trim() || !form.url.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[var(--cream-on-dark)] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
         >
           <Check className="w-3.5 h-3.5" />
-          {saving ? "Saving…" : isNew ? "Add Link" : "Save"}
-        </button>
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[var(--body)] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
+          {saving ? "Saving…" : isNew ? "Add link" : "Save"}
+        </CentralButton>
+        <CentralButton variant="secondary" size="sm" onClick={onCancel}>
           Cancel
-        </button>
+        </CentralButton>
       </div>
     </div>
   )
+}
+
+// Parse a display domain from a URL: strip protocol + www, keep host only.
+function linkDomain(url: string): string {
+  return (url || "").replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]
+}
+// Derive favicon-style initials from a link label (first letters of up to two words).
+function linkInitials(label: string): string {
+  const words = (label || "").trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return "•"
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return (words[0][0] + words[1][0]).toUpperCase()
 }
 
 export function StudentOrgRoleTabContent({
@@ -220,14 +261,17 @@ export function StudentOrgRoleTabContent({
 
   const [description, setDescription] = useState<RoleDescription | null>(null)
   const [editingDesc, setEditingDesc] = useState(false)
-  const [descDraft, setDescDraft] = useState("")
+  const [summaryDraft, setSummaryDraft] = useState("")
+  const [respDraft, setRespDraft] = useState<string[]>([])
   const [savingDesc, setSavingDesc] = useState(false)
+  const [descError, setDescError] = useState<string | null>(null)
 
   const [links, setLinks] = useState<RoleLink[]>([])
   const [addingLink, setAddingLink] = useState(false)
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
   const [linkForm, setLinkForm] = useState({ title: "", description: "", url: "" })
   const [savingLink, setSavingLink] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
   const loadContent = useCallback(async () => {
     if (!teamId) return
@@ -243,16 +287,35 @@ export function StudentOrgRoleTabContent({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadContent() }, [loadContent])
 
+  // ── Derived: the new summary/responsibilities vs. the legacy HTML description ──
+  const summaryText = description?.summary?.trim() ?? ""
+  const responsibilities = Array.isArray(description?.responsibilities) ? description!.responsibilities.filter(r => r && r.trim()) : []
+  const hasNewContent = summaryText.length > 0 || responsibilities.length > 0
+  const legacyHtml = description?.description?.trim() ? description.description : null
+  const showLegacy = !hasNewContent && !!legacyHtml
+
+  function startEditDesc() {
+    setDescError(null)
+    setSummaryDraft(description?.summary ?? "")
+    setRespDraft(responsibilities.length > 0 ? [...responsibilities] : [""])
+    setEditingDesc(true)
+  }
+
   async function saveDescription() {
     if (!teamId) return
     setSavingDesc(true)
+    setDescError(null)
     const now = new Date().toISOString()
-    if (description) {
-      await supabase.from("team_role_descriptions").update({ description: descDraft.trim(), updated_by: userId, updated_at: now }).eq("id", description.id)
-    } else {
-      await supabase.from("team_role_descriptions").insert({ team_id: teamId, role_name: roleName, description: descDraft.trim(), created_by: userId, updated_by: userId, updated_at: now })
-    }
+    const cleanResp = respDraft.map(r => r.trim()).filter(Boolean)
+    const summary = summaryDraft.trim()
+    const { error } = description
+      ? await supabase.from("team_role_descriptions")
+          .update({ summary, responsibilities: cleanResp, updated_by: userId, updated_at: now })
+          .eq("id", description.id).eq("team_id", teamId)
+      : await supabase.from("team_role_descriptions")
+          .insert({ team_id: teamId, role_name: roleName, summary, responsibilities: cleanResp, created_by: userId, updated_by: userId, updated_at: now })
     setSavingDesc(false)
+    if (error) { setDescError("Couldn't save — you may not have permission to edit this role."); return }
     setEditingDesc(false)
     loadContent()
   }
@@ -260,13 +323,16 @@ export function StudentOrgRoleTabContent({
   async function saveLink() {
     if (!teamId) return
     setSavingLink(true)
+    setLinkError(null)
     const now = new Date().toISOString()
-    if (editingLinkId) {
-      await supabase.from("team_role_links").update({ title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), updated_by: userId, updated_at: now }).eq("id", editingLinkId)
-    } else {
-      await supabase.from("team_role_links").insert({ team_id: teamId, role_name: roleName, title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), created_by: userId, updated_by: userId, updated_at: now })
-    }
+    const { error } = editingLinkId
+      ? await supabase.from("team_role_links")
+          .update({ title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), updated_by: userId, updated_at: now })
+          .eq("id", editingLinkId).eq("team_id", teamId)
+      : await supabase.from("team_role_links")
+          .insert({ team_id: teamId, role_name: roleName, title: linkForm.title.trim(), description: linkForm.description.trim(), url: linkForm.url.trim(), created_by: userId, updated_by: userId, updated_at: now })
     setSavingLink(false)
+    if (error) { setLinkError("Couldn't save link — you may not have permission to edit this role."); return }
     setAddingLink(false)
     setEditingLinkId(null)
     setLinkForm({ title: "", description: "", url: "" })
@@ -274,11 +340,15 @@ export function StudentOrgRoleTabContent({
   }
 
   async function deleteLink(id: string) {
-    await supabase.from("team_role_links").delete().eq("id", id)
-    setLinks(prev => prev.filter(l => l.id !== id))
+    setLinkError(null)
+    const prev = links
+    setLinks(cur => cur.filter(l => l.id !== id))
+    const { error } = await supabase.from("team_role_links").delete().eq("id", id).eq("team_id", teamId ?? "")
+    if (error) { setLinks(prev); setLinkError("Couldn't delete link — you may not have permission.") }
   }
 
   function startEditLink(link: RoleLink) {
+    setLinkError(null)
     setLinkForm({ title: link.title, description: link.description, url: link.url })
     setEditingLinkId(link.id)
     setAddingLink(false)
@@ -290,63 +360,106 @@ export function StudentOrgRoleTabContent({
     setLinkForm({ title: "", description: "", url: "" })
   }
 
-  const cardStyle: React.CSSProperties = {
-    background: "var(--cream-panel)",
-    border: "1px solid var(--line)",
-    borderRadius: 16,
-    padding: "16px 20px",
-    boxShadow: "0 1px 4px rgba(19,16,26,0.06)",
-  }
+  const sectionHeaderStyle: React.CSSProperties = { ...EYEBROW_STYLE, fontSize: 11, letterSpacing: "0.12em" }
+  const respEyebrow: React.CSSProperties = { ...EYEBROW_STYLE, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted-text)", margin: "18px 0 10px" }
 
   return (
     <div>
-      {/* Role Description */}
-      <div className="mb-10">
-        <div className="flex items-center justify-between mb-3">
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
-            Role Description
-          </span>
+      {/* ── Role description ── */}
+      <div style={{ marginBottom: 38 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+          <span style={sectionHeaderStyle}>Role description</span>
           {canWrite && !editingDesc && (
-            <button
-              onClick={() => { setDescDraft(description?.description ?? ""); setEditingDesc(true) }}
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
-            >
+            <CentralButton variant="quiet" size="sm" onClick={startEditDesc}>
               <Edit3 className="w-3.5 h-3.5" />
               Edit
-            </button>
+            </CentralButton>
           )}
         </div>
+
         {editingDesc ? (
-          <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-            <RoleDescriptionEditor
-              initialContent={descDraft}
-              onChange={setDescDraft}
+          <div style={{ border: "1px solid var(--plum)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
+            <label style={RESOURCE_LABEL_STYLE}>Summary</label>
+            <textarea
+              value={summaryDraft}
+              onChange={e => setSummaryDraft(e.target.value)}
+              onFocus={resourceFocusPlum}
+              onBlur={resourceBlurLine}
               placeholder={`Describe the ${roleName} role…`}
+              style={{ ...RESOURCE_INPUT_STYLE, fontSize: 15, padding: "12px 13px", minHeight: 70, resize: "vertical", lineHeight: 1.5 }}
             />
-            <div className="flex gap-2" style={{ padding: "10px 16px", borderTop: "1px solid #F0EDE8" }}>
-              <button
-                onClick={saveDescription}
-                disabled={savingDesc}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--plum)] text-[var(--cream-on-dark)] text-[13px] font-semibold hover:bg-[var(--plum-2)] active:scale-[0.97] transition-[transform,background-color] duration-150 disabled:opacity-50"
-              >
+
+            <div style={respEyebrow}>Responsibilities</div>
+            <div className="flex flex-col gap-2">
+              {respDraft.map((r, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <span style={{ color: "var(--dashed)", flexShrink: 0, display: "grid", placeItems: "center", cursor: "grab" }} aria-hidden>
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </span>
+                  <input
+                    value={r}
+                    onChange={e => setRespDraft(d => d.map((v, idx) => idx === i ? e.target.value : v))}
+                    onFocus={resourceFocusPlum}
+                    onBlur={resourceBlurLine}
+                    placeholder="A responsibility…"
+                    style={{ ...RESOURCE_INPUT_STYLE, flex: 1 }}
+                  />
+                  <IconButton dim={26} onClick={() => setRespDraft(d => d.filter((_, idx) => idx !== i))} title="Remove" className="resource-remove-btn">
+                    <X className="w-3.5 h-3.5" />
+                  </IconButton>
+                </div>
+              ))}
+            </div>
+            <CentralButton variant="quiet" size="sm" onClick={() => setRespDraft(d => [...d, ""])} style={{ marginTop: 10 }}>
+              <Plus className="w-3.5 h-3.5" />
+              Add responsibility
+            </CentralButton>
+
+            {descError && (
+              <p style={{ ...EYEBROW_STYLE, fontSize: 11, letterSpacing: "0.04em", textTransform: "none", color: "var(--danger)", margin: "14px 0 0" }}>{descError}</p>
+            )}
+            <div className="flex gap-3 items-center" style={{ marginTop: 18 }}>
+              <CentralButton variant="primary" size="sm" onClick={saveDescription} disabled={savingDesc}>
                 <Check className="w-3.5 h-3.5" />
                 {savingDesc ? "Saving…" : "Save"}
-              </button>
-              <button
-                onClick={() => setEditingDesc(false)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F0EDE8] text-[var(--body)] text-[13px] font-semibold hover:bg-[#E5E0D2] transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-                Cancel
-              </button>
+              </CentralButton>
+              <CentralButton variant="secondary" size="sm" onClick={() => setEditingDesc(false)}>Cancel</CentralButton>
             </div>
           </div>
         ) : (
-          <div style={cardStyle}>
-            {description?.description ? (
-              <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: description.description }} />
+          <div style={{ border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
+            {hasNewContent ? (
+              <>
+                {summaryText && (
+                  <p style={{ fontFamily: "var(--sans)", fontSize: 15, fontWeight: 400, color: "var(--ink)", lineHeight: 1.55, margin: 0 }}>
+                    {summaryText}
+                  </p>
+                )}
+                {responsibilities.length > 0 && (
+                  <>
+                    <div style={{ ...respEyebrow, marginTop: summaryText ? 18 : 0 }}>Responsibilities</div>
+                    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 9 }}>
+                      {responsibilities.map((t, i) => (
+                        <li key={i} style={{ fontFamily: "var(--sans)", fontSize: 14, color: "var(--body)", lineHeight: 1.45, paddingLeft: 18, position: "relative" }}>
+                          <span style={{ position: "absolute", left: 0, top: 7, width: 5, height: 5, borderRadius: "50%", background: "var(--dashed)" }} />
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            ) : showLegacy ? (
+              <>
+                <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: legacyHtml! }} />
+                {canWrite && (
+                  <p style={{ ...EYEBROW_STYLE, fontSize: 10, letterSpacing: "0.06em", color: "var(--faint)", margin: "14px 0 0" }}>
+                    Legacy description — edit to migrate
+                  </p>
+                )}
+              </>
             ) : (
-              <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4", margin: 0 }}>
+              <p style={{ fontFamily: "var(--sans)", fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
                 {canWrite ? "No description yet. Click Edit to add one." : "No description yet."}
               </p>
             )}
@@ -354,82 +467,86 @@ export function StudentOrgRoleTabContent({
         )}
       </div>
 
-      {/* Relevant Links */}
+      {/* ── Relevant links ── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>
-            Relevant Links
-          </span>
+        <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+          <span style={sectionHeaderStyle}>Relevant links</span>
           {canWrite && !addingLink && editingLinkId === null && (
-            <button
-              onClick={() => { setLinkForm({ title: "", description: "", url: "" }); setEditingLinkId(null); setAddingLink(true) }}
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", fontWeight: 500 }}
+            <CentralButton
+              variant="quiet"
+              size="sm"
+              onClick={() => { setLinkError(null); setLinkForm({ title: "", description: "", url: "" }); setEditingLinkId(null); setAddingLink(true) }}
             >
               <Plus className="w-3.5 h-3.5" />
-              Add Link
-            </button>
+              Add link
+            </CentralButton>
           )}
         </div>
 
+        {linkError && (
+          <p style={{ ...EYEBROW_STYLE, fontSize: 11, letterSpacing: "0.04em", textTransform: "none", color: "var(--danger)", margin: "0 0 10px" }}>{linkError}</p>
+        )}
+
         {addingLink && (
-          <div style={{ ...cardStyle, marginBottom: 10 }}>
+          <div style={{ border: "1px solid var(--plum)", borderRadius: "var(--r-card)", padding: "16px 18px", background: "var(--cream)", marginBottom: 10 }}>
             <LinkForm form={linkForm} setForm={setLinkForm} onSave={saveLink} onCancel={cancelLink} saving={savingLink} isNew />
           </div>
         )}
 
         {links.length === 0 && !addingLink ? (
-          <div style={{ ...cardStyle, textAlign: "center", padding: "28px 20px" }}>
-            <p style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
+          <div style={{ border: "1px solid var(--line-2)", borderRadius: "var(--r-card)", background: "var(--cream)", textAlign: "center", padding: "28px 20px" }}>
+            <p style={{ fontFamily: "var(--sans)", fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
               {canWrite ? "No links yet. Add one to get started." : "No links yet."}
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             {links.map(link =>
               editingLinkId === link.id ? (
-                <div key={link.id} style={cardStyle}>
+                <div key={link.id} style={{ border: "1px solid var(--plum)", borderRadius: "var(--r-card)", padding: "16px 18px", background: "var(--cream)" }}>
                   <LinkForm form={linkForm} setForm={setLinkForm} onSave={saveLink} onCancel={cancelLink} saving={savingLink} isNew={false} />
                 </div>
               ) : (
-                <div key={link.id} style={cardStyle}>
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontFamily: "var(--font-inter)", fontSize: 14, fontWeight: 600, color: "var(--plum)", textDecoration: "underline", textUnderlineOffset: 2, wordBreak: "break-word" }}
-                      >
-                        {link.title}
-                      </a>
-                      {link.description && (
-                        <p style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "var(--body)", margin: "3px 0 0", lineHeight: 1.55 }}>
-                          {link.description}
-                        </p>
-                      )}
-                      <p style={{ fontFamily: "var(--font-inter)", fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {link.url}
-                      </p>
-                    </div>
-                    {canWrite && (
-                      <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
-                        <button
-                          onClick={() => startEditLink(link)}
-                          className="p-1.5 rounded-lg hover:bg-[#EFEAE0] transition-colors"
-                          title="Edit link"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-[var(--muted-text)]" />
-                        </button>
-                        <button
-                          onClick={() => deleteLink(link.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Delete link"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-[var(--muted-text)] hover:text-red-500" />
-                        </button>
-                      </div>
+                <div
+                  key={link.id}
+                  className="group flex items-center gap-3.5 border border-[var(--line-2)] rounded-[var(--r-card)] bg-[var(--cream)] hover:border-[var(--dashed)] transition-colors"
+                  style={{ padding: "14px 16px" }}
+                >
+                  {/* Favicon badge — initials from the label */}
+                  <span
+                    style={{ width: 36, height: 36, borderRadius: "var(--r-input)", background: "var(--ivory)", display: "grid", placeItems: "center", fontFamily: "var(--sans)", fontWeight: 600, fontSize: 13, color: "var(--body)", flexShrink: 0 }}
+                    aria-hidden
+                  >
+                    {linkInitials(link.title)}
+                  </span>
+
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 block">
+                    <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 15, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {link.title}
+                    </span>
+                    {link.description && (
+                      <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {link.description}
+                      </span>
                     )}
-                  </div>
+                  </a>
+
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.02em", color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }} className="hidden sm:block">
+                    {linkDomain(link.url)}
+                  </span>
+
+                  {canWrite && (
+                    <div className="flex items-center gap-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <IconButton dim={26} onClick={() => startEditLink(link)} title="Edit link">
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </IconButton>
+                      <IconButton dim={26} onClick={() => deleteLink(link.id)} title="Delete link" className="resource-remove-btn">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </IconButton>
+                    </div>
+                  )}
+
+                  <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--faint)" }} />
                 </div>
               )
             )}
@@ -1222,8 +1339,12 @@ export function StudentOrgTeamHome({
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
 
-  // Resources tab — which role's content to display
+  // Resources tab — which role's content to display + the team's actual roles
   const [resourcesRole, setResourcesRole] = useState<string | null>(null)
+  const [teamRoles, setTeamRoles] = useState<{ name: string; is_president: boolean }[]>([])
+  // Reset the selected role whenever the team changes so a stale role from a
+  // previous team never renders as the active tab.
+  useEffect(() => { setResourcesRole(null) }, [teamId])
 
   // Groups tab — trigger wizard from header button
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
@@ -1278,6 +1399,21 @@ export function StudentOrgTeamHome({
         name: (m.profiles as { name?: string } | null)?.name ?? "Unknown",
         role: (m.team_roles as { name?: string } | null)?.name ?? "Member",
       }))))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId])
+
+  // Resources role tabs are the team's ACTUAL roles (president first), not a hardcoded list.
+  useEffect(() => {
+    if (!teamId) { setTeamRoles([]); return }
+    supabase.from("team_roles")
+      .select("name, is_president")
+      .eq("team_id", teamId)
+      .then(({ data }) => {
+        const rows = (data ?? []) as { name: string; is_president: boolean | null }[]
+        // President(s) first; otherwise preserve the query order.
+        const sorted = [...rows].sort((a, b) => (b.is_president ? 1 : 0) - (a.is_president ? 1 : 0))
+        setTeamRoles(sorted.map(r => ({ name: r.name, is_president: !!r.is_president })))
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId])
 
@@ -1357,8 +1493,22 @@ export function StudentOrgTeamHome({
   }
 
   const userRosterRole = roster.find(m => m.user_id === userId)?.role ?? null
-  const activeResourcesRole = resourcesRole ?? userRosterRole ?? "President"
-  const resourcesRoles = ["President", "Treasurer", "Secretary", "Event Coordinator"]
+  const resourcesRoles = teamRoles.map(r => r.name)
+  const presidentRoleName = teamRoles.find(r => r.is_president)?.name ?? null
+  // Resolve the active role tab to a REAL role: an explicit selection, else the
+  // user's own role if it's a resource role, else the first role.
+  const activeResourcesRole =
+    (resourcesRole && resourcesRoles.includes(resourcesRole) ? resourcesRole : null) ??
+    (userRosterRole && resourcesRoles.includes(userRosterRole) ? userRosterRole : null) ??
+    resourcesRoles[0] ?? ""
+  // Per-role edit gating (mirrors the DB RLS write rule): admin/leader-tier team
+  // editors (canEdit) OR the team President OR the member whose own role matches
+  // the active role tab. Prevents edit controls appearing where the write is a
+  // silent RLS no-op.
+  const canWriteActiveRole =
+    canEdit ||
+    (presidentRoleName != null && userRosterRole === presidentRoleName) ||
+    (!!userRosterRole && userRosterRole === activeResourcesRole)
 
   // Note detail consumes the whole content body on BOTH viewports: the section
   // header is suppressed and MeetingNotesSection (which early-returns the
@@ -1437,7 +1587,7 @@ export function StudentOrgTeamHome({
       })()}
 
       {/* Desktop Resources role sub-strip (replaces pill buttons) */}
-      {isDesktopView && displaySection === "Resources" && (
+      {isDesktopView && displaySection === "Resources" && resourcesRoles.length > 0 && (
         <PlanSubTabStrip
           tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
           active={activeResourcesRole}
@@ -1540,27 +1690,18 @@ export function StudentOrgTeamHome({
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-                  {resourcesRoles.map(role => (
-                    <button
-                      key={role}
-                      onClick={() => setResourcesRole(role)}
-                      style={{
-                        padding: "6px 14px", borderRadius: 9999, border: "1.5px solid",
-                        borderColor: activeResourcesRole === role ? "var(--plum)" : "var(--line)",
-                        background: activeResourcesRole === role ? "var(--plum)" : "transparent",
-                        color: activeResourcesRole === role ? "var(--cream-on-dark)" : "var(--body)",
-                        fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)",
-                        transition: "border-color 150ms, background-color 150ms, color 150ms",
-                      }}
-                    >
-                      {role}
-                    </button>
-                  ))}
-                </div>
+                {resourcesRoles.length > 0 && (
+                  <div style={{ marginBottom: 22 }}>
+                    <PlanSubTabStrip
+                      tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
+                      active={activeResourcesRole}
+                      onChange={setResourcesRole}
+                    />
+                  </div>
+                )}
               </>
             )}
-            <StudentOrgRoleTabContent teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canEdit} />
+            <StudentOrgRoleTabContent key={activeResourcesRole} teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canWriteActiveRole} />
           </div>
         )}
 
