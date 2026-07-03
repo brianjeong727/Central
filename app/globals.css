@@ -433,6 +433,10 @@
 .central-field-serif { transition: border-color var(--dur-fast) var(--ease-out); }
 .central-field-serif:focus { border-bottom-color: var(--plum); }
 
+/* ListRow (§8.3) — table-row hover highlight */
+.central-list-row { transition: background var(--dur-fast) var(--ease-out); }
+.central-list-row:hover { background: var(--cream-2); }
+
 .central-icon-btn { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
 .central-icon-btn:not(:disabled):hover { background: var(--ivory); color: var(--ink); }
 .central-icon-btn:not(:disabled):active { transform: scale(0.94); }

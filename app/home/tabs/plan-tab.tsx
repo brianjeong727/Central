@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -396,7 +396,7 @@ export function StudentOrgRoleTabContent({
             </div>
           </div>
         ) : (
-          <div style={{ border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
+          <CentralCard variant="standard" radius="var(--r-callout)" padding="22px 22px">
             {hasNewContent ? (
               <>
                 {summaryText && (
@@ -432,7 +432,7 @@ export function StudentOrgRoleTabContent({
                 {canWrite ? "No description yet. Click Edit to add one." : "No description yet."}
               </p>
             )}
-          </div>
+          </CentralCard>
         )}
       </div>
 
@@ -7666,8 +7666,7 @@ export function EventPlanWorkspace({
 
               const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
-              const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
-              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 400, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
               const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
               const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
@@ -7768,7 +7767,7 @@ export function EventPlanWorkspace({
                 {/* ── RIGHT column — stat cards ── */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
                   {/* Expected turnout */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Expected turnout</p>
                     {canEdit && editingTurnout ? (
                       <input
@@ -7793,10 +7792,10 @@ export function EventPlanWorkspace({
                         <span style={{ fontWeight: 500, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
-                  </div>
+                  </CentralCard>
 
                   {/* Budget */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={monoLabel}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
@@ -7840,10 +7839,10 @@ export function EventPlanWorkspace({
                         )}
                       </div>
                     )}
-                  </div>
+                  </CentralCard>
 
                   {/* Readiness */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
@@ -7860,7 +7859,7 @@ export function EventPlanWorkspace({
                         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
                       </div>
                     )}
-                  </div>
+                  </CentralCard>
                 </aside>
               </div>
               )
@@ -7873,13 +7872,13 @@ export function EventPlanWorkspace({
 
                 {/* Pinned band — top-level pinned tasks (+ their children) */}
                 {pinnedTop.length > 0 && (
-                  <div style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "6px 14px 8px", marginBottom: 24 }}>
+                  <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                       <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
                       <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
                     </div>
                     {pinnedTop.map((task) => renderTaskTree(task))}
-                  </div>
+                  </CentralCard>
                 )}
 
                 {/* Date-driven sections — top-level, non-pinned tasks grouped by window */}
@@ -8053,7 +8052,7 @@ export function EventPlanWorkspace({
                 const isCovered = !!role.assigned_to
                 const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
                 return (
-                  <div key={role.id} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px", borderRadius: 8, borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                  <ListRow key={role.id} hover={false} last={isLast} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px" }}>
                     {isCovered ? (
                       <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 600 }} />
                     ) : (
@@ -8100,7 +8099,7 @@ export function EventPlanWorkspace({
                         </>
                       )}
                     </div>
-                  </div>
+                  </ListRow>
                 )
               }
 
@@ -8272,9 +8271,11 @@ export function EventPlanWorkspace({
                         ) : (
                           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
                             {yearNotes.map(pp => (
-                              <article
+                              <CentralCard
                                 key={pp.id}
-                                style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "20px 22px" }}
+                                variant="callout"
+                                radius="var(--r-callout)"
+                                padding="22px 22px"
                               >
                                 {/* Title + category */}
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -8313,7 +8314,7 @@ export function EventPlanWorkspace({
                                   <span style={{ color: "var(--body)", fontWeight: 500 }}>{pp.created_by_name ?? "Someone"}</span>
                                   {" · "}{new Date(pp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                 </p>
-                              </article>
+                              </CentralCard>
                             ))}
                           </div>
                         )}
@@ -8753,7 +8754,7 @@ function ActsTab({
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         {acts.map((act, idx) => (
-          <div key={act.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+          <ListRow key={act.id} last={idx === acts.length - 1} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#A09A8C", textAlign: "center" }}>{idx + 1}</span>
             {canEdit ? (
               <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
@@ -8774,7 +8775,7 @@ function ActsTab({
             {canEdit ? (
               <IconButton dim={24} onClick={() => deleteAct(act.id)} title="Remove act"><X className="w-3.5 h-3.5" /></IconButton>
             ) : <span />}
-          </div>
+          </ListRow>
         ))}
       </div>
     </div>
@@ -8822,7 +8823,7 @@ function TeamsTab({
   }
 
   const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
-    <div style={{ flex: 1, padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
+    <CentralCard variant="standard" radius="var(--r-callout)" padding={22} style={{ flex: 1 }}>
       {canEdit ? (
         <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
       ) : (
@@ -8845,7 +8846,7 @@ function TeamsTab({
           </AddInlineSelect>
         )}
       </div>
-    </div>
+    </CentralCard>
   )
 
   return (
@@ -8954,7 +8955,7 @@ function TransportTab({
           const driver = members.find(m => m.id === car.driver_id)
           const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
           return (
-            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
+            <CentralCard key={car.id} variant="standard" radius="var(--r-callout)" padding="18px 22px">
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 {canEdit ? (
                   <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
@@ -8992,7 +8993,7 @@ function TransportTab({
                   </AddInlineSelect>
                 )}
               </div>
-            </div>
+            </CentralCard>
           )
         })}
       </div>
@@ -9069,8 +9070,8 @@ function ProgramTab({
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "12px 4px" }}>No sessions yet.</p>
             )}
 
-            {daySessions.map(session => (
-              <div key={session.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+            {daySessions.map((session, sIdx) => (
+              <ListRow key={session.id} last={sIdx === daySessions.length - 1} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", alignItems: "center" }}>
                 {canEdit ? (
                   <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
                 ) : (
@@ -9092,7 +9093,7 @@ function ProgramTab({
                 {canEdit ? (
                   <IconButton dim={24} onClick={() => deleteSession(session.id)} title="Remove session"><X className="w-3.5 h-3.5" /></IconButton>
                 ) : <span />}
-              </div>
+              </ListRow>
             ))}
           </div>
         )
@@ -9234,9 +9235,12 @@ function GroupsTab({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.map(session => (
-            <div
+            <CentralCard
               key={session.id}
-              style={{ background: "var(--cream-panel)", border: "1px solid " + (confirmDeleteId === session.id ? "var(--danger)" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
+              variant="standard"
+              radius="var(--r-callout)"
+              padding="18px 22px"
+              style={{ ...(confirmDeleteId === session.id ? { border: "1px solid var(--danger)" } : {}), transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -9244,7 +9248,7 @@ function GroupsTab({
                   <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "4px 0 0" }}>
                     {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     {session.config.smallGroupMode === true && (
-                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "#F0EDE8", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
+                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "var(--ivory)", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
                     )}
                   </p>
                 </div>
@@ -9269,7 +9273,7 @@ function GroupsTab({
 
               {/* Inline confirmation row */}
               {confirmDeleteId === session.id && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0EDE8", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-3)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
                     {session.config.smallGroupMode === true && (
@@ -9292,7 +9296,7 @@ function GroupsTab({
                   </div>
                 </div>
               )}
-            </div>
+            </CentralCard>
           ))}
         </div>
       )}

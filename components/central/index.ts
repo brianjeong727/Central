@@ -1,4 +1,5 @@
 export { CentralCard } from "./card"
+export { ListRow } from "./list-row"
 export { SectionHeader } from "./section-header"
 export { CentralButton, IconButton } from "./button"
 export { UpNextCard } from "./up-next-card"
