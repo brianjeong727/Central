@@ -34,11 +34,11 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, SectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -587,7 +587,7 @@ export function MeetingNoteDetail({
             background: "var(--cream-2)",
           }}
         >
-          <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          <span style={MONO_STYLE}>
             {noteDateLabel}
           </span>
         </div>
@@ -1404,11 +1404,6 @@ export function StudentOrgTeamHome({
     if (planningEvent?.id === evId) onPlanningEventChange(null)
   }
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
-
   if (planningEvent) {
     // Single render for both viewports. SubpageShell consumes the page body
     // (cream, in-content) and supplies the only horizontal inset + the mobile
@@ -1588,10 +1583,7 @@ export function StudentOrgTeamHome({
         {displaySection === "Meeting Notes" && (
           <div>
             {!isDesktopView && (
-              <div style={{ marginBottom: 28 }}>
-                <p style={mono}>Meeting Notes</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Meeting Notes</h2>
-              </div>
+              <SectionHeader eyebrow="Meeting Notes" title="Meeting Notes" titleSize={30} style={{ marginBottom: 28 }} />
             )}
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
           </div>
@@ -1602,12 +1594,12 @@ export function StudentOrgTeamHome({
           <div>
             {/* Mobile header + New Event (desktop header is TabPageHeader above) */}
             {!isDesktopView && (
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
-                <div>
-                  <p style={mono}>Events & planning</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Events</h2>
-                </div>
-                {canEdit && (
+              <SectionHeader
+                eyebrow="Events & planning"
+                title="Events"
+                titleSize={30}
+                style={{ marginBottom: 28 }}
+                action={canEdit && (
                   <CentralButton
                     variant="primary" size="sm"
                     onClick={() => setShowAddModal(true)}
@@ -1616,7 +1608,7 @@ export function StudentOrgTeamHome({
                     <Plus className="w-3.5 h-3.5" /> New Event
                   </CentralButton>
                 )}
-              </div>
+              />
             )}
             <EventsAgendaList
               events={calEvents}
@@ -1638,17 +1630,17 @@ export function StudentOrgTeamHome({
             {/* Mobile header + role pills (desktop gets TabPageHeader + PlanSubTabStrip above) */}
             {!isDesktopView && (
               <>
-                <div style={{ marginBottom: 20 }}>
-                  <p style={mono}>Team resources</p>
-                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "var(--ink)" }}>Resources</h2>
-                    {userRosterRole && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
-                        {userRosterRole}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <SectionHeader
+                  eyebrow="Team resources"
+                  title="Resources"
+                  titleSize={30}
+                  style={{ marginBottom: 20 }}
+                  action={userRosterRole && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                      {userRosterRole}
+                    </span>
+                  )}
+                />
                 {resourcesRoles.length > 0 && (
                   <div style={{ marginBottom: 22 }}>
                     <PlanSubTabStrip
@@ -2394,13 +2386,7 @@ export function PlanTab({
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "11px",
-    letterSpacing: "0.04em",
-    textTransform: "uppercase",
-    color: "var(--muted-text)",
-  }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
   const activeTeamPerms = activeUserTeam?.permissions ?? []
@@ -2685,7 +2671,7 @@ export function PlanTab({
             /* EMPTY STATE — strictly 0 teams */
             <div className="px-14 py-7">
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>
                   {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
                 </div>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
@@ -2971,7 +2957,7 @@ export function PlanTab({
                           <p className="text-[14px] font-semibold text-[var(--ink)]">{team.name}</p>
                           <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
+                        <ChevronRight className="w-4 h-4 text-[var(--faint)] flex-shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -3083,17 +3069,7 @@ export function StudentOrgSectionNav({
                         <button
                           key={ev.id}
                           onClick={() => { onPlanningEventChange(ev); onSectionChange("Events") }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 7,
-                            width: "100%", padding: "5px 10px",
-                            background: isEvActive ? "var(--ivory)" : "none",
-                            border: "none", borderRadius: "var(--r-chip)",
-                            cursor: "pointer", textAlign: "left" as const,
-                            fontFamily: "var(--sans)", fontSize: 12,
-                            color: isEvActive ? "var(--ink)" : "var(--muted-text)",
-                            fontWeight: isEvActive ? 500 : 400,
-                            transition: "background 100ms ease",
-                          }}
+                          style={{ ...sidebarItemStyle(isEvActive), gap: 7, fontSize: 12, borderLeftColor: "transparent" }}
                         >
                           <span style={{ width: 4, height: 4, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0 }} />
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{ev.title}</span>
@@ -3292,7 +3268,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
   async function loadSchedule() {
     const gen = ++loadScheduleGenRef.current
     setScheduleLoading(true)
@@ -3943,7 +3919,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* Song list */}
                     {songs.length === 0 && !isUploadingThis ? (
                       <div style={{ padding: "20px 18px", textAlign: "center" }}>
-                        <p style={{ fontSize: 13, color: "#C4C4C4" }}>No charts uploaded yet.</p>
+                        <p style={{ fontSize: 13, color: "var(--faint)" }}>No charts uploaded yet.</p>
                       </div>
                     ) : (
                       <div>
@@ -3956,7 +3932,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           return (
                             <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                               {/* Position number */}
-                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
 
                               {/* Title */}
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -3995,12 +3971,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                       onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                       onBlur={handleSaveInlineEdit}
                                       onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
+                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
                                     />
                                   ) : (
                                     <button
                                       onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
+                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
                                     >
                                       {song.key || "—"}
                                     </button>
@@ -4025,7 +4001,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         })}
                         {isUploadingThis && (
                           <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #EFE9DA" : "none", display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>—</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>—</span>
                             <span style={{ fontSize: 13, color: "var(--muted-text)" }}>Parsing chart…</span>
                           </div>
                         )}
@@ -4099,9 +4075,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--line-2)" }}>
-                          <th style={{ textAlign: "left", padding: "10px 16px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
+                          <th style={{ textAlign: "left", padding: "10px 16px", color: "var(--muted-text)", fontFamily: "var(--mono)", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
                           {weeks.map(w => (
-                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
+                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "var(--muted-text)", fontFamily: "var(--mono)", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
                               {new Date(w.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </th>
                           ))}
@@ -4121,7 +4097,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                       ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4E2E2", color: "#8A2C2C", fontSize: 11, fontWeight: 700 }}>✕</span>
                                       : a === "unsure"
                                         ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4ECDB", color: "#B58940", fontSize: 11, fontWeight: 700 }}>?</span>
-                                        : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
+                                        : <span style={{ color: "var(--faint)", fontSize: 13 }}>—</span>
                                   }
                                 </td>
                               )
@@ -4146,7 +4122,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
 function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const [events, setEvents] = useState<{ id: string; week_date: string; roles: WorshipRoleRow[] }[]>([])
   const [teamMembers, setTeamMembers] = useState<{ user_id: string; name: string }[]>([])
@@ -4527,7 +4503,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -4536,7 +4512,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -4558,10 +4534,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -4591,7 +4567,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
 function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const [events, setEvents] = useState<{ id: string; week_date: string; event_name: string | null; roles: WorshipRoleRow[] }[]>([])
   const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
@@ -4887,7 +4863,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -4896,7 +4872,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -4918,10 +4894,10 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -4951,7 +4927,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
 
 function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   type TeamInfo = { id: string; name: string; team_type: string }
   type EventWithMeta = { id: string; week_date: string; event_name: string | null; team_id: string; teamName: string; teamType: string }
@@ -5111,12 +5087,12 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         </div>
         {songs.map((song, i) => (
           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
-            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
-            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 18 }}>{i + 1}</span>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--faint)" }}>Untitled</span>}</span>
+            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
           </div>
         ))}
-        {songs.length === 0 && <p style={{ fontSize: 13, color: "#C4C4C4", padding: "12px 18px" }}>No songs in set.</p>}
+        {songs.length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", padding: "12px 18px" }}>No songs in set.</p>}
       </div>
     )
   }
@@ -5308,7 +5284,7 @@ function SetListPdfViewer({
     setEditingField(null)
   }
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--ink)", display: "flex", flexDirection: "column" }}>
@@ -5744,7 +5720,7 @@ export function MonthGrid({
       {/* Week header */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted-text)", textAlign: "center", paddingBottom: 4 }}>
+          <div key={d} style={{ ...MONO_STYLE, textAlign: "center", paddingBottom: 4 }}>
             {d}
           </div>
         ))}
@@ -5857,7 +5833,7 @@ export function TimelineView({
         const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
         return (
           <div key={key}>
-            <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 8 }}>
+            <div style={{ ...MONO_STYLE, marginBottom: 8 }}>
               {monthLabel}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -6210,7 +6186,7 @@ export function AddEventModal({
   }
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 11, fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: 11, fontFamily: "var(--mono)",
     letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4, display: "block",
   }
 
@@ -6447,7 +6423,7 @@ export function MinistryCalendar({
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Upcoming
           </p>
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
@@ -6512,7 +6488,7 @@ export function MinistryCalendar({
 
         {/* Events panel — right */}
         <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid #E5E0D2", paddingLeft: 20 }}>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>
+          <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>
             Events · {events.length || 3}
           </p>
 
@@ -7389,18 +7365,18 @@ export function EventPlanWorkspace({
         />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
           <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Assignee</span>
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Assignee</span>
             <Select size="sm" value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)}>
               <option value="">Unassigned</option>
               {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </Select>
           </label>
           <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Due date</span>
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Due date</span>
             <Input size="sm" type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ cursor: "pointer" }} />
           </label>
           <div>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Priority</span>
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Priority</span>
             <button type="button" onClick={() => setEditTaskPriority((p) => (p === "high" ? "none" : "high"))}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
                 background: isHighPriority ? "var(--cream-3)" : "var(--cream-2)", border: "1px solid " + (isHighPriority ? "var(--plum)" : "var(--line-2)"), color: isHighPriority ? "var(--plum)" : "var(--body)", fontFamily: "var(--font-inter)" }}>
@@ -7486,7 +7462,7 @@ export function EventPlanWorkspace({
         <span style={{ flex: 1, minWidth: 0, fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
         {/* subcount */}
         {!isChild && hasKids && (
-          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
         )}
         {/* assignee */}
         {task.assigned_name && (
@@ -7494,7 +7470,7 @@ export function EventPlanWorkspace({
         )}
         {/* due */}
         {task.due_date && (
-          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
         )}
         {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
         {canEdit && (
@@ -7663,11 +7639,11 @@ export function EventPlanWorkspace({
                 { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate },
               ]
 
-              const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
+              const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
               const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 400, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
-              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
+              const factKey: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
               const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
                 <div key={f.k} style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
                   <span style={{ ...factKey, width: keyW, flexShrink: 0 }}>{f.k}</span>
@@ -7874,7 +7850,7 @@ export function EventPlanWorkspace({
                   <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                       <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                      <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
                     </div>
                     {pinnedTop.map((task) => renderTaskTree(task))}
                   </CentralCard>
@@ -7905,15 +7881,15 @@ export function EventPlanWorkspace({
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
                         <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
                       </button>
                       <div style={{ borderTop: "1px solid var(--line)" }} />
 
                       {isDropZone && (
                         <div style={{ margin: "10px 0", padding: "12px", border: "1.5px dashed var(--plum)", borderRadius: 10, textAlign: "center" }}>
-                          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
                         </div>
                       )}
 
@@ -8742,7 +8718,7 @@ function ActsTab({
       {acts.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
-            <span key={i} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
+            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
           ))}
         </div>
       )}
@@ -8846,10 +8822,7 @@ function TeamsTab({
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Turkey Bowl</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Teams</h2>
-      </div>
+      <EventSectionHeader title="Teams" />
 
       <div style={{ display: "flex", gap: 20, marginBottom: 24 }} className="max-md:!flex-col">
         {renderTeam("teamA", teamsData.teamA)}
@@ -9052,7 +9025,7 @@ function ProgramTab({
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
+              <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
@@ -9128,10 +9101,7 @@ function GroupsTab({
 
   useEffect(() => { if (generateTrigger) setShowWizard(true) }, [generateTrigger])
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   async function loadSessions() {
     if (!teamId) { setLoading(false); return }
@@ -9316,10 +9286,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
   const [groups, setGroups] = useState<{ id: string; name: string; order_index: number; members: { id: string; name: string; graduation_year: number | null; role: string }[] }[]>([])
   const [loading, setLoading] = useState(true)
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   // Back nav is the shell breadcrumb (§175) — "Groups" crumb returns to the list.
   useSubpageCrumbs([{ label: "Groups", onClick: onBack }, { label: session.name }])
@@ -9481,10 +9448,7 @@ function GroupGeneratorWizard({
   const [sgConfirmResult, setSgConfirmResult] = useState<string | null>(null)
   const semester = useMemo(() => getSemesterLabel(), [])
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   // Load announcements + forms on mount
   useEffect(() => {
@@ -10098,14 +10062,14 @@ function GroupGeneratorWizard({
               <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 12 }}>
                 <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
                 <p style={{ fontSize: 12, color: "var(--body)", margin: "0 0 10px" }}>
-                  Format: <code style={{ fontFamily: "ui-monospace,monospace", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
+                  Format: <code style={{ fontFamily: "var(--mono)", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
                 </p>
                 <textarea
                   value={prevCSVText}
                   onChange={e => setPrevCSVText(e.target.value)}
                   placeholder={"Name,Group\nJane Smith,Group 1\nJohn Doe,Group 2"}
                   rows={6}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream-panel)", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream-panel)", fontSize: 12, fontFamily: "var(--mono)", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
             )}
@@ -11717,7 +11681,7 @@ function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string;
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
       <div>
-        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{eyebrow}</div>
+        <div style={MONO_STYLE}>{eyebrow}</div>
         <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", margin: "4px 0 0", letterSpacing: "-0.015em", lineHeight: 1.15 }}>{title}</h2>
         {sub && <div style={{ fontSize: 13, color: "var(--body)", marginTop: 3 }}>{sub}</div>}
       </div>
@@ -12414,12 +12378,12 @@ function SmallGroupLeadersTab({
                         }}
                       >
                         <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
-                          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
-                          <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginTop: 3 }}>
+                          <p style={{ ...MONO_STYLE, marginTop: 3 }}>
                             {subLabel}
                           </p>
                         </div>
@@ -12685,7 +12649,7 @@ function SmallGroupLeadersTab({
           {/* Semester selector — president/admin only */}
           {isPresident && (
             <div className="flex items-center gap-3">
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Semester</p>
+              <p style={{ ...EYEBROW_STYLE, margin: 0 }}>Semester</p>
               <select
                 value={semester}
                 onChange={e => setSemester(e.target.value)}
@@ -12872,7 +12836,7 @@ function SmallGroupLeadersTab({
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", margin: 0 }}>
+                    <p style={{ ...MONO_STYLE, margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
                     </p>
                   </div>
@@ -12942,7 +12906,7 @@ function SmallGroupLeadersTab({
                               >
                                 <ChevronDown style={{ width: 15, height: 15, color: "var(--body)", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
                                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
-                                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
+                                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
                               </button>
                               {isOpen && (
                                 <div style={{ borderTop: "1px solid #EFE9DA" }}>
