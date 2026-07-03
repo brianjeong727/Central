@@ -231,7 +231,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/pending/page.tsx` | Shown when user's ministry has `status = 'pending'` |
 | `app/pick-ministry/page.tsx` | Multi-ministry switcher |
 | `app/actions/create-group.ts` | Server action: create chat group + add members |
-| `app/actions/ministry.ts` | Server actions: `joinMinistryByCode`, `registerMinistry`, `selfLeaveMinistry` |
+| `app/actions/ministry.ts` | Server actions: `joinMinistryByCode`, `submitMinistryApplication`, `selfLeaveMinistry` |
 | `proxy.ts` | Auth gate middleware — replaces deleted `middleware.ts` |
 | `lib/supabase.ts` | Browser Supabase client (singleton, exports `createClient()`) |
 | `lib/supabase-server.ts` | Server Supabase client |
