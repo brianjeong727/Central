@@ -591,7 +591,12 @@ export interface RoleDescription {
   id: string
   team_id: string
   role_name: string
+  /** Legacy rich-text (HTML) field — kept for backward compat; superseded by summary + responsibilities. */
   description: string
+  /** New: plain-text lead paragraph. */
+  summary: string | null
+  /** New: bulleted responsibility list (jsonb array). */
+  responsibilities: string[]
   updated_by: string | null
   updated_at: string
 }
