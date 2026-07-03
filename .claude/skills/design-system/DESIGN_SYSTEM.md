@@ -212,13 +212,15 @@ padding: 30px 36px 32px
 
 **Status (June 2026):** The plum gradient hero has been retired from all app shell surfaces — team home headers, section headers, event sub-headers, tab headers, and identity cards inside the shell are now cream. Plum remains a surgical accent (CTA button fills, active tab underlines, icon chip backgrounds) but is never a card background, section header, or surface gradient anywhere in the shell. The §4.1 gradient spec is preserved only for rare standalone full-identity moments where the surface genuinely needs to own the room (e.g., a dedicated profile identity card or give-page hero) — never as a default treatment for a section or team.
 
+**Exception — Pastor Pulse slide (June 2026):** exactly ONE scoped plum *surface* is authorized inside the shell: the Pastor Pulse question card when it rides as the lead slide of the home hero carousel (§4.1c). It is a **flat** `--plum-2` fill (never the retired gradient, no dot texture), scoped to that single card, and never repeats. This is the sole sanctioned plum surface in the shell — do not generalize it to any other card, header, or slide.
+
 ### 4.1b Home hero carousel (Phase 2)
 
 The home "Up Next" slot is a manually-advanced carousel of curated slides sharing **one frame identity**. Constant frame elements are always system tokens (never image-derived):
-- **Height:** `--hero-h` (500px) — single source of truth; every slide type reads it, never hardcode per-slide.
+- **Height:** `--hero-h` (375px) — single source of truth; every slide type reads it, never hardcode per-slide.
 - **Radius:** `--r-hero` (18px). **Border:** `1px var(--line-2)`. No drop shadows.
 - **Section eyebrow:** "Featured" + plum dot, `--muted-text`, above the frame (constant).
-- **Chrome:** tall flanking side-pill arrows (54px wide, full frame height, radius `--r-pill-lg`, `--cream-2`/`--line-2`, hover `--ivory`/`--plum-2`, `--dur-fast` transition) + an elongated-dot row below (`--dashed` inactive, `--plum-2` active). Manual advance only — no auto-rotation/motion/swipe. Arrows/dots appear only when >1 slide.
+- **Chrome (bottom nav):** navigation sits **below** the frame — a single centered row of `ChevronLeft` · elongated-dot row · `ChevronRight` (chevrons 24px in `--muted-text`; dots `--dashed` inactive / `--plum-2` active pill). The viewport spans the **full container width** — no side arrows reserving horizontal space, so the eyebrow label no longer offsets for arrows. **Auto-advance:** content slides auto-rotate on a ~7s cadence; rotation pauses on hover/focus, is skipped under `prefers-reduced-motion`, and is fully suppressed while a gated pulse slide holds the lead (§4.1c). Manual prev/next always works. The controls row appears only when >1 slide. *(This superseded the earlier tall flanking side-pill arrows; the arrows moved to the bottom so the card reclaims full width — authorized June 2026 with the pulse-in-carousel work.)*
 
 **Three slide types, one frame** (only the interior differs):
 - **Photo:** full-bleed image; the stored clamped `panel_color` makes a **light mood ramp** — a horizontal clamped-color gradient that fades to transparent by ~70% (**Option A — no solid panel; the photo reads through nearly everywhere**), with a **separate soft radial near-black scrim** anchored to the text for legibility (a true over-photo floor under cream text — never plum/colored, never a dark slab). Static CSS only — no live blur, no per-render image work, SSR-safe. The near-black backdrop/scrim values are kept as inline component constants (one component's internal curve), not global tokens. `panel_color` is computed **once at upload** by a hue-preserving HSL clamp (chroma-weighted dominant hue, near-white/near-black pixels discarded → fixed dark L≈0.13, saturation clamped to a floor/cap; `--plum-deep` fallback only when the image is colorless). Cream caption (with a legibility text-shadow) + cream eyebrow dot.
@@ -230,6 +232,20 @@ The home "Up Next" slot is a manually-advanced carousel of curated slides sharin
 - **Cream over photo:** use `--cream` (opacity for hierarchy); do not introduce a separate over-dark cream value. **Eyebrow dot over photos is `--cream`, never `--gold`** (gold stays avatar-accent-only, §1.2).
 
 **New material:** `backdrop-filter: blur` is allowed **only** on the event glass chip as a contained, surgical material — do not let it proliferate to other surfaces.
+
+### 4.1c Pastor Pulse slide — flat-plum lead slide (scoped exception)
+
+The Pastor Pulse question rides **inside** the home hero carousel as a hosted **lead slide** (index 0), not as a standalone card elsewhere on Home. It renders only for a **non-pastor** viewer with an **active, unanswered** question. It is the one sanctioned plum surface in the shell (see §4.1 Status exception).
+
+- **Card:** flat `--plum-2` fill, `1px solid --plum-deep`, radius `--r-hero`, fills the carousel frame. All text is cream. No gradient, no dot texture, no drop shadow.
+- **Header:** mono eyebrow `Pastor Pulse · {type}` in translucent cream with a solid cream lead dot; a small top-right **`Anonymous`** mono tag (translucent cream). Serif question, 24px/600, cream.
+- **Translucent-cream controls (new control treatment — plum-card only):** interactive controls on the plum card are cream-at-low-opacity **at rest** and **solid `--cream` when chosen** (chosen text flips to `--plum-2`). Express every translucency as `color-mix(in srgb, var(--cream) N%, transparent)` — **never** a raw `rgba()` and never a translucent *plum* fill. This is the only place this treatment is used; it does not replace the standard §4.3 button roles anywhere in cream space.
+  - **Poll** — auto-layout by option length: short options (≤24 chars) → wrapping **chips**; long/sentence options → **stacked rows** with a leading radio dot.
+  - **Scale** — a **1–10 drag slider**: cream track-fill + cream thumb, a value bubble above the thumb, a 1–10 tick row and low/high word anchors. The value is **unset until the user interacts** (thumb rests at mid, bubble hidden, submit dim).
+  - **Open / Prayer** — a translucent-cream textarea; **Prayer** adds a small lock + "Shared privately with the prayer team" privacy line.
+- **Submit:** the §4.3 **hero-invert** primary (cream bg / `--plum-2` text), label "Submit anonymously"; dims to `opacity 0.35` (stays cream — do NOT swap to the cream-2/faint disabled treatment on this dark card) and disables until the answer is valid.
+- **Answered state:** on submit the interior collapses to a centered cream check + "Thanks for sharing." / "Your response was received anonymously.", then the slide **drops out of the carousel** (~2s later) so content slides take the lead.
+- **Gating (peek-past):** the pulse holds the lead and the carousel does **not** auto-rotate away from it, but the viewer **may** manually page to other slides; it stays first until answered, then leaves. (Not a hard block.)
 
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
@@ -397,6 +413,17 @@ The team **Events** section is an **agenda/timeline list** (not a calendar grid 
 **Sub-events disclosure** — events with children (`calendar_events.parent_event_id`) show a plum "Sub-events (N)" toggle (rotating chevron + `--ivory` count pill) that expands an inline panel (max-height transition) of child rows: a mini date, a mini sub-spine, and a small cream sub-card (child title ~15/500 + description + right-aligned mono time). The Up Next event's panel defaults open.
 
 **Past events** — events before today are split out below the upcoming list behind a **collapsed** "Past events (N)" toggle divider (centered mono label + rotating chevron + `--ivory` count pill, flanked by `--line` hairlines). Expanded, past events list **reverse-chronologically** (most recent first, not month-grouped) and **de-emphasized**: `--cream-2` card at `opacity .82` (hover → 1), title `--body`/500, meta `--faint`, a muted date block, and a `--line-2` spine node carrying a small cream "done" check. Each shows an "Ended · {relative}" mono `--faint` label instead of a countdown, and no sub-events disclosure. The toggle defaults open only when there are zero upcoming events (so an all-past list isn't hidden).
+
+### 4.22 Event overview (EventPlanWorkspace overview tab)
+
+The **Overview** tab of an event's plan workspace is a **two-column** layout (`1fr 336px`) shared by all standard team events (worship weeks use their own workspace, not this). Under the serif event title + underline tabs:
+
+**Left column** —
+- **Identity header:** the serif event date + a compact facts list (mono key `Time` / `Where` / `What` + value; empty facts omitted), with an **"Edit event"** outline button (edits the calendar-event identity) — bottom hairline.
+- **Launchpad** ("Jump into planning"): a column of link rows into the event's OWN planning tabs, built dynamically per event template — **Checklist** and **Roles & Leads** always first (each with a metric: a mini `--plum` progress bar + "N / M" for checklist, "N / M assigned" for roles), then one row per the event type's `extraTabs` (Sub-events, New Folks, Acts, Teams, Transport, Program). Each row: ivory icon-chip (plum icon) + serif title + subtitle + right-side metric/arrow; hover → `--plum` border + slight translateX. **No left-border on the primary rows** — they're distinguished by position + the progress metric, not a border (the §8.7 exception is NOT extended here).
+- **Planning notes** (demoted): an editable `--cream-2` box for free-form context.
+
+**Right column** — three stat cards (`--cream`, `--r-callout`): **Expected turnout** (serif number or `—`, click-to-edit), **Budget** (allocated number, click-to-edit; divider; ministry-allocation sub-line or "No ministry budget set"), and **Readiness** (a status dot — `--gold` needs-attention → `--success`/`--sage` ready — + a 5-segment bar + "X of N done · P%", derived from checklist completion).
 
 ---
 

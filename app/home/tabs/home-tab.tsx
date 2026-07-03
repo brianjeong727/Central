@@ -9,7 +9,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
@@ -24,14 +24,6 @@ export { HomeTabProps }
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
 const EYEBROW = EYEBROW_STYLE
-
-
-function pulseTypeLabel(type: string) {
-  if (type === "poll") return "Poll"
-  if (type === "scale") return "1–5 Scale"
-  if (type === "prayer") return "Prayer"
-  return "Open"
-}
 
 // Everything the home tab loads in one round-trip. Held as a single SWR cache
 // object so the tab paints instantly from cache on revisit; RSVP toggles update
@@ -110,7 +102,9 @@ export function HomeTab({
     await supabase.from("congregation_responses").upsert(payload, { onConflict: "question_id,user_id" })
     setPulseSubmitting(false)
     setPulseSubmitted(true)
-    onResponded?.()
+    // Let the "Thanks for sharing" confirmation show in the slide first, THEN flip
+    // hasResponded upstream so the pulse slide drops out of the carousel.
+    setTimeout(() => onResponded?.(), 2200)
   }
 
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
@@ -476,10 +470,26 @@ export function HomeTab({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const pulseAnswered =
-    (activeQuestion?.question_type === "poll" && !pulseOption) ||
-    (activeQuestion?.question_type === "scale" && !pulseScale) ||
-    ((activeQuestion?.question_type === "open" || activeQuestion?.question_type === "prayer") && !pulseInput.trim())
+  // Pastor Pulse rides as the LEAD slide of the hero carousel (PulseSlideCard);
+  // all answer state stays here, the card is purely prop-driven. One node per
+  // breakpoint (both trees are mounted; only CSS hides one).
+  const showPulse = !!activeQuestion && !hasResponded && !isPastorRole
+  const pulseCardProps = showPulse && activeQuestion
+    ? {
+        question: activeQuestion,
+        pulseOption,
+        setPulseOption,
+        pulseScale,
+        setPulseScale,
+        pulseInput,
+        setPulseInput,
+        pulseSubmitting,
+        submitted: pulseSubmitted,
+        onSubmit: handlePulseSubmit,
+      }
+    : null
+  const pulseNodeDesktop = pulseCardProps ? <PulseSlideCard {...pulseCardProps} /> : null
+  const pulseNodeMobile = pulseCardProps ? <PulseSlideCard {...pulseCardProps} mobile /> : null
 
   return (
     <div className="pb-28 md:pb-0">
@@ -558,11 +568,12 @@ export function HomeTab({
         {loading ? (
           <HomeHeroSkeleton />
         ) : (
-          <HeroSectionLabel offsetForArrows={slides.length > 1} breathe />
+          <HeroSectionLabel breathe />
         )}
-        {!loading && (slides.length > 0 ? (
+        {!loading && (slides.length > 0 || pulseNodeDesktop ? (
           <HomeHeroCarousel
             slides={slides}
+            pulseNode={pulseNodeDesktop}
             rsvpedIds={slideRsvpedIds}
             rsvpCounts={slideRsvpCounts}
             rsvpAttendees={slideRsvpAttendees}
@@ -640,110 +651,6 @@ export function HomeTab({
           onSeeAll={onSeeChats}
           style={{ marginTop: "var(--space-8)" }}
         />
-
-        {/* ── Pastor Pulse — desktop ── */}
-        {activeQuestion && !hasResponded && !isPastorRole && (
-          <CentralCard variant="callout" radius="var(--r-callout)" style={{ marginTop: 22 }} padding="28px 32px">
-            {pulseSubmitted ? (
-              <div style={{ textAlign: "center", padding: "16px 0" }}>
-                <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                <CardTitle size={22}>Thanks for sharing.</CardTitle>
-                <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 6 }}>
-                  Your response was received anonymously.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36, alignItems: "start" }}>
-                <div>
-                  <div style={EYEBROW}>
-                    Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
-                  </div>
-                  <CardTitle size={24} style={{ marginTop: 8 }}>
-                    {activeQuestion.question_text}
-                  </CardTitle>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {activeQuestion.question_type === "poll" && activeQuestion.options && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {activeQuestion.options.map((opt, i) => (
-                        <button
-                          key={`${opt}-${i}`}
-                          onClick={() => setPulseOption(opt)}
-                          style={{
-                            padding: "9px 14px",
-                            borderRadius: "var(--r-input)",
-                            border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
-                            background: pulseOption === opt ? "var(--ivory)" : "transparent",
-                            color: pulseOption === opt ? "var(--plum)" : "var(--body)",
-                            fontSize: 14,
-                            fontWeight: pulseOption === opt ? 500 : 400,
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "var(--sans)",
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {activeQuestion.question_type === "scale" && (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          onClick={() => setPulseScale(n)}
-                          style={{
-                            flex: 1,
-                            aspectRatio: "1",
-                            borderRadius: "var(--r-input)",
-                            border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
-                            background: pulseScale === n ? "var(--ivory)" : "transparent",
-                            color: pulseScale === n ? "var(--plum)" : "var(--ink)",
-                            fontSize: 16,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            fontFamily: "var(--sans)",
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
-                    <textarea
-                      value={pulseInput}
-                      onChange={e => setPulseInput(e.target.value)}
-                      placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
-                      rows={3}
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: "var(--r-input)",
-                        border: "1px solid var(--line-2)",
-                        background: "var(--cream-2)",
-                        color: "var(--ink)",
-                        fontSize: 14,
-                        fontFamily: "var(--sans)",
-                        resize: "none",
-                        boxSizing: "border-box",
-                        outline: "none",
-                      }}
-                    />
-                  )}
-                  <CentralButton
-                    onClick={handlePulseSubmit}
-                    disabled={pulseSubmitting || pulseAnswered}
-                    style={{ justifyContent: "center" }}
-                  >
-                    {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                  </CentralButton>
-                </div>
-              </div>
-            )}
-          </CentralCard>
-        )}
 
         {/* ── For You section — desktop ── */}
         {forYouItems.length > 0 && (
@@ -936,9 +843,10 @@ export function HomeTab({
                 card area skeletons (label lives in the real header, so hide it). */}
             {loading ? (
               <HomeHeroSkeleton showLabel={false} />
-            ) : slides.length > 0 ? (
+            ) : slides.length > 0 || pulseNodeMobile ? (
               <HomeHeroCarousel
                 slides={slides}
+                pulseNode={pulseNodeMobile}
                 mobile
                 rsvpedIds={slideRsvpedIds}
                 rsvpCounts={slideRsvpCounts}
@@ -991,110 +899,6 @@ export function HomeTab({
               </CentralCard>
             )}
           </section>
-
-          {/* ── Pastor Pulse — mobile ── */}
-          {activeQuestion && !hasResponded && !isPastorRole && (
-            <section>
-              {pulseSubmitted ? (
-                <CentralCard variant="callout" padding="24px" style={{ textAlign: "center" }}>
-                  <div style={{ ...EYEBROW, marginBottom: 8 }}>Response received</div>
-                  <CardTitle size={20}>Thanks for sharing.</CardTitle>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 6, fontFamily: "var(--sans)" }}>
-                    Your response was received anonymously.
-                  </p>
-                </CentralCard>
-              ) : (
-                <CentralCard variant="callout" padding="24px">
-                  <div style={EYEBROW}>
-                    Pastor Pulse · {pulseTypeLabel(activeQuestion.question_type)}
-                  </div>
-                  <CardTitle size={22} style={{ margin: "8px 0 14px" }}>
-                    {activeQuestion.question_text}
-                  </CardTitle>
-
-                  {activeQuestion.question_type === "poll" && activeQuestion.options && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {activeQuestion.options.map((opt, i) => (
-                        <button
-                          key={`${opt}-${i}`}
-                          onClick={() => setPulseOption(opt)}
-                          style={{
-                            padding: "10px 14px",
-                            borderRadius: "var(--r-input)",
-                            border: `1.5px solid ${pulseOption === opt ? "var(--plum)" : "var(--line-2)"}`,
-                            background: pulseOption === opt ? "var(--ivory)" : "transparent",
-                            color: pulseOption === opt ? "var(--plum)" : "var(--body)",
-                            fontSize: 14,
-                            fontWeight: pulseOption === opt ? 500 : 400,
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontFamily: "var(--sans)",
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeQuestion.question_type === "scale" && (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          onClick={() => setPulseScale(n)}
-                          style={{
-                            flex: 1,
-                            aspectRatio: "1",
-                            borderRadius: "var(--r-input)",
-                            border: `1.5px solid ${pulseScale === n ? "var(--plum)" : "var(--line-2)"}`,
-                            background: pulseScale === n ? "var(--ivory)" : "transparent",
-                            color: pulseScale === n ? "var(--plum)" : "var(--ink)",
-                            fontSize: 16,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            fontFamily: "var(--sans)",
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {(activeQuestion.question_type === "open" || activeQuestion.question_type === "prayer") && (
-                    <textarea
-                      value={pulseInput}
-                      onChange={e => setPulseInput(e.target.value)}
-                      placeholder={activeQuestion.question_type === "prayer" ? "Share your prayer request…" : "Share your thoughts…"}
-                      rows={3}
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: "var(--r-input)",
-                        border: "1px solid var(--line-2)",
-                        background: "var(--cream-2)",
-                        color: "var(--ink)",
-                        fontSize: 14,
-                        fontFamily: "var(--sans)",
-                        resize: "none",
-                        boxSizing: "border-box",
-                        outline: "none",
-                      }}
-                    />
-                  )}
-
-                  <CentralButton
-                    onClick={handlePulseSubmit}
-                    disabled={pulseSubmitting || pulseAnswered}
-                    style={{ marginTop: 12, width: "100%", justifyContent: "center" }}
-                  >
-                    {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
-                  </CentralButton>
-                </CentralCard>
-              )}
-            </section>
-          )}
 
           {/* ── For You — mobile ── */}
           {forYouItems.length > 0 && (
