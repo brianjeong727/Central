@@ -10,7 +10,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
-  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle,
+  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -1606,147 +1606,499 @@ export function StudentOrgTeamHome({
 
 // ── RotationsTab ──────────────────────────────────────────────────────────────
 type CCSFRotationType = "lockup" | "sunday_lunch_prayer"
-interface CCSFRotation {
+const ROTATION_TYPES: { type: CCSFRotationType; label: string }[] = [
+  { type: "lockup", label: "Lock-up" },
+  { type: "sunday_lunch_prayer", label: "Sunday Lunch Prayer" },
+]
+const WEEKDAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+interface RotationSlot {
   id: string
   rotation_type: CCSFRotationType
   assigned_to: string | null
   assigned_name?: string
   week_date: string
-  notes: string | null
+}
+interface RotationSemester {
+  id: string
+  name: string
+  start_date: string
+  end_date: string
+}
+
+// Local YMD (avoids UTC-shift from toISOString on local dates)
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+// All dates in [start, end] falling on `weekday` (0=Sun..6=Sat)
+function datesForWeekday(startStr: string, endStr: string, weekday: number): string[] {
+  const out: string[] = []
+  const d = new Date(startStr + "T12:00:00")
+  const end = new Date(endStr + "T12:00:00")
+  while (d.getDay() !== weekday && d <= end) d.setDate(d.getDate() + 1)
+  while (d <= end) {
+    out.push(ymd(d))
+    d.setDate(d.getDate() + 7)
+  }
+  return out
+}
+function shortMonthDay(dateStr: string): string {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+function shortDow(dateStr: string): string {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })
+}
+
+// Small circular initials avatar. `mine` → plum fill; else neutral ivory.
+function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 22, height: 22, borderRadius: 999, flexShrink: 0,
+        fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.02em",
+        background: mine ? "var(--plum)" : "var(--ivory)",
+        color: mine ? "var(--cream-on-dark)" : "var(--body)",
+        border: mine ? "1px solid transparent" : "1px solid var(--line-2)",
+      }}
+    >
+      {getInitials(name)}
+    </span>
+  )
 }
 
 function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   teamId: string; ministryId: string; userId: string; canEdit: boolean
 }) {
   const supabase = createClient()
-  const [rotations, setRotations] = useState<CCSFRotation[]>([])
-  const [roster, setRoster] = useState<{ user_id: string; name: string }[]>([])
+  const [semesters, setSemesters] = useState<RotationSemester[]>([])
+  const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
+  const [slots, setSlots] = useState<RotationSlot[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [slotsLoading, setSlotsLoading] = useState(false)
 
-  const ROTATION_TYPES: { type: CCSFRotationType; label: string }[] = [
-    { type: "lockup", label: "Lock-up" },
-    { type: "sunday_lunch_prayer", label: "Sunday Lunch Prayer" },
-  ]
+  const [confirmSlot, setConfirmSlot] = useState<RotationSlot | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const [showNewSemester, setShowNewSemester] = useState(false)
 
-  // Generate upcoming Sundays (next 8 weeks)
-  const upcomingSundays = useMemo(() => {
-    const sundays: string[] = []
-    const d = new Date()
-    d.setDate(d.getDate() - d.getDay()) // start from this Sunday
-    for (let i = 0; i < 8; i++) {
-      sundays.push(d.toISOString().split("T")[0])
-      d.setDate(d.getDate() + 7)
+  const loadSemesters = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from("rotation_semesters")
+      .select("id, name, start_date, end_date")
+      .eq("ministry_id", ministryId)
+      .eq("team_id", teamId)
+      .order("start_date", { ascending: false })
+    const rows = (data ?? []) as RotationSemester[]
+    setSemesters(rows)
+    setActiveSemesterId(prev => (prev && rows.some(s => s.id === prev) ? prev : rows[0]?.id ?? null))
+    setLoading(false)
+  }, [supabase, ministryId, teamId])
+
+  const loadSlots = useCallback(async (semesterId: string | null) => {
+    if (!semesterId) { setSlots([]); return }
+    setSlotsLoading(true)
+    const { data } = await supabase
+      .from("ccsf_rotations")
+      .select("id, rotation_type, assigned_to, week_date")
+      .eq("semester_id", semesterId)
+      .order("week_date", { ascending: true })
+    const rows = (data ?? []) as RotationSlot[]
+    const ids = [...new Set(rows.map(r => r.assigned_to).filter(Boolean))] as string[]
+    let nameMap = new Map<string, string>()
+    if (ids.length > 0) {
+      const { data: pData } = await supabase.from("profiles").select("id, name").in("id", ids)
+      nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
     }
-    return sundays
-  }, [])
+    setSlots(rows.map(r => ({ ...r, assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) : undefined })))
+    setSlotsLoading(false)
+  }, [supabase])
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
+  useEffect(() => { loadSemesters() }, [loadSemesters])
+  useEffect(() => { loadSlots(activeSemesterId) }, [activeSemesterId, loadSlots])
 
-      // Fetch roster: get user_ids from team_members, then names from profiles
-      const { data: memberRows } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", teamId)
-      const userIds = (memberRows ?? []).map((m: { user_id: string }) => m.user_id)
-      if (userIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from("profiles")
-          .select("id, name")
-          .in("id", userIds)
-          .order("name")
-        setRoster((profileRows ?? []).map((p: { id: string; name: string }) => ({ user_id: p.id, name: p.name })))
-      }
-
-      const { data } = await supabase
-        .from("ccsf_rotations")
-        .select("id, rotation_type, assigned_to, week_date, notes")
-        .eq("team_id", teamId)
-        .eq("ministry_id", ministryId)
-        .in("week_date", upcomingSundays)
-      const profileIds = [...new Set((data ?? []).map((r: { assigned_to: string | null }) => r.assigned_to).filter(Boolean))] as string[]
-      let nameMap = new Map<string, string>()
-      if (profileIds.length > 0) {
-        const { data: pData } = await supabase.from("profiles").select("id, name").in("id", profileIds)
-        nameMap = new Map((pData ?? []).map((p: { id: string; name: string }) => [p.id, p.name]))
-      }
-      setRotations((data ?? []).map((r: CCSFRotation) => ({ ...r, assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) : undefined })))
-      setLoading(false)
+  // Claim an open slot or drop your own — mutates only assigned_to.
+  // RLS only permits writing an OPEN or your-own slot; if the write hit 0 rows
+  // (someone raced us / stale state) `.select()` returns nothing → resync from DB
+  // instead of keeping a phantom optimistic change.
+  async function confirmClaimOrDrop() {
+    if (!confirmSlot) return
+    const slot = confirmSlot
+    const isMine = slot.assigned_to === userId
+    setConfirmBusy(true)
+    const nextAssigned = isMine ? null : userId
+    const { data, error } = await supabase
+      .from("ccsf_rotations")
+      .update({ assigned_to: nextAssigned })
+      .eq("id", slot.id)
+      .eq("ministry_id", ministryId)
+      .select()
+    setConfirmBusy(false)
+    if (error) return
+    if (!data || data.length === 0) {
+      // rejected / no-op — reconcile with the DB and close.
+      await loadSlots(activeSemesterId)
+      setConfirmSlot(null)
+      return
     }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, ministryId])
-
-  async function handleAssign(rotationType: CCSFRotationType, weekDate: string, userId: string | null) {
-    const key = `${rotationType}::${weekDate}`
-    setSaving(key)
-    const existing = rotations.find(r => r.rotation_type === rotationType && r.week_date === weekDate)
-    if (userId === null) {
-      if (existing) {
-        await supabase.from("ccsf_rotations").delete().eq("id", existing.id)
-        setRotations(prev => prev.filter(r => r.id !== existing.id))
-      }
-    } else {
-      const assignedName = roster.find(m => m.user_id === userId)?.name
-      if (existing) {
-        await supabase.from("ccsf_rotations").update({ assigned_to: userId }).eq("id", existing.id)
-        setRotations(prev => prev.map(r => r.id === existing.id ? { ...r, assigned_to: userId, assigned_name: assignedName } : r))
-      } else {
-        const { data } = await supabase.from("ccsf_rotations").insert({ team_id: teamId, ministry_id: ministryId, rotation_type: rotationType, assigned_to: userId, week_date: weekDate }).select().single()
-        if (data) setRotations(prev => [...prev, { ...data as CCSFRotation, assigned_name: assignedName }])
-      }
-    }
-    setSaving(null)
+    setSlots(prev => prev.map(s => s.id === slot.id
+      ? { ...s, assigned_to: nextAssigned, assigned_name: nextAssigned ? s.assigned_name : undefined }
+      : s))
+    setConfirmSlot(null)
   }
 
-  function getAssignment(rotationType: CCSFRotationType, weekDate: string) {
-    return rotations.find(r => r.rotation_type === rotationType && r.week_date === weekDate)
+  async function createSemester(name: string, start: string, end: string, configs: { type: CCSFRotationType; enabled: boolean; weekday: number }[]) {
+    const { data: sem, error } = await supabase
+      .from("rotation_semesters")
+      .insert({ ministry_id: ministryId, team_id: teamId, name, start_date: start, end_date: end, created_by: userId })
+      .select("id, name, start_date, end_date")
+      .single()
+    if (error || !sem) return
+    const rows: { ministry_id: string; team_id: string; semester_id: string; rotation_type: CCSFRotationType; week_date: string; assigned_to: null }[] = []
+    for (const cfg of configs.filter(c => c.enabled)) {
+      for (const d of datesForWeekday(start, end, cfg.weekday)) {
+        rows.push({ ministry_id: ministryId, team_id: teamId, semester_id: sem.id, rotation_type: cfg.type, week_date: d, assigned_to: null })
+      }
+    }
+    if (rows.length > 0) await supabase.from("ccsf_rotations").insert(rows)
+    setShowNewSemester(false)
+    await loadSemesters()
+    setActiveSemesterId(sem.id)
   }
-
-  const todayStr = new Date().toISOString().split("T")[0]
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
 
+  const groups = ROTATION_TYPES
+    .map(rt => ({ ...rt, slots: slots.filter(s => s.rotation_type === rt.type) }))
+    .filter(g => g.slots.length > 0)
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      {ROTATION_TYPES.map(({ type, label }) => (
-        <div key={type}>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>{label}</p>
-          <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
-            {upcomingSundays.map((weekDate, i) => {
-              const assignment = getAssignment(type, weekDate)
-              const key = `${type}::${weekDate}`
-              const isToday = weekDate === todayStr
-              const dateLabel = new Date(weekDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      {/* ── Semester bar ── */}
+      {semesters.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+            {semesters.map(sem => {
+              const active = sem.id === activeSemesterId
               return (
-                <div key={weekDate} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderTop: i ? "1px solid #F0EBE0" : undefined, background: isToday ? "#F9F6FF" : undefined }}>
-                  <div style={{ width: 96, flexShrink: 0 }}>
-                    <p style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 400, color: isToday ? "var(--plum)" : "var(--body)" }}>{dateLabel}</p>
-                    {isToday && <p style={{ fontSize: 10.5, color: "var(--muted-text)", marginTop: 1 }}>This week</p>}
-                  </div>
-                  {canEdit ? (
-                    <select
-                      value={assignment?.assigned_to ?? ""}
-                      disabled={saving === key}
-                      onChange={e => handleAssign(type, weekDate, e.target.value || null)}
-                      style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", border: "none", outline: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      <option value="">— Unassigned —</option>
-                      {roster.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-                    </select>
-                  ) : (
-                    <span style={{ flex: 1, fontSize: 13, color: assignment?.assigned_to ? "var(--ink)" : "#C4C4C4", fontFamily: "inherit" }}>
-                      {assignment?.assigned_name ?? "— Unassigned —"}
-                    </span>
-                  )}
-                </div>
+                <button
+                  key={sem.id}
+                  onClick={() => setActiveSemesterId(sem.id)}
+                  style={{
+                    display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+                    padding: "7px 14px", borderRadius: 11, cursor: "pointer",
+                    background: active ? "var(--ivory)" : "transparent",
+                    border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
+                    fontFamily: "var(--sans)", textAlign: "left",
+                    transition: "border-color 150ms, background-color 150ms",
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
+                  <span style={{ fontSize: 10.5, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
+                </button>
               )
             })}
           </div>
+          {canEdit && (
+            <button
+              onClick={() => setShowNewSemester(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, flexShrink: 0 }}
+            >
+              <Plus className="w-4 h-4" /> New semester
+            </button>
+          )}
         </div>
-      ))}
+      )}
+
+      {/* ── No semesters at all ── */}
+      {semesters.length === 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <EmptyState
+            icon={<Calendar className="w-6 h-6" />}
+            title="No rotation semesters yet."
+            subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
+          />
+          {canEdit && (
+            <button
+              onClick={() => setShowNewSemester(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500 }}
+            >
+              <Plus className="w-4 h-4" /> New semester
+            </button>
+          )}
+        </div>
+      ) : slotsLoading ? (
+        <div style={{ textAlign: "center", padding: "24px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          icon={<ClipboardList className="w-6 h-6" />}
+          title="No slots in this semester."
+          subtitle={canEdit ? "This semester has no rotations. Create a new one to add slots." : "Nothing to sign up for here yet."}
+        />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+          {groups.map(group => {
+            const total = group.slots.length
+            const filled = group.slots.filter(s => s.assigned_to).length
+            const weekdayName = WEEKDAY_LONG[new Date(group.slots[0].week_date + "T12:00:00").getDay()]
+            const pct = total ? Math.round((filled / total) * 100) : 0
+            return (
+              <div key={group.type}>
+                {/* header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                  <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+                    {group.label} · {weekdayName}s
+                  </p>
+                  <span style={{ fontFamily: "var(--sans)", fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
+                    {filled} of {total} filled
+                  </span>
+                  <div style={{ flex: 1, minWidth: 80, height: 5, borderRadius: 999, background: "var(--line-2)", overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: "var(--plum)", borderRadius: 999, transition: "width 200ms" }} />
+                  </div>
+                </div>
+                {/* slot grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }} className="max-md:!grid-cols-1">
+                  {group.slots.map(slot => (
+                    <RotationSlotCell key={slot.id} slot={slot} userId={userId} onClick={() => setConfirmSlot(slot)} />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Claim / Drop confirm modal ── */}
+      {confirmSlot && (() => {
+        const isMine = confirmSlot.assigned_to === userId
+        const label = ROTATION_TYPES.find(r => r.type === confirmSlot.rotation_type)?.label ?? ""
+        const dateLine = new Date(confirmSlot.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+        return (
+          <div
+            onClick={() => { if (!confirmBusy) setConfirmSlot(null) }}
+            onKeyDown={e => { if (e.key === "Escape" && !confirmBusy) setConfirmSlot(null) }}
+            style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 34%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ width: "100%", maxWidth: 380, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "24px 26px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
+            >
+              <h3 style={{ fontFamily: "var(--sans)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0 }}>
+                {isMine ? "Drop this slot?" : "Take this slot?"}
+              </h3>
+              {/* slot detail card */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "12px 14px", background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+                  <Calendar className="w-4 h-4" />
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{label}</p>
+                  <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                <button
+                  onClick={() => setConfirmSlot(null)}
+                  disabled={confirmBusy}
+                  style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: confirmBusy ? "default" : "pointer", padding: "8px 10px" }}
+                >
+                  {isMine ? "Keep it" : "Cancel"}
+                </button>
+                {isMine ? (
+                  <button
+                    onClick={confirmClaimOrDrop}
+                    disabled={confirmBusy}
+                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--danger)", background: "transparent", border: "1px solid var(--danger)", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
+                  >
+                    {confirmBusy ? "Dropping…" : "Drop it"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={confirmClaimOrDrop}
+                    disabled={confirmBusy}
+                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
+                  >
+                    {confirmBusy ? "Signing up…" : "Yes, sign me up"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── New semester modal ── */}
+      {showNewSemester && (
+        <NewSemesterModal
+          onClose={() => setShowNewSemester(false)}
+          onCreate={createSemester}
+        />
+      )}
+    </div>
+  )
+}
+
+// A single sign-up slot cell. Claimable = open, or your own.
+function RotationSlotCell({ slot, userId, onClick }: {
+  slot: RotationSlot; userId: string; onClick: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const isOpen = !slot.assigned_to
+  const isMine = slot.assigned_to === userId
+  const claimable = isOpen || isMine
+
+  const border = isMine
+    ? "1px solid var(--plum)"
+    : isOpen
+    ? "1px dashed var(--dashed)"
+    : "1px solid var(--line-2)"
+  const bg = isMine ? "var(--cream-3)" : isOpen ? "var(--cream-2)" : "var(--cream)"
+
+  return (
+    <button
+      onClick={claimable ? onClick : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      disabled={!claimable}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+        padding: "11px 14px", borderRadius: 11, background: bg,
+        border: claimable && hover && !isMine ? "1px solid var(--dashed)" : border,
+        cursor: claimable ? "pointer" : "default",
+        transition: "border-color 150ms, background-color 150ms",
+      }}
+    >
+      {/* date */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }}>{shortDow(slot.week_date)}</span>
+        <span style={{ fontFamily: "var(--sans)", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
+      </div>
+      {/* status */}
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+        {isOpen ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>
+            <PlusCircle className="w-4 h-4" /> Open
+          </span>
+        ) : isMine ? (
+          <>
+            <RotationAvatar name="You" mine />
+            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>You</span>
+          </>
+        ) : (
+          <>
+            <RotationAvatar name={slot.assigned_name ?? "?"} mine={false} />
+            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.assigned_name ?? "Assigned"}</span>
+          </>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// New-semester creation modal — name, dates, and a per-rotation run/weekday picker.
+function NewSemesterModal({ onClose, onCreate }: {
+  onClose: () => void
+  onCreate: (name: string, start: string, end: string, configs: { type: CCSFRotationType; enabled: boolean; weekday: number }[]) => Promise<void>
+}) {
+  const [name, setName] = useState("")
+  const [start, setStart] = useState("")
+  const [end, setEnd] = useState("")
+  const [configs, setConfigs] = useState<{ type: CCSFRotationType; enabled: boolean; weekday: number }[]>(
+    ROTATION_TYPES.map(rt => ({ type: rt.type, enabled: true, weekday: 0 }))
+  )
+  const [busy, setBusy] = useState(false)
+
+  const anyRotation = configs.some(c => c.enabled)
+  const validDates = start !== "" && end !== "" && start <= end
+  const canCreate = name.trim() !== "" && validDates && anyRotation && !busy
+
+  async function submit() {
+    if (!canCreate) return
+    setBusy(true)
+    await onCreate(name.trim(), start, end, configs)
+    setBusy(false)
+  }
+
+  const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const inputStyle: React.CSSProperties = { marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--sans)" }
+
+  return (
+    <div
+      onClick={() => { if (!busy) onClose() }}
+      onKeyDown={e => { if (e.key === "Escape" && !busy) onClose() }}
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 34%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "26px 28px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <p style={{ ...labelStyle, margin: 0 }}>Rotations</p>
+            <h3 style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 600, color: "var(--ink)", margin: "5px 0 0" }}>New semester</h3>
+          </div>
+          <button onClick={() => { if (!busy) onClose() }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--muted-text)", flexShrink: 0 }}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+          <label style={{ display: "block" }}>
+            <span style={labelStyle}>Semester name</span>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" style={inputStyle} />
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
+            <label style={{ display: "block" }}>
+              <span style={labelStyle}>Starts</span>
+              <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
+            </label>
+            <label style={{ display: "block" }}>
+              <span style={labelStyle}>Ends</span>
+              <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
+            </label>
+          </div>
+          {!validDates && start !== "" && end !== "" && (
+            <p style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--danger)", margin: 0 }}>End date must be on or after the start date.</p>
+          )}
+
+          {/* rotation picker */}
+          <div>
+            <span style={labelStyle}>Rotations</span>
+            <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 8 }}>
+              {configs.map((cfg, i) => {
+                const label = ROTATION_TYPES.find(r => r.type === cfg.type)?.label ?? ""
+                return (
+                  <div key={cfg.type} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: cfg.enabled ? "var(--cream-2)" : "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 11 }}>
+                    <button
+                      onClick={() => setConfigs(prev => prev.map((c, j) => j === i ? { ...c, enabled: !c.enabled } : c))}
+                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: 6, flexShrink: 0, cursor: "pointer", background: cfg.enabled ? "var(--plum)" : "transparent", border: cfg.enabled ? "1px solid var(--plum)" : "1px solid var(--line-2)", color: "var(--cream-on-dark)" }}
+                    >
+                      {cfg.enabled && <Check className="w-3 h-3" />}
+                    </button>
+                    <span style={{ flex: 1, fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: cfg.enabled ? "var(--ink)" : "var(--muted-text)", minWidth: 0 }}>{label}</span>
+                    <select
+                      value={cfg.weekday}
+                      disabled={!cfg.enabled}
+                      onChange={e => setConfigs(prev => prev.map((c, j) => j === i ? { ...c, weekday: Number(e.target.value) } : c))}
+                      style={{ fontFamily: "var(--sans)", fontSize: 13, color: cfg.enabled ? "var(--ink)" : "var(--muted-text)", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 8, padding: "6px 8px", cursor: cfg.enabled ? "pointer" : "default", outline: "none" }}
+                    >
+                      {WEEKDAY_LONG.map((w, wi) => <option key={wi} value={wi}>{w}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
+          <button onClick={() => { if (!busy) onClose() }} disabled={busy} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: busy ? "default" : "pointer", padding: "9px 12px" }}>Cancel</button>
+          <button onClick={submit} disabled={!canCreate} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "9px 18px", cursor: canCreate ? "pointer" : "default", opacity: canCreate ? 1 : 0.5 }}>
+            {busy ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
